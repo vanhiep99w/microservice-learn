@@ -39,21 +39,23 @@
 
 ```mermaid
 graph LR
-    A[1. Overview<br/>Monolith vs Microservice] --> B[2. Decomposition<br/>Strategies]
-    B --> C[3. Communication<br/>REST / gRPC / MQ]
-    C --> D[4. API Gateway<br/>& BFF]
-    C --> E[5. Service<br/>Discovery]
-    D --> F[6. Data<br/>Management]
+    A[1. Overview<br/>Monolith vs Microservice] --> A2[2. SRP &<br/>Bounded Context]
+    A2 --> B[3. Decomposition<br/>Strategies]
+    B --> C[4. Communication<br/>REST / gRPC / MQ]
+    C --> D[5. API Gateway<br/>& BFF]
+    C --> E[6. Service<br/>Discovery]
+    D --> F[7. Data<br/>Management]
     E --> F
-    F --> G[7. Resilience<br/>Patterns]
-    G --> H[8. Observability<br/>Logs / Metrics / Traces]
-    H --> I[9. Containerization<br/>Docker]
-    I --> J[10. Orchestration<br/>Kubernetes]
-    J --> K[11. CI/CD<br/>Deployment]
-    K --> L[12. Security<br/>OAuth2 / mTLS]
-    L --> M[13. Design Patterns<br/>Tổng hợp]
+    F --> G[8. Resilience<br/>Patterns]
+    G --> H[9. Observability<br/>Logs / Metrics / Traces]
+    H --> I[10. Containerization<br/>Docker]
+    I --> J[11. Orchestration<br/>Kubernetes]
+    J --> K[12. CI/CD<br/>Deployment]
+    K --> L[13. Security<br/>OAuth2 / mTLS]
+    L --> M[14. Design Patterns<br/>Tổng hợp]
 
     style A fill:#4CAF50,color:#fff
+    style A2 fill:#4CAF50,color:#fff
     style B fill:#4CAF50,color:#fff
     style C fill:#2196F3,color:#fff
     style D fill:#2196F3,color:#fff
@@ -75,53 +77,54 @@ graph LR
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
 | 01 | [Microservice Overview](docs/01-microservice-overview.md) | Microservice là gì, Monolith vs Microservice vs SOA, ưu/nhược điểm | ✅ |
-| 02 | [Decomposition Strategies](docs/02-decomposition-strategies.md) | Phân tách service theo Business Capability, DDD, Strangler Fig | ⬜ |
+| 02 | [Single Responsibility & Bounded Context](docs/02-single-responsibility-bounded-context.md) | SRP trong Microservice, Bounded Context (DDD), cách xác định ranh giới service | ✅ |
+| 03 | [Decomposition Strategies](docs/03-decomposition-strategies.md) | Phân tách service theo Business Capability, DDD, Strangler Fig | ⬜ |
 
 ## 2. Communication & Integration
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 03 | [Inter-Service Communication](docs/03-inter-service-communication.md) | REST vs gRPC vs GraphQL, Sync vs Async, Event-Driven | ⬜ |
-| 04 | [API Gateway](docs/04-api-gateway.md) | API Gateway Pattern, BFF, Rate Limiting, Load Balancing | ⬜ |
-| 05 | [Service Discovery](docs/05-service-discovery.md) | Client-side vs Server-side, Consul, Eureka, DNS-based | ⬜ |
+| 04 | [Inter-Service Communication](docs/04-inter-service-communication.md) | REST vs gRPC vs GraphQL, Sync vs Async, Event-Driven | ⬜ |
+| 05 | [API Gateway](docs/05-api-gateway.md) | API Gateway Pattern, BFF, Rate Limiting, Load Balancing | ⬜ |
+| 06 | [Service Discovery](docs/06-service-discovery.md) | Client-side vs Server-side, Consul, Eureka, DNS-based | ⬜ |
 
 ## 3. Data Management
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 06 | [Data Management](docs/06-data-management.md) | Database per Service, Saga, CQRS, Event Sourcing, CAP Theorem | ⬜ |
+| 07 | [Data Management](docs/07-data-management.md) | Database per Service, Saga, CQRS, Event Sourcing, CAP Theorem | ⬜ |
 
 ## 4. Resilience & Reliability
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 07 | [Resilience Patterns](docs/07-resilience-patterns.md) | Circuit Breaker, Retry, Bulkhead, Rate Limiter, Fallback | ⬜ |
+| 08 | [Resilience Patterns](docs/08-resilience-patterns.md) | Circuit Breaker, Retry, Bulkhead, Rate Limiter, Fallback | ⬜ |
 
 ## 5. Observability
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 08 | [Observability](docs/08-observability.md) | Logs, Metrics, Traces, ELK, Prometheus, Grafana, Jaeger | ⬜ |
+| 09 | [Observability](docs/09-observability.md) | Logs, Metrics, Traces, ELK, Prometheus, Grafana, Jaeger | ⬜ |
 
 ## 6. Deployment & Infrastructure
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 09 | [Containerization](docs/09-containerization.md) | Docker, Docker Compose, multi-stage build, best practices | ⬜ |
-| 10 | [Orchestration](docs/10-orchestration.md) | Kubernetes, Service Mesh (Istio/Linkerd), Helm Charts | ⬜ |
-| 11 | [CI/CD & Deployment](docs/11-cicd-deployment.md) | Pipeline, Blue-Green, Canary, Rolling, GitOps | ⬜ |
+| 10 | [Containerization](docs/10-containerization.md) | Docker, Docker Compose, multi-stage build, best practices | ⬜ |
+| 11 | [Orchestration](docs/11-orchestration.md) | Kubernetes, Service Mesh (Istio/Linkerd), Helm Charts | ⬜ |
+| 12 | [CI/CD & Deployment](docs/12-cicd-deployment.md) | Pipeline, Blue-Green, Canary, Rolling, GitOps | ⬜ |
 
 ## 7. Security
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 12 | [Security](docs/12-security.md) | OAuth2, JWT, mTLS, API Security, Zero Trust | ⬜ |
+| 13 | [Security](docs/13-security.md) | OAuth2, JWT, mTLS, API Security, Zero Trust | ⬜ |
 
 ## 8. Design Patterns tổng hợp
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 13 | [Design Patterns](docs/13-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ⬜ |
+| 14 | [Design Patterns](docs/14-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ⬜ |
 
 ---
 
@@ -195,4 +198,4 @@ Mỗi tài liệu đều có:
 
 ---
 
-> 💡 **Tip**: Đọc theo thứ tự từ 01 → 13 để có lộ trình học tập tốt nhất!
+> 💡 **Tip**: Đọc theo thứ tự từ 01 → 14 để có lộ trình học tập tốt nhất!

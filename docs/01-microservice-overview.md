@@ -17,6 +17,7 @@
   - [Ví dụ cụ thể: Luồng "Tạo đơn hàng" trong SOA](#ví-dụ-cụ-thể-luồng-tạo-đơn-hàng-trong-soa)
   - [Vấn đề của SOA — Tại sao cần Microservice?](#vấn-đề-của-soa--tại-sao-cần-microservice)
   - [Tóm lại: SOA dễ hiểu qua phép ẩn dụ](#tóm-lại-soa-dễ-hiểu-qua-phép-ẩn-dụ)
+  - [Hiểu lầm thường gặp: "SOA chỉ là Microservice + Orchestrator?"](#hiểu-lầm-thường-gặp-soa-chỉ-là-microservice--orchestrator)
 - [SOA vs Microservice — Bảng so sánh](#soa-vs-microservice--bảng-so-sánh)
 - [So sánh tổng hợp: Monolith vs SOA vs Microservice](#so-sánh-tổng-hợp-monolith-vs-soa-vs-microservice)
 - [Khi nào nên dùng Microservice?](#khi-nào-nên-dùng-microservice)
@@ -48,12 +49,12 @@
 
 ```
 ┌─────────────────────────────────────────────────┐
-│                MONOLITHIC APP                    │
+│                MONOLITHIC APP                   │
 │                                                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐│
-│  │    UI    │ │ Business │ │  Data Access     ││
-│  │  Layer   │ │  Logic   │ │    Layer         ││
-│  └──────────┘ └──────────┘ └──────────────────┘│
+│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐ │
+│  │    UI    │ │ Business │ │  Data Access     │ │
+│  │  Layer   │ │  Logic   │ │    Layer         │ │
+│  └──────────┘ └──────────┘ └──────────────────┘ │
 │                                                 │
 │  ┌─────────────────────────────────────────────┐│
 │  │         Shared Database                     ││
@@ -97,16 +98,16 @@
 ## Kiến trúc Microservice
 
 ```
-┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
-│ User     │  │ Order    │  │ Product  │  │ Payment  │
-│ Service  │  │ Service  │  │ Service  │  │ Service  │
-│          │  │          │  │          │  │          │
-│ ┌──────┐ │  │ ┌──────┐ │  │ ┌──────┐ │  │ ┌──────┐ │
-│ │ DB 1 │ │  │ │ DB 2 │ │  │ │ DB 3 │ │  │ │ DB 4 │ │
-│ └──────┘ │  │ └──────┘ │  │ └──────┘ │  │ └──────┘ │
-└────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘
-     │              │              │              │
-─────┴──────────────┴──────────────┴──────────────┴─────
+┌──────────┐  ┌───────────┐  ┌──────────┐  ┌──────────┐
+│ User     │  │ Order     │  │ Product  │  │ Payment  │
+│ Service  │  │ Service   │  │ Service  │  │ Service  │
+│          │  │           │  │          │  │          │
+│ ┌──────┐ │  │ ┌──────┐  │  │ ┌──────┐ │  │ ┌──────┐ │
+│ │ DB 1 │ │  │ │ DB 2 │  │  │ │ DB 3 │ │  │ │ DB 4 │ │
+│ └──────┘ │  │ └──────┘  │  │ └──────┘ │  │ └──────┘ │
+└────┬─────┘  └─────┬─────┘  └─────┬────┘  └─────┬────┘
+     │              │              │             │
+─────┴──────────────┴──────────────┴─────────────┴─────
               API Gateway / Message Bus
 ```
 
@@ -145,6 +146,38 @@
 ## SOA là gì? (Service-Oriented Architecture)
 
 **SOA** (Service-Oriented Architecture — kiến trúc hướng dịch vụ) là một kiến trúc phần mềm xuất hiện từ **đầu những năm 2000**, chủ yếu được dùng trong các **doanh nghiệp lớn** (ngân hàng, bảo hiểm, viễn thông...).
+
+### Dòng thời gian: SOA ra đời trước Microservice
+
+```
+Timeline kiến trúc phần mềm:
+═══════════════════════════════════════════════════════════════
+
+~1990s ──── Monolithic Architecture
+            │  Tất cả trong 1 cục, deploy 1 lần
+            │
+~2000-2005 ── SOA ra đời
+            │  Tách thành service, kết nối qua ESB
+            │  Phổ biến trong enterprise (ngân hàng, viễn thông)
+            │  Công cụ: IBM WebSphere, Oracle SOA Suite, TIBCO
+            │
+~2005-2010 ── SOA bộc lộ vấn đề
+            │  ESB phình to, trở thành bottleneck
+            │  SOAP/XML quá nặng nề
+            │
+~2011-2014 ── Microservice ra đời
+            │  Netflix, Amazon, Spotify áp dụng thành công
+            │  Martin Fowler & James Lewis đặt tên chính thức (2014)
+            │  Lấy ý tưởng tách service từ SOA,
+            │  nhưng BỎ ĐI sự tập trung (ESB)
+            │
+~2015+  ──── Microservice trở thành xu hướng chính
+            Cloud-native, Docker, Kubernetes hỗ trợ mạnh
+
+═══════════════════════════════════════════════════════════════
+```
+
+> 💡 **Microservice không phải phát minh mới hoàn toàn** — nó là bước tiến hóa từ SOA, giữ lại ý tưởng hay (tách service) và loại bỏ điểm yếu (ESB tập trung, shared DB).
 
 ### Ý tưởng cốt lõi của SOA
 
@@ -188,9 +221,9 @@ SOA giải quyết bằng cách: **Mỗi hệ thống "bọc" chức năng của
                     │  • Logging              │
                     └────┬──────┬──────┬──────┘
                          │      │      │
-              ┌──────────┘      │      └──────────┐
-              │                 │                  │
-        ┌─────▼──────┐  ┌──────▼─────┐  ┌────────▼────┐
+              ┌──────────┘      │      └─────────┐
+              │                 │                │
+        ┌─────▼──────┐  ┌───────▼────┐  ┌────────▼────┐
         │ HR Service │  │ Accounting │  │   Sales     │
         │            │  │  Service   │  │  Service    │
         │ • getStaff │  │ • getSalary│  │ • getOrders │
@@ -272,14 +305,14 @@ Microservice:  "Dumb Pipes, Smart Endpoints"
        │    API Gateway / MQ      │
        │    (chỉ routing đơn giản)│  ← Pipe đơn giản
        └──────────────────────────┘
-              │         │
-        ┌─────▼──┐ ┌────▼───┐
-        │Service │ │Service │  ← Service THÔNG MINH,
-        │ ┌────┐ │ │ ┌────┐ │    tự chứa logic
+              │          │
+        ┌─────▼───┐ ┌────▼────┐
+        │Service  │ │Service  │  ← Service THÔNG MINH,
+        │ ┌─────┐ │ │ ┌─────┐ │    tự chứa logic
         │ │Logic│ │ │ │Logic│ │
         │ │ DB  │ │ │ │ DB  │ │
-        │ └────┘ │ │ └────┘ │
-        └────────┘ └────────┘
+        │ └─────┘ │ │ └─────┘ │
+        └─────────┘ └─────────┘
 ```
 
 ### Tóm lại: SOA dễ hiểu qua phép ẩn dụ
@@ -292,6 +325,43 @@ Microservice:  "Dumb Pipes, Smart Endpoints"
 | **Khi 1 phần lỗi** | Quản đốc bận → cả nhà máy đứng | Cửa hàng A đóng → cửa hàng B vẫn bán bình thường |
 
 > 💡 **Tóm gọn:** SOA = "tách service nhưng vẫn phụ thuộc vào trung tâm (ESB)". Microservice = "tách service VÀ phi tập trung hoàn toàn".
+
+### Hiểu lầm thường gặp: "SOA chỉ là Microservice + Orchestrator?"
+
+Thoạt nhìn SOA giống Microservice dùng **Saga Orchestration pattern** — đều có một "bộ điều phối" ở giữa. Nhưng thực tế khác nhau rất nhiều:
+
+| | ESB trong SOA | Saga Orchestrator trong Microservice |
+|--|--------------|--------------------------------------|
+| **Số lượng** | **1 ESB duy nhất** cho toàn hệ thống | **Nhiều orchestrator**, mỗi cái lo 1 workflow |
+| **Phạm vi** | Làm **mọi thứ**: routing, transform data, orchestrate, protocol mediation, logging | **Chỉ điều phối** 1 business flow cụ thể |
+| **Database** | Các service **dùng chung DB** | Mỗi service **có DB riêng** |
+| **Khi lỗi** | ESB chết → **cả hệ thống chết** | Orchestrator A chết → chỉ flow A bị ảnh hưởng |
+| **Service** | Service lớn, **thụ động** (chờ ESB gọi) | Service nhỏ, **tự chủ** (tự chứa logic) |
+| **Tech** | Bắt buộc cùng stack (SOAP/XML) | Mỗi service tự chọn tech |
+
+```
+SOA — 1 ESB "ông vua" quản hết:
+
+       Service A ──┐
+       Service B ──┼──▶ [ ESB — God Object ]  ──▶ Shared DB
+       Service C ──┘      routing + transform
+                          + orchestrate + logging
+                          + protocol mediation
+                          (TẤT CẢ trong 1 chỗ)
+
+
+Microservice + Saga — nhiều orchestrator nhỏ, service tự chủ:
+
+  ┌─ Order Saga Orchestrator ──────── chỉ lo flow đặt hàng
+  ├─ Payment Saga Orchestrator ────── chỉ lo flow thanh toán
+  ├─ Refund Saga Orchestrator ─────── chỉ lo flow hoàn tiền
+  │
+  │  Service A ──▶ DB A  ┐
+  │  Service B ──▶ DB B  ├── mỗi service ĐỘC LẬP hoàn toàn
+  │  Service C ──▶ DB C  ┘
+```
+
+> 💡 **Nói đơn giản:** ESB giống **1 ông giám đốc** quản hết mọi phòng ban. Saga Orchestrator giống **trưởng nhóm dự án** — mỗi dự án có 1 trưởng nhóm riêng, nhưng nhân viên (service) vẫn tự chủ trong công việc của mình.
 
 ---
 
@@ -372,9 +442,9 @@ graph LR
 ┌────────────────────────────────────────────┐
 │            E-Commerce Monolith             │
 │                                            │
-│  User Module ← Order Module ← Product     │
+│  User Module ← Order Module ← Product      │
 │       ↕            ↕           Module      │
-│  Payment Module ← Inventory ← Search      │
+│  Payment Module ← Inventory ← Search       │
 │       ↕            Module      Module      │
 │  Notification Module                       │
 │                                            │
@@ -486,7 +556,8 @@ graph TB
 
 ## Links liên quan
 
-- Tiếp theo: [Decomposition Strategies](02-decomposition-strategies.md) — Cách phân tách Monolith thành Microservice
-- [Inter-Service Communication](03-inter-service-communication.md) — Giao tiếp giữa các service
-- [Resilience Patterns](07-resilience-patterns.md) — Xử lý lỗi trong hệ thống phân tán
-- [Design Patterns tổng hợp](13-design-patterns.md) — Tất cả pattern quan trọng
+- Tiếp theo: [Single Responsibility & Bounded Context](02-single-responsibility-bounded-context.md) — SRP và cách xác định ranh giới service
+- [Decomposition Strategies](03-decomposition-strategies.md) — Cách phân tách Monolith thành Microservice
+- [Inter-Service Communication](04-inter-service-communication.md) — Giao tiếp giữa các service
+- [Resilience Patterns](08-resilience-patterns.md) — Xử lý lỗi trong hệ thống phân tán
+- [Design Patterns tổng hợp](14-design-patterns.md) — Tất cả pattern quan trọng

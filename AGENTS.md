@@ -12,18 +12,19 @@ microservice-learn/
 ├── AGENTS.md              # File hướng dẫn này
 └── docs/                  # Thư mục chứa tất cả tài liệu chi tiết
     ├── 01-microservice-overview.md
-    ├── 02-decomposition-strategies.md
-    ├── 03-inter-service-communication.md
-    ├── 04-api-gateway.md
-    ├── 05-service-discovery.md
-    ├── 06-data-management.md
-    ├── 07-resilience-patterns.md
-    ├── 08-observability.md
-    ├── 09-containerization.md
-    ├── 10-orchestration.md
-    ├── 11-cicd-deployment.md
-    ├── 12-security.md
-    └── 13-design-patterns.md
+    ├── 02-single-responsibility-bounded-context.md
+    ├── 03-decomposition-strategies.md
+    ├── 04-inter-service-communication.md
+    ├── 05-api-gateway.md
+    ├── 06-service-discovery.md
+    ├── 07-data-management.md
+    ├── 08-resilience-patterns.md
+    ├── 09-observability.md
+    ├── 10-containerization.md
+    ├── 11-orchestration.md
+    ├── 12-cicd-deployment.md
+    ├── 13-security.md
+    └── 14-design-patterns.md
 ```
 
 ## Quy tắc viết tài liệu
