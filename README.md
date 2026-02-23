@@ -6,14 +6,14 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     MICROSERVICE ARCHITECTURE                       │
 │                                                                     │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐          │
-│   │ Service A│  │ Service B│  │ Service C│  │ Service D│          │
-│   │  ┌────┐  │  │  ┌────┐  │  │  ┌────┐  │  │  ┌────┐  │          │
-│   │  │ DB │  │  │  │ DB │  │  │  │ DB │  │  │  │ DB │  │          │
-│   │  └────┘  │  │  └────┘  │  │  └────┘  │  │  └────┘  │          │
-│   └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘          │
-│        │              │              │              │                │
-│   ─────┴──────────────┴──────────────┴──────────────┴─────────      │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
+│   │ Service A│  │ Service B│  │ Service C│  │ Service D│            │
+│   │  ┌────┐  │  │  ┌────┐  │  │  ┌────┐  │  │  ┌────┐  │            │
+│   │  │ DB │  │  │  │ DB │  │  │  │ DB │  │  │  │ DB │  │            │
+│   │  └────┘  │  │  └────┘  │  │  └────┘  │  │  └────┘  │            │
+│   └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘            │
+│        │             │             │             │                  │
+│   ─────┴─────────────┴─────────────┴─────────────┴─────────         │
 │                    Message Bus / API Gateway                        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -27,48 +27,12 @@
 - [2. Communication & Integration](#2-communication--integration)
 - [3. Data Management](#3-data-management)
 - [4. Resilience & Reliability](#4-resilience--reliability)
-- [5. Observability](#5-observability)
+- [5. Observability & Evolvability](#5-observability--evolvability)
 - [6. Deployment & Infrastructure](#6-deployment--infrastructure)
 - [7. Security](#7-security)
-- [8. Design Patterns tổng hợp](#8-design-patterns-tổng-hợp)
+- [8. Configuration Management](#8-configuration-management)
+- [9. Design Patterns tổng hợp](#9-design-patterns-tổng-hợp)
 - [Tham khảo](#-tham-khảo)
-
----
-
-## 🗺️ Roadmap học tập
-
-```mermaid
-graph LR
-    A[1. Overview<br/>Monolith vs Microservice] --> A2[2. SRP &<br/>Bounded Context]
-    A2 --> B[3. Decomposition<br/>Strategies]
-    B --> C[4. Communication<br/>REST / gRPC / MQ]
-    C --> D[5. API Gateway<br/>& BFF]
-    C --> E[6. Service<br/>Discovery]
-    D --> F[7. Data<br/>Management]
-    E --> F
-    F --> G[8. Resilience<br/>Patterns]
-    G --> H[9. Observability<br/>Logs / Metrics / Traces]
-    H --> I[10. Containerization<br/>Docker]
-    I --> J[11. Orchestration<br/>Kubernetes]
-    J --> K[12. CI/CD<br/>Deployment]
-    K --> L[13. Security<br/>OAuth2 / mTLS]
-    L --> M[14. Design Patterns<br/>Tổng hợp]
-
-    style A fill:#4CAF50,color:#fff
-    style A2 fill:#4CAF50,color:#fff
-    style B fill:#4CAF50,color:#fff
-    style C fill:#2196F3,color:#fff
-    style D fill:#2196F3,color:#fff
-    style E fill:#2196F3,color:#fff
-    style F fill:#FF9800,color:#fff
-    style G fill:#f44336,color:#fff
-    style H fill:#9C27B0,color:#fff
-    style I fill:#00BCD4,color:#fff
-    style J fill:#00BCD4,color:#fff
-    style K fill:#00BCD4,color:#fff
-    style L fill:#E91E63,color:#fff
-    style M fill:#607D8B,color:#fff
-```
 
 ---
 
@@ -78,97 +42,61 @@ graph LR
 |---|----------|--------|:----------:|
 | 01 | [Microservice Overview](docs/01-microservice-overview.md) | Microservice là gì, Monolith vs Microservice vs SOA, ưu/nhược điểm | ✅ |
 | 02 | [Single Responsibility & Bounded Context](docs/02-single-responsibility-bounded-context.md) | SRP trong Microservice, Bounded Context (DDD), cách xác định ranh giới service | ✅ |
-| 03 | [Decomposition Strategies](docs/03-decomposition-strategies.md) | Phân tách service theo Business Capability, DDD, Strangler Fig | ⬜ |
+| 03 | [Loose Coupling & High Cohesion](docs/03-loose-coupling-high-cohesion.md) | Loose Coupling, High Cohesion, cách đo lường và áp dụng trong Microservice | ✅ |
+| 04 | [Autonomy & Independence](docs/04-autonomy-independence.md) | Service autonomy, independent deployment, team ownership, self-contained service | ✅ |
+| 05 | [Decomposition Strategies](docs/05-decomposition-strategies.md) | Phân tách service theo Business Capability, DDD, Strangler Fig | ✅ |
 
 ## 2. Communication & Integration
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 04 | [Inter-Service Communication](docs/04-inter-service-communication.md) | REST vs gRPC vs GraphQL, Sync vs Async, Event-Driven | ⬜ |
-| 05 | [API Gateway](docs/05-api-gateway.md) | API Gateway Pattern, BFF, Rate Limiting, Load Balancing | ⬜ |
-| 06 | [Service Discovery](docs/06-service-discovery.md) | Client-side vs Server-side, Consul, Eureka, DNS-based | ⬜ |
+| 06 | [Inter-Service Communication](docs/06-inter-service-communication.md) | REST vs gRPC vs GraphQL, Sync vs Async, Event-Driven | ✅ |
+| 07 | [API Gateway](docs/07-api-gateway.md) | API Gateway Pattern, BFF, Rate Limiting, Load Balancing | ✅ |
+| 08 | [Service Discovery](docs/08-service-discovery.md) | Client-side vs Server-side, Consul, Eureka, DNS-based | ⬜ |
 
 ## 3. Data Management
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 07 | [Data Management](docs/07-data-management.md) | Database per Service, Saga, CQRS, Event Sourcing, CAP Theorem | ⬜ |
+| 09 | [Data Management](docs/09-data-management.md) | Database per Service, Saga, CQRS, Event Sourcing, CAP Theorem | ⬜ |
 
 ## 4. Resilience & Reliability
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 08 | [Resilience Patterns](docs/08-resilience-patterns.md) | Circuit Breaker, Retry, Bulkhead, Rate Limiter, Fallback | ⬜ |
+| 10 | [Resilience Patterns](docs/10-resilience-patterns.md) | Circuit Breaker, Retry, Bulkhead, Rate Limiter, Fallback | ⬜ |
 
-## 5. Observability
+## 5. Observability & Evolvability
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 09 | [Observability](docs/09-observability.md) | Logs, Metrics, Traces, ELK, Prometheus, Grafana, Jaeger | ⬜ |
+| 11 | [Observability & Evolvability](docs/11-observability-evolvability.md) | Logs, Metrics, Traces, Evolvability, ELK, Prometheus, Grafana, Jaeger | ⬜ |
 
 ## 6. Deployment & Infrastructure
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 10 | [Containerization](docs/10-containerization.md) | Docker, Docker Compose, multi-stage build, best practices | ⬜ |
-| 11 | [Orchestration](docs/11-orchestration.md) | Kubernetes, Service Mesh (Istio/Linkerd), Helm Charts | ⬜ |
-| 12 | [CI/CD & Deployment](docs/12-cicd-deployment.md) | Pipeline, Blue-Green, Canary, Rolling, GitOps | ⬜ |
+| 12 | [Containerization](docs/12-containerization.md) | Docker, Docker Compose, multi-stage build, best practices | ⬜ |
+| 13 | [Orchestration](docs/13-orchestration.md) | Kubernetes, Service Mesh (Istio/Linkerd), Helm Charts | ⬜ |
+| 14 | [CI/CD & Deployment](docs/14-cicd-deployment.md) | Pipeline, Blue-Green, Canary, Rolling, GitOps | ⬜ |
 
 ## 7. Security
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 13 | [Security](docs/13-security.md) | OAuth2, JWT, mTLS, API Security, Zero Trust | ⬜ |
+| 15 | [Security](docs/15-security.md) | OAuth2, JWT, mTLS, API Security, Zero Trust | ⬜ |
 
-## 8. Design Patterns tổng hợp
+## 8. Configuration Management
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 14 | [Design Patterns](docs/14-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ⬜ |
+| 17 | [Configuration & Secrets Management](docs/17-configuration-secrets-management.md) | External Config, Config Server, Secrets Management, Vault, Environment Variables | ⬜ |
 
----
+## 9. Design Patterns tổng hợp
 
-## 📊 Tổng quan kiến trúc Microservice
-
-```
-                              ┌─────────────┐
-                              │   Clients   │
-                              │ Web/Mobile  │
-                              └──────┬──────┘
-                                     │
-                              ┌──────▼──────┐
-                              │ API Gateway │
-                              │ Auth/Route  │
-                              │ Rate Limit  │
-                              └──────┬──────┘
-                                     │
-                    ┌────────────────┼────────────────┐
-                    │                │                │
-             ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
-             │  Service A  │ │  Service B  │ │  Service C  │
-             │  (Users)    │ │  (Orders)   │ │  (Products) │
-             └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
-                    │                │                │
-             ┌──────▼──────┐ ┌──────▼──────┐ ┌──────▼──────┐
-             │ PostgreSQL  │ │   MongoDB   │ │    Redis    │
-             └─────────────┘ └─────────────┘ └─────────────┘
-                    │                │                │
-                    └────────────────┼────────────────┘
-                                     │
-                              ┌──────▼──────┐
-                              │ Message Bus │
-                              │ Kafka/NATS  │
-                              └─────────────┘
-
-    ┌─────────────────────────────────────────────────────────────┐
-    │                    INFRASTRUCTURE LAYER                      │
-    │  ┌───────────┐  ┌───────────┐  ┌───────────┐  ┌─────────┐ │
-    │  │ Container │  │ Service   │  │ Monitoring│  │  CI/CD  │ │
-    │  │ Runtime   │  │ Discovery │  │ & Logging │  │ Pipeline│ │
-    │  │ (Docker)  │  │ (Consul)  │  │ (ELK/Prom)│  │(Jenkins)│ │
-    │  └───────────┘  └───────────┘  └───────────┘  └─────────┘ │
-    └─────────────────────────────────────────────────────────────┘
-```
+| # | Tài liệu | Mô tả | Trạng thái |
+|---|----------|--------|:----------:|
+| 16 | [Design Patterns](docs/16-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ⬜ |
 
 ---
 
@@ -198,4 +126,4 @@ Mỗi tài liệu đều có:
 
 ---
 
-> 💡 **Tip**: Đọc theo thứ tự từ 01 → 14 để có lộ trình học tập tốt nhất!
+> 💡 **Tip**: Đọc theo thứ tự từ 01 → 16 để có lộ trình học tập tốt nhất!

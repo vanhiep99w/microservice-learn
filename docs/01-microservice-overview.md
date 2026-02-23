@@ -557,7 +557,9 @@ graph TB
 ## Links liên quan
 
 - Tiếp theo: [Single Responsibility & Bounded Context](02-single-responsibility-bounded-context.md) — SRP và cách xác định ranh giới service
-- [Decomposition Strategies](03-decomposition-strategies.md) — Cách phân tách Monolith thành Microservice
-- [Inter-Service Communication](04-inter-service-communication.md) — Giao tiếp giữa các service
-- [Resilience Patterns](08-resilience-patterns.md) — Xử lý lỗi trong hệ thống phân tán
-- [Design Patterns tổng hợp](14-design-patterns.md) — Tất cả pattern quan trọng
+- [Loose Coupling & High Cohesion](03-loose-coupling-high-cohesion.md) — Nguyên tắc kết nối lỏng, gắn kết cao
+- [Autonomy & Independence](04-autonomy-independence.md) — Tự chủ và độc lập trong Microservice
+- [Decomposition Strategies](05-decomposition-strategies.md) — Cách phân tách Monolith thành Microservice
+- [Inter-Service Communication](06-inter-service-communication.md) — Giao tiếp giữa các service
+- [Resilience Patterns](10-resilience-patterns.md) — Xử lý lỗi trong hệ thống phân tán
+- [Design Patterns tổng hợp](16-design-patterns.md) — Tất cả pattern quan trọng

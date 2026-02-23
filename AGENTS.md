@@ -13,18 +13,21 @@ microservice-learn/
 └── docs/                  # Thư mục chứa tất cả tài liệu chi tiết
     ├── 01-microservice-overview.md
     ├── 02-single-responsibility-bounded-context.md
-    ├── 03-decomposition-strategies.md
-    ├── 04-inter-service-communication.md
-    ├── 05-api-gateway.md
-    ├── 06-service-discovery.md
-    ├── 07-data-management.md
-    ├── 08-resilience-patterns.md
-    ├── 09-observability.md
-    ├── 10-containerization.md
-    ├── 11-orchestration.md
-    ├── 12-cicd-deployment.md
-    ├── 13-security.md
-    └── 14-design-patterns.md
+    ├── 03-loose-coupling-high-cohesion.md
+    ├── 04-autonomy-independence.md
+    ├── 05-decomposition-strategies.md
+    ├── 06-inter-service-communication.md
+    ├── 07-api-gateway.md
+    ├── 08-service-discovery.md
+    ├── 09-data-management.md
+    ├── 10-resilience-patterns.md
+    ├── 11-observability-evolvability.md
+    ├── 12-containerization.md
+    ├── 13-orchestration.md
+    ├── 14-cicd-deployment.md
+    ├── 15-security.md
+    ├── 17-configuration-secrets-management.md
+    └── 16-design-patterns.md
 ```
 
 ## Quy tắc viết tài liệu
