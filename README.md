@@ -58,13 +58,13 @@
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 09 | [Data Management](docs/09-data-management.md) | Database per Service, Saga, CQRS, Event Sourcing, CAP Theorem | ⬜ |
+| 09 | [Data Management](docs/09-data-management.md) | Database per Service, Saga, CQRS, Event Sourcing, CAP Theorem | ✅ |
 
 ## 4. Resilience & Reliability
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 10 | [Resilience Patterns](docs/10-resilience-patterns.md) | Circuit Breaker, Retry, Bulkhead, Rate Limiter, Fallback | ⬜ |
+| 10 | [Resilience Patterns](docs/10-resilience-patterns.md) | Circuit Breaker, Retry, Bulkhead, Rate Limiter, Fallback | ✅ |
 
 ## 5. Observability & Evolvability
 
