@@ -76,8 +76,8 @@
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 12 | [Containerization](docs/12-containerization.md) | Docker, Docker Compose, multi-stage build, best practices | ⬜ |
-| 13 | [Orchestration](docs/13-orchestration.md) | Kubernetes, Service Mesh (Istio/Linkerd), Helm Charts | ⬜ |
+| 12 | [Containerization](docs/12-containerization.md) | Docker, Docker Compose, multi-stage build, best practices | ✅ |
+| 13 | [Orchestration](docs/13-orchestration.md) | Kubernetes, Service Mesh (Istio/Linkerd), Helm Charts | ✅ |
 | 14 | [CI/CD & Deployment](docs/14-cicd-deployment.md) | Pipeline, Blue-Green, Canary, Rolling, GitOps | ⬜ |
 
 ## 7. Security
