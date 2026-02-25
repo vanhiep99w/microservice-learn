@@ -52,7 +52,7 @@
 |---|----------|--------|:----------:|
 | 06 | [Inter-Service Communication](docs/06-inter-service-communication.md) | REST vs gRPC vs GraphQL, Sync vs Async, Event-Driven | ✅ |
 | 07 | [API Gateway](docs/07-api-gateway.md) | API Gateway Pattern, BFF, Rate Limiting, Load Balancing | ✅ |
-| 08 | [Service Discovery](docs/08-service-discovery.md) | Client-side vs Server-side, Consul, Eureka, DNS-based | ⬜ |
+| 08 | [Service Discovery](docs/08-service-discovery.md) | Client-side vs Server-side, Consul, Eureka, DNS-based | ✅ |
 
 ## 3. Data Management
 
