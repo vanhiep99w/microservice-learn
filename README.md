@@ -70,7 +70,7 @@
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 11 | [Observability & Evolvability](docs/11-observability-evolvability.md) | Logs, Metrics, Traces, Evolvability, ELK, Prometheus, Grafana, Jaeger | ⬜ |
+| 11 | [Observability & Evolvability](docs/11-observability-evolvability.md) | Logs, Metrics, Traces, Evolvability, ELK, Prometheus, Grafana, Jaeger | ✅ |
 
 ## 6. Deployment & Infrastructure
 
