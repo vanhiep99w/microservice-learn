@@ -32,6 +32,7 @@
 - [7. Security](#7-security)
 - [8. Configuration Management](#8-configuration-management)
 - [9. Design Patterns tổng hợp](#9-design-patterns-tổng-hợp)
+- [10. Microservice trên AWS](#10-microservice-trên-aws)
 - [Tham khảo](#-tham-khảo)
 
 ---
@@ -98,6 +99,18 @@
 |---|----------|--------|:----------:|
 | 16 | [Design Patterns](docs/16-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ⬜ |
 
+## 10. Microservice trên AWS
+
+| # | Tài liệu | Mô tả | Trạng thái |
+|---|----------|--------|:----------:|
+| 18 | [AWS Overview & Architecture](docs/18-aws-microservice-overview.md) | Tổng quan kiến trúc Microservice trên AWS, ECS vs EKS vs Lambda, Well-Architected | ⬜ |
+| 19 | [AWS Networking & Load Balancing](docs/19-aws-networking.md) | VPC, ALB/NLB, API Gateway, CloudFront, Route 53, PrivateLink | ⬜ |
+| 20 | [AWS Compute — ECS, EKS, Lambda](docs/20-aws-compute.md) | ECS Fargate vs EC2, EKS, Lambda cho Microservice, so sánh chi tiết | ⬜ |
+| 21 | [AWS Data & Messaging](docs/21-aws-data-messaging.md) | RDS, DynamoDB, ElastiCache, SQS, SNS, EventBridge, MSK (Kafka) | ⬜ |
+| 22 | [AWS Observability & Monitoring](docs/22-aws-observability.md) | CloudWatch, X-Ray, CloudTrail, Container Insights, cost monitoring | ⬜ |
+| 23 | [AWS Security & IAM](docs/23-aws-security.md) | IAM Roles, Cognito, Secrets Manager, KMS, WAF, Security Groups, Zero Trust | ⬜ |
+| 24 | [AWS Deployment Strategies](docs/24-aws-deployment-strategies.md) | Các mô hình triển khai trên AWS (ECS+ALB, EKS+Ingress, Lambda+APIGW), Blue-Green, Canary, IaC (CDK/Terraform), cost optimization | ⬜ |
+
 ---
 
 ## 📖 Quy ước
@@ -126,4 +139,4 @@ Mỗi tài liệu đều có:
 
 ---
 
-> 💡 **Tip**: Đọc theo thứ tự từ 01 → 16 để có lộ trình học tập tốt nhất!
+> 💡 **Tip**: Đọc theo thứ tự từ 01 → 17 cho kiến thức nền tảng, sau đó 18 → 23 cho triển khai thực tế trên AWS!

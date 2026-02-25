@@ -27,7 +27,14 @@ microservice-learn/
     ├── 14-cicd-deployment.md
     ├── 15-security.md
     ├── 17-configuration-secrets-management.md
-    └── 16-design-patterns.md
+    ├── 16-design-patterns.md
+    ├── 18-aws-microservice-overview.md
+    ├── 19-aws-networking.md
+    ├── 20-aws-compute.md
+    ├── 21-aws-data-messaging.md
+    ├── 22-aws-observability.md
+    ├── 23-aws-security.md
+    └── 24-aws-deployment-strategies.md
 ```
 
 ## Quy tắc viết tài liệu
