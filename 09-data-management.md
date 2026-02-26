@@ -168,10 +168,10 @@ Ví dụ — E-Commerce system:
   │     Cần ACID transaction, relational data (order → items)      │
   │                                                                │
   │  Product Reviews ──▶ MongoDB                                   │
-  │     Flexible schema (review có thể kèm ảnh, video, rating)    │
+  │     Flexible schema (review có thể kèm ảnh, video, rating)     │
   │                                                                │
   │  Recommendation ──▶ Neo4j (Graph DB)                           │
-  │     "Users who bought X also bought Y" → graph traversal      │
+  │     "Users who bought X also bought Y" → graph traversal       │
   │                                                                │
   │  Notification Log ──▶ Cassandra                                │
   │     Append-heavy, time-series, distributed, no single failure  │
@@ -179,14 +179,14 @@ Ví dụ — E-Commerce system:
   │                                                                │
   │  🔵 SPECIALIZED STORE (secondary / derived)                    │
   │  ──────────────────────────────────────────                    │
-  │  Product Catalog ──▶ PostgreSQL (primary) + Elasticsearch (search) │
+  │ Product Catalog ──▶ PostgreSQL (primary)+Elasticsearch (search)│
   │     Write vào PostgreSQL → sync sang Elasticsearch cho search  │
   │                                                                │
   │  User Session ──▶ Redis                                        │
-  │     Data tạm thời (TTL), mất thì user login lại — OK          │
+  │     Data tạm thời (TTL), mất thì user login lại — OK           │
   │                                                                │
-  │  Shopping Cart ──▶ Redis / DynamoDB                             │
-  │     Key-value, auto-expire, ephemeral data                    │
+  │  Shopping Cart ──▶ Redis / DynamoDB                            │
+  │     Key-value, auto-expire, ephemeral data                     │
   │                                                                │
   │  Analytics ──▶ ClickHouse / BigQuery                           │
   │     Columnar storage, aggregate data từ nhiều source           │
@@ -570,16 +570,16 @@ Vậy SQL database thuộc loại nào?
   ────────────────────────────────
     → CP — Thiết kế để vừa distributed vừa strong consistency
 
-    ┌───────────────────────────────────────────────────────────┐
-    │  Database          │ Hành vi                              │
-    │────────────────────│──────────────────────────────────────│
-    │  CockroachDB       │ Raft consensus, serializable         │
-    │                    │ → unavailable nếu mất majority       │
-    │  Google Spanner    │ TrueTime + Paxos, externally         │
+    ┌────────────────────────────────────────────────────────────┐
+    │  Database          │ Hành vi                               │
+    │────────────────────│───────────────────────────────────────│
+    │  CockroachDB       │ Raft consensus, serializable          │
+    │                    │ → unavailable nếu mất majority        │
+    │  Google Spanner    │ TrueTime + Paxos, externally          │
     │                    │ consistent → unavailable khi partition│
-    │  YugabyteDB        │ Raft consensus, PostgreSQL-compatible│
-    │  TiDB              │ Raft, MySQL-compatible               │
-    └───────────────────────────────────────────────────────────┘
+    │  YugabyteDB        │ Raft consensus, PostgreSQL-compatible │
+    │  TiDB              │ Raft, MySQL-compatible                │
+    └────────────────────────────────────────────────────────────┘
 
     → NewSQL = "distributed SQL with strong consistency"
     → Trade-off: latency cao hơn (consensus overhead)
@@ -1444,15 +1444,15 @@ Ví dụ: Tài khoản có 10.000 giao dịch
 
   Hình dung:
   ┌────────────────────────────────────────────────────────────┐
-  │  [E1] [E2] ... [E1000] [E1001] ... [E2000] ... [E10000]  │
-  │                   ▲                    ▲                  │
+  │  [E1] [E2] ... [E1000] [E1001] ... [E2000] ... [E10000]    │
+  │                   ▲                    ▲                   │
   │              Snapshot 1           Snapshot 2               │
   │          {balance: 800k}      {balance: 1.2M}              │
   │                                                            │
-  │  Muốn biết số dư hiện tại:                                │
+  │  Muốn biết số dư hiện tại:                                 │
   │  1. Lấy Snapshot gần nhất (Snapshot tại E9000)             │
-  │  2. Chỉ replay E9001 → E10000                             │
-  │  → Không cần replay từ đầu                                │
+  │  2. Chỉ replay E9001 → E10000                              │
+  │  → Không cần replay từ đầu                                 │
   └────────────────────────────────────────────────────────────┘
 ```
 
@@ -1552,7 +1552,7 @@ Projection — Flow chi tiết:
   │              │     │  (Consumer)    │     │              │
   │ events table │     │                │     │ orders_view  │
   │              │     │ Lắng nghe event│     │ products_view│
-  │              │     │ → xử lý       │     │ dashboard    │
+  │              │     │ → xử lý        │     │ dashboard    │
   │              │     │ → ghi Read DB  │     │              │
   └──────────────┘     └────────────────┘     └──────────────┘
 
@@ -1622,11 +1622,11 @@ Projection — Ví dụ thực tế E-Commerce:
   📊 Projection 2: "Dashboard" — Cho trang thống kê
   ──────────────────────────────────────────────────
   Read DB: bảng daily_stats (PostgreSQL)
-  ┌────────────┬──────────────┬─────────────┬─────────────┐
+  ┌────────────┬──────────────┬──────────────┬─────────────┐
   │ date       │ total_orders │ total_revenue│ top_product │
-  │────────────│──────────────│─────────────│─────────────│
-  │ 2025-02-24 │ 2            │ 1198        │ iPhone      │
-  └────────────┴──────────────┴─────────────┴─────────────┘
+  │────────────│──────────────│──────────────│─────────────│
+  │ 2025-02-24 │ 2            │ 1198         │ iPhone      │
+  └────────────┴──────────────┴──────────────┴─────────────┘
   → Dashboard query: SELECT * FROM daily_stats WHERE date = TODAY
 
 
@@ -1688,17 +1688,17 @@ Công nghệ thường dùng cho Projection:
   │ Thành phần        │ Công nghệ phổ biến                     │
   │───────────────────│────────────────────────────────────────│
   │ Event Store       │ PostgreSQL (bảng events), EventStoreDB,│
-  │                   │ Kafka (topic = event stream)            │
+  │                   │ Kafka (topic = event stream)           │
   │                   │                                        │
   │ Projection chạy   │ • Kafka Consumer (Java/Spring, Node.js)│
   │ bằng gì?          │ • EventStoreDB built-in Projection     │
-  │                   │ • Custom worker (cron polling DB)       │
-  │                   │ • Debezium CDC → Kafka → Consumer       │
+  │                   │ • Custom worker (cron polling DB)      │
+  │                   │ • Debezium CDC → Kafka → Consumer      │
   │                   │                                        │
   │ Read DB           │ • PostgreSQL / MySQL (query thường)    │
-  │ (output)          │ • Elasticsearch (full-text search)      │
-  │                   │ • Redis (cache, real-time dashboard)    │
-  │                   │ • MongoDB (flexible view)               │
+  │ (output)          │ • Elasticsearch (full-text search)     │
+  │                   │ • Redis (cache, real-time dashboard)   │
+  │                   │ • MongoDB (flexible view)              │
   └───────────────────┴────────────────────────────────────────┘
 
   Ví dụ stack phổ biến:
@@ -1787,22 +1787,22 @@ Ví dụ: Trang "Chi tiết đơn hàng"
 
   ┌──────────────────────────────────────────────────────────────┐
   │                                                              │
-  │  Cách 1: GỌI API lúc cần (API Composition)                  │
+  │  Cách 1: GỌI API lúc cần (API Composition)                   │
   │  ──────────────────────────────────────────                  │
-  │  Order Service gọi: GET /users/U-456 → lấy tên "Hiep"       │
-  │  → Đơn giản, data mới nhất, nhưng chậm (network call)       │
+  │  Order Service gọi: GET /users/U-456 → lấy tên "Hiep"        │
+  │  → Đơn giản, data mới nhất, nhưng chậm (network call)        │
   │                                                              │
   │  Cách 2: COPY data về local (Event-Carried State Transfer)   │
-  │  ──────────────────────────────────────────────────────────   │
+  │  ──────────────────────────────────────────────────────────  │
   │  User Service publish event: {userId: U-456, name: "Hiep"}   │
   │  Order Service nhận event → lưu vào bảng local_users         │
-  │  → Nhanh (query local), nhưng data có thể cũ vài giây       │
+  │  → Nhanh (query local), nhưng data có thể cũ vài giây        │
   │                                                              │
-  │  Cách 3: BẮT thay đổi từ DB nguồn (CDC)                     │
+  │  Cách 3: BẮT thay đổi từ DB nguồn (CDC)                      │
   │  ──────────────────────────────────────                      │
-  │  Debezium đọc DB của User Service → đẩy thay đổi sang Kafka │
+  │  Debezium đọc DB của User Service → đẩy thay đổi sang Kafka  │
   │  Order Service consume → cập nhật bảng local_users           │
-  │  → Tương tự cách 2, nhưng không cần User Service sửa code   │
+  │  → Tương tự cách 2, nhưng không cần User Service sửa code    │
   │                                                              │
   └──────────────────────────────────────────────────────────────┘
 ```

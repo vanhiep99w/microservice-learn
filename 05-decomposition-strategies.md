@@ -48,16 +48,16 @@ Bài này trả lời câu hỏi thực tế nhất: **"OK, tôi hiểu lý thuy
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│              DECOMPOSITION STRATEGIES OVERVIEW                   │
+│              DECOMPOSITION STRATEGIES OVERVIEW                  │
 │                                                                 │
 │   Có monolith / ý tưởng hệ thống                                │
 │          │                                                      │
 │          ▼                                                      │
-│   ┌─────────────────────────────────────┐                        │
-│   │    Chọn chiến lược phân tách        │                        │
-│   └──────────────┬──────────────────────┘                        │
+│   ┌─────────────────────────────────────┐                       │
+│   │    Chọn chiến lược phân tách        │                       │
+│   └──────────────┬──────────────────────┘                       │
 │                  │                                              │
-│     ┌────────────┼────────────┬──────────────┐                   │
+│     ┌────────────┼────────────┬──────────────┐                  │
 │     ▼            ▼            ▼              ▼                  │
 │  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐             │
 │  │Business│ │Subdomain │ │Strangler │ │  Khác:    │             │
@@ -67,7 +67,7 @@ Bài này trả lời câu hỏi thực tế nhất: **"OK, tôi hiểu lý thuy
 │  │project │ │project   │ │migration │ │           │             │
 │  └────────┘ └──────────┘ └──────────┘ └───────────┘             │
 │                                                                 │
-│  Greenfield = dự án mới    Brownfield = migrate từ monolith      │
+│  Greenfield = dự án mới    Brownfield = migrate từ monolith     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -196,9 +196,9 @@ Bước 3: Map capability → service
 ### 3.3. Ví dụ thực tế — E-Commerce
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────┐
 │            E-COMMERCE — BUSINESS CAPABILITY MAP                  │
-│                                                                 │
+│                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐     │
 │  │                 CORE CAPABILITIES                       │     │
 │  │                                                         │     │
@@ -212,7 +212,7 @@ Bước 3: Map capability → service
 │  │  │• Quản lý giá │  │• Hủy đơn     │  │• Đối soát    │   │     │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘   │     │
 │  └─────────────────────────────────────────────────────────┘     │
-│                                                                 │
+│                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐     │
 │  │               SUPPORTING CAPABILITIES                   │     │
 │  │                                                         │     │
@@ -225,7 +225,7 @@ Bước 3: Map capability → service
 │  │  │• Nhập hàng   │  │• Tracking    │  │• FAQ         │   │     │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘   │     │
 │  └─────────────────────────────────────────────────────────┘     │
-│                                                                 │
+│                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐     │
 │  │               GENERIC CAPABILITIES                      │     │
 │  │                                                         │     │
@@ -238,10 +238,10 @@ Bước 3: Map capability → service
 │  │  │• Phân quyền  │  │• Push        │  │• Filter      │   │     │
 │  │  └──────────────┘  └──────────────┘  └──────────────┘   │     │
 │  └─────────────────────────────────────────────────────────┘     │
-│                                                                 │
+│                                                                  │
 │  Mapping: 1 Business Capability → 1 Microservice                 │
 │  Tổng: 9 services cho hệ thống e-commerce trung bình             │
-└─────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### 3.4. Ưu và nhược điểm
@@ -314,13 +314,13 @@ graph TB
 ### 4.3. Ví dụ thực tế — Online Banking
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────┐
 │               ONLINE BANKING — DDD DECOMPOSITION                 │
-│                                                                 │
+│                                                                  │
 │  Domain: Ngân hàng số                                            │
-│                                                                 │
+│                                                                  │
 │  Core Subdomains:                                                │
-│  ─────────────────                                              │
+│  ─────────────────                                               │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
 │  │  Transaction │  │  Loan        │  │  Risk        │            │
 │  │  Processing  │  │  Origination │  │  Assessment  │            │
@@ -331,21 +331,21 @@ graph TB
 │  │              │  │ • Giải ngân  │  │   scoring    │            │
 │  └──────────────┘  └──────────────┘  └──────────────┘            │
 │  → Tự build 100%, team senior, security-first                    │
-│                                                                 │
+│                                                                  │
 │  Supporting Subdomains:                                          │
-│  ─────────────────────                                          │
+│  ─────────────────────                                           │
 │  ┌──────────────┐  ┌──────────────┐                              │
 │  │  Customer    │  │  Account     │                              │
 │  │  Management  │  │  Management  │                              │
 │  │              │  │              │                              │
-│  │ • KYC/eKYC   │  │ • Mở tài    │                              │
-│  │ • Profile    │  │   khoản     │                              │
-│  │ • Preferences│  │ • Đóng TK   │                              │
+│  │ • KYC/eKYC   │  │ • Mở tài     │                              │
+│  │ • Profile    │  │   khoản      │                              │
+│  │ • Preferences│  │ • Đóng TK    │                              │
 │  └──────────────┘  └──────────────┘                              │
-│  → Tự build, có thể dùng 1 số thư viện                          │
-│                                                                 │
+│  → Tự build, có thể dùng 1 số thư viện                           │
+│                                                                  │
 │  Generic Subdomains:                                             │
-│  ───────────────────                                            │
+│  ───────────────────                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
 │  │  Identity &  │  │ Notification │  │  Reporting   │            │
 │  │  Auth        │  │              │  │              │            │
@@ -353,8 +353,8 @@ graph TB
 │  │ • Keycloak   │  │ • Firebase   │  │ • Metabase   │            │
 │  │ • OAuth2/OIDC│  │ • Twilio SMS │  │ • Grafana    │            │
 │  └──────────────┘  └──────────────┘  └──────────────┘            │
-│  → Dùng SaaS / open-source, chỉ integrate                       │
-└─────────────────────────────────────────────────────────────────┘
+│  → Dùng SaaS / open-source, chỉ integrate                        │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.4. Business Capability vs Subdomain
@@ -869,7 +869,7 @@ Nếu có > 3 câu trả lời "Không" → CHƯA NÊN TÁCH
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    DECOMPOSITION CHEAT SHEET                     │
+│                    DECOMPOSITION CHEAT SHEET                    │
 │                                                                 │
 │  Bạn đang ở đâu?          → Chiến lược nào?                     │
 │  ──────────────────          ─────────────────                  │
@@ -891,10 +891,10 @@ Nếu có > 3 câu trả lời "Không" → CHƯA NÊN TÁCH
 │  ─────────────────────────────────────────────────              │
 │                                                                 │
 │  Quy tắc vàng:                                                  │
-│  1. Tách theo NGHIỆP VỤ, không theo KỸ THUẬT                   │
-│  2. Bắt đầu với SỐ ÍT service, tách thêm khi CẦN              │
-│  3. Nếu không chắc → CHƯA TÁCH                                 │
-│  4. Modular Monolith luôn là bước đệm tốt                      │
+│  1. Tách theo NGHIỆP VỤ, không theo KỸ THUẬT                    │
+│  2. Bắt đầu với SỐ ÍT service, tách thêm khi CẦN                │
+│  3. Nếu không chắc → CHƯA TÁCH                                  │
+│  4. Modular Monolith luôn là bước đệm tốt                       │
 │  5. Strangler Fig > Big Bang rewrite                            │
 └─────────────────────────────────────────────────────────────────┘
 ```

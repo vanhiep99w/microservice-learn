@@ -346,13 +346,13 @@ Version mới (v2):
 │     • Cung cấp migration guide                           │
 │                                                          │
 │  2. Sunset period (2–4 tuần)                             │
-│     • v1 vẫn chạy nhưng trả thêm header:                │
+│     • v1 vẫn chạy nhưng trả thêm header:                 │
 │       Deprecation: true                                  │
 │       Sunset: Sat, 01 Mar 2025 00:00:00 GMT              │
 │     • Log tất cả request vào v1 để track ai chưa migrate │
 │                                                          │
 │  3. Force migrate                                        │
-│     • Tắt v1 → trả 410 Gone                             │
+│     • Tắt v1 → trả 410 Gone                              │
 │     • Hoặc: v1 tự redirect/proxy sang v2                 │
 │       (nếu có thể map request)                           │
 └──────────────────────────────────────────────────────────┘
@@ -610,37 +610,37 @@ Tiết kiệm: ~65% chi phí so với monolith scaling
 Mỗi service có thể chọn **ngôn ngữ lập trình** và **framework** phù hợp nhất với bài toán của nó.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   POLYGLOT ARCHITECTURE                     │
-│                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │ User Service │  │ ML/Recommend │  │ Real-time    │       │
-│  │              │  │   Service    │  │ Chat Service │       │
-│  │   Java /     │  │              │  │              │       │
-│  │  Spring Boot │  │   Python /   │  │   Go /       │       │
-│  │              │  │  FastAPI     │  │  Goroutines  │       │
-│  │  Lý do:      │  │              │  │              │       │
-│  │  • Ecosystem │  │  Lý do:      │  │  Lý do:      │       │
-│  │    phong phú │  │  • ML libs   │  │  • Concurrency│      │
-│  │  • Team có   │  │    (sklearn, │  │    xuất sắc  │       │
-│  │    kinh nghiệm│ │    pytorch)  │  │  • Low latency│      │
-│  │  • Enterprise│  │  • Fast      │  │  • Low memory│       │
-│  │    patterns  │  │    prototyping│ │              │       │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
-│                                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │ Admin        │  │ Data Pipeline│  │ Payment      │       │
-│  │ Dashboard    │  │   Service    │  │ Service      │       │
-│  │              │  │              │  │              │       │
-│  │  Node.js /   │  │  Scala /     │  │  Kotlin /    │       │
-│  │  Next.js     │  │  Spark       │  │  Spring Boot │       │
-│  │              │  │              │  │              │       │
-│  │  Lý do:      │  │  Lý do:      │  │  Lý do:      │       │
-│  │  • Full-stack│  │  • Big data  │  │  • Type-safe │       │
-│  │  • Rapid dev │  │    processing│  │  • Coroutines│       │
-│  │  • SSR       │  │  • Streaming │  │  • Java interop│     │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                   POLYGLOT ARCHITECTURE                       │
+│                                                               │
+│  ┌──────────────┐  ┌───────────────┐  ┌───────────────┐       │
+│  │ User Service │  │ ML/Recommend  │  │ Real-time     │       │
+│  │              │  │   Service     │  │ Chat Service  │       │
+│  │   Java /     │  │               │  │               │       │
+│  │  Spring Boot │  │   Python /    │  │   Go /        │       │
+│  │              │  │  FastAPI      │  │  Goroutines   │       │
+│  │  Lý do:      │  │               │  │               │       │
+│  │  • Ecosystem │  │  Lý do:       │  │  Lý do:       │       │
+│  │    phong phú │  │  • ML libs    │  │  • Concurrency│       │
+│  │  • Team có   │  │    (sklearn,  │  │    xuất sắc   │       │
+│  │    kinh nghiệm│ │    pytorch)   │  │  • Low latency│       │
+│  │  • Enterprise│  │  • Fast       │  │  • Low memory │       │
+│  │    patterns  │  │    prototyping│  │               │       │
+│  └──────────────┘  └───────────────┘  └───────────────┘       │
+│                                                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐       │
+│  │ Admin        │  │ Data Pipeline│  │ Payment        │       │
+│  │ Dashboard    │  │   Service    │  │ Service        │       │
+│  │              │  │              │  │                │       │
+│  │  Node.js /   │  │  Scala /     │  │  Kotlin /      │       │
+│  │  Next.js     │  │  Spark       │  │  Spring Boot   │       │
+│  │              │  │              │  │                │       │
+│  │  Lý do:      │  │  Lý do:      │  │  Lý do:        │       │
+│  │  • Full-stack│  │  • Big data  │  │  • Type-safe   │       │
+│  │  • Rapid dev │  │    processing│  │  • Coroutines  │       │
+│  │  • SSR       │  │  • Streaming │  │  • Java interop│       │
+│  └──────────────┘  └──────────────┘  └────────────────┘       │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ### 5.2. Polyglot Persistence

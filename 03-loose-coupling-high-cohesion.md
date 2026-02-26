@@ -260,11 +260,11 @@ Email Service tự lắng nghe và quyết định: "OK, tôi sẽ gửi email x
 Mỗi service sở hữu **riêng** database của mình. Không service nào được đọc/ghi trực tiếp vào database của service khác.
 
 ```
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│ Order Service│    │Product Service│   │ User Service │
-└──────┬───────┘    └──────┬───────┘    └──────┬───────┘
-       │                   │                   │
-  ┌────▼─────┐         ┌───▼─────┐         ┌───▼──────┐
+┌──────────────┐    ┌───────────────┐    ┌──────────────┐
+│ Order Service│    │Product Service│    │ User Service │
+└──────┬───────┘    └──────┬────────┘    └──────┬───────┘
+       │                   │                    │
+  ┌────▼─────┐         ┌───▼─────┐         ┌────▼─────┐
   │Order DB  │         │Product  │         │ User DB  │
   │(Postgres)│         │DB(Mongo)│         │(Postgres)│
   └─────────┘          └─────────┘         └──────────┘
@@ -552,18 +552,18 @@ Ví dụ: Khi thay đổi business rule về "discount":
 └──────────────────┘  │    thay đổi      │
                       └──────────────────┘
 
-┌──────────────────┐  ┌──────────────────┐
-│   AuthZ Service  │  │Notification Svc  │
-│  ──────────────  │  │  ──────────────  │
-│  checkPermission()│ │  sendEmail()     │
-│  assignRole()    │  │  sendSMS()       │
-│  managePolicies()│  │  sendPush()      │
-│  evaluateAccess()│  │  manageTemplates()│
-│                  │  │                  │
-│  → 1 lý do:      │  │  → 1 lý do:      │
-│    Permission    │  │    Notification  │
-│    rules thay đổi│  │    logic thay đổi│
-└──────────────────┘  └──────────────────┘
+┌───────────────────┐  ┌───────────────────┐
+│   AuthZ Service   │  │Notification Svc   │
+│  ──────────────   │  │  ──────────────   │
+│  checkPermission()│  │  sendEmail()      │
+│  assignRole()     │  │  sendSMS()        │
+│  managePolicies() │  │  sendPush()       │
+│  evaluateAccess() │  │  manageTemplates()│
+│                   │  │                   │
+│  → 1 lý do:       │  │  → 1 lý do:       │
+│    Permission     │  │    Notification   │
+│    rules thay đổi │  │    logic thay đổi │
+└───────────────────┘  └───────────────────┘
 ```
 
 ---

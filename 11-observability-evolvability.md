@@ -67,15 +67,15 @@ Trong monolith, khi có lỗi → kiểm tra 1 log file, debug 1 process. Trong 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │          MỘT REQUEST ĐI QUA NHIỀU SERVICES                  │
-│                                                              │
+│                                                             │
 │   User ──▶ API GW ──▶ Order ──▶ Inventory ──▶ Payment       │
-│                          │          │            │            │
-│                          ▼          ▼            ▼            │
-│                       Notification  Warehouse   Bank API      │
-│                                                              │
+│                          │          │            │          │
+│                          ▼          ▼            ▼          │
+│                       Notification  Warehouse   Bank API    │
+│                                                             │
 │   ❓ Request chậm → Lỗi ở đâu? Service nào?                 │
-│   ❓ Latency tăng → Bottleneck ở service nào?                │
-│   ❓ Error rate tăng → Ảnh hưởng bao nhiêu user?             │
+│   ❓ Latency tăng → Bottleneck ở service nào?               │
+│   ❓ Error rate tăng → Ảnh hưởng bao nhiêu user?            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -176,14 +176,14 @@ Sử dụng **Structured Logging** (JSON format):
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    LOG LEVELS                            │
+│                    LOG LEVELS                           │
 │                                                         │
 │   FATAL   ████████████████████████████  Hệ thống crash  │
 │   ERROR   ██████████████████████        Lỗi cần xử lý   │
-│   WARN    ████████████████              Cảnh báo         │
-│   INFO    ██████████                    Thông tin chung   │
-│   DEBUG   ██████                        Chi tiết debug    │
-│   TRACE   ████                          Rất chi tiết     │
+│   WARN    ████████████████              Cảnh báo        │
+│   INFO    ██████████                    Thông tin chung │
+│   DEBUG   ██████                        Chi tiết debug  │
+│   TRACE   ████                          Rất chi tiết    │
 │                                                         │
 │   ◀── Production ──▶  ◀── Dev/Debug ──▶                 │
 │   (INFO trở lên)      (DEBUG/TRACE)                     │
@@ -243,10 +243,10 @@ sequenceDiagram
 **Trả lời ngắn:** Request ID **không bắt buộc** gửi từ client, và nó **KHÔNG phải** là một phần của quá trình tracing (Distributed Tracing). Đây là hai cơ chế **riêng biệt**, phục vụ mục đích khác nhau.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│     REQUEST ID vs TRACE ID — HAI THỨ KHÁC NHAU                   │
-│                                                                  │
-│  ┌─────────────────────────────┐  ┌─────────────────────────────┐│
+┌───────────────────────────────────────────────────────────────────┐
+│     REQUEST ID vs TRACE ID — HAI THỨ KHÁC NHAU                    │
+│                                                                   │
+│  ┌─────────────────────────────┐  ┌──────────────────────────────┐│
 │  │     REQUEST ID / CORRELATION│  │         TRACE ID             ││
 │  │         ID                  │  │     (Distributed Tracing)    ││
 │  │                             │  │                              ││
@@ -254,19 +254,19 @@ sequenceDiagram
 │  │  → Client hoặc API Gateway  │  │  → OTel SDK (tự động)        ││
 │  │                             │  │                              ││
 │  │  Mục đích?                  │  │  Mục đích?                   ││
-│  │  → Tìm log, support ticket │  │  → Đo latency, tìm bottleneck││
-│  │  → "User gửi ticket #abc,  │  │  → "Span nào chậm nhất?"     ││
-│  │     tìm log req-abc-123"   │  │  → Waterfall, dependency map ││
+│  │  → Tìm log, support ticket  │  │  → Đo latency, tìm bottleneck││
+│  │  → "User gửi ticket #abc, │  │  → "Span nào chậm nhất?"     ││
+│  │     tìm log req-abc-123"    │  │  → Waterfall, dependency map ││
 │  │                             │  │                              ││
-│  │  Truyền qua?               │  │  Truyền qua?                 ││
-│  │  → X-Request-ID header     │  │  → traceparent header        ││
+│  │  Truyền qua?                │  │  Truyền qua?                 ││
+│  │  → X-Request-ID header      │  │  → traceparent header        ││
 │  │    (convention, không chuẩn)│  │    (W3C standard)            ││
 │  │                             │  │                              ││
 │  │  Ai dùng?                   │  │  Ai dùng?                    ││
-│  │  → Developer đọc log       │  │  → Jaeger, Zipkin, Grafana   ││
+│  │  → Developer đọc log        │  │  → Jaeger, Zipkin, Grafana   ││
 │  │  → Customer support         │  │  → Tracing backend tự động   ││
-│  └─────────────────────────────┘  └─────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
+│  └─────────────────────────────┘  └──────────────────────────────┘│
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 **Chi tiết về Request ID:**
@@ -857,32 +857,32 @@ Mỗi span cần các thông số sau để **tính ra trace** và xác định 
 Theo chuẩn [W3C Trace Context](https://www.w3.org/TR/trace-context/), trace context được truyền qua **2 HTTP headers**:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│       W3C TRACE CONTEXT — TRUYỀN QUA HTTP HEADERS               │
-│                                                                  │
-│  Service A gửi request tới Service B:                            │
-│                                                                  │
-│  POST /api/payments HTTP/1.1                                     │
-│  Host: payment-service:8080                                      │
-│  Content-Type: application/json                                  │
+┌───────────────────────────────────────────────────────────────────┐
+│       W3C TRACE CONTEXT — TRUYỀN QUA HTTP HEADERS                 │
+│                                                                   │
+│  Service A gửi request tới Service B:                             │
+│                                                                   │
+│  POST /api/payments HTTP/1.1                                      │
+│  Host: payment-service:8080                                       │
+│  Content-Type: application/json                                   │
 │  ┌────────────────────────────────────────────────────────────┐   │
-│  │ traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-         │   │
+│  │ traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-          │   │
 │  │              00f067aa0ba902b7-01                           │   │
 │  │                                                            │   │
-│  │ Format:  {version}-{trace-id}-{parent-span-id}-{flags}    │   │
-│  │           ──┬──    ───┬────   ──────┬────────   ──┬──     │   │
+│  │ Format:  {version}-{trace-id}-{parent-span-id}-{flags}     │   │
+│  │           ──┬──    ───┬────   ──────┬────────   ──┬──      │   │
 │  │             │         │             │             │        │   │
-│  │          Phiên bản  Trace ID     Span ID của   Sampled?   │   │
-│  │          (luôn 00)  (128-bit)    service A     01 = yes   │   │
-│  │                     KHÔNG ĐỔI    (64-bit)     00 = no    │   │
-│  │                     suốt trace   ĐỔI mỗi hop             │   │
+│  │          Phiên bản  Trace ID     Span ID của   Sampled?    │   │
+│  │          (luôn 00)  (128-bit)    service A     01 = yes    │   │
+│  │                     KHÔNG ĐỔI    (64-bit)     00 = no      │   │
+│  │                     suốt trace   ĐỔI mỗi hop               │   │
 │  ├────────────────────────────────────────────────────────────┤   │
-│  │ tracestate: vendor1=value1,vendor2=value2                 │   │
-│  │ (Optional: vendor-specific data)                          │   │
+│  │ tracestate: vendor1=value1,vendor2=value2                  │   │
+│  │ (Optional: vendor-specific data)                           │   │
 │  └────────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│  Body: {"order_id": "123", "amount": 99.99}                      │
-└─────────────────────────────────────────────────────────────────┘
+│                                                                   │
+│  Body: {"order_id": "123", "amount": 99.99}                       │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 #### Quá trình tạo Trace và Span — Từng bước
@@ -1038,10 +1038,10 @@ OpenTelemetry (OTel) là dự án CNCF hợp nhất các tiêu chuẩn tracing/m
 │  │  └──────────┴──────────┴──────────┘ │                    │
 │  └──────────┬──────────┬───────────────┘                    │
 │             │          │                                    │
-│        ┌────▼───┐ ┌────▼────┐ ┌─────────┐                   │
-│        │ Jaeger │ │Prometheus││  Loki   │                   │
-│        │(Traces)│ │(Metrics)│ │ (Logs)  │                   │
-│        └────────┘ └─────────┘ └─────────┘                   │
+│        ┌────▼───┐ ┌────▼─────┐ ┌─────────┐                  │
+│        │ Jaeger │ │Prometheus│ │  Loki   │                  │
+│        │(Traces)│ │(Metrics) │ │ (Logs)  │                  │
+│        └────────┘ └──────────┘ └─────────┘                  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -1202,10 +1202,10 @@ api-gateway         POST /api/orders         8.2s      OK
 │                   │ │Logs ││Trace│  │                                │
 │                   │ │Panel││Panel│  │                                │
 │                   │ └─────┘└─────┘  │                                │
-│                   │ ┌─────┐┌─────┐  │                                │
+│                   │ ┌──────┐┌─────┐ │                                │
 │                   │ │Metric││Alert│ │                                │
 │                   │ │Panel ││Panel│ │                                │
-│                   │ └─────┘└─────┘  │                                │
+│                   │ └──────┘└─────┘ │                                │
 │                   └─────────────────┘                                │
 └──────────────────────────────────────────────────────────────────────┘
 ```

@@ -238,7 +238,7 @@ VẤN ĐỀ: DOCKER TRONG KUBERNETES — QUÁ NHIỀU LAYERS:
   │     → Gánh nặng maintenance cho K8s team                 │
   │                                                          │
   │  2. Docker Daemon = single point of failure              │
-  │     → dockerd crash → TẤT CẢ containers trên node bị    │
+  │     → dockerd crash → TẤT CẢ containers trên node bị     │
   │       ảnh hưởng                                          │
   │                                                          │
   │  3. Overhead: kubelet → dockershim → dockerd → containerd│
@@ -246,9 +246,9 @@ VẤN ĐỀ: DOCKER TRONG KUBERNETES — QUÁ NHIỀU LAYERS:
   │     → K8s chỉ cần containerd, không cần Docker           │
   │                                                          │
   │  4. CRI (Container Runtime Interface):                   │
-  │     K8s định nghĩa chuẩn CRI để giao tiếp với runtime   │
-  │     → containerd hỗ trợ CRI native                      │
-  │     → Docker KHÔNG hỗ trợ CRI → cần dockershim          │
+  │     K8s định nghĩa chuẩn CRI để giao tiếp với runtime    │
+  │     → containerd hỗ trợ CRI native                       │
+  │     → Docker KHÔNG hỗ trợ CRI → cần dockershim           │
   └──────────────────────────────────────────────────────────┘
 
 
@@ -257,7 +257,7 @@ VẤN ĐỀ: DOCKER TRONG KUBERNETES — QUÁ NHIỀU LAYERS:
   │                                                          │
   │  kubelet                                                 │
   │    │                                                     │
-  │    ▼ (CRI — giao tiếp trực tiếp, không cần adapter)     │
+  │    ▼ (CRI — giao tiếp trực tiếp, không cần adapter)      │
   │  containerd                                              │
   │    │                                                     │
   │    ▼                                                     │
@@ -265,7 +265,7 @@ VẤN ĐỀ: DOCKER TRONG KUBERNETES — QUÁ NHIỀU LAYERS:
   │                                                          │
   │  ✅ Bỏ 2 layers (dockershim + dockerd)                   │
   │  ✅ Ít overhead hơn → khởi động container nhanh hơn      │
-  │  ✅ containerd daemon-per-container → crash 1 container   │
+  │  ✅ containerd daemon-per-container → crash 1 container  │
   │     không ảnh hưởng container khác                       │
   │  ✅ K8s team không cần maintain dockershim nữa           │
   └──────────────────────────────────────────────────────────┘

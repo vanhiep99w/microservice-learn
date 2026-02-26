@@ -333,7 +333,7 @@ Vấn đề của Sync:
        │     (chờ 200ms...)    │ (xử lý)               │
        │◀── OK ────────────────│                       │
        │                       │                       │
-       │── Reserve stock ──────────────────────────────▶│
+       │── Reserve stock ─────────────────────────────▶│
        │     (chờ 150ms...)                            │ (xử lý)
        │◀── OK ────────────────────────────────────────│
        │                                               │
@@ -363,10 +363,10 @@ Async giải quyết:
 ```
 Point-to-Point: 1 message → 1 consumer
 
-  Producer ──▶ ┌──────────────────┐ ──▶ Consumer
-               │ Queue            │
+  Producer ──▶ ┌───────────────────┐ ──▶ Consumer
+               │ Queue             │
                │ [msg1][msg2][msg3]│
-               └──────────────────┘
+               └───────────────────┘
 
   • Message được xóa sau khi consumer xử lý (acknowledge)
   • Nếu có nhiều consumers → mỗi message chỉ đến 1 consumer (load balance)
@@ -498,7 +498,7 @@ flowchart TD
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│         E-COMMERCE ORDER FLOW — MIXED COMMUNICATION              │
+│         E-COMMERCE ORDER FLOW — MIXED COMMUNICATION             │
 │                                                                 │
 │  User click "Đặt hàng"                                          │
 │       │                                                         │
@@ -534,13 +534,13 @@ flowchart TD
 │                                                     │           │
 │                              ┌───────────────┬──────┴────┐      │
 │                              ▼               ▼           ▼      │
-│                        ┌──────────┐   ┌──────────┐ ┌─────────┐  │
-│                        │Inventory │   │  Notif.  │ │Analytics│  │
-│                        │ Service  │   │ Service  │ │ Service │  │
-│                        │          │   │          │ │         │  │
-│                        │Reserve   │   │Gửi email │ │Track    │  │
+│                        ┌──────────┐   ┌──────────┐ ┌──────────┐ │
+│                        │Inventory │   │  Notif.  │ │Analytics │ │
+│                        │ Service  │   │ Service  │ │ Service  │ │
+│                        │          │   │          │ │          │ │
+│                        │Reserve   │   │Gửi email │ │Track     │ │
 │                        │stock     │   │xác nhận  │ │conversion│ │
-│                        └──────────┘   └──────────┘ └─────────┘  │
+│                        └──────────┘   └──────────┘ └──────────┘ │
 │                                                                 │
 │  Sync:  Order → Product (cần giá ngay)                          │
 │         Order → Payment (cần kết quả charge ngay)               │
@@ -870,7 +870,7 @@ Failure (step 3 fails):
     - Mark as published
 
   ┌──────────────────────────────────────────────────┐
-  │              Order Service                        │
+  │              Order Service                       │
   │                                                  │
   │  ┌────────────┐     ┌────────────┐               │
   │  │  orders    │     │   outbox   │               │
@@ -885,8 +885,8 @@ Failure (step 3 fails):
   │   transaction!      │  false     │               │
   │                     └─────┬──────┘               │
   │                           │                      │
-  │                  Outbox Publisher                 │
-  │                  (poll + publish)                 │
+  │                  Outbox Publisher                │
+  │                  (poll + publish)                │
   │                           │                      │
   └───────────────────────────┼──────────────────────┘
                               │
@@ -1047,9 +1047,9 @@ Về reliability:
 ## 10. Tổng kết
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────┐
 │           COMMUNICATION CHEAT SHEET                              │
-│                                                                 │
+│                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐     │
 │  │                    SYNCHRONOUS                          │     │
 │  │                                                         │     │
@@ -1057,17 +1057,17 @@ Về reliability:
 │  │  gRPC     → Internal high-perf, streaming, strict type  │     │
 │  │  GraphQL  → Client-facing, flexible queries (ở Gateway) │     │
 │  └─────────────────────────────────────────────────────────┘     │
-│                                                                 │
+│                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐     │
-│  │                    ASYNCHRONOUS                          │     │
+│  │                    ASYNCHRONOUS                         │     │
 │  │                                                         │     │
 │  │  Queue    → 1 producer → 1 consumer, task distribution  │     │
 │  │  Pub/Sub  → 1 event → N subscribers, fan-out            │     │
-│  │  Kafka    → Event streaming, replay, high throughput     │     │
+│  │  Kafka    → Event streaming, replay, high throughput    │     │
 │  └─────────────────────────────────────────────────────────┘     │
-│                                                                 │
+│                                                                  │
 │  ┌─────────────────────────────────────────────────────────┐     │
-│  │                    QUY TẮC VÀNG                          │     │
+│  │                    QUY TẮC VÀNG                         │     │
 │  │                                                         │     │
 │  │  1. Mặc định dùng ASYNC trừ khi CẦN response ngay       │     │
 │  │  2. Sync cho QUERY, Async cho COMMAND                   │     │
@@ -1076,7 +1076,7 @@ Về reliability:
 │  │  5. Dùng Outbox Pattern khi cần DB write + event        │     │
 │  │  6. Dead Letter Queue cho mọi async consumer            │     │
 │  └─────────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ---

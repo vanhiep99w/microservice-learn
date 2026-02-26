@@ -223,12 +223,12 @@ Auth tại Gateway:
                                │
                           ┌────▼─────────────────┐
                           │ Nếu INVALID:         │
-                          │ → 401 Unauthorized    │
+                          │ → 401 Unauthorized   │
                           └──────────────────────┘
                                │
                           ┌────▼─────────────────┐
                           │ Nếu VALID:           │
-                          │ Forward request +     │
+                          │ Forward request +    │
                           │ Header: X-User-Id=123│
                           │ Header: X-Roles=admin│
                           └────┬─────────────────┘
@@ -328,12 +328,12 @@ Thuật toán:
 **Có**. Vì bản thân Gateway cũng chạy nhiều instances → cần **LB phía trước Gateway**. Thực tế là có **nhiều tầng LB chồng nhau**, mỗi tầng vai trò khác nhau:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────────┐
 │              MULTI-LAYER LOAD BALANCING (AWS)                    │
-│                                                                 │
-│  User                                                           │
-│   │                                                             │
-│   ▼                                                             │
+│                                                                  │
+│  User                                                            │
+│   │                                                              │
+│   ▼                                                              │
 │  ┌──────────────────────────────────────────┐                    │
 │  │ Layer 1: EXTERNAL LB (ALB / NLB / CLB)   │                    │
 │  │                                          │                    │
@@ -343,33 +343,33 @@ Thuật toán:
 │  │ • Health check Gateway                   │                    │
 │  │ • HA cho Gateway (Gateway chết 1 → ok)   │                    │
 │  └────────────────┬─────────────────────────┘                    │
-│                   │                                             │
-│      ┌────────────┼────────────┐                                │
-│      ▼            ▼            ▼                                │
+│                   │                                              │
+│      ┌────────────┼────────────┐                                 │
+│      ▼            ▼            ▼                                 │
 │  ┌────────┐  ┌────────┐  ┌────────┐                              │
 │  │Gateway │  │Gateway │  │Gateway │  ← 3 instances               │
 │  │  #1    │  │  #2    │  │  #3    │                              │
 │  └───┬────┘  └───┬────┘  └───┬────┘                              │
-│      │           │           │                                  │
-│  ┌───▼───────────▼───────────▼───┐                               │
-│  │ Layer 2: GATEWAY LB            │                               │
-│  │                                │                               │
-│  │ Vai trò:                       │                               │
-│  │ • Route đến đúng service       │                               │
-│  │ • LB giữa instances của service│                               │
-│  │ • Auth, rate limit, aggregate  │                               │
-│  └───────────────┬────────────────┘                               │
-│                  │                                              │
-│     ┌────────────┼────────────┐                                 │
-│     ▼            ▼            ▼                                 │
+│      │           │           │                                   │
+│  ┌───▼───────────▼───────────▼────┐                              │
+│  │ Layer 2: GATEWAY LB            │                              │
+│  │                                │                              │
+│  │ Vai trò:                       │                              │
+│  │ • Route đến đúng service       │                              │
+│  │ • LB giữa instances của service│                              │
+│  │ • Auth, rate limit, aggregate  │                              │
+│  └───────────────┬────────────────┘                              │
+│                  │                                               │
+│     ┌────────────┼────────────┐                                  │
+│     ▼            ▼            ▼                                  │
 │  ┌──────┐    ┌──────┐    ┌──────┐                                │
 │  │Order │    │Order │    │Order │  ← Service instances           │
 │  │ #1   │    │ #2   │    │ #3   │                                │
 │  └──────┘    └──────┘    └──────┘                                │
-│                                                                 │
+│                                                                  │
 │  Trong K8s: Layer 2 có thể là K8s Service (kube-proxy)           │
-│  thay vì Gateway tự LB                                          │
-└─────────────────────────────────────────────────────────────────┘
+│  thay vì Gateway tự LB                                           │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 **Ví dụ cụ thể trong AWS:**
@@ -556,16 +556,16 @@ graph TD
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘                       │
 │       │             │             │                             │
 │       ▼             ▼             ▼                             │
-│  ┌─────────┐   ┌─────────┐   ┌─────────┐                        │
-│  │ Web BFF │   │Mobile   │   │Public   │                        │
-│  │         │   │  BFF    │   │  API    │                        │
-│  │ Full    │   │ Compact │   │ Raw     │                        │
-│  │ response│   │ response│   │ data    │                        │
-│  │ GraphQL │   │ REST    │   │ REST    │                        │
-│  │ SSR     │   │ Optimized│  │ Versioned│                       │
-│  └────┬────┘   └────┬────┘   └────┬────┘                        │
-│       │             │             │                             │
-│       └─────────────┼─────────────┘                             │
+│  ┌─────────┐   ┌──────────┐   ┌──────────┐                      │
+│  │ Web BFF │   │Mobile    │   │Public    │                      │
+│  │         │   │  BFF     │   │  API     │                      │
+│  │ Full    │   │ Compact  │   │ Raw      │                      │
+│  │ response│   │ response │   │ data     │                      │
+│  │ GraphQL │   │ REST     │   │ REST     │                      │
+│  │ SSR     │   │ Optimized│   │ Versioned│                      │
+│  └────┬────┘   └────┬─────┘   └────┬─────┘                      │
+│       │             │              │                            │
+│       └─────────────┼──────────────┘                            │
 │                     │                                           │
 │         ┌───────────┼────────────┐                              │
 │         ▼           ▼            ▼                              │
@@ -681,8 +681,8 @@ Sau (offload sang gateway):
 ───────────────────────────
   ┌──────────────────────────────────────┐
   │            API Gateway               │
-  │ ✓ SSL   ✓ Auth   ✓ Rate Limit       │
-  │ ✓ CORS  ✓ Logging                   │
+  │ ✓ SSL   ✓ Auth   ✓ Rate Limit        │
+  │ ✓ CORS  ✓ Logging                    │
   └──────────────────┬───────────────────┘
                      │
   ┌──────────────┐ ┌─┴────────────┐ ┌──────────────┐
@@ -1088,12 +1088,12 @@ Nguyên tắc:
   Nếu không có Gateway → service tự tạo.
 
   ┌───────────────────────────────────────────────────────────────┐
-  │  Entry Point             │ Ai tạo Trace ID?                  │
+  │  Entry Point             │ Ai tạo Trace ID?                   │
   │──────────────────────────│────────────────────────────────────│
-  │  Client → API Gateway    │ Gateway tạo                       │
-  │  Cron Job                │ Cron job tự tạo khi bắt đầu run   │
+  │  Client → API Gateway    │ Gateway tạo                        │
+  │  Cron Job                │ Cron job tự tạo khi bắt đầu run    │
   │  Kafka Consumer          │ Consumer tạo khi nhận message      │
-  │                          │ (hoặc lấy từ message header nếu   │
+  │                          │ (hoặc lấy từ message header nếu    │
   │                          │  producer đã inject)               │
   │  Background Worker       │ Worker tạo khi pick job từ queue   │
   │  CDC Event               │ CDC processor tạo khi nhận event   │
@@ -1170,21 +1170,21 @@ Tổng hợp — Trace ID lifecycle đầy đủ:
   ┌──────────────────────────────────────────────────────────────┐
   │                                                              │
   │  Client Request Flow:                                        │
-  │  Client → Gateway(tạo Trace) → Service → Service → ...      │
+  │  Client → Gateway(tạo Trace) → Service → Service → ...       │
   │                                                              │
   │  Async Event Flow:                                           │
   │  ... → Service(publish + inject Trace) → Broker              │
   │       → Consumer(extract Trace) → Service → ...              │
   │                                                              │
   │  Cron / Background Flow:                                     │
-  │  Scheduler(tạo Trace MỚI) → Service → Service → ...         │
+  │  Scheduler(tạo Trace MỚI) → Service → Service → ...          │
   │                                                              │
   │  Quy tắc vàng:                                               │
   │  ─────────────                                               │
   │  1. Mọi operation PHẢI có Trace ID                           │
-  │  2. Nếu có context sẵn (từ GW hoặc message) → propagate     │
-  │  3. Nếu KHÔNG có context → tự tạo mới                       │
-  │  4. Dùng OpenTelemetry SDK → tự động xử lý cả 3 trường hợp  │
+  │  2. Nếu có context sẵn (từ GW hoặc message) → propagate      │
+  │  3. Nếu KHÔNG có context → tự tạo mới                        │
+  │  4. Dùng OpenTelemetry SDK → tự động xử lý cả 3 trường hợp   │
   └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -1288,14 +1288,14 @@ Tổng hợp — CB hoạt động ở nhiều lớp:
 
   Hoặc dùng Service Mesh — Envoy sidecar tự CB cho MỌI outgoing call:
 
-  ┌─────────────────────────┐     ┌─────────────────────────┐
-  │ Pod: Order Service      │     │ Pod: Payment Service    │
-  │ ┌───────┐  ┌──────────┐ │     │┌──────────┐  ┌────────┐ │
-  │ │  App  │→ │  Envoy   │ │────▶││  Envoy   │→ │  App   │ │
-  │ │       │  │ Sidecar  │ │     ││ Sidecar  │  │        │ │
-  │ │       │  │ (CB ở đây)││     ││          │  │        │ │
-  │ └───────┘  └──────────┘ │     │└──────────┘  └────────┘ │
-  └─────────────────────────┘     └─────────────────────────┘
+  ┌──────────────────────────┐     ┌─────────────────────────┐
+  │ Pod: Order Service       │     │ Pod: Payment Service    │
+  │ ┌───────┐  ┌───────────┐ │     │┌──────────┐  ┌────────┐ │
+  │ │  App  │→ │  Envoy    │ │────▶││  Envoy   │→ │  App   │ │
+  │ │       │  │ Sidecar   │ │     ││ Sidecar  │  │        │ │
+  │ │       │  │ (CB ở đây)│ │     ││          │  │        │ │
+  │ └───────┘  └───────────┘ │     │└──────────┘  └────────┘ │
+  └──────────────────────────┘     └─────────────────────────┘
   
   Envoy sidecar CB hoạt động cho MỌI outgoing request
   — dù từ client flow, cron job, hay event consumer

@@ -728,21 +728,21 @@ NETFLIX EUREKA:
   │  │   (node 1)   │     │   (node 2)   │    replication   │
   │  └──────┬───────┘     └──────┬───────┘                  │
   │         │                    │                          │
-  │    ┌────┴──────┐        ┌────┴──────┐                   │
-  │    │ Payment   │        │  Order    │                   │
-  │    │ Service   │        │  Service  │                   │
-  │    │           │        │           │                   │
-  │    │ ┌────────┐│        │ ┌────────┐│                   │
-  │    │ │ Eureka ││        │ │ Eureka ││                   │
-  │    │ │ Client ││        │ │ Client ││                   │
-  │    │ └────────┘│        │ └────────┘│                   │
-  │    │           │        │           │                   │
-  │    │ • Register│        │ • Register│                   │
+  │    ┌────┴──────┐        ┌────┴───────┐                  │
+  │    │ Payment   │        │  Order     │                  │
+  │    │ Service   │        │  Service   │                  │
+  │    │           │        │            │                  │
+  │    │ ┌────────┐│        │ ┌────────┐ │                  │
+  │    │ │ Eureka ││        │ │ Eureka │ │                  │
+  │    │ │ Client ││        │ │ Client │ │                  │
+  │    │ └────────┘│        │ └────────┘ │                  │
+  │    │           │        │            │                  │
+  │    │ • Register│        │ • Register │                  │
   │    │ • Heartbeat│       │ • Heartbeat│                  │
-  │    │   (30s)   │        │   (30s)   │                   │
-  │    │ • Fetch   │        │ • Fetch   │                   │
-  │    │   registry│        │   registry│                   │
-  │    └───────────┘        └───────────┘                   │
+  │    │   (30s)   │        │   (30s)    │                  │
+  │    │ • Fetch   │        │ • Fetch    │                  │
+  │    │   registry│        │   registry │                  │
+  │    └───────────┘        └────────────┘                  │
   │                                                         │
   └─────────────────────────────────────────────────────────┘
 
@@ -935,7 +935,7 @@ AWS ELASTIC LOAD BALANCER:
   │     • TCP/UDP, ultra-low latency                          │
   │     • Hàng triệu requests/giây                            │
   │     • Static IP / Elastic IP                              │
-  │     → Phù hợp: gRPC, real-time, IoT, gaming              │
+  │     → Phù hợp: gRPC, real-time, IoT, gaming               │
   │                                                           │
   │  3. CLB (Classic Load Balancer) — Legacy                  │
   │     • Layer 4 + 7 (cơ bản)                                │
@@ -944,35 +944,35 @@ AWS ELASTIC LOAD BALANCER:
   └───────────────────────────────────────────────────────────┘
 
   Kiến trúc — ALB + ECS (phổ biến nhất):
-  ┌───────────────────────────────────────────────────────────┐
-  │                                                           │
-  │  Order Service                                            │
-  │    │                                                      │
-  │    │  http://payment-alb.us-east-1.elb.amazonaws.com      │
-  │    │  (chỉ cần DNS name của ALB!)                         │
-  │    ▼                                                      │
-  │  ┌────────────────────────────────────────────┐           │
-  │  │  ALB: payment-alb                          │           │
-  │  │  DNS: payment-alb.us-east-1.elb.amazonaws  │           │
-  │  │                                            │           │
-  │  │  Listener: 443 (HTTPS)                     │           │
-  │  │  Rule: /charge → payment-target-group      │           │
-  │  └──────────────────┬─────────────────────────┘           │
+  ┌────────────────────────────────────────────────────────────┐
+  │                                                            │
+  │  Order Service                                             │
+  │    │                                                       │
+  │    │  http://payment-alb.us-east-1.elb.amazonaws.com       │ 
+  │    │  (chỉ cần DNS name của ALB!)                          │
+  │    ▼                                                       │
+  │  ┌────────────────────────────────────────────┐            │
+  │  │  ALB: payment-alb                          │            │
+  │  │  DNS: payment-alb.us-east-1.elb.amazonaws  │            │
+  │  │                                            │            │
+  │  │  Listener: 443 (HTTPS)                     │            │
+  │  │  Rule: /charge → payment-target-group      │            │
+  │  └──────────────────┬─────────────────────────┘            │
   │                     │  Target Group (health check: /health)│
-  │          ┌──────────┼──────────┐                          │
-  │          ▼          ▼          ▼                          │
-  │     ┌─────────┐┌─────────┐┌─────────┐                    │
-  │     │  ECS    ││  ECS    ││  ECS    │                    │
-  │     │ Task 1  ││ Task 2  ││ Task 3  │                    │
-  │     │ Payment ││ Payment ││ Payment │                    │
-  │     │10.0.1.10││10.0.1.20││10.0.2.30│                    │
-  │     └─────────┘└─────────┘└─────────┘                    │
-  │                                                           │
-  │  ECS tự động register/deregister task vào Target Group    │
-  │  ALB health check → loại task unhealthy                   │
-  │  Auto Scaling → thêm/bớt task → ALB tự cập nhật          │
-  │                                                           │
-  └───────────────────────────────────────────────────────────┘
+  │          ┌──────────┼──────────┐                           │
+  │          ▼          ▼          ▼                           │
+  │     ┌─────────┐┌─────────┐┌─────────┐                      │
+  │     │  ECS    ││  ECS    ││  ECS    │                      │
+  │     │ Task 1  ││ Task 2  ││ Task 3  │                      │
+  │     │ Payment ││ Payment ││ Payment │                      │
+  │     │10.0.1.10││10.0.1.20││10.0.2.30│                      │
+  │     └─────────┘└─────────┘└─────────┘                      │
+  │                                                            │
+  │  ECS tự động register/deregister task vào Target Group     │
+  │  ALB health check → loại task unhealthy                    │
+  │  Auto Scaling → thêm/bớt task → ALB tự cập nhật            │
+  │                                                            │
+  └────────────────────────────────────────────────────────────┘
 
   Service Discovery tự động:
   ──────────────────────────
@@ -1265,10 +1265,10 @@ Scenario: Hệ thống e-commerce trên Kubernetes, 6 services.
   │  │  │  Kong / NGINX Ingress Controller                │    │ │
   │  │  │  (cũng là PODS — thường 2-3 replicas)           │    │ │
   │  │  │                                                 │    │ │
-  │  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐      │    │ │
-  │  │  │  │  Pod 1   │  │  Pod 2   │  │  Pod 3   │      │    │ │
-  │  │  │  │  Kong    │  │  Kong    │  │  Kong    │      │    │ │
-  │  │  │  └──────────┘  └──────────┘  └──────────┘      │    │ │
+  │  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐       │    │ │
+  │  │  │  │  Pod 1   │  │  Pod 2   │  │  Pod 3   │       │    │ │
+  │  │  │  │  Kong    │  │  Kong    │  │  Kong    │       │    │ │
+  │  │  │  └──────────┘  └──────────┘  └──────────┘       │    │ │
   │  │  └─────────────────────────────────────────────────┘    │ │
   │  └─────────────────────────────────────────────────────────┘ │
   │                           │                                  │
@@ -1305,7 +1305,7 @@ Scenario: Hệ thống e-commerce trên Kubernetes, 6 services.
   │  • Chạy như pods (Deployment), KHÔNG phải component đặc biệt │
   │  • Thường ở namespace riêng (ingress-nginx, kong)            │
   │  • Scale bằng HPA giống service thường                       │
-  │  • Cloud LB (ALB/NLB) đứng trước → route traffic vào        │
+  │  • Cloud LB (ALB/NLB) đứng trước → route traffic vào         │
   │    Kong pods qua Service type=LoadBalancer                   │
   │  • Kong dùng K8s DNS để discover backend services            │
   │    (cùng cơ chế CoreDNS như mọi pod khác)                    │

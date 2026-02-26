@@ -693,14 +693,14 @@ Request: "Thanh toán đơn hàng #456"
   │  → OK, cho request đi qua ✅
   │
   │  ┌─────────────────────────────────────────────────┐
-  │  │  LỚP TRONG: Retry xử lý                        │
-  │  │                                                  │
+  │  │  LỚP TRONG: Retry xử lý                         │
+  │  │                                                 │
   │  │  Lần 1: Gọi Payment Service → ❌ timeout 3s     │
   │  │  Chờ 500ms (backoff)                            │
   │  │  Lần 2: Gọi Payment Service → ❌ 500 error      │
   │  │  Chờ 1000ms (backoff)                           │
   │  │  Lần 3: Gọi Payment Service → ✅ 200ms OK!      │
-  │  │                                                  │
+  │  │                                                 │
   │  │  → Trả kết quả thành công                       │
   │  └─────────────────────────────────────────────────┘
   │
