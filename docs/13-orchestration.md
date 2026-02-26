@@ -1870,4 +1870,4 @@ graph LR
 | [12 - Containerization](12-containerization.md) | Docker image → K8s chạy containers |
 | [14 - CI/CD & Deployment](14-cicd-deployment.md) | Helm, ArgoCD, deployment strategies |
 | [15 - Security](15-security.md) | mTLS (Service Mesh), RBAC, Network Policies |
-| [17 - Configuration Management](17-configuration-secrets-management.md) | ConfigMap, Secret, External Secrets |
+| [16 - Configuration Management](16-configuration-secrets-management.md) | ConfigMap, Secret, External Secrets |

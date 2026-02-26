@@ -986,8 +986,8 @@ CÁCH GITOPS HOẠT ĐỘNG — VÍ DỤ CỤ THỂ:
 
   ┌──────────────────────────────────────────────────────────┐
   │                                                          │
-  │  Git repo ◄─────── ArgoCD pull (mỗi 3 phút) ─── Cluster │
-  │  (desired state)      so sánh + sync        (actual state)│
+  │  Git repo ◄─────── ArgoCD pull (mỗi 3 phút) ─── Cluster  │
+  │  (desired state)      so sánh + sync       (actual state)│
   │                                                          │
   │  Desired ≠ Actual? → ArgoCD tự sửa cluster cho giống Git │
   │                                                          │
@@ -1112,8 +1112,8 @@ GITOPS — 4 NGUYÊN TẮC:
 
   ┌──────┐              ┌─────────────────────────────────────┐
   │ Git  │              │ Cluster                             │
-  │merge │◀──pull───────│  ArgoCD: "Git thay đổi!" → apply   │
-  │      │   (mỗi 3p)  │                                     │
+  │merge │◀──pull───────│  ArgoCD: "Git thay đổi!" → apply    │
+  │      │   (mỗi 3p)  │                                      │
   └──────┘              └─────────────────────────────────────┘
 
   → KHÔNG CÓ CI/CD nào push vào cluster.
@@ -1129,38 +1129,38 @@ VẬY TẠI SAO CẦN GITOPS? PUSH-BASED CÓ 3 VẤN ĐỀ:
   │  Jenkins/GitHub Actions phải lưu:                        │
   │  • kubeconfig / Service Account token / AWS credentials  │
   │                                                          │
-  │  → Credentials nằm ở CI server (BÊN NGOÀI cluster)      │
+  │  → Credentials nằm ở CI server (BÊN NGOÀI cluster)       │
   │  → Bị hack CI = hack được cluster production 😱          │
-  │  → 20 pipelines = 20 chỗ lưu credentials = 20 rủi ro    │
+  │  → 20 pipelines = 20 chỗ lưu credentials = 20 rủi ro     │
   │                                                          │
   │  GitOps: Agent chạy TRONG cluster                        │
   │  → Không cần expose credentials ra ngoài                 │
-  │  → Agent chỉ cần READ access tới Git repo               │
+  │  → Agent chỉ cần READ access tới Git repo                │
   └──────────────────────────────────────────────────────────┘
 
   VẤN ĐỀ 2: DRIFT — CI/CD không phát hiện ai sửa tay
   ┌──────────────────────────────────────────────────────────┐
-  │  CI/CD chỉ chạy KHI CÓ TRIGGER (push, merge)            │
+  │  CI/CD chỉ chạy KHI CÓ TRIGGER (push, merge)             │
   │  Giữa 2 lần deploy → không ai canh cluster               │
   │                                                          │
   │  → Ai đó kubectl edit trên cluster                       │
   │  → CI/CD KHÔNG BIẾT — không có gì trigger                │
   │  → Cluster drift — không ai phát hiện                    │
   │                                                          │
-  │  GitOps: Agent check LIÊN TỤC (mỗi 3 phút)              │
+  │  GitOps: Agent check LIÊN TỤC (mỗi 3 phút)               │
   │  → Phát hiện drift → tự revert                           │
-  │  → Kể cả không ai deploy gì mới                         │
+  │  → Kể cả không ai deploy gì mới                          │
   └──────────────────────────────────────────────────────────┘
 
   VẤN ĐỀ 3: TRẠNG THÁI THẬT — "Cluster đang chạy cái gì?"
   ┌──────────────────────────────────────────────────────────┐
-  │  CI/CD: "kubectl apply thành công" ✅                     │
+  │  CI/CD: "kubectl apply thành công" ✅                    │
   │  Nhưng: Pod có chạy không? OOMKill? CrashLoop?           │
   │  → CI/CD push xong là xong, KHÔNG theo dõi tiếp          │
   │                                                          │
   │  GitOps (ArgoCD UI):                                     │
   │  → Dashboard realtime:                                   │
-  │    ✅ Synced — cluster = Git                              │
+  │    ✅ Synced — cluster = Git                             │
   │    ⚠️ OutOfSync — ai đó sửa tay / deploy pending         │
   │    ❌ Degraded — pod crash, lỗi                          │
   │  → Luôn biết cluster THỰC SỰ đang ở trạng thái nào       │
@@ -1598,24 +1598,24 @@ JENKINS — TỔNG QUAN:
 ────────────────────
 
   ┌──────────────────────────────────────────────────────────┐
-  │  Jenkins Architecture:                                    │
+  │  Jenkins Architecture:                                   │
   │                                                          │
-  │  ┌─────────────────┐                                     │
+  │  ┌──────────────────┐                                    │
   │  │  Jenkins Master  │   ← Quản lý jobs, UI, scheduling   │
-  │  │  (Controller)    │                                     │
-  │  └────────┬─────────┘                                     │
-  │           │                                               │
-  │     ┌─────┼──────┐                                        │
-  │     │     │      │                                        │
-  │     ▼     ▼      ▼                                        │
+  │  │  (Controller)    │                                    │
+  │  └────────┬─────────┘                                    │
+  │           │                                              │
+  │     ┌─────┼──────┐                                       │
+  │     │     │      │                                       │
+  │     ▼     ▼      ▼                                       │
   │  ┌─────┐┌─────┐┌─────┐                                   │
-  │  │Agent││Agent││Agent│  ← Worker nodes chạy jobs          │
-  │  │  1  ││  2  ││  3  │    (trước gọi là Slave/Node)       │
+  │  │Agent││Agent││Agent│  ← Worker nodes chạy jobs         │
+  │  │  1  ││  2  ││  3  │    (trước gọi là Slave/Node)      │
   │  └─────┘└─────┘└─────┘                                   │
   │                                                          │
-  │  Pipeline viết bằng: Jenkinsfile (Groovy DSL)             │
+  │  Pipeline viết bằng: Jenkinsfile (Groovy DSL)            │
   │  Quản lý: Web UI hoặc Configuration as Code (JCasC)      │
-  │  Plugin: 1800+ plugins cho mọi thứ                        │
+  │  Plugin: 1800+ plugins cho mọi thứ                       │
   └──────────────────────────────────────────────────────────┘
 ```
 
@@ -1725,21 +1725,21 @@ JENKINS vs GITHUB ACTIONS — KHI NÀO DÙNG GÌ?
   ┌──────────────────────────────────────────────────────────┐
   │  CHỌN JENKINS KHI:                                       │
   │                                                          │
-  │  • Enterprise lớn, đã có Jenkins chạy nhiều năm           │
-  │  • Cần self-hosted (data không ra ngoài, compliance)      │
-  │  • Pipeline phức tạp, cần Groovy scripting                │
+  │  • Enterprise lớn, đã có Jenkins chạy nhiều năm          │
+  │  • Cần self-hosted (data không ra ngoài, compliance)     │
+  │  • Pipeline phức tạp, cần Groovy scripting               │
   │  • Cần tích hợp tools nội bộ (plugin tự viết)            │
-  │  • Multi-branch, multi-repo pipeline phức tạp             │
+  │  • Multi-branch, multi-repo pipeline phức tạp            │
   └──────────────────────────────────────────────────────────┘
 
   ┌──────────────────────────────────────────────────────────┐
   │  CHỌN GITHUB ACTIONS KHI:                                │
   │                                                          │
-  │  • Dự án mới, code trên GitHub                            │
-  │  • Muốn setup nhanh (YAML, không cần server)              │
+  │  • Dự án mới, code trên GitHub                           │
+  │  • Muốn setup nhanh (YAML, không cần server)             │
   │  • Team nhỏ-vừa, không muốn maintain CI server           │
-  │  • Open source (free cho public repos)                    │
-  │  • Marketplace có sẵn actions cho hầu hết use cases       │
+  │  • Open source (free cho public repos)                   │
+  │  • Marketplace có sẵn actions cho hầu hết use cases      │
   └──────────────────────────────────────────────────────────┘
 ```
 
@@ -2001,4 +2001,4 @@ TÓM TẮT CI/CD & DEPLOYMENT CHO MICROSERVICE:
 - [10. Resilience Patterns](10-resilience-patterns.md) — Circuit Breaker trong Canary/Rolling
 - [11. Observability & Evolvability](11-observability-evolvability.md) — Monitoring post-deploy
 - [15. Security](15-security.md) — Pipeline security, image scanning
-- [17. Configuration & Secrets Management](17-configuration-secrets-management.md) — Config trong CD pipeline
+- [16. Configuration & Secrets Management](16-configuration-secrets-management.md) — Config trong CD pipeline

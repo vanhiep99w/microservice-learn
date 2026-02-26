@@ -85,19 +85,19 @@
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 15 | [Security](docs/15-security.md) | OAuth2, JWT, mTLS, API Security, Zero Trust | ⬜ |
+| 15 | [Security](docs/15-security.md) | OAuth2, JWT, mTLS, API Security, Zero Trust | ✅ |
 
 ## 8. Configuration Management
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 17 | [Configuration & Secrets Management](docs/17-configuration-secrets-management.md) | External Config, Config Server, Secrets Management, Vault, Environment Variables | ⬜ |
+| 16 | [Configuration & Secrets Management](docs/16-configuration-secrets-management.md) | External Config, Config Server, Secrets Management, Vault, Environment Variables | ✅ |
 
 ## 9. Design Patterns tổng hợp
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 16 | [Design Patterns](docs/16-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ⬜ |
+| 17 | [Design Patterns](docs/17-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ⬜ |
 
 ## 10. Microservice trên AWS
 

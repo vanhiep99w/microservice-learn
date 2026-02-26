@@ -26,8 +26,8 @@ microservice-learn/
     ├── 13-orchestration.md
     ├── 14-cicd-deployment.md
     ├── 15-security.md
-    ├── 17-configuration-secrets-management.md
-    ├── 16-design-patterns.md
+    ├── 16-configuration-secrets-management.md
+    ├── 17-design-patterns.md
     ├── 18-aws-microservice-overview.md
     ├── 19-aws-networking.md
     ├── 20-aws-compute.md
