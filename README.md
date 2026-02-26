@@ -97,7 +97,7 @@
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 17 | [Design Patterns](17-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ⬜ |
+| 17 | [Design Patterns](17-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ✅ |
 
 ## 10. Microservice trên AWS
 
