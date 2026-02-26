@@ -10,31 +10,30 @@ Repository này là tài liệu học tập về **Microservice Architecture**. 
 microservice-learn/
 ├── README.md              # Tổng quan, roadmap, links tới tất cả docs
 ├── AGENTS.md              # File hướng dẫn này
-└── docs/                  # Thư mục chứa tất cả tài liệu chi tiết
-    ├── 01-microservice-overview.md
-    ├── 02-single-responsibility-bounded-context.md
-    ├── 03-loose-coupling-high-cohesion.md
-    ├── 04-autonomy-independence.md
-    ├── 05-decomposition-strategies.md
-    ├── 06-inter-service-communication.md
-    ├── 07-api-gateway.md
-    ├── 08-service-discovery.md
-    ├── 09-data-management.md
-    ├── 10-resilience-patterns.md
-    ├── 11-observability-evolvability.md
-    ├── 12-containerization.md
-    ├── 13-orchestration.md
-    ├── 14-cicd-deployment.md
-    ├── 15-security.md
-    ├── 16-configuration-secrets-management.md
-    ├── 17-design-patterns.md
-    ├── 18-aws-microservice-overview.md
-    ├── 19-aws-networking.md
-    ├── 20-aws-compute.md
-    ├── 21-aws-data-messaging.md
-    ├── 22-aws-observability.md
-    ├── 23-aws-security.md
-    └── 24-aws-deployment-strategies.md
+├── 01-microservice-overview.md
+├── 02-single-responsibility-bounded-context.md
+├── 03-loose-coupling-high-cohesion.md
+├── 04-autonomy-independence.md
+├── 05-decomposition-strategies.md
+├── 06-inter-service-communication.md
+├── 07-api-gateway.md
+├── 08-service-discovery.md
+├── 09-data-management.md
+├── 10-resilience-patterns.md
+├── 11-observability-evolvability.md
+├── 12-containerization.md
+├── 13-orchestration.md
+├── 14-cicd-deployment.md
+├── 15-security.md
+├── 16-configuration-secrets-management.md
+├── 17-design-patterns.md
+├── 18-aws-microservice-overview.md
+├── 19-aws-networking.md
+├── 20-aws-compute.md
+├── 21-aws-data-messaging.md
+├── 22-aws-observability.md
+├── 23-aws-security.md
+└── 24-aws-deployment-strategies.md
 ```
 
 ## Quy tắc viết tài liệu
@@ -68,7 +67,7 @@ microservice-learn/
   - `⬜` — Chưa viết
   - `🟡` — Đang viết
   - `✅` — Hoàn thành
-- Đảm bảo tất cả links trong README trỏ đúng tới file trong `docs/`
+- Đảm bảo tất cả links trong README trỏ đúng tới file
 
 ### Diagrams
 
@@ -94,7 +93,7 @@ graph LR
 
 ### Khi thêm doc mới
 
-1. Tạo file trong `docs/` theo format đặt tên
+1. Tạo file ở thư mục gốc theo format đặt tên
 2. Thêm TOC ở đầu file
 3. Cập nhật README.md — thêm vào bảng tương ứng
 4. Đổi trạng thái thành `✅` khi hoàn thành
