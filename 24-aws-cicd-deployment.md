@@ -57,6 +57,8 @@ Doc này trả lời câu hỏi: **CodePipeline vs GitHub Actions chọn khi nà
 
 > 💡 Giả định: Bạn đã đọc [doc 14](14-cicd-deployment.md) và hiểu lý thuyết. Doc này tập trung vào **cách AWS hiện thực hóa** các khái niệm đó.
 
+> 📌 Lưu ý: Các ước tính chi phí trong tài liệu là **tham khảo theo thời điểm viết**. Giá thực tế phụ thuộc region, mức sử dụng, và có thể thay đổi; luôn đối chiếu AWS Pricing trước khi triển khai.
+
 ```
 MAPPING: LÝ THUYẾT CI/CD → AWS SERVICES
 ──────────────────────────────────────────

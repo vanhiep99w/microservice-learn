@@ -13,11 +13,11 @@
   - [3.3. JWT & Token Management](#33-jwt--token-management)
   - [3.4. Cognito + API Gateway Integration](#34-cognito--api-gateway-integration)
   - [3.5. So sánh Cognito vs Keycloak vs Auth0 trên AWS](#35-so-sánh-cognito-vs-keycloak-vs-auth0-trên-aws)
-- [4. mTLS & Service Mesh Security với App Mesh](#4-mtls--service-mesh-security-với-app-mesh)
-  - [4.1. App Mesh — mTLS tự động](#41-app-mesh--mtls-tự-động)
-  - [4.2. Cấu hình mTLS với App Mesh](#42-cấu-hình-mtls-với-app-mesh)
-  - [4.3. Authorization Policies trong App Mesh](#43-authorization-policies-trong-app-mesh)
-  - [4.4. ECS Service Connect vs App Mesh](#44-ecs-service-connect-vs-app-mesh)
+- [4. mTLS & Service-to-Service Security trên AWS](#4-mtls--service-to-service-security-trên-aws)
+  - [4.1. Các lựa chọn triển khai mTLS](#41-các-lựa-chọn-triển-khai-mtls)
+  - [4.2. Mẫu cấu hình mTLS (tham khảo)](#42-mẫu-cấu-hình-mtls-tham-khảo)
+  - [4.3. Authorization policy giữa services](#43-authorization-policy-giữa-services)
+  - [4.4. Service Connect vs Istio vs App Mesh (legacy)](#44-service-connect-vs-istio-vs-app-mesh-legacy)
 - [5. Secrets Management trên AWS](#5-secrets-management-trên-aws)
   - [5.1. AWS Secrets Manager](#51-aws-secrets-manager)
   - [5.2. AWS Systems Manager Parameter Store](#52-aws-systems-manager-parameter-store)
@@ -50,7 +50,7 @@
 
 Trong [doc 15 — Security](15-security.md), chúng ta đã hiểu lý thuyết về Authentication, Authorization, mTLS, JWT, Zero Trust, Secrets Management, và Network Security trong kiến trúc Microservice. Doc này **áp dụng tất cả kiến thức đó vào thực tế trên AWS** — mapping từng khái niệm bảo mật sang AWS service cụ thể, từ cấu hình chi tiết đến best practices.
 
-Doc này trả lời câu hỏi: **IAM Roles cho service-to-service auth cấu hình thế nào? Cognito dùng ra sao cho AuthN/AuthZ? mTLS với App Mesh triển khai bằng cách nào? Secrets Manager vs Parameter Store chọn khi nào? VPC/Security Groups thiết kế thế nào cho Microservice? Zero Trust áp dụng trên AWS ra sao?**
+Doc này trả lời câu hỏi: **IAM Roles cho service-to-service auth cấu hình thế nào? Cognito dùng ra sao cho AuthN/AuthZ? mTLS service-to-service triển khai bằng cách nào trên AWS? Secrets Manager vs Parameter Store chọn khi nào? VPC/Security Groups thiết kế thế nào cho Microservice? Zero Trust áp dụng trên AWS ra sao?**
 
 > 💡 Giả định: Bạn đã đọc [doc 15](15-security.md) và hiểu lý thuyết. Doc này tập trung vào **cách AWS hiện thực hóa** các khái niệm đó.
 
@@ -64,7 +64,7 @@ MAPPING: LÝ THUYẾT SECURITY → AWS SERVICES
   Authorization (AuthZ)      →    IAM Policies, Cognito Groups
   OAuth 2.0 / OIDC           →    Cognito + API Gateway Authorizer
   JWT Validation             →    API Gateway, Lambda Authorizer
-  mTLS                       →    App Mesh + ACM Private CA
+  mTLS                       →    Service Connect / Istio / legacy App Mesh
   Service Identity (SPIFFE)  →    IAM Roles (Task Role, IRSA)
   Secrets Management         →    Secrets Manager, Parameter Store
   Network Security           →    VPC, Security Groups, NACLs
@@ -86,7 +86,7 @@ MAPPING: LÝ THUYẾT SECURITY → AWS SERVICES
   │   │  VPC + Security Groups + NACLs + PrivateLink          │  │
   │   └───────────────────────┬───────────────────────────────┘  │
   │   ┌─── Service ───────────▼───────────────────────────────┐  │
-  │   │  IAM Roles + App Mesh mTLS + Service Connect          │  │
+  │   │  IAM Roles + service-to-service TLS/mTLS              │  │
   │   └───────────────────────┬───────────────────────────────┘  │
   │   ┌─── Data ──────────────▼───────────────────────────────┐  │
   │   │  KMS + Secrets Manager + RDS Encryption               │  │
@@ -98,7 +98,7 @@ MAPPING: LÝ THUYẾT SECURITY → AWS SERVICES
   └──────────────────────────────────────────────────────────────┘
 ```
 
-> 📖 Tham khảo thêm: [doc 16 — Configuration & Secrets Management](16-configuration-secrets-management.md) cho lý thuyết config/secrets, [doc 19 — Communication trên AWS](19-aws-communication-discovery.md) cho App Mesh basics.
+> 📖 Tham khảo thêm: [doc 16 — Configuration & Secrets Management](16-configuration-secrets-management.md) cho lý thuyết config/secrets, [doc 19 — Communication trên AWS](19-aws-communication-discovery.md) cho Service Connect/VPC Lattice và App Mesh (legacy).
 
 ---
 
@@ -671,11 +671,13 @@ def handler(event, context):
 
 ---
 
-## 4. mTLS & Service Mesh Security với App Mesh
+## 4. mTLS & Service-to-Service Security trên AWS
 
-Trong [doc 15](15-security.md), ta đã hiểu mTLS cho phép 2 services **xác thực lẫn nhau** và **mã hóa traffic**. Trên AWS, **App Mesh** kết hợp với **ACM Private CA** triển khai mTLS tự động cho mọi service-to-service communication.
+Trong [doc 15](15-security.md), ta đã hiểu mTLS cho phép 2 services **xác thực lẫn nhau** và **mã hóa traffic**. Trên AWS, có nhiều lựa chọn để bảo vệ service-to-service communication; App Mesh chỉ nên xem là lựa chọn legacy.
 
-### 4.1. App Mesh — mTLS tự động
+### 4.1. Các lựa chọn triển khai mTLS
+
+> ⚠️ **Lưu ý thời gian:** AWS App Mesh có mốc **End of Support ngày 30/09/2026**. Không nên chọn App Mesh cho workload mới.
 
 ```
 APP MESH mTLS ARCHITECTURE
@@ -709,9 +711,9 @@ APP MESH mTLS ARCHITECTURE
   └───────────────────────────────────┘
 ```
 
-> 📖 So sánh với [doc 15](15-security.md): Istio dùng **built-in CA** (istiod) cấp cert. App Mesh dùng **ACM Private CA** — managed, nhưng tốn phí ($400/mo per CA).
+> 📖 So sánh với [doc 15](15-security.md): Istio dùng **built-in CA** (istiod) cấp cert. App Mesh (legacy) có thể dùng **ACM Private CA**.
 
-### 4.2. Cấu hình mTLS với App Mesh
+### 4.2. Mẫu cấu hình mTLS (tham khảo)
 
 ```json
 // Virtual Node — Bật mTLS cho Order Service
@@ -761,9 +763,9 @@ APP MESH mTLS ARCHITECTURE
 | **PERMISSIVE** | Chấp nhận cả TLS và plaintext | Migration period (chuyển dần sang TLS) |
 | **STRICT** | Bắt buộc TLS | Production — mọi traffic phải encrypted |
 
-### 4.3. Authorization Policies trong App Mesh
+### 4.3. Authorization policy giữa services
 
-App Mesh kiểm soát service nào được gọi service nào thông qua **Virtual Node backends**:
+Service mesh có thể kiểm soát service nào được gọi service nào thông qua policy/backends:
 
 ```json
 // Order Service chỉ được gọi Payment Service và Inventory Service
@@ -788,19 +790,19 @@ App Mesh kiểm soát service nào được gọi service nào thông qua **Virt
 }
 ```
 
-### 4.4. ECS Service Connect vs App Mesh
+### 4.4. Service Connect vs Istio vs App Mesh (legacy)
 
-| Tiêu chí | ECS Service Connect | App Mesh |
-|----------|-------------------|----------|
-| **Complexity** | Đơn giản | Phức tạp |
-| **mTLS** | TLS tự động (không mutual) | Full mTLS với ACM PCA |
-| **Observability** | CloudWatch metrics tự động | X-Ray + CloudWatch + custom |
-| **Authorization** | Không có fine-grained | Backend-level control |
-| **Cross-cluster** | Chỉ trong ECS cluster | Cross ECS + EKS |
-| **Cost** | Free (chỉ infra) | Free (+ ACM PCA nếu dùng mTLS) |
-| **Phù hợp** | Services đơn giản, team nhỏ | Production lớn, cần mTLS + observability |
+| Tiêu chí | ECS Service Connect | Istio (EKS) | App Mesh (legacy) |
+|----------|---------------------|-------------|-------------------|
+| **Complexity** | Đơn giản | Trung bình-cao | Cao |
+| **mTLS** | TLS tự động (không mutual) | Full mTLS | Full mTLS |
+| **Observability** | CloudWatch metrics tự động | OTel + Prometheus/Grafana/X-Ray | Envoy + X-Ray/CloudWatch |
+| **Authorization** | Hạn chế | Fine-grained qua policy | Backend-level control |
+| **Cross-cluster** | Chủ yếu ECS | Mạnh cho K8s multi-cluster | Cross ECS + EKS |
+| **Tình trạng** | Active | Active | Legacy (EoS 30/09/2026) |
+| **Phù hợp** | Services đơn giản, team nhỏ | Production lớn trên EKS cần policy sâu | Hệ thống cũ đang vận hành |
 
-> 💡 **Recommendation**: Bắt đầu với **ECS Service Connect** cho đơn giản. Chuyển sang **App Mesh** khi cần mTLS, fine-grained authorization, hoặc cross-platform (ECS + EKS).
+> 💡 **Recommendation**: Bắt đầu với **ECS Service Connect** (ECS) hoặc **Istio/Linkerd** (EKS). Chỉ giữ App Mesh cho hệ thống legacy có kế hoạch migration.
 
 ---
 
@@ -1365,7 +1367,7 @@ ZERO TRUST TRÊN AWS — DEFENSE IN DEPTH
   │  │ • VPC Endpoints (no public internet)                │ │
   │  └─────────────────────────────────────────────────────┘ │
   │  ┌─ Layer 3: Application ──────────────────────────────┐ │
-  │  │ • mTLS between services (App Mesh)                  │ │
+  │  │ • mTLS between services (Service mesh / policy)     │ │
   │  │ • JWT validation per request                        │ │
   │  │ • Input validation + WAF                            │ │
   │  └─────────────────────────────────────────────────────┘ │
@@ -1404,7 +1406,7 @@ graph TB
     end
     
     subgraph "Phase 4 — Service Security (Week 7-8)"
-        J[App Mesh / Service Connect] --> K[mTLS between services]
+        J[Service mesh / Service Connect] --> K[mTLS between services]
         K --> L[Service-level AuthZ]
     end
     
@@ -1672,7 +1674,7 @@ E-COMMERCE SECURITY ARCHITECTURE — FULL STACK
   │  Secrets Manager: DB passwords (auto-rotate 30 days)        │
   │  Parameter Store: Feature flags, config values              │
   │  KMS CMK: Encrypt RDS, S3, SQS, DynamoDB                    │
-  │  ACM: TLS certificates cho ALB + App Mesh mTLS              │
+  │  ACM: TLS certificates cho ALB + internal TLS/mTLS           │
   └─────────────────────────────────────────────────────────────┘
 
   Layer 6: AUDIT & MONITORING
@@ -1723,9 +1725,9 @@ E-COMMERCE SECURITY ARCHITECTURE — FULL STACK
 
 ### Service-to-Service Security
 
-- [ ] App Mesh / Service Connect cho service mesh
-- [ ] mTLS enabled (STRICT mode) cho production
-- [ ] ACM Private CA cho certificate management
+- [ ] Service-to-service TLS/mTLS strategy đã chọn (Service Connect / Istio / legacy App Mesh)
+- [ ] mTLS enabled (STRICT mode) cho production khi workload yêu cầu mutual auth
+- [ ] Certificate lifecycle được quản lý rõ (ACM/ACM PCA/mesh CA theo stack đã chọn)
 
 ### Secrets & Encryption
 
@@ -1770,7 +1772,7 @@ E-COMMERCE SECURITY ARCHITECTURE — FULL STACK
 │  • Lambda Authorizer cho custom logic (multi-tenant)              │
 │                                                                   │
 │  Service-to-Service:                                              │
-│  • App Mesh + ACM PCA cho mTLS (production lớn)                   │
+│  • Chọn mTLS stack phù hợp: Service Connect (đơn giản), Istio (policy sâu), App Mesh chỉ legacy │
 │  • ECS Service Connect cho đơn giản                               │
 │                                                                   │
 │  Secrets:                                                         │
@@ -1799,7 +1801,7 @@ E-COMMERCE SECURITY ARCHITECTURE — FULL STACK
 2. **Cognito + API Gateway = AuthN zero-code** — đủ cho 80% use cases, Lambda Authorizer cho 20% còn lại
 3. **Secrets KHÔNG BAO GIỜ hardcode** — Secrets Manager (auto-rotate) cho passwords, Parameter Store (free) cho config
 4. **Network isolation = defense in depth** — Private Subnets + SG chains + VPC Endpoints
-5. **Encrypt everything** — KMS CMK cho at-rest, ACM cho in-transit, App Mesh cho mTLS
+5. **Encrypt everything** — KMS CMK cho at-rest, ACM cho in-transit, và service-to-service TLS/mTLS
 6. **Audit from day 1** — CloudTrail + GuardDuty bật ngay từ đầu, không đợi incident mới bật
 
 ---
@@ -1809,7 +1811,7 @@ E-COMMERCE SECURITY ARCHITECTURE — FULL STACK
 - [15 — Security](15-security.md) — Lý thuyết Authentication, Authorization, mTLS, JWT, Zero Trust
 - [16 — Configuration & Secrets Management](16-configuration-secrets-management.md) — Lý thuyết Config Server, Vault, Secrets Management
 - [18 — Triển khai & Kiến trúc tổng quan](18-aws-deployment-architecture.md) — Multi-account strategy, ECS vs EKS vs Lambda
-- [19 — Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) — App Mesh, Service Connect, API Gateway
+- [19 — Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) — Service Connect, VPC Lattice, API Gateway, App Mesh (legacy)
 - [21 — Resilience & Auto Scaling trên AWS](21-aws-resilience.md) — Health Check, Auto Scaling
 - [22 — Observability trên AWS](22-aws-observability.md) — CloudWatch, X-Ray, audit logging
 - [24 — CI/CD & Deployment trên AWS](24-aws-cicd-deployment.md) — Pipeline security, deployment strategies

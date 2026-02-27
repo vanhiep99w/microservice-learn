@@ -50,6 +50,8 @@ Doc này trả lời câu hỏi: **Dùng database nào trên AWS cho từng serv
 
 > 💡 Giả định: Bạn đã đọc [doc 09](09-data-management.md) và hiểu lý thuyết. Doc này tập trung vào **cách AWS hiện thực hóa** các khái niệm đó.
 
+> 📌 Lưu ý: Các con số về pricing trong tài liệu là **giá tham khảo theo thời điểm viết** và có thể thay đổi theo region/thời gian. Luôn kiểm tra trang AWS Pricing chính thức trước khi ra quyết định.
+
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │            DATA MANAGEMENT LANDSCAPE trên AWS                      │

@@ -276,7 +276,7 @@ resource "aws_lambda_function" "payment_processor" {
 | **ECS** | X-Ray Daemon sidecar + SDK | Trung bình | ⚠️ Cần instrument code |
 | **EKS** | ADOT Collector DaemonSet + OTel SDK | Trung bình | ⚠️ Cần instrument code |
 | **API Gateway** | Enable tracing trong stage settings | Rất thấp | ✅ Tự động |
-| **App Mesh** | Envoy tự gửi traces | Thấp | ✅ Tự động qua Envoy |
+| **App Mesh (legacy)** | Envoy tự gửi traces | Thấp | ⚠️ Legacy, EoS 30/09/2026 |
 
 ### 2.3. X-Ray Service Map
 
@@ -1568,7 +1568,7 @@ resource "aws_cloudwatch_event_target" "ssm_automation" {
 
 - [11 — Observability & Evolvability](11-observability-evolvability.md) — Lý thuyết Logs, Metrics, Traces, ELK, Prometheus, Jaeger
 - [18 — Triển khai & Kiến trúc tổng quan](18-aws-deployment-architecture.md) — ECS vs EKS vs Lambda
-- [19 — Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) — App Mesh, tracing qua service mesh
+- [19 — Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) — Service Connect, VPC Lattice, tracing qua service layer
 - [20 — Data Management trên AWS](20-aws-data-management.md) — Monitoring data layer
 - [21 — Resilience & Auto Scaling trên AWS](21-aws-resilience.md) — Health Check, Auto Scaling (cần metrics)
 - [23 — Security trên AWS](23-aws-security.md) — Audit logging, security monitoring

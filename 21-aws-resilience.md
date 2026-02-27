@@ -13,7 +13,7 @@
   - [3.2. Multi-Region — Disaster Recovery & Global Users](#32-multi-region--disaster-recovery--global-users)
   - [3.3. DR Strategies trên AWS](#33-dr-strategies-trên-aws)
 - [4. Circuit Breaker & Resilience Patterns trên AWS](#4-circuit-breaker--resilience-patterns-trên-aws)
-  - [4.1. Circuit Breaker với App Mesh (Envoy)](#41-circuit-breaker-với-app-mesh-envoy)
+  - [4.1. Circuit Breaker ở service layer (ưu tiên non-App-Mesh)](#41-circuit-breaker-ở-service-layer-ưu-tiên-non-app-mesh)
   - [4.2. Retry & Timeout trên AWS](#42-retry--timeout-trên-aws)
   - [4.3. Bulkhead trên AWS](#43-bulkhead-trên-aws)
   - [4.4. Rate Limiting trên AWS](#44-rate-limiting-trên-aws)
@@ -43,7 +43,7 @@
 
 Trong [doc 10 — Resilience Patterns](10-resilience-patterns.md), chúng ta đã hiểu lý thuyết về Circuit Breaker, Retry, Bulkhead, Rate Limiter, Fallback, Health Check, Chaos Engineering. Doc này **áp dụng tất cả kiến thức đó vào thực tế trên AWS** — mapping từng pattern lý thuyết sang AWS service cụ thể, kết hợp thêm **Auto Scaling** và **Disaster Recovery** — hai yếu tố cốt lõi cho hệ thống production trên cloud.
 
-Doc này trả lời câu hỏi: **Auto Scaling ECS/EKS/Lambda khác nhau thế nào? Multi-AZ/Multi-Region triển khai ra sao? Circuit Breaker cấu hình với App Mesh như thế nào? Chaos Engineering thực hành trên AWS bằng cách nào? DR strategy nào phù hợp?**
+Doc này trả lời câu hỏi: **Auto Scaling ECS/EKS/Lambda khác nhau thế nào? Multi-AZ/Multi-Region triển khai ra sao? Circuit Breaker cấu hình ở service layer như thế nào? Chaos Engineering thực hành trên AWS bằng cách nào? DR strategy nào phù hợp?**
 
 > 💡 Giả định: Bạn đã đọc [doc 10](10-resilience-patterns.md) và hiểu lý thuyết. Doc này tập trung vào **cách AWS hiện thực hóa** các khái niệm đó.
 
@@ -60,7 +60,8 @@ Doc này trả lời câu hỏi: **Auto Scaling ECS/EKS/Lambda khác nhau thế 
 │  └─────────────────────────────────────────────────────────────┘   │
 │                                                                    │
 │  ┌─────── Resilience Patterns ────────────────────────────────┐    │
-│  │  App Mesh (Envoy)            ← Circuit Breaker, Retry      │    │
+│  │  Service Connect / VPC Lattice / Istio                     │    │
+│  │                               ← Timeout, Retry, policy      │    │
 │  │  API Gateway                 ← Rate Limiting, Throttling   │    │
 │  │  ALB/NLB                     ← Health Check, Failover      │    │
 │  │  Route 53                    ← DNS Failover, Health Check  │    │
@@ -557,9 +558,13 @@ Multi-Region cần thiết khi: **(1)** Yêu cầu DR cho critical workloads, **
 
 ## 4. Circuit Breaker & Resilience Patterns trên AWS
 
-### 4.1. Circuit Breaker với App Mesh (Envoy)
+### 4.1. Circuit Breaker ở service layer (ưu tiên non-App-Mesh)
 
-**AWS App Mesh** sử dụng Envoy Proxy làm sidecar, hỗ trợ **outlier detection** (tương đương Circuit Breaker) ở tầng infrastructure — không cần code trong application.
+Circuit Breaker có thể triển khai ở 2 tầng:
+- **Application-level** (Resilience4j/Polly): linh hoạt nhất cho business fallback.
+- **Service layer** (Service Connect/VPC Lattice/Istio): quản lý policy tập trung.
+
+> ⚠️ **Lưu ý thời gian:** AWS App Mesh có mốc **End of Support ngày 30/09/2026**. Không nên chọn App Mesh cho workload mới.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -581,11 +586,13 @@ Multi-Region cần thiết khi: **(1)** Yêu cầu DR cho critical workloads, **
 │  │  └───────────────┘  │      │  └───────────────┘  │    │
 │  └─────────────────────┘      └─────────────────────┘    │
 │                                                          │
-│  App Mesh Control Plane ← cấu hình qua API/Terraform     │
+│  Service layer control plane ← cấu hình qua API/Terraform │
 └──────────────────────────────────────────────────────────┘
 ```
 
-#### Cấu hình Outlier Detection (Circuit Breaker)
+#### Cấu hình Outlier Detection (legacy App Mesh, chỉ tham khảo migration)
+
+> Phần cấu hình dưới đây giữ lại để hỗ trợ hệ thống cũ đang chạy App Mesh; không khuyến nghị cho dự án greenfield.
 
 ```hcl
 # App Mesh Virtual Node với Outlier Detection
@@ -708,22 +715,22 @@ resource "aws_appmesh_route" "payment_route" {
 }
 ```
 
-#### App Mesh vs Application-Level Circuit Breaker
+#### Service Layer vs Application-Level Circuit Breaker
 
-| Tiêu chí | App Mesh (Envoy) | Application-Level (Resilience4j, Polly) |
+| Tiêu chí | Service Layer (Service Connect/VPC Lattice/Istio) | Application-Level (Resilience4j, Polly) |
 |----------|------------------|----------------------------------------|
 | **Ngôn ngữ** | Language-agnostic | Per-language library |
 | **Config** | Infrastructure-as-Code | Application config |
 | **Granularity** | Per-service endpoint | Per-method/per-call |
 | **Custom logic** | ❌ Limited | ✅ Full control (fallback, custom metrics) |
 | **Overhead** | Sidecar resource (~50MB RAM) | In-process (minimal) |
-| **Khi nào dùng** | Polyglot services, platform-level policy | Fine-grained control, complex fallbacks |
+| **Khi nào dùng** | Policy tập trung, giảm drift cấu hình | Fine-grained control, complex fallbacks |
 
-> 💡 **Best practice**: Dùng **App Mesh cho baseline** (timeout, retry, outlier detection), kết hợp **application-level cho business logic** (custom fallback, degraded response).
+> 💡 **Best practice**: Dùng **service-layer policy** cho baseline (timeout, retry), kết hợp **application-level** cho business logic (custom fallback, degraded response).
 
 ### 4.2. Retry & Timeout trên AWS
 
-Ngoài App Mesh, nhiều AWS service có **built-in retry**:
+Ngoài service layer, nhiều AWS service có **built-in retry**:
 
 | Service | Retry tích hợp | Cấu hình |
 |---------|:--------------:|----------|
@@ -791,7 +798,7 @@ Bulkhead trên AWS được triển khai qua nhiều tầng:
 │  └────────────────────────────────────────────────────┘    │
 │                                                            │
 │  ┌── Service-Level Bulkhead ──────────────────────────┐    │
-│  │  • App Mesh connection pool (max_connections)      │    │
+│  │  • Service-layer connection pool (max_connections)  │    │
 │  │  • ALB target group per service                    │    │
 │  │  • API Gateway usage plans per client              │    │
 │  │  • SQS separate queues per workload type           │    │
@@ -1475,7 +1482,7 @@ resource "aws_rds_cluster" "dr" {
 │  │  └── Lambda Authorizer (JWT validation)                          │    │
 │  └──────────────────────────────────────────────────────────────────┘    │
 │           │                                                              │
-│  ┌─── Service Layer (ECS Fargate + App Mesh) ───────────────────────┐    │
+│  ┌─── Service Layer (ECS Fargate + Service Connect) ────────────────┐    │
 │  │                                                                  │    │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐              │    │
 │  │  │ Order Svc   │  │ Payment Svc │  │ Inventory    │              │    │
@@ -1570,7 +1577,7 @@ resource "aws_rds_cluster" "dr" {
 
 ### Resilience Patterns
 
-- [ ] App Mesh outlier detection (Circuit Breaker) configured
+- [ ] Circuit Breaker được cấu hình ở application-level hoặc service layer
 - [ ] Retry policy cho mỗi service-to-service call
 - [ ] Timeout configured (connection + request timeout)
 - [ ] DLQ cho tất cả SQS queues
@@ -1617,7 +1624,7 @@ resource "aws_rds_cluster" "dr" {
 │  • Always: ALB + Health Check + Auto Scaling                      │
 │                                                                   │
 │  Resilience Patterns:                                             │
-│  • Platform-level: App Mesh (CB, retry, timeout, connection pool) │
+│  • Platform-level: Service layer policy + app-level resilience     │
 │  • Application-level: Custom fallback, graceful degradation       │
 │  • Async: SQS + DLQ cho error isolation                           │
 │  • Edge: WAF + API Gateway throttling cho rate limiting           │
@@ -1640,7 +1647,7 @@ resource "aws_rds_cluster" "dr" {
 
 1. **Auto Scaling là bắt buộc** — không manual scale trên cloud, chọn metric phù hợp workload
 2. **Multi-AZ là minimum** — mọi production service phải Multi-AZ, cost thêm rất ít
-3. **App Mesh cho platform-level resilience** — Circuit Breaker, retry, timeout không cần code
+3. **Không phụ thuộc 1 công cụ** cho platform-level resilience — ưu tiên service layer hiện hành + app-level logic
 4. **Health Check ở mọi tầng** — Container, ALB, Route 53, mỗi tầng có mục đích khác nhau
 5. **Chaos Engineering là văn hóa** — không phải one-time activity, cần Game Day định kỳ
 6. **DR phải test thường xuyên** — DR plan chưa test = không có DR plan
@@ -1651,7 +1658,7 @@ resource "aws_rds_cluster" "dr" {
 
 - [10 — Resilience Patterns](10-resilience-patterns.md) — Lý thuyết Circuit Breaker, Retry, Bulkhead, Fallback
 - [18 — Triển khai & Kiến trúc tổng quan](18-aws-deployment-architecture.md) — ECS vs EKS vs Lambda, IaC
-- [19 — Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) — App Mesh, SQS/SNS, EventBridge
+- [19 — Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) — Service Connect, VPC Lattice, SQS/SNS, EventBridge
 - [20 — Data Management trên AWS](20-aws-data-management.md) — Aurora Global Database, DynamoDB Global Tables
 - [22 — Observability trên AWS](22-aws-observability.md) — Monitoring, alerting cho resilience
 - [23 — Security trên AWS](23-aws-security.md) — WAF, Shield, network isolation
