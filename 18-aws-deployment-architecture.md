@@ -510,8 +510,8 @@ Khi Service A cần gọi Service B **trong cùng VPC**, có 3 cách:
 | **Internal ALB** | Mỗi service expose qua Internal ALB | Đơn giản, có health check, path routing | Thêm cost cho mỗi ALB (~$22/tháng) |
 | **Service Connect (ECS)** | ECS native service discovery + load balancing | Không cần ALB, tích hợp sẵn ECS, có retry/timeout | Chỉ ECS, limited features |
 | **Cloud Map** | AWS service discovery — DNS-based hoặc API-based | Flexible, dùng được với ECS/EKS/Lambda | Phải tự handle load balancing client-side |
-| **App Mesh** | Service mesh — sidecar proxy (Envoy) | mTLS, observability, traffic control, circuit breaker | Phức tạp, thêm resource cho sidecar, AWS đang deprecate dần |
-| **VPC Lattice** | Thế hệ mới — application networking service | Cross-VPC, cross-account, auth tích hợp, serverless | Mới (2023), ecosystem còn non |
+| **App Mesh** | Service mesh — sidecar proxy (Envoy) | mTLS, observability, traffic control, circuit breaker | Legacy; AWS công bố End of Support ngày 30/09/2026 |
+| **VPC Lattice** | Application networking service | Cross-VPC, cross-account, auth tích hợp, serverless | Cần thiết kế policy/auth rõ để tránh tăng độ phức tạp vận hành |
 
 **Recommend:**
 
@@ -1019,7 +1019,7 @@ Account: Production
 - [12 — Containerization](12-containerization.md) — Docker fundamentals
 - [13 — Orchestration](13-orchestration.md) — Kubernetes concepts
 - [14 — CI/CD & Deployment](14-cicd-deployment.md) — Pipeline & deployment strategies
-- [19 — Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) — API Gateway, App Mesh, SQS/SNS
+- [19 — Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) — API Gateway, Service Connect, VPC Lattice, SQS/SNS
 - [21 — Resilience & Auto Scaling trên AWS](21-aws-resilience.md) — Auto Scaling, Multi-AZ, Circuit Breaker
 - [24 — CI/CD & Deployment Strategies trên AWS](24-aws-cicd-deployment.md) — AWS-specific CI/CD
 - [25 — Case Study: E-Commerce](25-case-study-ecommerce.md) — Áp dụng tổng hợp

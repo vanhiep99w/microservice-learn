@@ -33,7 +33,8 @@ microservice-learn/
 ├── 21-aws-resilience.md
 ├── 22-aws-observability.md
 ├── 23-aws-security.md
-└── 24-aws-cicd-deployment.md
+├── 24-aws-cicd-deployment.md
+└── 25-case-study-ecommerce.md
 ```
 
 ## Quy tắc viết tài liệu

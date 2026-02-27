@@ -562,4 +562,4 @@ graph TB
 - [Decomposition Strategies](05-decomposition-strategies.md) — Cách phân tách Monolith thành Microservice
 - [Inter-Service Communication](06-inter-service-communication.md) — Giao tiếp giữa các service
 - [Resilience Patterns](10-resilience-patterns.md) — Xử lý lỗi trong hệ thống phân tán
-- [Design Patterns tổng hợp](16-design-patterns.md) — Tất cả pattern quan trọng
+- [Design Patterns tổng hợp](17-design-patterns.md) — Tất cả pattern quan trọng

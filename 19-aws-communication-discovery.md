@@ -14,7 +14,7 @@
   - [3.2. ECS Service Connect](#32-ecs-service-connect)
   - [3.3. AWS Cloud Map](#33-aws-cloud-map)
   - [3.4. VPC Lattice](#34-vpc-lattice)
-  - [3.5. App Mesh (Envoy Sidecar)](#35-app-mesh-envoy-sidecar)
+  - [3.5. App Mesh (Legacy, EoS 30/09/2026)](#35-app-mesh-legacy-eos-30092026)
   - [3.6. So sánh các phương pháp Sync](#36-so-sánh-các-phương-pháp-sync)
 - [4. Asynchronous Communication trên AWS](#4-asynchronous-communication-trên-aws)
   - [4.1. Amazon SQS — Message Queue](#41-amazon-sqs--message-queue)
@@ -58,8 +58,8 @@ Doc này áp dụng kiến thức từ doc [06 — Inter-Service Communication](
 │  │  ECS Service Connect   ← ECS native, zero-config      │     │
 │  │  Cloud Map             ← DNS-based discovery          │     │
 │  │  VPC Lattice           ← cross-VPC, cross-account     │     │
-│  │  App Mesh              ← service mesh (Envoy)         │     │
-│  └───────────────────────────────────────────────────────┘     │
+│  │  App Mesh (legacy)     ← service mesh (Envoy)         │     │
+│  └────────────────────────────────────────────────────────┘     │
 │                                                                │
 │  ┌─────────── Service → Service (Async) ─────────────────┐     │
 │  │  SQS                   ← point-to-point queue         │     │
@@ -421,17 +421,17 @@ Cách **đơn giản nhất** — mỗi service hoặc nhóm services expose qua
 - Muốn **thay thế** Transit Gateway + ALB phức tạp bằng 1 service đơn giản
 - **Không nên** dùng nếu tất cả services trong 1 VPC — overkill, Service Connect đủ dùng
 
-### 3.5. App Mesh (Envoy Sidecar)
+### 3.5. App Mesh (Legacy, EoS 30/09/2026)
 
-**App Mesh** = AWS managed service mesh — deploy Envoy sidecar proxy vào mỗi service.
+**App Mesh** là AWS managed service mesh với Envoy sidecar.
 
-> ⚠️ **Lưu ý**: AWS đang dần chuyển hướng sang **VPC Lattice** thay cho App Mesh. App Mesh vẫn supported nhưng ít được đầu tư features mới. Cân nhắc VPC Lattice cho greenfield projects.
+> ⚠️ **Lưu ý quan trọng (mốc thời gian cụ thể):** Theo tài liệu AWS, **AWS App Mesh sẽ End of Support vào ngày 30/09/2026**. Không nên chọn App Mesh cho workload mới (greenfield). Ưu tiên **ECS Service Connect** hoặc **VPC Lattice** tùy use case.
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    App Mesh                                  │
-│                                                              │
-│  ┌─── Virtual Service: user-service ───────────────────┐     │
+┌───────────────────────────────────────────────────────────┐
+│                App Mesh (legacy)                            │
+│                                                             │
+│  ┌─── Virtual Service: user-service ──────────────────┐     │
 │  │                                                     │     │
 │  │  Virtual Router:                                    │     │
 │  │  ├── Route: 90% → Virtual Node v1 (user-svc-v1)     │     │
@@ -458,14 +458,14 @@ Cách **đơn giản nhất** — mỗi service hoặc nhóm services expose qua
 
 ### 3.6. So sánh các phương pháp Sync
 
-| Tiêu chí | Internal ALB | Service Connect | Cloud Map | VPC Lattice | App Mesh |
+| Tiêu chí | Internal ALB | Service Connect | Cloud Map | VPC Lattice | App Mesh (legacy) |
 |----------|-------------|----------------|-----------|-------------|----------|
 | **Complexity** | Rất thấp | Thấp | Thấp | Trung bình | Cao |
 | **Chi phí** | ~$22/ALB/tháng | Free (sidecar CPU/RAM) | Free tier generous | Per-request pricing | Free (sidecar CPU/RAM) |
 | **Load Balancing** | ✅ ALB native | ✅ Envoy | ❌ Client-side | ✅ Built-in | ✅ Envoy |
 | **Health Check** | ✅ | ✅ | ✅ (Route 53 HC) | ✅ | ✅ |
 | **Retry/Timeout** | ❌ | ✅ | ❌ | ✅ | ✅ |
-| **mTLS** | ❌ | ❌ | ❌ | ✅ (IAM) | ✅ |
+| **mTLS** | ❌ | ❌ | ❌ | ⚠️ TLS + IAM auth (không mTLS native) | ✅ |
 | **Traffic Shifting** | ✅ (weighted TG) | ❌ | ❌ | ✅ | ✅ |
 | **Cross-VPC** | VPC Peering | ❌ | ❌ | ✅ Native | ✅ |
 | **Cross-Account** | Complex | ❌ | ❌ | ✅ Native | ❌ |

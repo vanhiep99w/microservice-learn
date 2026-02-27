@@ -38,6 +38,19 @@
 
 ---
 
+## 🚀 Roadmap học tập
+
+| Giai đoạn | Nội dung | Tài liệu |
+|---|---|---|
+| Foundation | Nền tảng Microservice | 01 → 05 |
+| Integration | Giao tiếp và tích hợp | 06 → 08 |
+| Data & Reliability | Dữ liệu, chịu lỗi, quan sát | 09 → 11 |
+| Platform | Container, Orchestration, CI/CD, Security | 12 → 17 |
+| AWS | Triển khai Microservice trên AWS | 18 → 24 |
+| End-to-End | Case study tổng hợp | 25 |
+
+---
+
 ## 1. Khái niệm cơ bản
 
 | # | Tài liệu | Mô tả | Trạng thái |
@@ -105,11 +118,11 @@
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
 | 18 | [Triển khai & Kiến trúc tổng quan](18-aws-deployment-architecture.md) | Kiến trúc reference trên AWS, ECS vs EKS vs Lambda — chọn khi nào, IaC (CDK/Terraform), multi-account strategy | ✅ |
-| 19 | [Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) | API Gateway, App Mesh, Service Connect, ALB/NLB routing, SQS/SNS/EventBridge cho async, so sánh sync vs async trên AWS | ✅ |
+| 19 | [Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) | API Gateway, Service Connect, Cloud Map, VPC Lattice, ALB/NLB routing, SQS/SNS/EventBridge cho async, so sánh sync vs async trên AWS | ✅ |
 | 20 | [Data Management trên AWS](20-aws-data-management.md) | Database per Service (RDS/DynamoDB), Saga pattern với Step Functions, CQRS + Event Sourcing với EventBridge/DynamoDB Streams, data consistency | ✅ |
-| 21 | [Resilience & Auto Scaling trên AWS](21-aws-resilience.md) | Auto Scaling (ECS/EKS/Lambda), Multi-AZ/Multi-Region, Circuit Breaker với App Mesh, Health Check, Chaos Engineering, disaster recovery | ✅ |
+| 21 | [Resilience & Auto Scaling trên AWS](21-aws-resilience.md) | Auto Scaling (ECS/EKS/Lambda), Multi-AZ/Multi-Region, Circuit Breaker (app-level/service mesh), Health Check, Chaos Engineering, disaster recovery | ✅ |
 | 22 | [Observability trên AWS](22-aws-observability.md) | Distributed Tracing (X-Ray), Centralized Logging (CloudWatch Logs), Metrics & Alerting, Container Insights, cost monitoring | ✅ |
-| 23 | [Security & Zero Trust trên AWS](23-aws-security.md) | IAM Roles cho service-to-service, Cognito cho AuthN/AuthZ, mTLS với App Mesh, Secrets Manager, network isolation (VPC/Security Groups) | ✅ |
+| 23 | [Security & Zero Trust trên AWS](23-aws-security.md) | IAM Roles cho service-to-service, Cognito cho AuthN/AuthZ, TLS/mTLS service-to-service, Secrets Manager, network isolation (VPC/Security Groups) | ✅ |
 | 24 | [CI/CD & Deployment Strategies trên AWS](24-aws-cicd-deployment.md) | CodePipeline/GitHub Actions, Blue-Green (ECS+ALB), Canary (Lambda/EKS), Rolling Update, GitOps với ArgoCD trên EKS, cost optimization | ✅ |
 
 ## 11. Case Study — Thiết kế kiến trúc Microservice từ đầu

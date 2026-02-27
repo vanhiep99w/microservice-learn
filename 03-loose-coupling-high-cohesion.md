@@ -1008,4 +1008,4 @@ graph TB
 - 📖 [06 - Inter-Service Communication](06-inter-service-communication.md) — Chi tiết về sync vs async communication
 - 📖 [09 - Data Management](09-data-management.md) — Database per Service, Saga Pattern
 - 📖 [10 - Resilience Patterns](10-resilience-patterns.md) — Circuit Breaker, Fallback khi service khác không available
-- 📖 [16 - Design Patterns](16-design-patterns.md) — Anti-patterns chi tiết
+- 📖 [17 - Design Patterns](17-design-patterns.md) — Anti-patterns chi tiết

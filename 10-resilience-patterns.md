@@ -1581,4 +1581,4 @@ Request
 - [07 - API Gateway](07-api-gateway.md) — Gateway thường tích hợp Rate Limiting, Circuit Breaker
 - [09 - Data Management](09-data-management.md) — Saga pattern cũng cần resilience
 - [11 - Observability & Evolvability](11-observability-evolvability.md) — Monitoring cho resilience patterns
-- [16 - Design Patterns](16-design-patterns.md) — Các pattern bổ sung
+- [17 - Design Patterns](17-design-patterns.md) — Các pattern bổ sung

@@ -2151,4 +2151,4 @@ Bắt đầu từ đâu?
 - [doc 06 — Inter-Service Communication](06-inter-service-communication.md) — Sync vs Async, Event-Driven
 - [doc 07 — API Gateway](07-api-gateway.md) — API Composition tại Gateway
 - [doc 10 — Resilience Patterns](10-resilience-patterns.md) — Circuit Breaker, Retry khi cross-service call
-- [doc 16 — Design Patterns](16-design-patterns.md) — Saga, CQRS, Event Sourcing trong context tổng hợp
+- [doc 17 — Design Patterns](17-design-patterns.md) — Saga, CQRS, Event Sourcing trong context tổng hợp

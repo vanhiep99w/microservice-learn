@@ -1191,4 +1191,4 @@ sequenceDiagram
 - [Decomposition Strategies](05-decomposition-strategies.md) — Chiến lược cụ thể để phân tách service
 - [Data Management](09-data-management.md) — Database per Service, Saga pattern
 - [Inter-Service Communication](06-inter-service-communication.md) — Cách các service giao tiếp
-- [Design Patterns tổng hợp](16-design-patterns.md) — Anti-corruption Layer, Strangler Fig và các pattern khác
+- [Design Patterns tổng hợp](17-design-patterns.md) — Anti-corruption Layer, Strangler Fig và các pattern khác
