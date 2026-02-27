@@ -105,7 +105,7 @@
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
 | 18 | [Triển khai & Kiến trúc tổng quan](18-aws-deployment-architecture.md) | Kiến trúc reference trên AWS, ECS vs EKS vs Lambda — chọn khi nào, IaC (CDK/Terraform), multi-account strategy | ✅ |
-| 19 | [Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) | API Gateway, App Mesh, Service Connect, ALB/NLB routing, SQS/SNS/EventBridge cho async, so sánh sync vs async trên AWS | ⬜ |
+| 19 | [Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) | API Gateway, App Mesh, Service Connect, ALB/NLB routing, SQS/SNS/EventBridge cho async, so sánh sync vs async trên AWS | ✅ |
 | 20 | [Data Management trên AWS](20-aws-data-management.md) | Database per Service (RDS/DynamoDB), Saga pattern với Step Functions, CQRS + Event Sourcing với EventBridge/DynamoDB Streams, data consistency | ⬜ |
 | 21 | [Resilience & Auto Scaling trên AWS](21-aws-resilience.md) | Auto Scaling (ECS/EKS/Lambda), Multi-AZ/Multi-Region, Circuit Breaker với App Mesh, Health Check, Chaos Engineering, disaster recovery | ⬜ |
 | 22 | [Observability trên AWS](22-aws-observability.md) | Distributed Tracing (X-Ray), Centralized Logging (CloudWatch Logs), Metrics & Alerting, Container Insights, cost monitoring | ⬜ |
