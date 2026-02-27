@@ -130,6 +130,7 @@
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
 | 25 | [Case Study: E-Commerce Platform](25-case-study-ecommerce.md) | Đề bài → phân tích domain → decompose services → chọn patterns → thiết kế infra → so sánh nhiều solutions | ✅ |
+| 26 | [Case Study: Food Delivery Platform](26-case-study-food-delivery.md) | Đề bài → domain/BC → service decomposition → dispatch flow → data/resilience/security → execution plan | ✅ |
 
 ---
 
