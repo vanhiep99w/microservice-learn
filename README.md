@@ -32,7 +32,8 @@
 - [7. Security](#7-security)
 - [8. Configuration Management](#8-configuration-management)
 - [9. Design Patterns tổng hợp](#9-design-patterns-tổng-hợp)
-- [10. Microservice trên AWS](#10-microservice-trên-aws)
+- [10. Triển khai Microservice trên AWS](#10-triển-khai-microservice-trên-aws)
+- [11. Case Study — Thiết kế kiến trúc Microservice từ đầu](#11-case-study--thiết-kế-kiến-trúc-microservice-từ-đầu)
 - [Tham khảo](#-tham-khảo)
 
 ---
@@ -99,17 +100,23 @@
 |---|----------|--------|:----------:|
 | 17 | [Design Patterns](17-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ✅ |
 
-## 10. Microservice trên AWS
+## 10. Triển khai Microservice trên AWS
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 18 | [AWS Overview & Architecture](18-aws-microservice-overview.md) | Tổng quan kiến trúc Microservice trên AWS, ECS vs EKS vs Lambda, Well-Architected | ⬜ |
-| 19 | [AWS Networking & Load Balancing](19-aws-networking.md) | VPC, ALB/NLB, API Gateway, CloudFront, Route 53, PrivateLink | ⬜ |
-| 20 | [AWS Compute — ECS, EKS, Lambda](20-aws-compute.md) | ECS Fargate vs EC2, EKS, Lambda cho Microservice, so sánh chi tiết | ⬜ |
-| 21 | [AWS Data & Messaging](21-aws-data-messaging.md) | RDS, DynamoDB, ElastiCache, SQS, SNS, EventBridge, MSK (Kafka) | ⬜ |
-| 22 | [AWS Observability & Monitoring](22-aws-observability.md) | CloudWatch, X-Ray, CloudTrail, Container Insights, cost monitoring | ⬜ |
-| 23 | [AWS Security & IAM](23-aws-security.md) | IAM Roles, Cognito, Secrets Manager, KMS, WAF, Security Groups, Zero Trust | ⬜ |
-| 24 | [AWS Deployment Strategies](24-aws-deployment-strategies.md) | Các mô hình triển khai trên AWS (ECS+ALB, EKS+Ingress, Lambda+APIGW), Blue-Green, Canary, IaC (CDK/Terraform), cost optimization | ⬜ |
+| 18 | [Triển khai & Kiến trúc tổng quan](18-aws-deployment-architecture.md) | Kiến trúc reference trên AWS, ECS vs EKS vs Lambda — chọn khi nào, IaC (CDK/Terraform), multi-account strategy | ✅ |
+| 19 | [Communication & Service Discovery trên AWS](19-aws-communication-discovery.md) | API Gateway, App Mesh, Service Connect, ALB/NLB routing, SQS/SNS/EventBridge cho async, so sánh sync vs async trên AWS | ⬜ |
+| 20 | [Data Management trên AWS](20-aws-data-management.md) | Database per Service (RDS/DynamoDB), Saga pattern với Step Functions, CQRS + Event Sourcing với EventBridge/DynamoDB Streams, data consistency | ⬜ |
+| 21 | [Resilience & Auto Scaling trên AWS](21-aws-resilience.md) | Auto Scaling (ECS/EKS/Lambda), Multi-AZ/Multi-Region, Circuit Breaker với App Mesh, Health Check, Chaos Engineering, disaster recovery | ⬜ |
+| 22 | [Observability trên AWS](22-aws-observability.md) | Distributed Tracing (X-Ray), Centralized Logging (CloudWatch Logs), Metrics & Alerting, Container Insights, cost monitoring | ⬜ |
+| 23 | [Security & Zero Trust trên AWS](23-aws-security.md) | IAM Roles cho service-to-service, Cognito cho AuthN/AuthZ, mTLS với App Mesh, Secrets Manager, network isolation (VPC/Security Groups) | ⬜ |
+| 24 | [CI/CD & Deployment Strategies trên AWS](24-aws-cicd-deployment.md) | CodePipeline/GitHub Actions, Blue-Green (ECS+ALB), Canary (Lambda/EKS), Rolling Update, GitOps với ArgoCD trên EKS, cost optimization | ⬜ |
+
+## 11. Case Study — Thiết kế kiến trúc Microservice từ đầu
+
+| # | Tài liệu | Mô tả | Trạng thái |
+|---|----------|--------|:----------:|
+| 25 | [Case Study: E-Commerce Platform](25-case-study-ecommerce.md) | Đề bài → phân tích domain → decompose services → chọn patterns → thiết kế infra → so sánh nhiều solutions | ⬜ |
 
 ---
 
@@ -139,4 +146,4 @@ Mỗi tài liệu đều có:
 
 ---
 
-> 💡 **Tip**: Đọc theo thứ tự từ 01 → 17 cho kiến thức nền tảng, sau đó 18 → 23 cho triển khai thực tế trên AWS!
+> 💡 **Tip**: Đọc theo thứ tự từ 01 → 17 cho kiến thức nền tảng, 18 → 24 cho triển khai trên AWS, và 25 cho case study tổng hợp!
