@@ -428,10 +428,10 @@ Cách **đơn giản nhất** — mỗi service hoặc nhóm services expose qua
 > ⚠️ **Lưu ý quan trọng (mốc thời gian cụ thể):** Theo tài liệu AWS, **AWS App Mesh sẽ End of Support vào ngày 30/09/2026**. Không nên chọn App Mesh cho workload mới (greenfield). Ưu tiên **ECS Service Connect** hoặc **VPC Lattice** tùy use case.
 
 ```
-┌───────────────────────────────────────────────────────────┐
-│                App Mesh (legacy)                            │
-│                                                             │
-│  ┌─── Virtual Service: user-service ──────────────────┐     │
+┌──────────────────────────────────────────────────────────────┐
+│                App Mesh (legacy)                             │
+│                                                              │
+│  ┌─── Virtual Service: user-service ───────────────────┐     │
 │  │                                                     │     │
 │  │  Virtual Router:                                    │     │
 │  │  ├── Route: 90% → Virtual Node v1 (user-svc-v1)     │     │
