@@ -129,7 +129,7 @@
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 25 | [Case Study: E-Commerce Platform](25-case-study-ecommerce.md) | Đề bài → phân tích domain → decompose services → chọn patterns → thiết kế infra → so sánh nhiều solutions | ⬜ |
+| 25 | [Case Study: E-Commerce Platform](25-case-study-ecommerce.md) | Đề bài → phân tích domain → decompose services → chọn patterns → thiết kế infra → so sánh nhiều solutions | ✅ |
 
 ---
 

@@ -3,18 +3,104 @@
 ## 📋 Mục lục
 
 - [Đề bài](#-đề-bài)
+  - [Bối cảnh](#bối-cảnh)
+  - [Quy mô hệ thống](#quy-mô-hệ-thống)
+  - [Các module hiện tại trong Monolith](#các-module-hiện-tại-trong-monolith)
 - [Yêu cầu chức năng (Functional Requirements)](#-yêu-cầu-chức-năng-functional-requirements)
 - [Yêu cầu phi chức năng (Non-Functional Requirements)](#-yêu-cầu-phi-chức-năng-non-functional-requirements)
 - [Phần 1 — Phân tích Domain & Bounded Context](#phần-1--phân-tích-domain--bounded-context)
+  - [1.1. Xác định Domain và Subdomain](#11-xác-định-domain-và-subdomain)
+  - [1.2. Xác định Bounded Context](#12-xác-định-bounded-context)
+  - [1.3. Ubiquitous Language](#13-ubiquitous-language)
+  - [1.4. Context Mapping](#14-context-mapping)
+  - [1.5. Event Storming — Checkout Flow](#15-event-storming--checkout-flow)
+  - [1.6. Ownership Matrix theo Team](#16-ownership-matrix-theo-team)
+  - [1.7. Domain Invariants (Bất biến nghiệp vụ)](#17-domain-invariants-bất-biến-nghiệp-vụ)
 - [Phần 2 — Decompose Services](#phần-2--decompose-services)
+  - [2.1. Nguyên tắc Decomposition](#21-nguyên-tắc-decomposition)
+  - [2.2. Danh sách Services chi tiết](#22-danh-sách-services-chi-tiết)
+  - [2.3. Service Dependency Graph](#23-service-dependency-graph)
+  - [2.4. Strangler Fig Migration Plan](#24-strangler-fig-migration-plan)
+  - [2.5. Service API Contracts quan trọng](#25-service-api-contracts-quan-trọng)
+  - [2.6. Team Topology và Release Ownership](#26-team-topology-và-release-ownership)
 - [Phần 3 — Inter-Service Communication](#phần-3--inter-service-communication)
+  - [3.1. Quy tắc chọn Sync vs Async](#31-quy-tắc-chọn-sync-vs-async)
+  - [3.2. Communication Matrix](#32-communication-matrix)
+  - [3.3. Event Taxonomy & Catalog](#33-event-taxonomy--catalog)
+  - [3.4. API Gateway Design](#34-api-gateway-design)
+  - [3.5. Service Discovery](#35-service-discovery)
+  - [3.6. Sequence Diagram — Complete Checkout Flow](#36-sequence-diagram--complete-checkout-flow)
+  - [3.7. Sequence Diagram — Flash Sale Flow](#37-sequence-diagram--flash-sale-flow)
+  - [3.8. Idempotency & Exactly-Once Semantics](#38-idempotency--exactly-once-semantics-thực-tế)
+  - [3.9. Message Broker Design (Kafka/SQS)](#39-message-broker-design-kafkasqs)
 - [Phần 4 — Data Management & Patterns](#phần-4--data-management--patterns)
+  - [4.1. Database per Service — Polyglot Persistence](#41-database-per-service--polyglot-persistence)
+  - [4.2. Saga Pattern cho Order Flow](#42-saga-pattern-cho-order-flow)
+  - [4.3. CQRS — Áp dụng ở đâu?](#43-cqrs--áp-dụng-ở-đâu)
+  - [4.4. Event Sourcing — Decision](#44-event-sourcing--decision)
+  - [4.5. Transactional Outbox Pattern](#45-transactional-outbox-pattern)
+  - [4.6. Data Consistency Rules](#46-data-consistency-rules)
+  - [4.7. Schema chi tiết cho Order & Inventory](#47-schema-chi-tiết-cho-order--inventory-thực-chiến)
+  - [4.8. Concurrency Control & Reconciliation Jobs](#48-concurrency-control--reconciliation-jobs)
 - [Phần 5 — Resilience & Reliability](#phần-5--resilience--reliability)
+  - [5.1. Mục tiêu Resilience](#51-mục-tiêu-resilience)
+  - [5.2. Circuit Breaker — Áp dụng ở đâu?](#52-circuit-breaker--áp-dụng-ở-đâu)
+  - [5.3. Retry Policy](#53-retry-policy)
+  - [5.4. Bulkhead Pattern](#54-bulkhead-pattern)
+  - [5.5. Rate Limiting](#55-rate-limiting)
+  - [5.6. Timeout Configuration](#56-timeout-configuration)
+  - [5.7. Fallback Strategies](#57-fallback-strategies)
+  - [5.8. Chaos Engineering Plan](#58-chaos-engineering-plan)
+  - [5.9. Defense in Depth — Thứ tự áp dụng](#59-defense-in-depth--thứ-tự-áp-dụng)
+  - [5.10. Capacity Planning cho Flash Sale](#510-capacity-planning-cho-flash-sale)
+  - [5.11. Runbook SEV-1: Checkout Down](#511-runbook-sev-1-checkout-down)
 - [Phần 6 — Observability](#phần-6--observability)
+  - [6.1. Mục tiêu Observability cho ShopVN](#61-mục-tiêu-observability-cho-shopvn)
+  - [6.2. Kiến trúc Telemetry tổng thể](#62-kiến-trúc-telemetry-tổng-thể)
+  - [6.3. Logging Strategy](#63-logging-strategy)
+  - [6.4. Metrics Framework (RED + USE)](#64-metrics-framework-red--use)
+  - [6.5. SLI/SLO và Error Budget](#65-slislo-và-error-budget)
+  - [6.6. Distributed Tracing](#66-distributed-tracing)
+  - [6.7. Alerting Rules theo mức độ](#67-alerting-rules-theo-mức-độ)
+  - [6.8. Dashboard Design](#68-dashboard-design)
+  - [6.9. Runbook mẫu: Payment error tăng đột biến](#69-runbook-mẫu-payment-error-tăng-đột-biến)
+  - [6.10. Log Retention, Sampling, và Cost Control](#610-log-retention-sampling-và-cost-control)
 - [Phần 7 — Security Architecture](#phần-7--security-architecture)
+  - [7.1. Security Principles](#71-security-principles)
+  - [7.2. AuthN/AuthZ cho người dùng cuối](#72-authnauthz-cho-người-dùng-cuối)
+  - [7.3. Service-to-Service Security](#73-service-to-service-security)
+  - [7.4. API Security Controls](#74-api-security-controls)
+  - [7.5. Data Protection](#75-data-protection)
+  - [7.6. Secrets Management](#76-secrets-management)
+  - [7.7. Threat Modeling (STRIDE) cho Checkout](#77-threat-modeling-stride-cho-checkout)
+  - [7.8. Security Testing Pipeline](#78-security-testing-pipeline)
+  - [7.9. Incident Response](#79-incident-response)
+  - [7.10. Compliance Checklist (PCI-DSS, OWASP ASVS)](#710-compliance-checklist-pci-dss-owasp-asvs)
 - [Phần 8 — Infrastructure & Deployment](#phần-8--infrastructure--deployment)
+  - [8.1. Mục tiêu nền tảng hạ tầng](#81-mục-tiêu-nền-tảng-hạ-tầng)
+  - [8.2. Topology môi trường](#82-topology-môi-trường)
+  - [8.3. Compute Strategy theo loại workload](#83-compute-strategy-theo-loại-workload)
+  - [8.4. Network & Edge Architecture](#84-network--edge-architecture)
+  - [8.5. Container Standards](#85-container-standards)
+  - [8.6. Autoscaling Policy](#86-autoscaling-policy)
+  - [8.7. CI/CD Pipeline chi tiết](#87-cicd-pipeline-chi-tiết)
+  - [8.8. Deployment Strategy theo service](#88-deployment-strategy-theo-service)
+  - [8.9. Backup, DR, và BCP](#89-backup-dr-và-bcp)
+  - [8.10. IaC Structure & Environment Promotion](#810-iac-structure--environment-promotion)
 - [Phần 9 — So sánh các Solution Infrastructure](#phần-9--so-sánh-các-solution-infrastructure)
+  - [9.1. 3 phương án cho ShopVN](#91-3-phương-án-cho-shopvn)
+  - [9.2. So sánh định tính](#92-so-sánh-định-tính)
+  - [9.3. Ước lượng chi phí tương đối (tham chiếu)](#93-ước-lượng-chi-phí-tương-đối-tham-chiếu)
+  - [9.4. Decision đề xuất cho ShopVN](#94-decision-đề-xuất-cho-shopvn)
+  - [9.5. Migration Path 3 giai đoạn](#95-migration-path-3-giai-đoạn)
+  - [9.6. Weighted Decision Matrix](#96-weighted-decision-matrix)
 - [Phần 10 — Tổng kết Architecture Decision Records](#phần-10--tổng-kết-architecture-decision-records)
+  - [10.1. Danh sách ADR chính](#101-danh-sách-adr-chính)
+  - [10.2. ADR template đề xuất](#102-adr-template-đề-xuất)
+  - [10.3. Trade-off tổng thể](#103-trade-off-tổng-thể)
+  - [10.4. KPI đánh giá thành công sau migration](#104-kpi-đánh-giá-thành-công-sau-migration)
+  - [10.5. Kết luận case study](#105-kết-luận-case-study)
+  - [10.6. Backlog thực thi 90 ngày đầu](#106-backlog-thực-thi-90-ngày-đầu)
 
 ---
 
@@ -294,6 +380,34 @@ graph TB
 3. **Price snapshot tại checkout** — Giá "đóng băng" khi buyer đặt hàng
 4. **COD flow khác biệt** — `PaymentCompleted` chỉ xảy ra khi shipper thu tiền thành công
 
+### 1.6. Ownership Matrix theo Team
+
+| Team | Services sở hữu | On-call | KPI chính |
+|------|------------------|---------|-----------|
+| Team Core Commerce | Order, Inventory, Promotion | 24/7 | Checkout success, oversell rate |
+| Team Payment | Payment, Refund | 24/7 | Payment success, callback latency |
+| Team Discovery | Catalog, Search, Recommendation | Giờ hành chính + trực sự kiện | Search latency, CTR |
+| Team Experience | Gateway, Cart, User | 24/7 | API error rate, login success |
+| Team Engagement | Notification, Review | Giờ hành chính | Delivery success, moderation SLA |
+| Platform/SRE | CI/CD, Observability, Security baseline | 24/7 | MTTR, SLO compliance |
+
+**Quy tắc ownership:**
+
+- Service chỉ có **một owner chính**.
+- Shared library phải có versioning và backward compatibility.
+- Incident SEV-1 bắt buộc có Incident Commander từ team owning service lỗi.
+
+### 1.7. Domain Invariants (Bất biến nghiệp vụ)
+
+| Invariant | Mô tả | Enforced tại |
+|----------|-------|--------------|
+| Không oversell | `available_stock >= 0` mọi thời điểm commit | Inventory Service |
+| Mỗi order có đúng 1 trạng thái tại 1 thời điểm | State machine không cho transition sai | Order Service |
+| Mỗi payment callback xử lý tối đa 1 lần | Idempotency theo `payment_provider_txn_id` | Payment Service |
+| Voucher usage không vượt quota | `used_count <= quota` | Promotion Service |
+| Review chỉ được tạo sau khi giao hàng thành công | Chỉ mở API review sau `shipment.delivered` | Review Service |
+| Snapshot giá order bất biến | Không thay đổi `unit_price_snapshot` sau confirm | Order DB |
+
 ---
 
 ## Phần 2 — Decompose Services
@@ -408,6 +522,57 @@ gantt
 | **Phase 6** | Review, Recommendation | 3 tháng | 🟢 Low | Disable features, no business impact |
 
 **Tổng thời gian: ~18 tháng** — Monolith vẫn chạy song song trong suốt quá trình migrate.
+
+### 2.5. Service API Contracts quan trọng
+
+**`POST /orders` (Order Service):**
+
+```json
+{
+  "userId": "USR-9821",
+  "items": [
+    { "skuId": "SKU-RED-42", "qty": 1 },
+    { "skuId": "SKU-BLACK-38", "qty": 2 }
+  ],
+  "voucherCode": "SALE50",
+  "shippingAddressId": "ADDR-102",
+  "paymentMethod": "vnpay"
+}
+```
+
+**Response:**
+
+```json
+{
+  "orderId": "ORD-20260227-8891",
+  "status": "PAYMENT_PENDING",
+  "paymentUrl": "https://sandbox.vnpay.vn/....",
+  "expiresAt": "2026-02-27T10:30:00Z"
+}
+```
+
+| Quy tắc contract | Mục tiêu |
+|------------------|----------|
+| Version theo URL (`/v1`) + schema registry cho event | Tránh breaking change |
+| Field mới phải optional ở version cũ | Backward compatible |
+| Error code chuẩn hóa liên service | Dễ xử lý phía client |
+| Có `x-request-id` và `idempotency-key` | Truy vết + chống double submit |
+
+### 2.6. Team Topology và Release Ownership
+
+| Loại thay đổi | Team quyết định | Team review bắt buộc |
+|--------------|------------------|----------------------|
+| Checkout logic | Core Commerce | Payment + Platform |
+| Payment provider integration | Payment | Security + Core Commerce |
+| Search ranking | Discovery | Product + Data |
+| Gateway policy/rate limit | Experience | Security + SRE |
+| CI/CD template chuẩn | Platform | Tất cả service owners |
+
+**Release cadence đề xuất:**
+
+- Core services (`Order`, `Payment`, `Inventory`): 2-3 lần/tuần.
+- Supporting services: 1-2 lần/tuần.
+- Hạ tầng shared: theo change window cố định để giảm blast radius.
 
 ---
 
@@ -622,6 +787,41 @@ sequenceDiagram
     end
 ```
 
+### 3.8. Idempotency & Exactly-Once Semantics (thực tế)
+
+| Use case | Idempotency key | TTL | Nơi lưu |
+|----------|------------------|-----|---------|
+| Checkout submit | `userId + cartChecksum` | 30 phút | Redis |
+| Payment initiate | `orderId + paymentMethod` | 24 giờ | Payment DB |
+| Payment callback | `providerTxnId` | 7 ngày | Payment DB unique index |
+| Shipment create | `orderId` | 7 ngày | Shipping DB |
+
+**Quy tắc vận hành:**
+
+- HTTP `POST` critical bắt buộc header `Idempotency-Key`.
+- Consumer event ghi bảng `processed_events(event_id)` trước side-effect.
+- Nếu duplicate event: ACK bỏ qua, không chạy logic lần hai.
+
+### 3.9. Message Broker Design (Kafka/SQS)
+
+| Thành phần | Thiết kế đề xuất |
+|------------|------------------|
+| Topic naming | `{domain}.{event}.v{n}` (ví dụ: `order.confirmed.v1`) |
+| Partition key | `orderId` cho order/payment/inventory flow |
+| Retention | 7 ngày với domain event, 14 ngày cho audit topics |
+| DLQ | Mỗi consumer group có DLQ riêng |
+| Retry | 3 lần với exponential backoff trước khi đưa DLQ |
+| Schema | Avro/JSON Schema + compatibility check CI |
+
+**Ví dụ thiết kế topic:**
+
+| Topic | Partitions | Throughput mục tiêu |
+|-------|------------|---------------------|
+| `order.created.v1` | 48 | 8K msg/s peak |
+| `payment.captured.v1` | 24 | 3K msg/s peak |
+| `stock.reserved.v1` | 48 | 10K msg/s peak flash sale |
+| `notification.requested.v1` | 32 | 15K msg/s burst |
+
 ---
 
 ## Phần 4 — Data Management & Patterns
@@ -828,6 +1028,74 @@ CREATE TABLE outbox_events (
 | Notification | **Eventual** | Async event + DLQ | Retry nếu fail |
 | Review rating aggregate | **Eventual** | Event → recalculate avg | Delay vài giây OK |
 
+### 4.7. Schema chi tiết cho Order & Inventory (thực chiến)
+
+**Order tables:**
+
+```sql
+CREATE TABLE orders (
+  order_id            VARCHAR(40) PRIMARY KEY,
+  user_id             VARCHAR(40) NOT NULL,
+  status              VARCHAR(30) NOT NULL,
+  subtotal_amount     BIGINT NOT NULL,
+  discount_amount     BIGINT NOT NULL DEFAULT 0,
+  shipping_fee        BIGINT NOT NULL DEFAULT 0,
+  total_amount        BIGINT NOT NULL,
+  payment_method      VARCHAR(20) NOT NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at          TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE order_items (
+  order_id            VARCHAR(40) NOT NULL,
+  line_no             INT NOT NULL,
+  product_id          VARCHAR(40) NOT NULL,
+  sku_id              VARCHAR(40) NOT NULL,
+  qty                 INT NOT NULL,
+  unit_price_snapshot BIGINT NOT NULL,
+  item_discount       BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (order_id, line_no)
+);
+```
+
+**Inventory tables:**
+
+```sql
+CREATE TABLE stocks (
+  sku_id              VARCHAR(40) PRIMARY KEY,
+  available_qty       INT NOT NULL,
+  reserved_qty        INT NOT NULL DEFAULT 0,
+  version             BIGINT NOT NULL DEFAULT 0,
+  updated_at          TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE stock_reservations (
+  reservation_id      VARCHAR(40) PRIMARY KEY,
+  order_id            VARCHAR(40) NOT NULL,
+  sku_id              VARCHAR(40) NOT NULL,
+  qty                 INT NOT NULL,
+  expires_at          TIMESTAMP NOT NULL,
+  status              VARCHAR(20) NOT NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT NOW()
+);
+```
+
+### 4.8. Concurrency Control & Reconciliation Jobs
+
+| Bài toán | Cách xử lý |
+|----------|------------|
+| Race condition reserve stock | Atomic SQL update hoặc Redis Lua script |
+| Lost update | Optimistic locking (`version`) |
+| Payment callback đến muộn | Kiểm tra order status + idempotency |
+| Event mất/consumer down | Replay từ offset + reconciliation jobs |
+
+**Reconciliation jobs hàng giờ:**
+
+1. So khớp `orders(CONFIRMED)` với `payments(CAPTURED)` để phát hiện lệch.
+2. So khớp `stocks.reserved_qty` với tổng reservations active.
+3. Quét reservation quá hạn để release.
+4. Đối soát callback provider với transactions nội bộ.
+
 ---
 
 ## Phần 5 — Resilience & Reliability
@@ -950,13 +1218,261 @@ Request ──▶ Rate Limit ──▶ Timeout ──▶ Retry ──▶ Circuit
                                                    isolated       response    degradation
 ```
 
+### 5.10. Capacity Planning cho Flash Sale
+
+| Hạng mục | Baseline | Peak Flash Sale (10x) | Ghi chú |
+|----------|----------|------------------------|---------|
+| Gateway RPS | 2,000 | 20,000 | Có cache và CDN |
+| Checkout RPS | 120 | 1,200 | Phụ thuộc campaign |
+| Inventory reserve QPS | 200 | 3,000 | Burst cao trong 5 phút đầu |
+| Payment initiate QPS | 80 | 1,000 | Thường thấp hơn reserve do drop-off |
+| Kafka ingress | 5 MB/s | 45 MB/s | Cần headroom >= 30% |
+
+**Headroom policy:**
+
+- Bình thường: giữ 40% headroom.
+- Trước flash sale: pre-scale lên 2-3x.
+- Nếu queue lag tăng > ngưỡng 5 phút: bật degraded mode.
+
+### 5.11. Runbook SEV-1: Checkout Down
+
+1. Xác nhận phạm vi: gateway lỗi, order lỗi, hay payment provider lỗi.
+2. Kích hoạt war-room và chỉ định Incident Commander.
+3. Bật cờ degraded mode:
+   - Tạm tắt recommendation, review write.
+   - Giữ lại core checkout path.
+4. Nếu lỗi external payment: chuyển sang COD/alt provider.
+5. Thực hiện rollback phiên bản gần nhất nếu lỗi do deploy.
+6. Cập nhật status page mỗi 15 phút.
+7. Sau khi ổn định: postmortem + action items có owner/date.
+
 ---
 
 ## Phần 6 — Observability
 
 > 🔗 Áp dụng kiến thức từ [11 — Observability & Evolvability](11-observability-evolvability.md)
 
-*(Sẽ viết chi tiết: logging strategy, metrics quan trọng, tracing flow, alerting rules, dashboard design)*
+### 6.1. Mục tiêu Observability cho ShopVN
+
+Observability trả lời 3 câu hỏi quan trọng:
+
+- **Hệ thống có đang khỏe không?** (Metrics)
+- **Lỗi đang xảy ra ở đâu?** (Logs + Traces)
+- **Tại sao lại lỗi?** (Correlation giữa Logs, Metrics, Traces)
+
+| Mục tiêu | Ngưỡng |
+|----------|--------|
+| API availability | >= 99.9% |
+| P95 latency (core APIs) | < 300ms |
+| MTTR (Mean Time To Recovery) | < 30 phút |
+| MTTD (Mean Time To Detect) | < 5 phút |
+| Trace sampling (prod) | 10-20% bình thường, 100% khi incident |
+
+### 6.2. Kiến trúc Telemetry tổng thể
+
+```mermaid
+flowchart LR
+    subgraph APP["Application Layer"]
+        SVC["Services: Gateway, Order, Payment, Inventory, Catalog, Search"]
+    end
+
+    subgraph COLLECT["Collection Layer"]
+        FB["Fluent Bit (logs)"]
+        PROM["Prometheus Scraper (metrics)"]
+        OTEL["OpenTelemetry Collector (traces)"]
+    end
+
+    subgraph STORE["Storage/Backend Layer"]
+        CW["CloudWatch Logs"]
+        AMP["Amazon Managed Prometheus"]
+        XRAY["AWS X-Ray / Jaeger"]
+    end
+
+    subgraph VIS["Visualization & Alerting"]
+        GRAF["Grafana Dashboards"]
+        AM["Alertmanager / Managed Alerting"]
+        PD["PagerDuty / Slack / Email"]
+    end
+
+    SVC -->|"stdout/stderr JSON logs"| FB
+    SVC -->|"/metrics"| PROM
+    SVC -->|"OTLP spans"| OTEL
+
+    FB --> CW
+    PROM --> AMP
+    OTEL --> XRAY
+
+    CW --> GRAF
+    AMP --> GRAF
+    XRAY --> GRAF
+    AMP --> AM
+    AM --> PD
+```
+
+**Luồng đúng theo tín hiệu:**
+
+- **Logs**: Service -> Fluent Bit -> CloudWatch Logs -> Grafana (query datasource).
+- **Metrics**: Prometheus scrape `/metrics` -> AMP/Prometheus -> Grafana + Alertmanager.
+- **Traces**: Service instrumentation (OTLP) -> OpenTelemetry Collector -> X-Ray/Jaeger -> Grafana.
+
+### 6.3. Logging Strategy
+
+**Nguyên tắc:**
+
+- Log theo định dạng **JSON** để dễ query.
+- Mọi log phải có `trace_id`, `span_id`, `request_id`, `user_id` (nếu có).
+- Tuyệt đối không log `password`, `card_number`, `cvv`, access token full.
+- Phân mức log rõ ràng: `DEBUG`, `INFO`, `WARN`, `ERROR`.
+
+**Schema log chuẩn:**
+
+| Field | Bắt buộc | Ví dụ | Ý nghĩa |
+|-------|----------|-------|---------|
+| `timestamp` | ✅ | `2026-02-27T10:12:45.123Z` | Thời điểm phát sinh |
+| `service` | ✅ | `order-service` | Tên service |
+| `env` | ✅ | `prod` | Môi trường |
+| `level` | ✅ | `ERROR` | Mức log |
+| `trace_id` | ✅ | `4bf92f...` | Correlate trace |
+| `span_id` | ✅ | `00f067...` | Span hiện tại |
+| `request_id` | ✅ | `req-7f39...` | ID request từ gateway |
+| `user_id` | ⚠️ | `USR-9821` | Người dùng (nếu authenticated) |
+| `message` | ✅ | `payment callback timeout` | Nội dung chính |
+| `error_code` | ⚠️ | `PAYMENT_TIMEOUT` | Mã lỗi chuẩn hóa |
+
+**Ví dụ log thực tế (checkout timeout):**
+
+```json
+{
+  "timestamp": "2026-02-27T10:12:45.123Z",
+  "service": "order-service",
+  "env": "prod",
+  "level": "ERROR",
+  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "span_id": "00f067aa0ba902b7",
+  "request_id": "req-4c1d-93ae",
+  "user_id": "USR-9821",
+  "order_id": "ORD-20260227-8891",
+  "error_code": "PAYMENT_TIMEOUT",
+  "message": "Payment service timeout after 10s"
+}
+```
+
+### 6.4. Metrics Framework (RED + USE)
+
+ShopVN áp dụng kết hợp:
+
+- **RED** (Rate, Errors, Duration) cho HTTP/gRPC endpoints.
+- **USE** (Utilization, Saturation, Errors) cho hạ tầng (CPU, memory, queue, connection pool).
+
+| Service | Golden Metrics chính | Ngưỡng cảnh báo |
+|---------|----------------------|-----------------|
+| API Gateway | RPS, 4xx/5xx rate, P95 latency | 5xx > 1% trong 5 phút |
+| Order | checkout success rate, saga timeout | success < 97% trong 10 phút |
+| Payment | callback delay, failed charge rate | failed charge > 2% |
+| Inventory | lock wait time, reserve success | reserve fail > 3% |
+| Search | P95 query latency, zero-result ratio | P95 > 250ms |
+| Kafka | consumer lag, DLQ size | lag > 10,000 messages |
+| Database | CPU, connections, slow query count | CPU > 80% trong 10 phút |
+
+### 6.5. SLI/SLO và Error Budget
+
+| User Journey | SLI | SLO | Error Budget (tháng) |
+|-------------|-----|-----|----------------------|
+| Login | Successful login ratio | 99.95% | 0.05% |
+| Search product | P95 latency | < 200ms | 5% request có thể > 200ms |
+| Checkout | Success ratio | 99.5% | 0.5% |
+| Payment capture | Success ratio | 99.9% | 0.1% |
+| Order tracking | Availability | 99.9% | 43.8 phút/tháng |
+
+**Quy tắc vận hành Error Budget:**
+
+- Nếu burn rate > 2x trong 1 giờ: dừng release tính năng mới.
+- Ưu tiên fix reliability bug trước feature.
+- Chỉ mở lại release khi burn rate trở lại ngưỡng an toàn.
+
+### 6.6. Distributed Tracing
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant G as API Gateway
+    participant O as Order
+    participant I as Inventory
+    participant P as Payment
+    participant K as Kafka
+    participant N as Notification
+
+    U->>G: POST /checkout
+    G->>O: Forward (traceparent)
+    O->>I: reserveStock (child span)
+    I-->>O: reserved
+    O->>P: initiatePayment (child span)
+    P-->>O: payment_pending
+    O->>K: publish order.created
+    K->>N: consume event
+    N-->>U: email/sms confirmation
+```
+
+**Trace tags bắt buộc:**
+
+| Tag | Ví dụ |
+|-----|-------|
+| `order.id` | `ORD-20260227-8891` |
+| `payment.provider` | `momo` |
+| `inventory.reservation_id` | `RSV-7781` |
+| `user.tier` | `gold` |
+| `http.status_code` | `200` |
+
+### 6.7. Alerting Rules theo mức độ
+
+| Severity | Điều kiện | Kênh | SLA phản hồi |
+|----------|-----------|------|--------------|
+| `SEV-1` | Checkout down toàn hệ thống > 5 phút | PagerDuty + Phone | 5 phút |
+| `SEV-2` | Payment fail rate > 5% | PagerDuty + Slack | 15 phút |
+| `SEV-3` | Search latency tăng cao | Slack | 30 phút |
+| `SEV-4` | Storage > 80% | Email + ticket | 4 giờ |
+
+**Alert anti-noise:**
+
+- Dùng **multi-window, multi-burn-rate** cho SLO alert.
+- Alert chỉ bắn khi vi phạm liên tục (không bắn spike ngắn).
+- Gom alert theo service owner để tránh duplicate.
+
+### 6.8. Dashboard Design
+
+| Dashboard | Đối tượng | Nội dung |
+|-----------|-----------|----------|
+| Executive Health | CTO/Product | GMV theo giờ, conversion rate, total errors |
+| Platform SRE | SRE/DevOps | SLI/SLO, infra saturation, incident timeline |
+| Checkout Deep Dive | Team Order/Payment | step timing, failure point, provider success |
+| Search Quality | Team Discovery | latency, click-through rate, zero-result rate |
+
+### 6.9. Runbook mẫu: Payment error tăng đột biến
+
+1. Xác nhận scope qua dashboard (`payment failed rate`, `provider breakdown`).
+2. Mở trace của các request fail gần nhất.
+3. Kiểm tra xem lỗi nội bộ hay lỗi từ provider bên ngoài.
+4. Nếu provider lỗi:
+   - Mở circuit breaker.
+   - Chuyển traffic sang provider dự phòng (nếu có).
+   - Hiển thị thông báo thanh toán thay thế.
+5. Tạo incident note + timeline.
+6. Postmortem trong 24 giờ.
+
+### 6.10. Log Retention, Sampling, và Cost Control
+
+| Loại telemetry | Retention | Sampling | Ghi chú chi phí |
+|----------------|-----------|----------|-----------------|
+| Access logs | 30 ngày hot, 180 ngày cold | 100% | Bắt buộc audit |
+| Application logs | 14 ngày hot, 90 ngày cold | 100% ERROR, 20% INFO | Giảm chi phí lưu trữ |
+| Traces | 7 ngày | 10-20% bình thường, 100% khi incident | Tail-based sampling |
+| Metrics | 15 tháng | N/A | Dùng downsampling cho long-term |
+
+**Nguyên tắc tối ưu chi phí observability:**
+
+- Gắn nhãn service/team để chargeback.
+- Cắt log debug ở production sau 24 giờ kể từ release.
+- Archive logs sang object storage lifecycle policy.
 
 ---
 
@@ -964,7 +1480,136 @@ Request ──▶ Rate Limit ──▶ Timeout ──▶ Retry ──▶ Circuit
 
 > 🔗 Áp dụng kiến thức từ [15 — Security](15-security.md)
 
-*(Sẽ viết chi tiết: AuthN/AuthZ flow, service-to-service auth, API security, data encryption, network segmentation)*
+### 7.1. Security Principles
+
+- **Zero Trust**: không tin tưởng mặc định bất kỳ request nội bộ nào.
+- **Least Privilege**: mỗi service chỉ có quyền tối thiểu cần thiết.
+- **Defense in Depth**: nhiều lớp bảo vệ từ edge đến data.
+- **Secure by Default**: bật TLS, bật auth, tắt truy cập public không cần thiết.
+
+### 7.2. AuthN/AuthZ cho người dùng cuối
+
+```mermaid
+flowchart LR
+    U[User App] --> G[API Gateway]
+    G --> IAM[Identity Service / IdP]
+    IAM --> JWT[JWT Access Token]
+    JWT --> G
+    G --> O[Order Service]
+    G --> C[Cart Service]
+    O --> PDP[Policy Engine]
+    C --> PDP
+```
+
+**Luồng chuẩn:**
+
+1. User login qua `Identity Service` (OAuth2/OIDC).
+2. Nhận `access_token` (JWT, TTL ngắn 15 phút) + `refresh_token`.
+3. Gateway xác thực chữ ký token.
+4. Gateway forward claims cần thiết (`sub`, `role`, `scope`, `tenant_id`).
+5. Service kiểm tra quyền theo policy (RBAC/ABAC).
+
+### 7.3. Service-to-Service Security
+
+| Control | Áp dụng | Mục đích |
+|--------|---------|----------|
+| mTLS | Internal traffic | Xác thực 2 chiều giữa services |
+| SPIFFE/SPIRE hoặc service identity | Runtime identity | Gán identity ngắn hạn cho workload |
+| IAM Role per service | Truy cập AWS resource | Không dùng static credential |
+| Network Policy | K8s/ECS SG | Chặn east-west traffic không hợp lệ |
+| API allowlist | Gateway/WAF | Chỉ cho endpoint cần thiết |
+
+**Ví dụ policy:** `order-service` chỉ được gọi `inventory-service:reserve`, không được đọc DB của `payment-service`.
+
+### 7.4. API Security Controls
+
+| Mối đe dọa | Control |
+|-----------|---------|
+| Brute force login | Rate limit + CAPTCHA + lockout |
+| Token theft | TLS everywhere + token TTL ngắn + rotate refresh token |
+| Injection | Parameterized query + input validation |
+| Broken object-level authorization | Check ownership theo `user_id` ở mọi endpoint |
+| Replay payment callback | HMAC signature + nonce + timestamp check |
+| DDoS/L7 flood | AWS WAF + CDN + autoscaling + rate limiting |
+
+### 7.5. Data Protection
+
+| Loại dữ liệu | At Rest | In Transit | Ghi chú |
+|-------------|---------|------------|---------|
+| User PII | AES-256 (KMS) | TLS 1.2+ | Mask log |
+| Payment metadata | AES-256 | TLS 1.2+ | Không lưu PAN/CVV |
+| Secrets/API keys | Secrets Manager | TLS 1.2+ | Auto-rotation 30-90 ngày |
+| Backup | Encrypted snapshot | Private network | Cross-account copy |
+
+**Phân loại dữ liệu:**
+
+- `Public`: catalog public data.
+- `Internal`: metrics, logs nghiệp vụ thường.
+- `Confidential`: user profile, địa chỉ, phone.
+- `Restricted`: payment token, security events.
+
+### 7.6. Secrets Management
+
+| Loại secret | Nơi lưu | Rotation | Owner |
+|------------|---------|----------|-------|
+| DB password | AWS Secrets Manager | 30 ngày | Platform team |
+| Payment provider key | Secrets Manager + KMS | 30 ngày | Payment team |
+| JWT signing key | KMS/HSM | 90 ngày | Security team |
+| TLS cert nội bộ | ACM/Cert Manager | 60 ngày | Platform team |
+
+**Nguyên tắc vận hành:**
+
+- Không hard-code secret trong source code.
+- Không truyền secret qua env var nếu runtime hỗ trợ file mount tạm thời.
+- Audit toàn bộ truy cập secret.
+
+### 7.7. Threat Modeling (STRIDE) cho Checkout
+
+| STRIDE | Ví dụ rủi ro | Mitigation |
+|--------|---------------|------------|
+| Spoofing | Giả mạo callback từ payment gateway | HMAC + IP allowlist + cert pinning |
+| Tampering | Sửa amount trên đường truyền | TLS + server-side amount revalidation |
+| Repudiation | User chối giao dịch | Audit log immutable + transaction ID |
+| Information Disclosure | Lộ PII qua logs | Data masking + DLP scan |
+| Denial of Service | Flood `POST /checkout` | Rate limit + queue + WAF |
+| Elevation of Privilege | User thường gọi admin API | RBAC + policy engine |
+
+### 7.8. Security Testing Pipeline
+
+| Giai đoạn | Kiểm thử |
+|----------|----------|
+| PR | SAST (Semgrep/CodeQL), secret scan |
+| Build | Dependency scan (SCA), container image scan |
+| Pre-prod | DAST (OWASP ZAP), API fuzzing |
+| Prod định kỳ | Pen-test, cloud config audit (CIS benchmark) |
+
+### 7.9. Incident Response
+
+1. Phát hiện bất thường qua SIEM/alerts.
+2. Phân loại mức độ ảnh hưởng (SEV-1..SEV-4).
+3. Cô lập thành phần bị compromise.
+4. Rotate toàn bộ credentials liên quan.
+5. Thu thập forensic logs.
+6. Thông báo stakeholder theo quy định.
+7. Post-incident review + hardening action items.
+
+### 7.10. Compliance Checklist (PCI-DSS, OWASP ASVS)
+
+| Nhóm kiểm soát | Trạng thái mục tiêu |
+|----------------|---------------------|
+| Không lưu PAN/CVV | Bắt buộc |
+| Tokenization với provider | Bắt buộc |
+| Vulnerability scan định kỳ | Hàng tuần |
+| Pen-test độc lập | Ít nhất 1 lần/năm |
+| MFA cho tài khoản admin | Bắt buộc |
+| Audit log immutable | Bắt buộc |
+| Secret rotation tự động | Bắt buộc |
+
+**Scope reduction cho PCI:**
+
+- Payment UI redirect sang hosted page của provider.
+- Hệ thống nội bộ chỉ xử lý `payment_token` và metadata.
+- Tách network segment cho payment components.
 
 ---
 
@@ -972,40 +1617,308 @@ Request ──▶ Rate Limit ──▶ Timeout ──▶ Retry ──▶ Circuit
 
 > 🔗 Áp dụng kiến thức từ [12 — Containerization](12-containerization.md), [13 — Orchestration](13-orchestration.md), [14 — CI/CD](14-cicd-deployment.md)
 
-*(Sẽ viết chi tiết: container strategy, orchestration choice, CI/CD pipeline design, deployment strategy per service, IaC)*
+### 8.1. Mục tiêu nền tảng hạ tầng
+
+- Triển khai độc lập từng service.
+- Scale ngang theo tải thực tế.
+- Tự động hóa hạ tầng bằng IaC.
+- Quan sát và bảo mật built-in.
+- Tối ưu chi phí theo từng giai đoạn tăng trưởng.
+
+### 8.2. Topology môi trường
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│                           AWS ACCOUNT: SHOPVN                       │
+│                                                                      │
+│  ┌────────────────────┐   ┌────────────────────┐   ┌──────────────┐  │
+│  │      DEV           │   │       STAGING      │   │    PROD      │  │
+│  │  lower cost        │   │  pre-release test  │   │  HA + SLO    │  │
+│  │  small dataset     │   │  prod-like traffic │   │  full scale  │  │
+│  └────────────────────┘   └────────────────────┘   └──────────────┘  │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### 8.3. Compute Strategy theo loại workload
+
+| Workload | Runtime khuyến nghị | Lý do |
+|----------|---------------------|-------|
+| Core API (Order, Payment, Inventory) | ECS Fargate hoặc EKS | Cần runtime ổn định, control scaling |
+| Search API | ECS/EKS | CPU/memory burst, cần tuning |
+| Async consumers (Kafka/SQS) | ECS/EKS | Chạy liên tục, cần batch control |
+| Event-driven nhẹ (thumbnail, email worker) | Lambda | Pay-per-use, scale nhanh |
+| ML inference recommendation | ECS GPU hoặc endpoint riêng | Cần resource profile đặc thù |
+
+### 8.4. Network & Edge Architecture
+
+```mermaid
+flowchart LR
+    U[Users] --> CDN[CloudFront]
+    CDN --> WAF[AWS WAF]
+    WAF --> APIGW[API Gateway / ALB]
+    APIGW --> SVC[Microservices in Private Subnets]
+    SVC --> DB[(RDS / DynamoDB)]
+    SVC --> MQ[Kafka / SQS]
+```
+
+**Thiết kế mạng:**
+
+- Public subnet chỉ chứa edge components (ALB/NAT nếu cần).
+- Tất cả service nghiệp vụ chạy private subnet.
+- DB, cache chỉ cho phép inbound từ security group của service liên quan.
+- Egress outbound bị kiểm soát qua NAT + firewall policy.
+
+### 8.5. Container Standards
+
+| Tiêu chí | Chuẩn áp dụng |
+|----------|---------------|
+| Base image | Distroless/Alpine tối giản |
+| Build | Multi-stage Docker build |
+| Security | Run as non-root, read-only filesystem |
+| Health check | `/healthz`, `/readyz` rõ ràng |
+| Resource limit | CPU/memory request-limit bắt buộc |
+| Artifact | Immutable tag theo commit SHA |
+
+### 8.6. Autoscaling Policy
+
+| Service | Metric scale-out | Min/Max replica | Cooldown |
+|---------|------------------|-----------------|----------|
+| Gateway | CPU > 60% hoặc RPS | 4/50 | 60s |
+| Order | RPS + queue lag | 6/80 | 90s |
+| Payment | in-flight request | 4/40 | 120s |
+| Search | P95 latency + CPU | 4/60 | 60s |
+| Consumers | consumer lag | 2/100 | 45s |
+
+### 8.7. CI/CD Pipeline chi tiết
+
+```mermaid
+flowchart LR
+    A[Git Push] --> B[CI: test + lint + scan]
+    B --> C[Build image]
+    C --> D[Push ECR]
+    D --> E[Deploy Staging]
+    E --> F[Integration + contract test]
+    F --> G[Approval Gate]
+    G --> H[Canary/Blue-Green Prod]
+    H --> I[Post-deploy verification]
+```
+
+**Gate bắt buộc trước production:**
+
+- Unit test pass >= 90% success.
+- Contract test pass 100%.
+- Security scan không có lỗ hổng Critical/High chưa waive.
+- Smoke test pass sau deploy.
+
+### 8.8. Deployment Strategy theo service
+
+| Service | Strategy | Lý do |
+|---------|----------|-------|
+| Gateway | Canary 5% -> 25% -> 100% | Rủi ro cao, cần quan sát lỗi sớm |
+| Order/Payment/Inventory | Blue-Green | Tránh downtime, rollback nhanh |
+| Catalog/Search | Rolling update | Chấp nhận rolling vì read-heavy |
+| Consumers | Rolling + drain graceful | Tránh mất message đang xử lý |
+| Lambda workers | Alias weighted canary | Native deployment control |
+
+### 8.9. Backup, DR, và BCP
+
+| Thành phần | RPO | RTO | Chiến lược |
+|-----------|-----|-----|------------|
+| Order DB | 5 phút | 30 phút | PITR + multi-AZ |
+| Payment DB | < 1 phút | 15 phút | Synchronous replica + PITR |
+| Catalog DB | 15 phút | 60 phút | Snapshot định kỳ |
+| Kafka topics | 5 phút | 30 phút | Replication + mirror topic |
+| Object storage | gần 0 | 15 phút | Versioning + cross-region replication |
+
+**BCP thực tế cho flash sale:**
+
+- Freeze deploy trước sự kiện 24 giờ.
+- Pre-scale capacity lên 2-3 lần baseline.
+- War-room trực chiến (Product + Eng + SRE + Security).
+- Chuẩn bị runbook rollback trong 1 lệnh.
+
+### 8.10. IaC Structure & Environment Promotion
+
+| Thành phần | Công cụ | Quy tắc |
+|------------|---------|---------|
+| VPC, subnet, SG, IAM | Terraform/CDK | Tách module reusable |
+| ECS/EKS services | Terraform/CDK + Helm (nếu EKS) | Mỗi service 1 module/chart |
+| Database/cache | Terraform | Backup policy bắt buộc |
+| CI/CD pipelines | Terraform + GitHub Actions templates | Chuẩn hóa theo service type |
+
+**Promotion flow:**
+
+1. Merge vào `main` -> deploy `dev` tự động.
+2. Tag release -> deploy `staging`.
+3. Sau khi test + approval -> deploy `prod` theo canary/blue-green.
+4. Artifact immutable, tuyệt đối không rebuild giữa các môi trường.
 
 ---
 
 ## Phần 9 — So sánh các Solution Infrastructure
 
-*(Sẽ viết chi tiết: so sánh ít nhất 3 solutions — ECS Fargate / EKS / ECS+Lambda hybrid, bảng so sánh chi phí, độ phức tạp, team skill, migration path)*
+### 9.1. 3 phương án cho ShopVN
+
+- **Solution A: ECS Fargate-first**
+- **Solution B: EKS-first**
+- **Solution C: Hybrid (ECS cho core + Lambda cho event-driven)**
+
+### 9.2. So sánh định tính
 
 | Tiêu chí | Solution A: ECS Fargate | Solution B: EKS | Solution C: Hybrid (ECS + Lambda) |
-|----------|------------------------|-----------------|----------------------------------|
-| Độ phức tạp vận hành | ... | ... | ... |
-| Chi phí (estimate) | ... | ... | ... |
-| Scaling | ... | ... | ... |
-| Team skill yêu cầu | ... | ... | ... |
-| Phù hợp cho | ... | ... | ... |
+|----------|--------------------------|-----------------|------------------------------------|
+| Độ phức tạp vận hành | Thấp-Trung bình | Cao | Trung bình |
+| Chi phí nền tảng ban đầu | Trung bình | Cao (team + control plane) | Trung bình |
+| Tốc độ go-live | Nhanh | Chậm hơn | Nhanh-Trung bình |
+| Khả năng custom networking/runtime | Trung bình | Rất cao | Cao |
+| Học tập cho team | Dễ hơn | Khó hơn | Trung bình |
+| Phù hợp team 30 dev | ✅ tốt | ⚠️ cần team platform mạnh | ✅ tốt nếu governance tốt |
+| Phù hợp phase 1 | ✅ | ⚠️ | ✅ |
+| Phù hợp scale rất lớn dài hạn | ⚠️ | ✅ | ✅ |
+
+### 9.3. Ước lượng chi phí tương đối (tham chiếu)
+
+| Thành phần | A: ECS Fargate | B: EKS | C: Hybrid |
+|-----------|-----------------|--------|-----------|
+| Compute core APIs | 1.0x | 0.8x-1.1x (tùy tối ưu node) | 0.9x |
+| Ops overhead nhân sự | 1.0x | 1.4x | 1.2x |
+| Event workloads | 1.0x | 1.0x | 0.6x-0.9x (Lambda phù hợp burst) |
+| Tổng giai đoạn đầu | **1.0x (baseline)** | **1.2x-1.4x** | **0.95x-1.15x** |
+
+> Ghi chú: Đây là estimate tương đối để ra quyết định kiến trúc ban đầu. Cost thực tế phụ thuộc traffic, data transfer, reserved plans, và mức tối ưu workload.
+
+### 9.4. Decision đề xuất cho ShopVN
+
+**Khuyến nghị:** chọn **Solution C (Hybrid)** theo lộ trình:
+
+1. Core domain (`Order`, `Payment`, `Inventory`, `Catalog`) chạy ECS Fargate.
+2. Workload burst/event-driven (`Notification`, ảnh, enrichment) chạy Lambda.
+3. Khi team platform trưởng thành và custom nhu cầu tăng mạnh, cân nhắc chuyển một phần hoặc toàn bộ sang EKS.
+
+### 9.5. Migration Path 3 giai đoạn
+
+| Giai đoạn | Thời gian | Trọng tâm | Kết quả |
+|-----------|-----------|-----------|---------|
+| Phase 1 | 0-3 tháng | Strangler Fig + tách core services | Monolith giảm tải 40-60% |
+| Phase 2 | 3-9 tháng | Event-driven, observability, security hardening | Scale độc lập cho core flow |
+| Phase 3 | 9-18 tháng | Tối ưu cost/perf, cân nhắc EKS cho workload phù hợp | Nền tảng ổn định dài hạn |
+
+### 9.6. Weighted Decision Matrix
+
+| Tiêu chí | Trọng số | ECS Fargate | EKS | Hybrid |
+|----------|----------|-------------|-----|--------|
+| Time-to-market | 25% | 9 | 6 | 8 |
+| Vận hành dài hạn | 20% | 7 | 9 | 8 |
+| Chi phí giai đoạn đầu | 20% | 8 | 6 | 8 |
+| Khả năng mở rộng cực lớn | 15% | 7 | 9 | 8 |
+| Năng lực hiện tại của team | 20% | 8 | 6 | 8 |
+| **Điểm tổng** | **100%** | **7.95** | **7.10** | **8.00** |
+
+Kết quả định lượng phù hợp với khuyến nghị chọn **Hybrid** cho bối cảnh hiện tại của ShopVN.
 
 ---
 
 ## Phần 10 — Tổng kết Architecture Decision Records
 
-*(Sẽ viết chi tiết: tổng hợp tất cả quyết định kiến trúc dưới dạng ADR — lý do chọn, alternatives đã cân nhắc, trade-offs)*
+### 10.1. Danh sách ADR chính
 
-| ADR # | Quyết định | Lý do | Alternatives |
-|-------|-----------|-------|-------------|
-| ADR-001 | ... | ... | ... |
-| ADR-002 | ... | ... | ... |
+| ADR # | Quyết định | Lý do | Alternatives đã cân nhắc |
+|-------|------------|-------|---------------------------|
+| ADR-001 | Decompose theo Business Capability + Bounded Context | Ranh giới nghiệp vụ rõ, phù hợp team ownership | Tách theo technical layer |
+| ADR-002 | Database per Service | Giảm coupling dữ liệu, tăng autonomy | Shared database |
+| ADR-003 | Saga Orchestration cho checkout | Luồng nhiều bước, cần compensating rõ ràng | Choreography thuần event |
+| ADR-004 | Transactional Outbox | Tránh dual-write inconsistency | 2PC, publish trực tiếp sau commit |
+| ADR-005 | Sync + Async hybrid communication | Cân bằng độ trễ và độ tin cậy | Sync-only hoặc async-only |
+| ADR-006 | CQRS cho Catalog/Search | Read-heavy, cần query tối ưu | Single model duy nhất |
+| ADR-007 | Event Sourcing chưa áp dụng phase đầu | Giảm complexity, tăng tốc delivery | Full Event Sourcing từ đầu |
+| ADR-008 | Defense-in-depth resilience stack | Ngăn cascading failure | Chỉ dùng retry cơ bản |
+| ADR-009 | Zero Trust + mTLS + IAM per service | Tăng security posture nội bộ | Shared static credentials |
+| ADR-010 | Hybrid ECS + Lambda | Go-live nhanh + tối ưu burst cost | ECS-only, EKS-only |
+
+### 10.2. ADR template đề xuất
+
+| Trường | Nội dung cần có |
+|--------|-----------------|
+| `Title` | Tên quyết định |
+| `Status` | Proposed / Accepted / Deprecated |
+| `Context` | Bối cảnh nghiệp vụ và kỹ thuật |
+| `Decision` | Quyết định cụ thể |
+| `Consequences` | Lợi ích, trade-off, rủi ro |
+| `Alternatives` | Các phương án đã loại |
+| `Date` | Ngày quyết định |
+| `Owners` | Team/phụ trách |
+
+### 10.3. Trade-off tổng thể
+
+| Quyết định | Lợi ích | Trade-off |
+|-----------|---------|-----------|
+| Tách nhiều services ngay từ đầu | Autonomy cao | Tăng vận hành và quan sát |
+| Saga thay vì transaction phân tán | Scale tốt, linh hoạt | Eventual consistency + debug khó hơn |
+| Hybrid compute | Tối ưu chi phí/tính linh hoạt | Governance phức tạp hơn |
+| CQRS có chọn lọc | Tối ưu read path | Tăng đồng bộ dữ liệu |
+
+### 10.4. KPI đánh giá thành công sau migration
+
+| KPI | Trước migration | Mục tiêu sau migration |
+|-----|-----------------|------------------------|
+| Deploy frequency | 2 lần/tháng | >= 20 lần/tháng |
+| Lead time for change | 7-14 ngày | < 1 ngày |
+| MTTR | 4 giờ | < 30 phút |
+| Checkout success rate | 96-97% peak | >= 99.5% |
+| P95 API latency | 450-700ms peak | < 300ms |
+| Downtime mỗi lần release | 2-3 giờ | ~0 (zero-downtime) |
+
+### 10.5. Kết luận case study
+
+Thiết kế này giúp ShopVN:
+
+- Chuyển từ monolith sang kiến trúc microservice có lộ trình, giảm rủi ro big-bang.
+- Tập trung đầu tư vào core domain (`Order`, `Payment`, `Inventory`) nơi tạo khác biệt cạnh tranh.
+- Đảm bảo scale cho flash sale bằng event-driven, autoscaling và resilience patterns.
+- Tăng độ tin cậy vận hành thông qua observability đầy đủ và SLO-driven operations.
+- Đáp ứng bảo mật thực chiến với Zero Trust, mTLS, secrets rotation và security testing liên tục.
+
+### 10.6. Backlog thực thi 90 ngày đầu
+
+| Tuần | Deliverable | Owner |
+|------|-------------|-------|
+| 1-2 | Chuẩn hóa logging/metrics/tracing SDK cho tất cả services | Platform |
+| 3-4 | Triển khai API Gateway policy chuẩn + idempotency middleware | Experience |
+| 5-6 | Hoàn thiện Order Saga orchestration + outbox relay | Core Commerce |
+| 7-8 | Payment ACL + callback verification + reconciliation job | Payment |
+| 9-10 | Inventory atomic reserve + expiry worker | Core Commerce |
+| 11-12 | SLO dashboard + alert burn-rate + runbook SEV-1 | SRE |
+
+**Definition of Done cho mỗi service migration:**
+
+- Contract test pass.
+- SLO và alert đã bật.
+- Runbook + on-call ownership rõ ràng.
+- Rollback verified trong staging.
 
 ---
 
 ## 🔗 Liên kết
 
 - [01 — Microservice Overview](01-microservice-overview.md)
+- [02 — Single Responsibility & Bounded Context](02-single-responsibility-bounded-context.md)
 - [05 — Decomposition Strategies](05-decomposition-strategies.md)
 - [06 — Inter-Service Communication](06-inter-service-communication.md)
+- [07 — API Gateway](07-api-gateway.md)
+- [08 — Service Discovery](08-service-discovery.md)
 - [09 — Data Management](09-data-management.md)
 - [10 — Resilience Patterns](10-resilience-patterns.md)
+- [11 — Observability & Evolvability](11-observability-evolvability.md)
+- [12 — Containerization](12-containerization.md)
+- [13 — Orchestration](13-orchestration.md)
+- [14 — CI/CD Deployment](14-cicd-deployment.md)
+- [15 — Security](15-security.md)
+- [16 — Configuration & Secrets Management](16-configuration-secrets-management.md)
 - [17 — Design Patterns](17-design-patterns.md)
+- [18 — AWS Deployment Architecture](18-aws-deployment-architecture.md)
+- [19 — AWS Communication & Discovery](19-aws-communication-discovery.md)
+- [20 — AWS Data Management](20-aws-data-management.md)
+- [21 — AWS Resilience](21-aws-resilience.md)
+- [22 — AWS Observability](22-aws-observability.md)
+- [23 — AWS Security](23-aws-security.md)
+- [24 — AWS CI/CD Deployment](24-aws-cicd-deployment.md)
