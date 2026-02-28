@@ -469,8 +469,8 @@ graph TD
     ORD -->|events| NTF[Notification Service]
     ORD -->|events| REV[Review Service]
 
-    style EXT_PAY fill:#f9f,stroke:#333
-    style EXT_SHP fill:#f9f,stroke:#333
+    style EXT_PAY fill:#f9f1,stroke:#333
+    style EXT_SHP fill:#f9f1,stroke:#333
 ```
 
 **Quy tắc dependency:**
@@ -690,12 +690,169 @@ gantt
 
 ### 3.5. Service Discovery
 
-**DNS-based (ECS Service Connect / Cloud Map):**
+> 🔗 Kiến thức nền tảng: [08 — Service Discovery](08-service-discovery.md)
 
-- Mỗi service đăng ký DNS name trong namespace `shopvn.local`
-- Ví dụ: `order-service.shopvn.local:3003`
-- Health check tự động deregister instance unhealthy
-- Không cần client-side discovery library — platform managed
+#### Service Discovery là gì và tại sao cần?
+
+Trong môi trường containerized (ECS, Kubernetes), mỗi service instance được cấp **IP động** — thay đổi mỗi khi container restart, scale, hoặc deploy phiên bản mới. Không thể hardcode IP address trong config.
+
+**Service Discovery** giải quyết bài toán: **"Service A muốn gọi Service B — gọi đến đâu?"**
+
+```
+❌ Không có Service Discovery:
+   Order Service → http://10.0.3.47:3003  ← IP cứng, container restart = mất kết nối
+
+✅ Có Service Discovery:
+   Order Service → http://order-service.shopvn.local:3003  ← DNS tự resolve đúng IP
+```
+
+#### Hai hướng tiếp cận chính
+
+| Tiêu chí | Client-side Discovery | Server-side / Platform-based Discovery |
+|----------|----------------------|----------------------------------------|
+| **Cách hoạt động** | Service tự query registry (Consul, Eureka) rồi chọn instance | Platform (ECS, K8s) tự quản lý DNS/load balancing |
+| **Library cần thiết** | Cần SDK/client library trong mỗi service | Không cần — transparent cho application code |
+| **Load balancing** | Client tự chọn (round-robin, weighted) | Platform managed (ALB, kube-proxy, Envoy) |
+| **Ví dụ** | Netflix Eureka, HashiCorp Consul client | AWS Cloud Map + ECS Service Connect, Kubernetes DNS |
+| **Ưu điểm** | Linh hoạt, tuỳ chỉnh routing logic | Đơn giản, không coupling vào library, ít ops overhead |
+| **Nhược điểm** | Mỗi service phải tích hợp SDK, thêm complexity | Ít kiểm soát routing logic ở application level |
+
+**ShopVN chọn: DNS-based (Server-side) với AWS Cloud Map + ECS Service Connect**
+
+Lý do:
+- **Polyglot tech stack** — ShopVN có Node.js, Java/Spring, Go, Python. Client-side discovery yêu cầu mỗi ngôn ngữ đều có SDK tương thích → tăng maintenance burden
+- **Team size nhỏ** — 6 team, không muốn mỗi team phải hiểu và vận hành service registry
+- **AWS-native** — Toàn bộ infra trên AWS ECS → Cloud Map tích hợp sẵn, zero-config
+- **Giảm failure domain** — Không có thêm thành phần (Consul cluster, Eureka server) cần quản lý HA
+
+#### Service Registry — DNS Mapping
+
+Tất cả services đăng ký trong **AWS Cloud Map** namespace: `shopvn.local`
+
+| # | Service | DNS Name | Port | Protocol | Ghi chú |
+|---|---------|----------|------|----------|---------|
+| 0 | API Gateway | `gateway.shopvn.local` | 443 | HTTPS | Entry point, public-facing |
+| 1 | Auth Service | `auth-service.shopvn.local` | 3001 | HTTP | Internal only |
+| 2 | User Service | `user-service.shopvn.local` | 3002 | HTTP | Internal only |
+| 3 | Catalog Service | `catalog-service.shopvn.local` | 3003 | HTTP | Internal only |
+| 4 | Search Service | `search-service.shopvn.local` | 3004 | HTTP | Internal only |
+| 5 | Cart Service | `cart-service.shopvn.local` | 3005 | HTTP | Internal only |
+| 6 | Order Service | `order-service.shopvn.local` | 3006 | HTTP | Saga orchestrator |
+| 7 | Payment Service | `payment-service.shopvn.local` | 3007 | HTTP | PCI-DSS isolated subnet |
+| 8 | Inventory Service | `inventory-service.shopvn.local` | 3008 | gRPC | High-throughput, gRPC cho perf |
+| 9 | Promotion Service | `promotion-service.shopvn.local` | 3009 | HTTP | Internal only |
+| 10 | Shipping Service | `shipping-service.shopvn.local` | 3010 | HTTP | Internal only |
+| 11 | Notification Service | `notification-service.shopvn.local` | 3011 | HTTP | Async consumer chính |
+| 12 | Review Service | `review-service.shopvn.local` | 3012 | HTTP | Internal only |
+| 13 | Recommendation Service | `recommendation-service.shopvn.local` | 3013 | HTTP | ML inference endpoint |
+
+> 💡 Service gọi nhau qua DNS name, không bao giờ dùng IP trực tiếp. Ví dụ: Order Service gọi Inventory bằng `inventory-service.shopvn.local:3008`
+
+#### Health Check — Cơ chế giám sát sức khoẻ
+
+Mỗi service expose endpoint `/health` (hoặc `/healthz`) để Cloud Map + ECS kiểm tra:
+
+```
+GET /health HTTP/1.1
+Host: order-service.shopvn.local:3006
+
+Response 200 OK:
+{
+  "status": "healthy",
+  "uptime": 84329,
+  "checks": {
+    "database": "connected",
+    "kafka": "connected",
+    "redis": "connected"
+  }
+}
+```
+
+**Cấu hình Health Check:**
+
+| Tham số | Giá trị | Ý nghĩa |
+|---------|---------|---------|
+| **Path** | `/health` | Endpoint kiểm tra |
+| **Interval** | 10 giây | Tần suất kiểm tra |
+| **Timeout** | 5 giây | Thời gian chờ response tối đa |
+| **Healthy threshold** | 2 lần liên tiếp | Số lần pass liên tiếp để đánh dấu healthy |
+| **Unhealthy threshold** | 3 lần liên tiếp | Số lần fail liên tiếp để đánh dấu unhealthy |
+| **Deregister delay** | 30 giây | Thời gian chờ trước khi xoá khỏi DNS |
+
+**Quy trình Health Check:**
+
+```mermaid
+sequenceDiagram
+    participant CM as Cloud Map
+    participant ECS as ECS Agent
+    participant SVC as Service Instance
+
+    loop Mỗi 10 giây
+        ECS->>SVC: GET /health
+        alt Response 200 trong 5s
+            SVC-->>ECS: 200 OK
+            ECS->>CM: Report HEALTHY
+        else Timeout hoặc 5xx
+            SVC--xECS: Timeout / 500
+            ECS->>CM: Report UNHEALTHY (count++)
+        end
+    end
+
+    Note over CM: Sau 3 lần UNHEALTHY liên tiếp
+    CM->>CM: Deregister instance khỏi DNS
+    CM->>ECS: Trigger replacement task
+```
+
+#### Khi một Service Instance gặp sự cố
+
+Khi một instance bị crash, OOM, hoặc treo (hang), hệ thống tự động xử lý **không cần can thiệp thủ công**:
+
+```
+Thời điểm    Sự kiện
+──────────────────────────────────────────────────────────────
+T+0s         Instance #2 của Order Service bị OOM killed
+T+10s        Health check lần 1 — FAIL
+T+20s        Health check lần 2 — FAIL
+T+30s        Health check lần 3 — FAIL → đánh dấu UNHEALTHY
+T+30s        Cloud Map xoá IP của instance #2 khỏi DNS record
+T+30s        Traffic tự động route sang instance #1 và #3
+T+35s        ECS khởi động instance #4 thay thế (desired count = 3)
+T+55s        Instance #4 healthy → Cloud Map đăng ký vào DNS
+T+55s        Traffic phân phối đều cho instance #1, #3, #4
+```
+
+**Minh hoạ luồng failover:**
+
+```
+                    ┌─────────────────────────────────────────┐
+                    │        Cloud Map DNS Resolution         │
+                    │    order-service.shopvn.local           │
+                    │                                         │
+                    │  ┌──────────┐  Trước sự cố:             │
+                    │  │ Instance │  10.0.1.10 ── Instance #1 │
+                    │  │   Pool   │  10.0.2.20 ── Instance #2 │ ← sắp crash
+                    │  │          │  10.0.3.30 ── Instance #3 │
+                    │  └──────────┘                           │
+                    │                                         │
+                    │  ┌──────────┐  Sau deregister:          │
+                    │  │ Instance │  10.0.1.10 ── Instance #1 │
+                    │  │   Pool   │  10.0.3.30 ── Instance #3 │
+                    │  │          │  (chờ instance mới...)    │
+                    │  └──────────┘                           │
+                    │                                         │
+                    │  ┌──────────┐  Sau recovery:            │
+                    │  │ Instance │  10.0.1.10 ── Instance #1 │
+                    │  │   Pool   │  10.0.3.30 ── Instance #3 │
+                    │  │          │  10.0.4.40 ── Instance #4 │ ← mới thay thế
+                    │  └──────────┘                           │
+                    └─────────────────────────────────────────┘
+```
+
+**Điểm quan trọng:**
+- Caller (ví dụ: API Gateway) **không cần biết** instance nào bị lỗi — DNS tự trả về danh sách instance healthy
+- **DNS TTL thấp (5-10s)** đảm bảo caller nhận IP mới nhanh chóng
+- Kết hợp với **Retry + Circuit Breaker** (xem [Phần 5](#phần-5--resilience--reliability)) để xử lý request đang in-flight tại thời điểm instance crash
+- ECS **desired count** đảm bảo luôn có đủ số instance tối thiểu — tự động thay thế instance bị xoá
 
 ### 3.6. Sequence Diagram — Complete Checkout Flow
 
@@ -932,7 +1089,7 @@ sequenceDiagram
     PAY->>K: payment.failed.v1
     K->>OS: consume payment.failed
     
-    rect rgb(179, 109, 109)
+    rect rgb(36, 29, 29)
         Note over OS: Compensating Transactions
         OS->>PRM: reverseVoucherUsage(orderId)
         PRM-->>OS: reversed ✓
@@ -956,6 +1113,16 @@ sequenceDiagram
 | **User** | ❌ Không | PostgreSQL + Redis cache | — | Đơn giản, không cần tách |
 | **Cart** | ❌ Không | Redis | — | Đã là key-value, đủ nhanh |
 | **Payment** | ❌ Không | PostgreSQL | — | Security concern, ít duplicate data |
+
+**Lý do chọn Read Model cụ thể cho từng service:**
+
+| Service | Read Model | Tại sao chọn? | Tại sao KHÔNG dùng cách khác? |
+|---------|------------|---------------|-------------------------------|
+| **Catalog → OpenSearch** | OpenSearch | Cần full-text search tiếng Việt, faceted filter (giá, màu, size, brand), ranking theo relevance — đây là thế mạnh của search engine | Redis chỉ lookup theo key, không hỗ trợ full-text search hay faceted filter cho 500K sản phẩm |
+| **Order → PG Read Replica** | PostgreSQL Read Replica + materialized views | Cần SQL JOIN phức tạp (order → items → product snapshot), aggregate báo cáo (doanh thu, top sản phẩm), đảm bảo durability cao — mất đơn hàng là mất tiền | Redis không hỗ trợ JOIN/aggregate; OpenSearch không phù hợp cho transactional data cần consistency cao |
+| **Inventory → Redis** | Redis cache | Dữ liệu đơn giản dạng key-value (`sku_id → stock_level`), chỉ cần tra cứu "còn bao nhiêu?", tốc độ đọc cực nhanh (sub-ms) | OpenSearch/PG Replica overkill cho lookup đơn giản; Redis là best-effort cho hiển thị, **source of truth vẫn là PostgreSQL + locking** khi checkout thật |
+
+> ⚠️ **Lưu ý về Inventory + Redis:** Redis cache stock chỉ phục vụ **hiển thị gần đúng** trên UI ("còn hàng" / "hết hàng"). Khi checkout thật, Inventory Service dùng **PostgreSQL + optimistic locking** (`version` column) để đảm bảo không bao giờ oversell. Trade-off: user có thể thấy "còn hàng" nhưng checkout báo "hết" (UX không đẹp nhưng không mất tiền/hàng).
 
 **CQRS Flow cho Catalog/Search:**
 
@@ -1001,6 +1168,18 @@ flowchart LR
     D --> E["Kafka"]
     E --> F["Consumers"]
 ```
+
+**Service nào cần Outbox?**
+
+| Service | Cần Outbox? | Events phát ra | Lý do |
+|---------|------------|----------------|-------|
+| **Order Service** | ✅ | `order.created`, `order.confirmed`, `order.cancelled` | Saga orchestrator — cần đảm bảo event tới Inventory, Payment, Notification |
+| **Payment Service** | ✅ | `payment.completed`, `payment.failed`, `payment.refunded` | Order cần biết kết quả để chuyển trạng thái |
+| **Inventory Service** | ✅ | `stock.reserved`, `stock.committed`, `stock.released` | Order Saga cần biết kết quả reserve |
+| **Promotion Service** | ✅ | `voucher.applied`, `voucher.released` | Order Saga cần biết kết quả validate voucher |
+| **Catalog Service** | ❌ | Dùng **CDC (Debezium)** đọc trực tiếp từ DB WAL | Debezium đã giải quyết dual write bằng cách khác, không cần outbox table riêng |
+
+> 💡 Mỗi service có outbox table **trong cùng database của nó**. Business data + outbox event được ghi trong **cùng 1 DB transaction** → cả 2 đều thành công hoặc đều rollback, không bao giờ mất event.
 
 **Outbox table schema:**
 
@@ -1089,12 +1268,106 @@ CREATE TABLE stock_reservations (
 | Payment callback đến muộn | Kiểm tra order status + idempotency |
 | Event mất/consumer down | Replay từ offset + reconciliation jobs |
 
-**Reconciliation jobs hàng giờ:**
+**Chi tiết từng case:**
 
-1. So khớp `orders(CONFIRMED)` với `payments(CAPTURED)` để phát hiện lệch.
-2. So khớp `stocks.reserved_qty` với tổng reservations active.
-3. Quét reservation quá hạn để release.
-4. Đối soát callback provider với transactions nội bộ.
+**① Race condition reserve stock**
+
+Scenario: Flash sale, 1000 user cùng mua 1 SKU chỉ còn 5 sản phẩm.
+
+```sql
+-- ❌ Cách sai — đọc rồi ghi riêng lẻ → oversell
+SELECT available_qty FROM stocks WHERE sku_id = 'SKU-001';  -- 5
+-- 100 request cùng đọc = 5 → đều nghĩ còn hàng
+UPDATE stocks SET available_qty = available_qty - 1 WHERE sku_id = 'SKU-001';
+
+-- ✅ Cách đúng — Atomic conditional update (1 câu SQL duy nhất)
+UPDATE stocks
+SET available_qty = available_qty - :qty,
+    reserved_qty  = reserved_qty + :qty,
+    version       = version + 1
+WHERE sku_id = :sku_id
+  AND available_qty >= :qty;
+-- Nếu affected_rows = 0 → hết hàng, trả lỗi ngay. Không có cửa oversell.
+```
+
+Với Redis (dùng cho pre-check trước khi vào DB):
+
+```lua
+-- Redis Lua script — atomic decrement, chạy single-threaded
+local stock = tonumber(redis.call('GET', KEYS[1]))
+if stock >= tonumber(ARGV[1]) then
+    redis.call('DECRBY', KEYS[1], ARGV[1])
+    return 1  -- success
+end
+return 0  -- out of stock
+```
+
+**② Lost update (Cập nhật bị ghi đè)**
+
+Scenario: 2 admin cùng sửa thông tin sản phẩm, người sau ghi đè thay đổi của người trước.
+
+```
+Admin A đọc product (version = 3), sửa giá
+Admin B đọc product (version = 3), sửa mô tả
+Admin A save → version 3→4 ✓
+Admin B save → version 3→4 ✗ CONFLICT! (version đã là 4)
+```
+
+```sql
+-- Optimistic locking — kiểm tra version khi update
+UPDATE products
+SET price = :new_price, version = version + 1
+WHERE product_id = :id AND version = :expected_version;
+-- affected_rows = 0 → conflict → trả 409 Conflict, yêu cầu client reload
+```
+
+> Dùng cho: Catalog (product update), Inventory (stock adjust), Order (status transition).
+
+**③ Payment callback đến muộn**
+
+Scenario: User thanh toán MoMo thành công, nhưng callback về ShopVN bị delay 5 phút (do network, queue provider). Lúc đó reservation đã hết hạn (TTL 15 phút gần hết) hoặc order đã bị cancel.
+
+```
+T+0:00  User checkout → Order PENDING, stock reserved (TTL 15min)
+T+0:01  Redirect MoMo → User thanh toán thành công
+T+0:06  Callback từ MoMo đến muộn (delay 5 phút)
+        → Payment Service nhận callback
+        → Kiểm tra: Order vẫn PENDING? → OK, xử lý bình thường
+        → Nếu Order đã CANCELLED (do timeout) → Trigger refund tự động
+```
+
+```
+-- Xử lý trong Payment Service:
+1. Lookup order by order_id → check status
+2. Nếu status = PENDING → confirm payment → order → CONFIRMED
+3. Nếu status = CANCELLED → auto refund → notify user
+4. Idempotency: check payment_provider_txn_id đã xử lý chưa
+   → Nếu đã xử lý → return success (không xử lý lại)
+```
+
+**④ Event mất / Consumer down**
+
+Scenario: Order Service publish `order.created` nhưng Inventory consumer đang deploy/crash → event không được xử lý.
+
+```
+Giải pháp multi-layer:
+1. Kafka consumer group — khi consumer restart, đọc tiếp từ last committed offset
+   → Event không mất, chỉ delay xử lý
+
+2. Dead Letter Queue (DLQ) — event xử lý fail 3 lần → chuyển vào DLQ
+   → Alert team để investigate manually
+
+3. Reconciliation job — safety net cuối cùng (xem bên dưới)
+```
+
+**Reconciliation jobs (chạy định kỳ):**
+
+| Job | Tần suất | Logic | Phát hiện vấn đề gì? |
+|-----|----------|-------|----------------------|
+| **Order ↔ Payment** | Mỗi giờ | So khớp `orders(status=CONFIRMED)` với `payments(status=CAPTURED)` | Order confirmed nhưng chưa có payment (event mất) hoặc payment captured nhưng order vẫn pending (callback bị miss) |
+| **Stock ↔ Reservation** | Mỗi 30 phút | So khớp `stocks.reserved_qty` với `SUM(reservations.qty) WHERE status='ACTIVE'` | reserved_qty bị lệch do race condition hoặc bug → tự động correct |
+| **Reservation cleanup** | Mỗi 5 phút | Quét `reservations WHERE expires_at < NOW() AND status='ACTIVE'` | Reservation quá hạn chưa được release (consumer down khi xử lý timeout event) → release stock về lại |
+| **Payment ↔ Provider** | Mỗi ngày | Gọi API đối soát MoMo/VNPay, so với `payments` nội bộ | Phát hiện giao dịch thành công ở provider nhưng ShopVN chưa ghi nhận → trigger bù trừ |
 
 ---
 
@@ -1142,6 +1415,24 @@ stateDiagram-v2
 
 ### 5.4. Bulkhead Pattern
 
+**Tại sao cần Bulkhead khi các service đã tách riêng?**
+
+Payment, Inventory, Promotion là các service độc lập với DB riêng — chúng không ảnh hưởng trực tiếp đến nhau. Nhưng vấn đề nằm ở **Order Service — service gọi tất cả chúng**. Khi checkout, Order Service phải gọi lần lượt Inventory, Payment, Promotion. Nếu dùng chung 1 thread/connection pool:
+
+```
+Ví dụ: Order Service có 100 threads, dùng chung cho mọi outbound call
+
+Bank API của MoMo bị chậm (timeout 10s mỗi request)
+→ 80 threads đang chờ Payment Service trả về (vì Payment chờ MoMo)
+→ Chỉ còn 20 threads cho cả Inventory + Promotion + Shipping
+→ Các request checkout mới không có thread để gọi Inventory
+→ Toàn bộ checkout CHẾT — dù Inventory và Promotion vẫn hoạt động bình thường!
+```
+
+> 💡 **Bulkhead không bảo vệ giữa các downstream service** — nó bảo vệ **bên trong caller (Order Service)**, đảm bảo 1 downstream chậm/chết không chiếm hết resource, kéo theo các downstream khác không gọi được. Giống tàu thuỷ chia khoang kín nước — 1 khoang thủng thì các khoang khác vẫn an toàn.
+
+**Giải pháp: Tách thread pool riêng cho từng downstream**
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │               ORDER SERVICE — BULKHEAD ISOLATION             │
@@ -1156,8 +1447,9 @@ stateDiagram-v2
 │  │   bị block      │  │   hưởng Payment │  │   bình thường│  │
 │  └─────────────────┘  └─────────────────┘  └──────────────┘  │
 │                                                              │
-│  ✅ Payment chậm → chỉ Payment pool bị ảnh hưởng             │
-│  ✅ Inventory, Promotion, Shipping vẫn hoạt động bình thường │
+│  ✅ Payment chậm → chỉ 20 thread Payment pool bị kẹt         │
+│  ✅ Inventory vẫn có 30 thread riêng → reserve stock bình thường│
+│  ✅ Promotion, Shipping vẫn có 50 thread → không bị ảnh hưởng │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -1184,6 +1476,31 @@ stateDiagram-v2
 
 ### 5.7. Fallback Strategies
 
+**Fallback là gì?**
+
+Khi một downstream service bị lỗi hoặc phản hồi quá chậm, thay vì trả lỗi trực tiếp cho user, hệ thống sẽ trả về một **kết quả thay thế** — chất lượng thấp hơn nhưng vẫn hoạt động được (degraded but functional). Mục tiêu là giữ cho core flow (browse, checkout, payment) **không bị gián đoạn** dù một số service phụ trợ đang down.
+
+**Mối quan hệ Circuit Breaker → Fallback:**
+
+```mermaid
+graph LR
+    A[Service Call] --> B{Response?}
+    B -->|Success| C[Return result]
+    B -->|Timeout / Error| D{Circuit Breaker state?}
+    D -->|CLOSED: lỗi chưa vượt threshold| E[Retry nếu còn quota]
+    D -->|OPEN: quá nhiều lỗi liên tiếp| F[Bỏ qua call, vào Fallback ngay]
+    D -->|HALF-OPEN: thử 1 request| G{Thành công?}
+    G -->|Yes| C
+    G -->|No| F
+    F --> H[Trả kết quả thay thế cho user]
+```
+
+Fallback chỉ được kích hoạt trong 2 trường hợp:
+- **Circuit Breaker ở trạng thái OPEN** — service đã lỗi quá nhiều, không gọi nữa, trả fallback ngay lập tức (không tốn thêm latency)
+- **Timeout xảy ra** — service phản hồi quá chậm, Circuit Breaker vẫn CLOSED nhưng request hiện tại đã quá hạn
+
+**Bảng tổng hợp Fallback:**
+
 | Service Down | Fallback Behavior | User Experience |
 |-------------|-------------------|----------------|
 | Search | Show popular products + cached results | "Kết quả phổ biến" |
@@ -1192,6 +1509,83 @@ stateDiagram-v2
 | Notification | Retry via DLQ (async) | User không biết, nhận muộn |
 | Review | Disable submit, show cached ratings | "Tạm thời không thể đánh giá" |
 | Shipping (fee calc) | Use cached fee hoặc flat rate | "Phí ship ước tính" |
+
+**Chi tiết một số case quan trọng:**
+
+#### Case 1: Search Service Down
+
+```
+User gõ "iPhone 15" → Gateway → Search Service (OpenSearch)
+                                      ❌ Circuit Breaker OPEN
+                                      │
+                                      ▼
+                              Fallback Handler
+                                      │
+                              ┌───────┴────────┐
+                              │  Redis Cache   │
+                              │  Key: search:  │
+                              │  popular:{cat} │
+                              └───────┬────────┘
+                                      │
+                                      ▼
+                              Trả về popular products
+                              + banner "Kết quả phổ biến"
+```
+
+**Cách chuẩn bị cache (pre-warm):**
+- Một **scheduled job chạy mỗi giờ** query top 100 sản phẩm phổ biến theo từng category (Electronics, Fashion, Home...) và lưu vào Redis với TTL = 2 giờ
+- Khi Search down, fallback handler lấy popular products từ Redis theo category mà user đang browse
+- Nếu user đang ở trang chủ (không có category context), trả về top 50 sản phẩm bán chạy nhất toàn sàn
+- User thấy: danh sách sản phẩm phổ biến + thông báo nhỏ *"Hiển thị kết quả phổ biến — tìm kiếm sẽ hoạt động lại sớm"*. User vẫn browse và mua hàng được, chỉ không search chính xác theo keyword
+
+#### Case 2: Promotion Service Timeout
+
+```
+User nhập voucher "SALE50" → Checkout Service → Promotion Service
+                                                      ❌ Timeout 2s
+                                                      │
+                                                      ▼
+                                              Fallback: bỏ qua voucher
+                                                      │
+                                                      ▼
+                                              Checkout tiếp tục với giá gốc
+                                              + thông báo cho user
+```
+
+- Checkout **vẫn hoạt động bình thường** — chỉ không áp dụng được voucher giảm giá
+- User nhận thông báo: *"Voucher tạm thời không khả dụng. Bạn có thể tiếp tục thanh toán với giá gốc, hoặc thử lại sau."*
+- User có 2 lựa chọn: (1) tiếp tục checkout không voucher, (2) quay lại thử nhập voucher sau khi Promotion Service hồi phục
+- **Không bao giờ** tự fake kết quả giảm giá — luôn trả giá gốc khi Promotion không xác nhận được
+
+#### Case 3: Shipping Fee Calculation Down
+
+```
+User xem trang checkout → Order Service → Shipping Service (GHN API)
+                                                ❌ Circuit Breaker OPEN
+                                                │
+                                                ▼
+                                        Fallback: flat rate 30,000đ
+                                                │
+                                                ▼
+                                        Hiển thị "Phí ship ước tính: 30,000đ"
+                                        + flag order.shipping_fee_estimated = true
+```
+
+- Khi Shipping Service hoặc API của đối tác vận chuyển (GHN, GHTK) bị down, hệ thống áp dụng **phí ship mặc định 30,000đ** (flat rate tính trung bình từ dữ liệu lịch sử)
+- User thấy: *"Phí ship ước tính: 30,000đ (sẽ được điều chỉnh chính xác sau)"*
+- Order được lưu với flag `shipping_fee_estimated = true`
+- Khi Shipping Service hồi phục, một **reconciliation job** chạy lại tính phí chính xác cho các order có flag này:
+  - Nếu phí thực tế **thấp hơn** 30,000đ → hoàn tiền chênh lệch cho user
+  - Nếu phí thực tế **cao hơn** 30,000đ → sàn chịu phần chênh lệch (chấp nhận lỗ nhỏ để giữ UX tốt)
+
+> ⚠️ **Những service KHÔNG BAO GIỜ được có fallback:**
+>
+> | Service | Lý do không fallback |
+> |---------|---------------------|
+> | **Payment** | Không bao giờ fake kết quả thanh toán. Nếu Payment gateway down → **dừng checkout**, thông báo user thử lại sau. Trả kết quả sai (thành công khi thực tế thất bại, hoặc ngược lại) sẽ gây mất tiền hoặc mất hàng |
+> | **Inventory Reserve** | Không bao giờ bỏ qua bước check tồn kho. Nếu Inventory Service down → **dừng checkout**. Bỏ qua stock check sẽ gây **oversell** — bán nhiều hơn hàng có, dẫn tới phải hủy đơn hàng loạt và mất uy tín |
+>
+> Nguyên tắc: **Fallback chỉ áp dụng cho service mà kết quả sai/thiếu không gây thiệt hại tài chính trực tiếp**. Với Payment và Inventory, "fail fast + thông báo rõ ràng" tốt hơn "fail silently + hậu quả nghiêm trọng".
 
 ### 5.8. Chaos Engineering Plan
 
@@ -1207,6 +1601,17 @@ stateDiagram-v2
 
 ### 5.9. Defense in Depth — Thứ tự áp dụng
 
+**Defense in Depth là gì?**
+
+Defense in Depth (phòng thủ nhiều lớp) là chiến lược kết hợp **nhiều resilience pattern thành một chuỗi tuần tự**, trong đó mỗi lớp đảm nhận một nhiệm vụ riêng và **bắt những lỗi mà lớp trước bỏ sót**. Không có pattern nào đứng một mình là đủ — chúng phải phối hợp như một pipeline:
+
+- **Rate Limit** chặn traffic bất thường → nhưng không xử lý được service chậm
+- **Timeout** ngắt request chờ quá lâu → nhưng không biết nên thử lại hay không
+- **Retry** thử lại lỗi tạm thời → nhưng nếu service chết hẳn thì retry chỉ làm tệ hơn
+- **Circuit Breaker** ngắt mạch khi service lỗi liên tục → nhưng không cách ly resource
+- **Bulkhead** cách ly thread pool → nhưng không cung cấp response thay thế
+- **Fallback** trả kết quả degraded → lớp cuối cùng, đảm bảo user luôn nhận response
+
 ```
 Request ──▶ Rate Limit ──▶ Timeout ──▶ Retry ──▶ Circuit Breaker ──▶ Bulkhead ──▶ Fallback
    │            │             │           │            │                │            │
@@ -1218,33 +1623,283 @@ Request ──▶ Rate Limit ──▶ Timeout ──▶ Retry ──▶ Circuit
                                                    isolated       response    degradation
 ```
 
+**Chi tiết từng lớp trong ShopVN:**
+
+| Lớp | Chức năng | Cấu hình ở đâu | Khi trigger thì sao? | Ví dụ ShopVN |
+|-----|-----------|-----------------|----------------------|--------------|
+| **Rate Limit** | Giới hạn số request/giây, chặn traffic bất thường (DDoS, bot, abuse) trước khi vào hệ thống | API Gateway (Kong/Nginx) | Trả `429 Too Many Requests`, request bị reject ngay tại gateway, không tốn resource backend | Flash sale: mỗi user tối đa 10 req/s cho checkout, 50 req/s cho browse. Bot spam add-to-cart bị chặn ngay |
+| **Timeout** | Đặt thời gian chờ tối đa cho mỗi lần gọi downstream, tránh thread bị treo vô hạn | Client-side (caller service) — config trong HTTP client hoặc gRPC channel | Request bị cancel sau thời gian timeout, thread được giải phóng, trả lỗi `504 Gateway Timeout` hoặc exception | Order Service gọi Payment Service với timeout 3s. Nếu Payment chậm > 3s → fail fast, không block 50 threads chờ |
+| **Retry** | Thử lại request khi gặp lỗi tạm thời (network blip, 503 tạm), tăng tỉ lệ thành công | Client-side (caller service) — retry policy với exponential backoff + jitter | Gửi lại request (tối đa N lần), mỗi lần chờ lâu hơn. **Bắt buộc**: downstream phải idempotent | Payment timeout lần 1 → retry sau 200ms → thành công lần 2. Idempotency key đảm bảo không charge 2 lần |
+| **Circuit Breaker** | Theo dõi tỉ lệ lỗi, khi vượt ngưỡng → ngắt mạch (OPEN), ngừng gọi service đang chết | Client-side (caller service) — Resilience4j hoặc Istio | Trạng thái OPEN: mọi request fail ngay (fast-fail), không gửi tới downstream. Sau thời gian → HALF-OPEN, thử vài request | Payment Service lỗi 60% trong 30s → circuit OPEN. Order Service ngừng gọi Payment, không tạo thêm áp lực lên service đang chết |
+| **Bulkhead** | Cách ly thread pool / connection pool theo từng downstream, ngăn một service chậm "nuốt" hết resource | Caller service — separate thread pool per downstream | Thread pool đầy → request mới bị reject ngay, nhưng các thread pool khác (gọi service khác) không bị ảnh hưởng | Order Service: 20 threads cho Payment, 10 threads cho Inventory. Payment chậm → 20 threads Payment đầy, nhưng 10 threads Inventory vẫn hoạt động bình thường |
+| **Fallback** | Cung cấp response thay thế (degraded) khi tất cả lớp trên đều fail, đảm bảo user luôn nhận được kết quả | Caller service — fallback handler trong code | Trả response degraded thay vì lỗi 500. Có thể dùng cache, giá trị mặc định, hoặc thông báo thân thiện | Payment fail → Order đặt trạng thái "pending_payment", trả cho user: "Đơn hàng đã tạo, thanh toán đang xử lý. Chúng tôi sẽ thông báo qua email trong 5 phút" |
+
+**Ví dụ thực tế: User checkout khi Payment Service bị chậm**
+
+Tình huống: Nguyễn Văn A checkout đơn hàng 500K VND trên ShopVN. Lúc này Payment Service đang bị quá tải, response time tăng từ 200ms → 8s, rồi bắt đầu trả lỗi 503.
+
+```
+Bước 1 — Rate Limit (Gateway):
+  Request checkout của user A đến Gateway.
+  ✅ PASS — user A mới gửi 2 req/s, dưới ngưỡng 10 req/s.
+  → Request được forward tới Order Service.
+
+Bước 2 — Timeout (Order Service → Payment Service):
+  Order Service gọi Payment Service, timeout = 3s.
+  ❌ TRIGGER — Payment response mất 8s > timeout 3s.
+  → Request bị cancel sau 3s, thread được giải phóng.
+
+Bước 3 — Retry (Order Service):
+  Retry policy: max 2 lần, backoff 200ms, 400ms.
+  Lần 1 (sau 200ms): Payment vẫn chậm → timeout 3s → fail.
+  Lần 2 (sau 400ms): Payment trả 503.
+  ❌ TRIGGER — Hết retry, cả 2 lần đều fail.
+  → Idempotency key = "order-12345-payment" đảm bảo không charge trùng.
+
+Bước 4 — Circuit Breaker (Order Service):
+  Đã tích lũy 60% failure rate trong 30s gần nhất (nhiều user cùng checkout fail).
+  ❌ TRIGGER — Circuit chuyển sang OPEN.
+  → Các request checkout tiếp theo fail ngay lập tức (fast-fail trong <10ms),
+    không gửi tới Payment nữa → giảm áp lực lên Payment để nó recovery.
+
+Bước 5 — Bulkhead (Order Service):
+  Thread pool "payment-pool" (20 threads) đã đầy vì các request trước đang chờ timeout.
+  ✅ KHÔNG LAN TRÀN — Thread pool "inventory-pool" (10 threads) vẫn hoạt động bình thường.
+  → User vẫn browse sản phẩm, xem tồn kho, thêm giỏ hàng được.
+
+Bước 6 — Fallback (Order Service):
+  ❌ TRIGGER — Payment fail hoàn toàn.
+  → Order Service tạo đơn hàng với trạng thái "pending_payment".
+  → Publish event OrderCreatedPendingPayment lên Kafka.
+  → Trả response cho user A:
+     "✅ Đơn hàng #12345 đã được tạo thành công!
+      💳 Thanh toán đang được xử lý. Bạn sẽ nhận email xác nhận trong 5 phút.
+      Nếu không nhận được, vui lòng vào Lịch sử đơn hàng để thử thanh toán lại."
+
+Sau 2 phút — Circuit Breaker HALF-OPEN:
+  Cho 3 request thử gọi Payment → 2/3 thành công.
+  → Circuit chuyển về CLOSED, checkout hoạt động bình thường trở lại.
+  → Background job xử lý các đơn "pending_payment" tồn đọng.
+```
+
+> 💡 **Nguyên tắc quan trọng:** Mỗi lớp bảo vệ một khía cạnh khác nhau. Rate Limit bảo vệ **gateway**, Timeout bảo vệ **thread**, Retry xử lý **lỗi tạm thời**, Circuit Breaker bảo vệ **downstream**, Bulkhead bảo vệ **resource isolation**, Fallback bảo vệ **user experience**. Thiếu bất kỳ lớp nào đều tạo ra lỗ hổng.
+
 ### 5.10. Capacity Planning cho Flash Sale
 
-| Hạng mục | Baseline | Peak Flash Sale (10x) | Ghi chú |
-|----------|----------|------------------------|---------|
-| Gateway RPS | 2,000 | 20,000 | Có cache và CDN |
-| Checkout RPS | 120 | 1,200 | Phụ thuộc campaign |
-| Inventory reserve QPS | 200 | 3,000 | Burst cao trong 5 phút đầu |
-| Payment initiate QPS | 80 | 1,000 | Thường thấp hơn reserve do drop-off |
-| Kafka ingress | 5 MB/s | 45 MB/s | Cần headroom >= 30% |
+**Capacity Planning là gì?**
+
+Là quá trình **tính toán trước** hệ thống cần bao nhiêu resource (pod, CPU, memory, DB connection) để chịu được traffic flash sale, rồi **chuẩn bị sẵn trước** khi sale bắt đầu. Không thể dựa hoàn toàn vào auto-scale vì auto-scale cần 2-5 phút để thêm pod mới, trong khi flash sale traffic tăng từ 0 → peak trong **vài giây** (200K user đồng loạt click lúc 12:00:00).
+
+**Cách tính số liệu từ business metrics:**
+
+```
+Đầu vào business:
+  - DAU bình thường: 200,000
+  - Flash sale: 10x traffic → 2,000,000 lượt truy cập
+  - Concurrent users peak: 200,000 (tập trung trong 5 phút đầu)
+
+Ước lượng RPS:
+  - Gateway:    200K concurrent × 1 req/10s = 20,000 RPS
+  - Checkout:   ~6% user thực sự checkout = 12,000 user → 1,200 RPS (mỗi user 1 checkout/10s)
+  - Inventory:  mỗi checkout trung bình 2.5 SKU = 1,200 × 2.5 = 3,000 QPS
+  - Payment:    ~83% user hoàn tất payment (17% bỏ giữa chừng) = 1,000 QPS
+  - Kafka:      mỗi event ~1KB × 45,000 events/s = ~45 MB/s
+```
+
+| Hạng mục | Baseline | Peak Flash Sale (10x) | Cách tính |
+|----------|----------|------------------------|-----------|
+| Gateway RPS | 2,000 | 20,000 | 200K concurrent ÷ 10s/req, có CDN cache static |
+| Checkout RPS | 120 | 1,200 | ~6% conversion rate từ browse → checkout |
+| Inventory reserve QPS | 200 | 3,000 | Checkout RPS × 2.5 SKU/order, burst cao 5 phút đầu |
+| Payment initiate QPS | 80 | 1,000 | ~83% checkout hoàn tất payment (17% drop-off) |
+| Kafka ingress | 5 MB/s | 45 MB/s | Tổng events từ Order + Inventory + Payment |
+
+**Pre-scale cụ thể từng service:**
+
+| Service | Baseline pods | Pre-scale Flash Sale | CPU/pod | Memory/pod | Lý do |
+|---------|--------------|---------------------|---------|------------|-------|
+| API Gateway | 3 | 10 | 1 vCPU | 1 GB | Nhận toàn bộ 20K RPS, SSL termination tốn CPU |
+| Cart Service | 2 | 6 | 0.5 vCPU | 512 MB | User thêm/xóa giỏ hàng liên tục trước giờ sale |
+| Order Service | 3 | 10 | 1 vCPU | 1 GB | Saga orchestrator, mỗi checkout gọi 4 downstream |
+| Inventory Service | 2 | 8 | 1 vCPU | 512 MB | Hot path — 3,000 QPS reserve, cần nhiều DB connections |
+| Payment Service | 2 | 6 | 0.5 vCPU | 512 MB | Phụ thuộc bank API, cần nhiều threads chờ callback |
+| Promotion Service | 2 | 6 | 0.5 vCPU | 512 MB | Validate voucher mỗi checkout, flash sale rule check |
+| Search Service | 3 | 4 | 0.5 vCPU | 1 GB | Ít tăng — user đã biết sản phẩm sale, ít search |
+| Notification Service | 2 | 4 | 0.25 vCPU | 256 MB | Async qua Kafka, có thể delay vài phút OK |
+
+> 💡 Redis và PostgreSQL cũng cần pre-scale: tăng connection pool, read replica, Redis memory.
+
+**Timeline hành động trước/trong/sau Flash Sale:**
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                    FLASH SALE TIMELINE                              │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  T-7 ngày   📋 Planning                                            │
+│  ├── Xác nhận campaign: sản phẩm nào, số lượng, khung giờ          │
+│  ├── Tính toán capacity dựa trên dự kiến traffic                   │
+│  └── Chuẩn bị flash sale data trong Promotion Service               │
+│                                                                     │
+│  T-1 ngày   🔧 Pre-scale & Verify                                  │
+│  ├── Scale pods lên theo bảng pre-scale ở trên                     │
+│  ├── Warm up Redis cache (product info, stock level)                │
+│  ├── Pre-warm DB connection pools                                   │
+│  ├── Load test với traffic giả lập 80% peak                        │
+│  └── Verify monitoring dashboards & alerting rules                  │
+│                                                                     │
+│  T-30 phút  🚦 Final check                                         │
+│  ├── Code freeze — không deploy bất kỳ service nào                 │
+│  ├── On-call team vào war-room (Slack channel/Zoom)                │
+│  ├── Verify tất cả pods healthy, zero error rate                   │
+│  └── Bật high-priority alerting (PagerDuty)                        │
+│                                                                     │
+│  T=0        🔥 Flash Sale bắt đầu                                   │
+│  ├── Monitor real-time: RPS, error rate, latency, queue lag        │
+│  ├── Nếu error rate > 5% → xem xét bật degraded mode              │
+│  ├── Nếu queue lag > 5 phút → scale Kafka consumers                │
+│  └── Nếu 1 service chết → Circuit Breaker + fallback               │
+│                                                                     │
+│  T+2 giờ    📉 Kết thúc Flash Sale                                  │
+│  ├── Chờ 30 phút để traffic giảm tự nhiên                          │
+│  ├── Scale down pods dần (không scale xuống đột ngột)              │
+│  ├── Chạy reconciliation jobs kiểm tra dữ liệu                    │
+│  └── Thu thập metrics cho postmortem                                │
+│                                                                     │
+│  T+1 ngày   📝 Postmortem                                          │
+│  ├── So sánh actual vs predicted traffic                           │
+│  ├── Phân tích bottleneck nếu có                                   │
+│  └── Cập nhật capacity model cho lần sale tiếp theo                │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Degraded Mode — tắt gì, giữ gì:**
+
+| Khi bật degraded mode | Hành động | Lý do |
+|----------------------|-----------|-------|
+| ✅ **Giữ** | Checkout flow (Order → Inventory → Payment) | Core business, mất = mất doanh thu |
+| ✅ **Giữ** | Cart add/remove | User cần thêm giỏ hàng để checkout |
+| ✅ **Giữ** | Product detail page (từ cache) | User cần xem sản phẩm trước khi mua |
+| ⚠️ **Giảm** | Search — trả kết quả từ cache, tắt auto-suggest | Giảm load OpenSearch |
+| ⚠️ **Giảm** | Recommendation — trả static "Top bán chạy" | Tắt ML inference, giảm CPU |
+| ❌ **Tắt** | Review write — tạm không cho submit review | Không urgent, giảm DB write |
+| ❌ **Tắt** | Notification email/SMS — queue lại, gửi sau | Delay 30 phút chấp nhận được |
+| ❌ **Tắt** | Non-essential API (user profile edit, address update) | Không ai sửa profile lúc flash sale |
 
 **Headroom policy:**
 
-- Bình thường: giữ 40% headroom.
-- Trước flash sale: pre-scale lên 2-3x.
-- Nếu queue lag tăng > ngưỡng 5 phút: bật degraded mode.
+| Tình huống | Headroom | Hành động |
+|-----------|----------|-----------|
+| Bình thường | 40% | Auto-scale handle được |
+| Trước flash sale (T-1 ngày) | Pre-scale 2-3x | Scale thủ công theo bảng trên |
+| Kafka queue lag > 5 phút | — | Scale consumers + xem xét degraded mode |
+| CPU > 80% bất kỳ service | — | Scale thêm pods ngay |
 
 ### 5.11. Runbook SEV-1: Checkout Down
 
-1. Xác nhận phạm vi: gateway lỗi, order lỗi, hay payment provider lỗi.
-2. Kích hoạt war-room và chỉ định Incident Commander.
-3. Bật cờ degraded mode:
-   - Tạm tắt recommendation, review write.
-   - Giữ lại core checkout path.
-4. Nếu lỗi external payment: chuyển sang COD/alt provider.
-5. Thực hiện rollback phiên bản gần nhất nếu lỗi do deploy.
-6. Cập nhật status page mỗi 15 phút.
-7. Sau khi ổn định: postmortem + action items có owner/date.
+**Runbook là gì?** Là **sổ tay hướng dẫn xử lý sự cố**, viết sẵn trước khi sự cố xảy ra. Khi hệ thống chết lúc 2 giờ sáng, engineer on-call không cần suy nghĩ — chỉ cần mở runbook và **làm theo từng bước**. Giống quy trình sơ cứu y tế — viết sẵn lúc bình yên, dùng lúc khẩn cấp.
+
+**SEV-1 (Severity 1)** = sự cố nghiêm trọng nhất. "Checkout Down" nghĩa là user không thể đặt hàng → **mất doanh thu trực tiếp**, đặc biệt nguy hiểm trong flash sale.
+
+**Quy trình xử lý 7 bước:**
+
+**Bước 1 — Xác nhận phạm vi (2-5 phút đầu)**
+
+Mở dashboard Grafana, xác định lỗi ở đâu:
+
+| Triệu chứng trên dashboard | Nguyên nhân có thể | Hướng xử lý |
+|----------------------------|--------------------|--------------| 
+| Gateway 5xx tăng đột biến | Gateway quá tải hoặc misconfiguration | Xem bước 5 (rollback) hoặc scale gateway |
+| Order Service timeout | Order hoặc downstream (Inventory/Payment) chậm | Xem trace → xác định downstream nào chậm |
+| Payment callback fail rate tăng | Provider bên ngoài (MoMo/VNPay) lỗi | Xem bước 4 (chuyển provider) |
+| Inventory reserve timeout | DB lock hoặc Inventory Service quá tải | Scale Inventory pods + kiểm tra DB connections |
+
+**Bước 2 — Kích hoạt War-room (5 phút)**
+
+```
+- Tạo Slack channel: #incident-checkout-YYYYMMDD
+- Chỉ định Incident Commander (IC): 1 người DUY NHẤT ra quyết định
+  → IC là senior engineer on-call của team sở hữu service lỗi
+  → IC KHÔNG tự fix — IC điều phối người khác fix
+- Gọi thêm engineer liên quan:
+  → Payment team nếu lỗi payment provider
+  → SRE nếu lỗi infra (DB, Kafka, network)
+  → Core Commerce nếu lỗi Order/Inventory logic
+```
+
+**Bước 3 — Bật Degraded Mode (ngay lập tức)**
+
+Tắt bớt thứ không cần thiết để giải phóng resource cho checkout:
+
+```
+- Tắt: Recommendation Service, Review write, Notification email/SMS
+- Giảm: Search chuyển sang cached results
+- GIỮ NGUYÊN: Checkout flow (Order → Inventory → Payment → Shipping)
+→ Mục tiêu: user vẫn mua được hàng, dù trải nghiệm kém hơn bình thường
+```
+
+**Bước 4 — Xử lý lỗi external payment provider**
+
+```
+Nếu MoMo chết:
+  → Tắt option MoMo trên checkout UI (feature flag)
+  → Chuyển traffic sang VNPay hoặc bank transfer
+  → Bật option COD (thanh toán khi nhận hàng)
+  → User vẫn checkout được bằng phương thức khác
+
+Nếu TẤT CẢ provider chết:
+  → Chỉ cho phép COD
+  → Thông báo: "Thanh toán online tạm thời gián đoạn, vui lòng chọn COD"
+```
+
+**Bước 5 — Rollback nếu lỗi do deploy mới**
+
+```
+Kiểm tra: Có deploy nào trong 2 giờ gần nhất không?
+  → Có → Rollback ngay về version trước:
+    - Blue-Green: chuyển traffic về bản cũ (< 1 phút)
+    - Canary: route 100% về stable version
+  → Không → Lỗi không do deploy, tiếp tục debug
+```
+
+**Bước 6 — Cập nhật Status Page (mỗi 15 phút)**
+
+```
+- Cập nhật status page công khai: https://status.shopvn.vn
+- Template thông báo:
+  "[HH:MM] Hệ thống đang gặp sự cố với chức năng thanh toán.
+   Đội ngũ kỹ thuật đang khắc phục. Cập nhật tiếp theo lúc [HH:MM+15]."
+- Khi fix xong:
+  "[HH:MM] Sự cố đã được khắc phục. Chức năng thanh toán hoạt động bình thường."
+```
+
+**Bước 7 — Postmortem (trong 24-48 giờ sau khi ổn định)**
+
+```
+Viết báo cáo postmortem gồm:
+- Timeline chi tiết: phút nào xảy ra gì, ai làm gì
+- Root cause: nguyên nhân gốc (không phải triệu chứng)
+- Impact: bao nhiêu user bị ảnh hưởng, mất bao nhiêu đơn hàng
+- Action items: việc cần làm để không tái diễn
+  → Mỗi item phải có OWNER + DEADLINE
+  → Ví dụ: "Thêm circuit breaker cho Order → Payment" — @payment-team — 2026-03-15
+```
+
+**Ví dụ timeline thực tế:**
+
+```
+02:00  PagerDuty alert: "Checkout error rate > 50%"
+02:02  On-call engineer xác nhận → mở dashboard → Payment callback fail 90%
+02:05  Tạo #incident-checkout-20260228, IC = Minh (Payment team lead)
+02:07  Bật degraded mode, tắt recommendation + review
+02:10  Xác nhận MoMo API trả 503 → lỗi phía MoMo
+02:12  Bật feature flag: tắt MoMo, chuyển sang VNPay + COD
+02:15  Checkout error rate giảm về 3% → hệ thống ổn định
+02:15  Cập nhật status page: "Thanh toán MoMo tạm gián đoạn, VNPay và COD hoạt động bình thường"
+02:30  Tắt degraded mode, bật lại recommendation + review
+06:00  MoMo thông báo đã khắc phục → bật lại option MoMo
+09:00  Postmortem meeting → 3 action items có owner/deadline
+```
 
 ---
 
@@ -1585,13 +2240,131 @@ flowchart LR
 
 ### 7.9. Incident Response
 
-1. Phát hiện bất thường qua SIEM/alerts.
-2. Phân loại mức độ ảnh hưởng (SEV-1..SEV-4).
-3. Cô lập thành phần bị compromise.
-4. Rotate toàn bộ credentials liên quan.
-5. Thu thập forensic logs.
-6. Thông báo stakeholder theo quy định.
-7. Post-incident review + hardening action items.
+#### Bảng phân loại mức độ nghiêm trọng (Severity Classification)
+
+| Mức độ | Mô tả | Người chịu trách nhiệm | Thời gian phản hồi | Ví dụ |
+|--------|--------|------------------------|---------------------|-------|
+| **SEV-1** | Data breach, dữ liệu thanh toán bị lộ | Incident Commander + Security Team + CTO | ≤ 15 phút | Rò rỉ PAN/CVV, database bị exfiltrate |
+| **SEV-2** | Unauthorized access được phát hiện | Security Team + Team Lead liên quan | ≤ 30 phút | Tài khoản admin bị chiếm, privilege escalation |
+| **SEV-3** | Hoạt động đáng ngờ (brute force, scanning) | Security Team | ≤ 2 giờ | Brute force login, port scanning nội bộ |
+| **SEV-4** | Vi phạm policy nhỏ | Tạo ticket, assign owner | Ngày làm việc tiếp theo | Secret không rotate đúng hạn, TLS cert sắp hết hạn |
+
+#### Quy trình 7 bước Incident Response
+
+**Bước 1 — Phát hiện bất thường qua SIEM/alerts**
+
+- **Ai:** Security Team (on-call rotation 24/7).
+- **Cách thực hiện:** SIEM (ví dụ: AWS Security Hub, Splunk, Elastic SIEM) tổng hợp log từ CloudTrail, VPC Flow Logs, WAF, GuardDuty. Alert rules tự động trigger khi phát hiện anomaly (ví dụ: số lần login fail > 50/phút, outbound traffic bất thường).
+- **Công cụ:** AWS GuardDuty, CloudWatch Alarms, PagerDuty/Opsgenie cho on-call notification.
+
+**Bước 2 — Phân loại mức độ ảnh hưởng (SEV-1..SEV-4)**
+
+- **Ai:** On-call engineer đánh giá ban đầu → Security Lead xác nhận severity.
+- **Cách thực hiện:** Dựa vào bảng severity ở trên, xác định phạm vi ảnh hưởng (số user, loại dữ liệu, service nào bị tác động). Nếu liên quan đến dữ liệu thanh toán → tự động escalate lên SEV-1.
+- **Công cụ:** Incident management platform (PagerDuty, Jira Service Management) với workflow tự động phân loại.
+
+**Bước 3 — Cô lập thành phần bị compromise**
+
+- **Ai:** DevOps/Platform Engineer dưới sự chỉ đạo của Incident Commander.
+- **Cách thực hiện:**
+  - Revoke IAM credentials/session tokens của thành phần bị compromise.
+  - Cập nhật Security Group/NACL để block traffic đáng ngờ.
+  - Nếu container bị compromise: drain node, terminate pod nhưng **giữ lại snapshot** để forensic.
+  - Nếu cần: tạm thời disable API endpoint hoặc feature flag liên quan.
+- **Công cụ:** AWS IAM, Security Groups, kubectl cordon/drain, feature flag system (LaunchDarkly/Unleash).
+
+**Bước 4 — Rotate toàn bộ credentials liên quan**
+
+- **Ai:** Security Team + DevOps.
+- **Cách thực hiện:**
+  - Rotate tất cả API keys, database passwords, JWT signing keys có khả năng bị ảnh hưởng.
+  - Invalidate toàn bộ active sessions/tokens liên quan.
+  - Cập nhật secrets trong AWS Secrets Manager/Parameter Store.
+  - Verify các service đã pick up credentials mới thành công.
+- **Công cụ:** AWS Secrets Manager (automatic rotation), Vault, CI/CD pipeline cho secret deployment.
+
+**Bước 5 — Thu thập forensic logs**
+
+- **Ai:** Security Team.
+- **Cách thực hiện:**
+  - Export và archive toàn bộ logs liên quan trong khoảng thời gian incident (CloudTrail, application logs, access logs).
+  - Snapshot EBS volumes, memory dump nếu cần.
+  - Tạo timeline chi tiết: thời điểm xâm nhập, lateral movement, dữ liệu bị truy cập.
+  - Lưu evidence vào S3 bucket riêng với **write-once policy** (Object Lock) để đảm bảo tính toàn vẹn.
+- **Công cụ:** AWS CloudTrail, S3 Object Lock, CloudWatch Logs Insights, Athena cho log query.
+
+**Bước 6 — Thông báo stakeholder theo quy định**
+
+- **Ai:** Incident Commander phối hợp với Legal/Compliance.
+- **Cách thực hiện:** Theo ma trận thông báo bên dưới, thông báo đúng người, đúng thời điểm. Với SEV-1 liên quan dữ liệu cá nhân: tuân thủ quy định báo cáo vi phạm dữ liệu (72 giờ theo GDPR nếu áp dụng).
+- **Công cụ:** Slack war room, email template chuẩn bị sẵn, status page (Statuspage.io).
+
+**Bước 7 — Post-incident review + hardening action items**
+
+- **Ai:** Toàn bộ team liên quan, điều phối bởi Engineering Manager.
+- **Cách thực hiện:**
+  - Tổ chức blameless post-mortem trong vòng 48 giờ sau incident.
+  - Viết Incident Report: timeline, root cause, impact, action items.
+  - Tạo hardening tickets với deadline cụ thể (ví dụ: thêm rate limiting, cải thiện monitoring rule).
+  - Cập nhật runbook và alert rules dựa trên bài học rút ra.
+- **Công cụ:** Confluence/Notion cho Incident Report, Jira cho action items tracking.
+
+#### Ma trận thông báo (Communication Matrix)
+
+| Mức độ | Team Lead | CTO | Legal/Compliance | Khách hàng bị ảnh hưởng | Toàn bộ công ty |
+|--------|-----------|-----|------------------|------------------------|-----------------|
+| **SEV-1** | Ngay lập tức | Ngay lập tức | Trong 1 giờ | Trong 24 giờ (sau khi có đánh giá impact) | Sau post-mortem |
+| **SEV-2** | Ngay lập tức | Trong 1 giờ | Trong 4 giờ (nếu liên quan dữ liệu) | Nếu cần | Sau post-mortem |
+| **SEV-3** | Trong 2 giờ | Báo cáo hàng tuần | Không bắt buộc | Không | Không |
+| **SEV-4** | Qua ticket | Không | Không | Không | Không |
+
+#### Ví dụ thực tế: Phát hiện API Key bị leak trên GitHub
+
+Kịch bản: Bot tự động phát hiện một API key của Payment Service xuất hiện trong commit trên GitHub public repository.
+
+```
+Timeline:
+
+T+0 min    │ GitHub Secret Scanning / GitGuardian alert → PagerDuty trigger
+           │ On-call engineer nhận notification.
+           │
+T+3 min    │ On-call xác nhận: API key thuộc Payment Service (Stripe secret key).
+           │ → Phân loại SEV-1 (liên quan payment credentials).
+           │ → Tạo Slack war room #inc-20260228-api-key-leak.
+           │
+T+5 min    │ Incident Commander (Engineering Manager) join war room.
+           │ Thông báo CTO, Security Lead.
+           │
+T+8 min    │ CÔ LẬP:
+           │ - Revoke API key bị leak trên Stripe Dashboard.
+           │ - Kiểm tra Stripe audit log: key có bị sử dụng trái phép không?
+           │
+T+12 min   │ ROTATE:
+           │ - Tạo API key mới trên Stripe.
+           │ - Cập nhật vào AWS Secrets Manager.
+           │ - Restart Payment Service pods để pick up key mới.
+           │ - Verify: test transaction thành công.
+           │
+T+20 min   │ FORENSIC:
+           │ - Xác định commit nào chứa key (git log --all -p -S 'sk_live_xxx').
+           │ - Xác nhận key chưa bị sử dụng bởi bên thứ ba (qua Stripe logs).
+           │ - Archive toàn bộ evidence.
+           │
+T+30 min   │ THÔNG BÁO:
+           │ - Cập nhật CTO: key đã bị revoke, không có unauthorized usage.
+           │ - Legal confirm: không cần thông báo khách hàng (không có data breach).
+           │
+T+45 min   │ Incident resolved. Downgrade status.
+           │
+T+48 giờ   │ POST-MORTEM:
+           │ - Root cause: Developer commit file .env vào repo,
+           │   .gitignore không cover đúng path.
+           │ - Action items:
+           │     ✅ Thêm pre-commit hook chặn secret (gitleaks/detect-secrets).
+           │     ✅ Enable GitHub push protection cho org.
+           │     ✅ Audit toàn bộ repo khác trong org.
+           │     ✅ Training team về secret hygiene.
+```
 
 ### 7.10. Compliance Checklist (PCI-DSS, OWASP ASVS)
 
@@ -1629,7 +2402,7 @@ flowchart LR
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                           AWS ACCOUNT: SHOPVN                       │
+│                           AWS ACCOUNT: SHOPVN                        │
 │                                                                      │
 │  ┌────────────────────┐   ┌────────────────────┐   ┌──────────────┐  │
 │  │      DEV           │   │       STAGING      │   │    PROD      │  │
@@ -1759,9 +2532,91 @@ flowchart LR
 
 ### 9.1. 3 phương án cho ShopVN
 
-- **Solution A: ECS Fargate-first**
-- **Solution B: EKS-first**
-- **Solution C: Hybrid (ECS cho core + Lambda cho event-driven)**
+#### Solution A: ECS Fargate-first
+
+**Kiến trúc tổng quan:** Tất cả microservices (Order, Payment, Inventory, Catalog, Notification, User…) đều chạy trên **Amazon ECS với launch type Fargate**. AWS hoàn toàn quản lý infrastructure layer — không cần provision hay patch EC2 instance. Mỗi service được đóng gói thành Docker container, định nghĩa Task Definition với CPU/Memory, và deploy qua ECS Service với ALB phía trước.
+
+```
+┌─────────────────────────────────────────────────┐
+│                   ALB / API Gateway             │
+├──────────┬──────────┬──────────┬────────────────┤
+│ Order    │ Payment  │ Catalog  │ Notification   │
+│ (Fargate)│ (Fargate)│ (Fargate)│ (Fargate)      │
+└──────────┴──────────┴──────────┴────────────────┘
+         Tất cả services → ECS Fargate
+```
+
+- **Ưu điểm:**
+  - Đơn giản vận hành — không quản lý cluster node, không lo patching OS, không capacity planning cho EC2
+  - Thời gian go-live nhanh — team chỉ cần biết Docker + ECS Task Definition là đủ deploy
+  - Auto Scaling tích hợp sẵn ở mức task, kết hợp CloudWatch metrics
+  - Bảo mật tốt — mỗi task chạy isolated, có riêng ENI (Elastic Network Interface)
+
+- **Nhược điểm:**
+  - Chi phí cao hơn EC2 15-30% cho workload stable, chạy liên tục 24/7 (không tận dụng được Reserved Instance hay Spot hiệu quả như EC2)
+  - Ít flexibility về networking và runtime — không can thiệp sâu vào host OS, không mount arbitrary volumes dễ dàng
+  - Không phù hợp cho workload cần GPU hoặc custom kernel module
+  - Vendor lock-in cao hơn so với Kubernetes
+
+#### Solution B: EKS-first
+
+**Kiến trúc tổng quan:** Tất cả microservices chạy trên **Amazon EKS** (Elastic Kubernetes Service). Team quản lý Kubernetes cluster, sử dụng Helm charts để package và deploy services. Mỗi service là một Deployment + Service + Ingress trong K8s, với HPA (Horizontal Pod Autoscaler) để auto-scale.
+
+```
+┌─────────────────────────────────────────────────┐
+│              Ingress Controller (ALB/Nginx)       │
+├──────────┬──────────┬──────────┬────────────────┤
+│ Order    │ Payment  │ Catalog  │ Notification   │
+│ (Pod)    │ (Pod)    │ (Pod)    │ (Pod)          │
+├──────────┴──────────┴──────────┴────────────────┤
+│            EKS Cluster (Managed Node Groups)     │
+└─────────────────────────────────────────────────┘
+         Tất cả services → Kubernetes Pods
+```
+
+- **Ưu điểm:**
+  - Linh hoạt cao nhất — toàn quyền kiểm soát networking (Service Mesh, Network Policy), scheduling, resource management
+  - Ecosystem cực lớn — Helm charts, Operators (database operator, cert-manager, external-secrets…), CNCF tooling
+  - Portable — có thể migrate sang GKE, AKS hoặc on-premise K8s khi cần multi-cloud
+  - Chi phí compute có thể tối ưu sâu với Spot Instances, Karpenter auto-provisioner, bin-packing pods hiệu quả
+
+- **Nhược điểm:**
+  - Cần team platform có kinh nghiệm Kubernetes — ít nhất 2-3 người hiểu sâu K8s networking, RBAC, troubleshooting
+  - Chi phí control plane cố định (~$73/tháng/cluster), cộng thêm chi phí nhân sự vận hành
+  - Learning curve cao — YAML manifests phức tạp, debugging pod failures khó hơn ECS
+  - Thời gian go-live chậm hơn — setup cluster, configure add-ons (CoreDNS, metrics-server, Ingress controller…) mất 2-4 tuần
+
+#### Solution C: Hybrid (ECS cho core + Lambda cho event-driven)
+
+**Kiến trúc tổng quan:** Phân loại workload và chọn compute phù hợp nhất cho từng loại. **Core API services** (request-response, cần low latency, chạy liên tục) deploy trên **ECS Fargate**. **Event-driven và burst workloads** (xử lý bất đồng bộ, traffic không đều) chạy trên **AWS Lambda**. Khi team platform trưởng thành, có thể migrate dần sang EKS nếu cần.
+
+```
+┌─────────────────────────────────────────────────────┐
+│                  ALB / API Gateway                  │
+├──────────┬──────────┬──────────┐                    │
+│ Order    │ Payment  │ Catalog  │  ← ECS Fargate     │
+│ (Fargate)│ (Fargate)│ (Fargate)│    (core APIs)     │
+├──────────┴──────────┴──────────┤                    │
+│                                │                    │
+│  SQS/SNS/EventBridge triggers  │                    │
+│  ┌────────────┬───────────┐    │                    │
+│  │Notification│ Image     │    │  ← Lambda          │
+│  │ (Lambda)   │ Resize    │    │    (event-driven)  │
+│  │            │ (Lambda)  │    │                    │
+│  └────────────┴───────────┘    │                    │
+└─────────────────────────────────────────────────────┘
+```
+
+- **Ưu điểm:**
+  - Tối ưu chi phí theo từng loại workload — Lambda chỉ tính tiền khi thực thi, rất phù hợp cho burst/sporadic tasks
+  - Balance giữa simplicity (ECS Fargate cho core) và cost-efficiency (Lambda cho event-driven)
+  - Giảm operational overhead so với EKS nhưng vẫn linh hoạt hơn ECS thuần túy
+  - Lộ trình migration rõ ràng — bắt đầu đơn giản, phức tạp hóa khi cần
+
+- **Nhược điểm:**
+  - Phải quản lý 2 compute platform (ECS + Lambda) — cần chuẩn hóa CI/CD cho cả hai
+  - Lambda có cold start latency (100-500ms), không phù hợp cho real-time API cần p99 < 50ms
+  - Governance phức tạp hơn — cần decision framework rõ ràng để team biết khi nào dùng ECS, khi nào dùng Lambda
 
 ### 9.2. So sánh định tính
 
@@ -1789,11 +2644,54 @@ flowchart LR
 
 ### 9.4. Decision đề xuất cho ShopVN
 
-**Khuyến nghị:** chọn **Solution C (Hybrid)** theo lộ trình:
+**Khuyến nghị:** chọn **Solution C (Hybrid)** — ECS Fargate cho core APIs + Lambda cho event-driven workloads.
 
-1. Core domain (`Order`, `Payment`, `Inventory`, `Catalog`) chạy ECS Fargate.
-2. Workload burst/event-driven (`Notification`, ảnh, enrichment) chạy Lambda.
-3. Khi team platform trưởng thành và custom nhu cầu tăng mạnh, cân nhắc chuyển một phần hoặc toàn bộ sang EKS.
+#### Tại sao Hybrid phù hợp nhất với bối cảnh ShopVN?
+
+ShopVN là startup với **team 30 developers**, phần lớn có kinh nghiệm backend nhưng **chưa có chuyên môn Kubernetes**. Trong bối cảnh này:
+
+| Yếu tố bối cảnh | Ảnh hưởng tới quyết định |
+|------------------|--------------------------|
+| Team 30 dev, chưa có K8s experience | Loại bỏ Solution B (EKS) ở giai đoạn đầu — learning curve quá cao, mất 2-3 tháng chỉ để team làm quen |
+| Startup budget, cần tối ưu chi phí | Hybrid cho phép dùng Lambda (pay-per-invocation) cho burst workloads thay vì chạy Fargate tasks 24/7 |
+| Cần go-live nhanh (target < 3 tháng cho Phase 1) | ECS Fargate setup nhanh hơn EKS 2-4 tuần, team tập trung vào business logic thay vì infrastructure |
+| Traffic pattern không đều — peak giờ trưa/tối, thấp lúc 2-5h sáng | Lambda auto-scale to zero cho event workloads, Fargate auto-scale cho core APIs |
+
+#### Chi tiết mapping Service → Compute Platform
+
+| Service | Compute | Lý do |
+|---------|---------|-------|
+| **Order Service** | ECS Fargate | Core business flow, cần low latency ổn định (p99 < 200ms), chạy liên tục |
+| **Payment Service** | ECS Fargate | Xử lý giao dịch tài chính, cần connection pool tới Payment Gateway, không chấp nhận cold start |
+| **Inventory Service** | ECS Fargate | Real-time stock check khi đặt hàng, cần giữ connection tới database luôn sẵn sàng |
+| **Catalog Service** | ECS Fargate | Đọc nhiều (read-heavy), serve qua cache layer (ElastiCache), cần response time ổn định cho UX |
+| **User/Auth Service** | ECS Fargate | Authentication flow cần latency thấp, session management liên tục |
+| **Notification Service** | Lambda | Event-driven (trigger từ SQS khi order created/updated), burst traffic, không cần chạy 24/7 |
+| **Image Processing** | Lambda | Resize/optimize ảnh sản phẩm khi upload, workload sporadic, phù hợp Lambda timeout 15 phút |
+| **Search Enrichment** | Lambda | Đồng bộ data vào Elasticsearch khi product thay đổi, trigger từ DynamoDB Streams hoặc EventBridge |
+| **Report Generation** | Lambda | Tạo báo cáo doanh thu theo schedule (cron), chạy vài lần/ngày, không cần container chạy liên tục |
+| **Webhook Handler** | Lambda | Nhận webhook từ Payment Gateway (VNPay, Momo), traffic không dự đoán được, auto-scale tự nhiên |
+
+#### Lộ trình triển khai theo 3 phase
+
+**Phase 1 (tháng 0-3):** Deploy core services lên ECS Fargate, Notification + Image Processing lên Lambda. CI/CD pipeline dùng CodePipeline cho cả hai compute platform.
+
+**Phase 2 (tháng 3-9):** Tách thêm services, hoàn thiện event-driven architecture với EventBridge + SQS. Lambda xử lý thêm Search Enrichment, Report, Webhook.
+
+**Phase 3 (tháng 9-18):** Tối ưu chi phí, đánh giá lại kiến trúc. Nếu đủ điều kiện, bắt đầu pilot EKS cho một vài services.
+
+#### Khi nào ShopVN nên cân nhắc migrate sang EKS?
+
+Không cần migrate sang EKS trừ khi gặp **ít nhất 2 trong 4 triggers** sau:
+
+| Trigger | Mô tả | Ngưỡng cụ thể |
+|---------|--------|----------------|
+| **Số lượng services lớn** | Quản lý hàng trăm ECS services trở nên khó khăn, cần namespace/label-based management | > 100 microservices |
+| **Cần custom operators** | Yêu cầu tự động hóa phức tạp: database provisioning, canary deployment nâng cao, custom autoscaler | Khi built-in ECS/Lambda không đáp ứng được |
+| **Multi-cloud requirement** | Business yêu cầu chạy trên nhiều cloud provider để tránh vendor lock-in hoặc compliance | Có yêu cầu rõ ràng từ stakeholder |
+| **Team platform trưởng thành** | Đã có team platform 3-5 người với production K8s experience, sẵn sàng own Kubernetes cluster | Team platform ≥ 3 người có CKA/CKAD |
+
+> **Lưu ý quan trọng:** Migration sang EKS không phải là mục tiêu — mà là công cụ khi ECS/Lambda không còn đáp ứng được nhu cầu. Nhiều tổ chức chạy thành công hàng trăm services trên ECS Fargate mà không cần EKS.
 
 ### 9.5. Migration Path 3 giai đoạn
 
