@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Microservice Architecture — Learning Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root {
+    --bg-primary: #0a0e17;
+    --bg-secondary: #111827;
+    --bg-card: #151d2e;
+    --bg-card-hover: #1a2540;
+    --accent-cyan: #06d6a0;
+    --accent-cyan-dim: rgba(6,214,160,0.15);
+    --accent-orange: #ff6b35;
+    --accent-orange-dim: rgba(255,107,53,0.12);
+    --accent-purple: #8b5cf6;
+    --accent-purple-dim: rgba(139,92,246,0.12);
+    --accent-blue: #38bdf8;
+    --accent-blue-dim: rgba(56,189,248,0.12);
+    --accent-pink: #f472b6;
+    --accent-pink-dim: rgba(244,114,182,0.12);
+    --accent-yellow: #fbbf24;
+    --accent-yellow-dim: rgba(251,191,36,0.12);
+    --accent-rose: #fb7185;
+    --accent-rose-dim: rgba(251,113,133,0.12);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border: rgba(255,255,255,0.06);
+    --border-hover: rgba(255,255,255,0.12);
+    --glow: 0 0 40px rgba(6,214,160,0.08);
+  }
+
+  html { scroll-behavior: smooth }
+
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Noise overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Grid background ── */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(6,214,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(6,214,160,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    position: relative;
+    padding: 80px 40px 60px;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(6,214,160,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border: 1px solid var(--accent-cyan-dim);
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-cyan);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    background: rgba(6,214,160,0.05);
+    animation: fadeInUp 0.6s ease-out;
+  }
+
+  .hero-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 8px var(--accent-cyan);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .hero h1 {
+    font-size: clamp(2.5rem, 5vw, 4rem);
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #e2e8f0 30%, var(--accent-cyan) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 16px;
+    animation: fadeInUp 0.6s ease-out 0.1s both;
+  }
+
+  .hero p {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    max-width: 600px;
+    margin: 0 auto;
+    line-height: 1.7;
+    animation: fadeInUp 0.6s ease-out 0.2s both;
+  }
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 32px 40px;
+    animation: fadeInUp 0.6s ease-out 0.3s both;
+    position: relative;
+    z-index: 1;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    text-align: center;
+    position: relative;
+  }
+
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+    line-height: 1;
+    text-shadow: 0 0 30px rgba(6,214,160,0.3);
+  }
+
+  .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 6px;
+  }
+
+  .stat + .stat::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 40px;
+    background: linear-gradient(180deg, transparent, var(--border-hover), transparent);
+  }
+
+  /* ── Progress ring ── */
+  .progress-container {
+    display: flex;
+    justify-content: center;
+    padding: 20px 40px 40px;
+    animation: fadeInUp 0.6s ease-out 0.4s both;
+    position: relative;
+    z-index: 1;
+  }
+
+  .progress-ring-wrap {
+    position: relative;
+    width: 160px;
+    height: 160px;
+  }
+
+  .progress-ring-wrap svg {
+    transform: rotate(-90deg);
+  }
+
+  .progress-ring-bg {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 8;
+  }
+
+  .progress-ring-fill {
+    fill: none;
+    stroke: url(#progressGradient);
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 440;
+    stroke-dashoffset: 0;
+    animation: ringFill 1.5s ease-out 0.8s both;
+    filter: drop-shadow(0 0 6px rgba(6,214,160,0.4));
+  }
+
+  .progress-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .progress-text .pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--accent-cyan);
+  }
+
+  .progress-text .pct-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ── Container ── */
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 40px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── Section ── */
+  .section {
+    margin-bottom: 64px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+  }
+
+  .section-header h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+
+  .section-header .section-count {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  /* ── Cards grid ── */
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .card:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--border-hover);
+    transform: translateY(-3px);
+    box-shadow: var(--glow);
+  }
+
+  .card:hover::before {
+    opacity: 1;
+  }
+
+  .card-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  .card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+
+  .card-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .card-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 14px;
+    font-size: 0.75rem;
+    color: var(--accent-cyan);
+    font-weight: 600;
+  }
+
+  .card-status::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+  }
+
+  /* ── Color themes per section ── */
+  .theme-cyan .section-icon { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+  .theme-cyan .card::before { background: linear-gradient(90deg, var(--accent-cyan), transparent); }
+  .theme-cyan .card-num { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
+
+  .theme-orange .section-icon { background: var(--accent-orange-dim); color: var(--accent-orange); }
+  .theme-orange .card::before { background: linear-gradient(90deg, var(--accent-orange), transparent); }
+  .theme-orange .card-num { background: var(--accent-orange-dim); color: var(--accent-orange); }
+
+  .theme-purple .section-icon { background: var(--accent-purple-dim); color: var(--accent-purple); }
+  .theme-purple .card::before { background: linear-gradient(90deg, var(--accent-purple), transparent); }
+  .theme-purple .card-num { background: var(--accent-purple-dim); color: var(--accent-purple); }
+
+  .theme-blue .section-icon { background: var(--accent-blue-dim); color: var(--accent-blue); }
+  .theme-blue .card::before { background: linear-gradient(90deg, var(--accent-blue), transparent); }
+  .theme-blue .card-num { background: var(--accent-blue-dim); color: var(--accent-blue); }
+
+  .theme-pink .section-icon { background: var(--accent-pink-dim); color: var(--accent-pink); }
+  .theme-pink .card::before { background: linear-gradient(90deg, var(--accent-pink), transparent); }
+  .theme-pink .card-num { background: var(--accent-pink-dim); color: var(--accent-pink); }
+
+  .theme-yellow .section-icon { background: var(--accent-yellow-dim); color: var(--accent-yellow); }
+  .theme-yellow .card::before { background: linear-gradient(90deg, var(--accent-yellow), transparent); }
+  .theme-yellow .card-num { background: var(--accent-yellow-dim); color: var(--accent-yellow); }
+
+  .theme-rose .section-icon { background: var(--accent-rose-dim); color: var(--accent-rose); }
+  .theme-rose .card::before { background: linear-gradient(90deg, var(--accent-rose), transparent); }
+  .theme-rose .card-num { background: var(--accent-rose-dim); color: var(--accent-rose); }
+
+  /* ── Roadmap ── */
+  .roadmap {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    padding: 40px 0;
+    position: relative;
+    scrollbar-width: none;
+  }
+
+  .roadmap::-webkit-scrollbar { display: none; }
+
+  .roadmap-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 160px;
+    position: relative;
+    flex: 1;
+  }
+
+  .roadmap-step::after {
+    content: '';
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+    opacity: 0.3;
+    z-index: 0;
+  }
+
+  .roadmap-step:last-child::after { display: none; }
+
+  .roadmap-dot {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    position: relative;
+    z-index: 1;
+    border: 2px solid;
+    background: var(--bg-primary);
+  }
+
+  .roadmap-dot.done {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 20px rgba(6,214,160,0.2);
+  }
+
+  .roadmap-label {
+    margin-top: 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: center;
+  }
+
+  .roadmap-range {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* ── Nav sidebar ── */
+  .sidebar-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1001;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    backdrop-filter: blur(12px);
+  }
+
+  .sidebar-toggle:hover {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 20px rgba(6,214,160,0.15);
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    right: -360px;
+    width: 360px;
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    z-index: 1000;
+    transition: right 0.35s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+    padding: 80px 24px 40px;
+    backdrop-filter: blur(20px);
+  }
+
+  .sidebar.open { right: 0; }
+
+  .sidebar h3 {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    margin-top: 24px;
+  }
+
+  .sidebar h3:first-child { margin-top: 0; }
+
+  .sidebar a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    margin-bottom: 2px;
+  }
+
+  .sidebar a:hover {
+    background: rgba(6,214,160,0.08);
+    color: var(--text-primary);
+  }
+
+  .sidebar a .nav-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    width: 22px;
+    flex-shrink: 0;
+  }
+
+  /* ── Footer ── */
+  .footer {
+    text-align: center;
+    padding: 60px 40px;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+  }
+
+  .footer p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .footer .footer-links {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  .footer .footer-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.8rem;
+    transition: color 0.2s;
+  }
+
+  .footer .footer-links a:hover { color: var(--accent-cyan); }
+
+  /* ── Animations ── */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.5); }
+  }
+
+  @keyframes ringFill {
+    from { stroke-dashoffset: 440; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* ── Scroll animations ── */
+  .animate-in {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  }
+
+  .animate-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .hero { padding: 60px 20px 40px; }
+    .container { padding: 0 20px; }
+    .stats-bar { gap: 24px; padding: 24px 20px; }
+    .stat-value { font-size: 1.8rem; }
+    .cards { grid-template-columns: 1fr; }
+    .sidebar { width: 100vw; right: -100vw; }
+    .roadmap { padding: 20px 0; }
+    .stat + .stat::before { display: none; }
+  }
+
+  /* ── Search bar ── */
+  .search-wrap {
+    max-width: 480px;
+    margin: 0 auto 0;
+    position: relative;
+    animation: fadeInUp 0.6s ease-out 0.35s both;
+  }
+
+  .search-wrap input {
+    width: 100%;
+    padding: 14px 20px 14px 48px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 0.95rem;
+    outline: none;
+    transition: all 0.3s;
+  }
+
+  .search-wrap input::placeholder { color: var(--text-muted); }
+  .search-wrap input:focus { border-color: rgba(6,214,160,0.4); box-shadow: 0 0 20px rgba(6,214,160,0.08); }
+
+  .search-wrap .search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar toggle -->
+<button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+
+<!-- Sidebar nav -->
+<nav class="sidebar" id="sidebar">
+  <h3>Khái niệm cơ bản</h3>
+  <a href="#s-basic"><span class="nav-num">01</span> Microservice Overview</a>
+  <a href="#s-basic"><span class="nav-num">02</span> SRP & Bounded Context</a>
+  <a href="#s-basic"><span class="nav-num">03</span> Coupling & Cohesion</a>
+  <a href="#s-basic"><span class="nav-num">04</span> Autonomy & Independence</a>
+  <a href="#s-basic"><span class="nav-num">05</span> Decomposition Strategies</a>
+
+  <h3>Communication</h3>
+  <a href="#s-comm"><span class="nav-num">06</span> Inter-Service Communication</a>
+  <a href="#s-comm"><span class="nav-num">07</span> API Gateway</a>
+  <a href="#s-comm"><span class="nav-num">08</span> Service Discovery</a>
+
+  <h3>Data & Resilience</h3>
+  <a href="#s-data"><span class="nav-num">09</span> Data Management</a>
+  <a href="#s-resilience"><span class="nav-num">10</span> Resilience Patterns</a>
+  <a href="#s-obs"><span class="nav-num">11</span> Observability</a>
+
+  <h3>Platform</h3>
+  <a href="#s-platform"><span class="nav-num">12</span> Containerization</a>
+  <a href="#s-platform"><span class="nav-num">13</span> Orchestration</a>
+  <a href="#s-platform"><span class="nav-num">14</span> CI/CD & Deployment</a>
+  <a href="#s-security"><span class="nav-num">15</span> Security</a>
+  <a href="#s-config"><span class="nav-num">16</span> Config & Secrets</a>
+  <a href="#s-patterns"><span class="nav-num">17</span> Design Patterns</a>
+
+  <h3>AWS</h3>
+  <a href="#s-aws"><span class="nav-num">18</span> Deployment & Architecture</a>
+  <a href="#s-aws"><span class="nav-num">19</span> Communication & Discovery</a>
+  <a href="#s-aws"><span class="nav-num">20</span> Data Management</a>
+  <a href="#s-aws"><span class="nav-num">21</span> Resilience & Scaling</a>
+  <a href="#s-aws"><span class="nav-num">22</span> Observability</a>
+  <a href="#s-aws"><span class="nav-num">23</span> Security & Zero Trust</a>
+  <a href="#s-aws"><span class="nav-num">24</span> CI/CD & Deployment</a>
+
+  <h3>Case Study</h3>
+  <a href="#s-case"><span class="nav-num">25</span> E-Commerce Platform</a>
+  <a href="#s-case"><span class="nav-num">26</span> Food Delivery Platform</a>
+</nav>
+
+<!-- Hero -->
+<header class="hero">
+  <div class="hero-badge">Learning Dashboard</div>
+  <h1>Microservice<br>Architecture</h1>
+  <p>Tài liệu học tập từ khái niệm cơ bản đến triển khai nâng cao trên AWS — 26 bài viết chi tiết</p>
+</header>
+
+<!-- Search -->
+<div class="search-wrap">
+  <span class="search-icon">⌕</span>
+  <input type="text" id="searchInput" placeholder="Tìm kiếm tài liệu..." oninput="filterCards(this.value)">
+</div>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat">
+    <div class="stat-value">26</div>
+    <div class="stat-label">Tài liệu</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">26</div>
+    <div class="stat-label">Hoàn thành</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">6</div>
+    <div class="stat-label">Giai đoạn</div>
+  </div>
+  <div class="stat">
+    <div class="stat-value">11</div>
+    <div class="stat-label">Chủ đề</div>
+  </div>
+</div>
+
+<!-- Progress ring -->
+<div class="progress-container">
+  <div class="progress-ring-wrap">
+    <svg width="160" height="160" viewBox="0 0 160 160">
+      <defs>
+        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="var(--accent-cyan)"/>
+          <stop offset="100%" stop-color="var(--accent-purple)"/>
+        </linearGradient>
+      </defs>
+      <circle class="progress-ring-bg" cx="80" cy="80" r="70"/>
+      <circle class="progress-ring-fill" cx="80" cy="80" r="70"/>
+    </svg>
+    <div class="progress-text">
+      <span class="pct">100%</span>
+      <span class="pct-label">Complete</span>
+    </div>
+  </div>
+</div>
+
+<!-- Roadmap -->
+<div class="container">
+  <div class="section animate-in">
+    <div class="section-header">
+      <div class="section-icon" style="background:var(--accent-cyan-dim);color:var(--accent-cyan)">🗺️</div>
+      <h2>Roadmap học tập</h2>
+    </div>
+    <div class="roadmap">
+      <div class="roadmap-step">
+        <div class="roadmap-dot done">🧱</div>
+        <div class="roadmap-label">Foundation</div>
+        <div class="roadmap-range">01 → 05</div>
+      </div>
+      <div class="roadmap-step">
+        <div class="roadmap-dot done">🔗</div>
+        <div class="roadmap-label">Integration</div>
+        <div class="roadmap-range">06 → 08</div>
+      </div>
+      <div class="roadmap-step">
+        <div class="roadmap-dot done">💾</div>
+        <div class="roadmap-label">Data & Reliability</div>
+        <div class="roadmap-range">09 → 11</div>
+      </div>
+      <div class="roadmap-step">
+        <div class="roadmap-dot done">⚙️</div>
+        <div class="roadmap-label">Platform</div>
+        <div class="roadmap-range">12 → 17</div>
+      </div>
+      <div class="roadmap-step">
+        <div class="roadmap-dot done">☁️</div>
+        <div class="roadmap-label">AWS</div>
+        <div class="roadmap-range">18 → 24</div>
+      </div>
+      <div class="roadmap-step">
+        <div class="roadmap-dot done">🏁</div>
+        <div class="roadmap-label">End-to-End</div>
+        <div class="roadmap-range">25 → 26</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section 1: Khái niệm cơ bản -->
+  <div class="section theme-cyan animate-in" id="s-basic">
+    <div class="section-header">
+      <div class="section-icon">🧱</div>
+      <h2>Khái niệm cơ bản</h2>
+      <span class="section-count">5 docs</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="01-microservice-overview.md" data-search="microservice overview monolith soa">
+        <span class="card-num">#01</span>
+        <div class="card-title">Microservice Overview</div>
+        <div class="card-desc">Microservice là gì, Monolith vs Microservice vs SOA, ưu/nhược điểm</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="02-single-responsibility-bounded-context.md" data-search="single responsibility bounded context ddd srp">
+        <span class="card-num">#02</span>
+        <div class="card-title">Single Responsibility & Bounded Context</div>
+        <div class="card-desc">SRP trong Microservice, Bounded Context (DDD), cách xác định ranh giới service</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="03-loose-coupling-high-cohesion.md" data-search="loose coupling high cohesion">
+        <span class="card-num">#03</span>
+        <div class="card-title">Loose Coupling & High Cohesion</div>
+        <div class="card-desc">Loose Coupling, High Cohesion, cách đo lường và áp dụng trong Microservice</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="04-autonomy-independence.md" data-search="autonomy independence deployment team ownership">
+        <span class="card-num">#04</span>
+        <div class="card-title">Autonomy & Independence</div>
+        <div class="card-desc">Service autonomy, independent deployment, team ownership, self-contained service</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="05-decomposition-strategies.md" data-search="decomposition strangler fig business capability">
+        <span class="card-num">#05</span>
+        <div class="card-title">Decomposition Strategies</div>
+        <div class="card-desc">Phân tách service theo Business Capability, DDD, Strangler Fig</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 2: Communication -->
+  <div class="section theme-orange animate-in" id="s-comm">
+    <div class="section-header">
+      <div class="section-icon">🔗</div>
+      <h2>Communication & Integration</h2>
+      <span class="section-count">3 docs</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="06-inter-service-communication.md" data-search="rest grpc graphql sync async event driven communication">
+        <span class="card-num">#06</span>
+        <div class="card-title">Inter-Service Communication</div>
+        <div class="card-desc">REST vs gRPC vs GraphQL, Sync vs Async, Event-Driven</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="07-api-gateway.md" data-search="api gateway bff rate limiting load balancing">
+        <span class="card-num">#07</span>
+        <div class="card-title">API Gateway</div>
+        <div class="card-desc">API Gateway Pattern, BFF, Rate Limiting, Load Balancing</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="08-service-discovery.md" data-search="service discovery consul eureka dns">
+        <span class="card-num">#08</span>
+        <div class="card-title">Service Discovery</div>
+        <div class="card-desc">Client-side vs Server-side, Consul, Eureka, DNS-based</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 3: Data Management -->
+  <div class="section theme-purple animate-in" id="s-data">
+    <div class="section-header">
+      <div class="section-icon">💾</div>
+      <h2>Data Management</h2>
+      <span class="section-count">1 doc</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="09-data-management.md" data-search="database saga cqrs event sourcing cap theorem">
+        <span class="card-num">#09</span>
+        <div class="card-title">Data Management</div>
+        <div class="card-desc">Database per Service, Saga, CQRS, Event Sourcing, CAP Theorem</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 4: Resilience -->
+  <div class="section theme-rose animate-in" id="s-resilience">
+    <div class="section-header">
+      <div class="section-icon">🛡️</div>
+      <h2>Resilience & Reliability</h2>
+      <span class="section-count">1 doc</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="10-resilience-patterns.md" data-search="circuit breaker retry bulkhead rate limiter fallback">
+        <span class="card-num">#10</span>
+        <div class="card-title">Resilience Patterns</div>
+        <div class="card-desc">Circuit Breaker, Retry, Bulkhead, Rate Limiter, Fallback</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 5: Observability -->
+  <div class="section theme-blue animate-in" id="s-obs">
+    <div class="section-header">
+      <div class="section-icon">📡</div>
+      <h2>Observability & Evolvability</h2>
+      <span class="section-count">1 doc</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="11-observability-evolvability.md" data-search="logs metrics traces elk prometheus grafana jaeger observability">
+        <span class="card-num">#11</span>
+        <div class="card-title">Observability & Evolvability</div>
+        <div class="card-desc">Logs, Metrics, Traces, ELK, Prometheus, Grafana, Jaeger</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 6: Platform -->
+  <div class="section theme-yellow animate-in" id="s-platform">
+    <div class="section-header">
+      <div class="section-icon">⚙️</div>
+      <h2>Deployment & Infrastructure</h2>
+      <span class="section-count">3 docs</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="12-containerization.md" data-search="docker compose multi-stage build container">
+        <span class="card-num">#12</span>
+        <div class="card-title">Containerization</div>
+        <div class="card-desc">Docker, Docker Compose, multi-stage build, best practices</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="13-orchestration.md" data-search="kubernetes service mesh istio linkerd helm">
+        <span class="card-num">#13</span>
+        <div class="card-title">Orchestration</div>
+        <div class="card-desc">Kubernetes, Service Mesh (Istio/Linkerd), Helm Charts</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="14-cicd-deployment.md" data-search="cicd pipeline blue-green canary rolling gitops">
+        <span class="card-num">#14</span>
+        <div class="card-title">CI/CD & Deployment</div>
+        <div class="card-desc">Pipeline, Blue-Green, Canary, Rolling, GitOps</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 7: Security -->
+  <div class="section theme-pink animate-in" id="s-security">
+    <div class="section-header">
+      <div class="section-icon">🔐</div>
+      <h2>Security</h2>
+      <span class="section-count">1 doc</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="15-security.md" data-search="oauth2 jwt mtls api security zero trust">
+        <span class="card-num">#15</span>
+        <div class="card-title">Security</div>
+        <div class="card-desc">OAuth2, JWT, mTLS, API Security, Zero Trust</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 8: Config -->
+  <div class="section theme-cyan animate-in" id="s-config">
+    <div class="section-header">
+      <div class="section-icon">🔧</div>
+      <h2>Configuration Management</h2>
+      <span class="section-count">1 doc</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="16-configuration-secrets-management.md" data-search="config server secrets vault environment variables">
+        <span class="card-num">#16</span>
+        <div class="card-title">Configuration & Secrets Management</div>
+        <div class="card-desc">External Config, Config Server, Secrets Management, Vault, Environment Variables</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 9: Design Patterns -->
+  <div class="section theme-orange animate-in" id="s-patterns">
+    <div class="section-header">
+      <div class="section-icon">🧩</div>
+      <h2>Design Patterns tổng hợp</h2>
+      <span class="section-count">1 doc</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="17-design-patterns.md" data-search="sidecar ambassador adapter anti-patterns design patterns">
+        <span class="card-num">#17</span>
+        <div class="card-title">Design Patterns</div>
+        <div class="card-desc">Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 10: AWS -->
+  <div class="section theme-blue animate-in" id="s-aws">
+    <div class="section-header">
+      <div class="section-icon">☁️</div>
+      <h2>Triển khai Microservice trên AWS</h2>
+      <span class="section-count">7 docs</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="18-aws-deployment-architecture.md" data-search="aws architecture ecs eks lambda iac cdk terraform">
+        <span class="card-num">#18</span>
+        <div class="card-title">Triển khai & Kiến trúc tổng quan</div>
+        <div class="card-desc">Kiến trúc reference trên AWS, ECS vs EKS vs Lambda, IaC (CDK/Terraform)</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="19-aws-communication-discovery.md" data-search="aws api gateway service connect cloud map vpc lattice sqs sns eventbridge">
+        <span class="card-num">#19</span>
+        <div class="card-title">Communication & Service Discovery</div>
+        <div class="card-desc">API Gateway, Service Connect, Cloud Map, VPC Lattice, SQS/SNS/EventBridge</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="20-aws-data-management.md" data-search="aws rds dynamodb step functions cqrs event sourcing data">
+        <span class="card-num">#20</span>
+        <div class="card-title">Data Management trên AWS</div>
+        <div class="card-desc">Database per Service (RDS/DynamoDB), Saga + Step Functions, CQRS + Event Sourcing</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="21-aws-resilience.md" data-search="aws auto scaling multi-az multi-region circuit breaker chaos engineering">
+        <span class="card-num">#21</span>
+        <div class="card-title">Resilience & Auto Scaling</div>
+        <div class="card-desc">Auto Scaling, Multi-AZ/Multi-Region, Circuit Breaker, Health Check, Chaos Engineering</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="22-aws-observability.md" data-search="aws x-ray cloudwatch distributed tracing metrics alerting container insights">
+        <span class="card-num">#22</span>
+        <div class="card-title">Observability trên AWS</div>
+        <div class="card-desc">Distributed Tracing (X-Ray), CloudWatch Logs, Metrics & Alerting, Container Insights</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="23-aws-security.md" data-search="aws iam cognito tls mtls secrets manager vpc security groups zero trust">
+        <span class="card-num">#23</span>
+        <div class="card-title">Security & Zero Trust</div>
+        <div class="card-desc">IAM Roles, Cognito, TLS/mTLS, Secrets Manager, VPC/Security Groups</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="24-aws-cicd-deployment.md" data-search="aws codepipeline github actions blue-green canary argocd gitops">
+        <span class="card-num">#24</span>
+        <div class="card-title">CI/CD & Deployment Strategies</div>
+        <div class="card-desc">CodePipeline/GitHub Actions, Blue-Green, Canary, Rolling Update, GitOps + ArgoCD</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+
+  <!-- Section 11: Case Study -->
+  <div class="section theme-rose animate-in" id="s-case">
+    <div class="section-header">
+      <div class="section-icon">🏁</div>
+      <h2>Case Study — Thiết kế từ đầu</h2>
+      <span class="section-count">2 docs</span>
+    </div>
+    <div class="cards">
+      <a class="card" href="25-case-study-ecommerce.md" data-search="case study ecommerce e-commerce platform">
+        <span class="card-num">#25</span>
+        <div class="card-title">Case Study: E-Commerce Platform</div>
+        <div class="card-desc">Đề bài → phân tích domain → decompose services → chọn patterns → thiết kế infra</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+      <a class="card" href="26-case-study-food-delivery.md" data-search="case study food delivery platform">
+        <span class="card-num">#26</span>
+        <div class="card-title">Case Study: Food Delivery Platform</div>
+        <div class="card-desc">Đề bài → domain/BC → service decomposition → dispatch flow → data/resilience/security</div>
+        <div class="card-status">Hoàn thành</div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  <p>Microservice Architecture — Learning Dashboard</p>
+  <div class="footer-links">
+    <a href="https://microservices.io/" target="_blank">Microservices.io</a>
+    <a href="https://martinfowler.com/articles/microservices.html" target="_blank">Martin Fowler</a>
+    <a href="https://12factor.net/" target="_blank">12-Factor App</a>
+    <a href="https://github.com/vanhiep99w/microservice-learn" target="_blank">GitHub Repo</a>
+  </div>
+</footer>
+
+<script>
+  // Sidebar toggle
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+  }
+
+  // Close sidebar on link click
+  document.querySelectorAll('.sidebar a').forEach(a => {
+    a.addEventListener('click', () => {
+      document.getElementById('sidebar').classList.remove('open');
+    });
+  });
+
+  // Search / filter
+  function filterCards(query) {
+    const q = query.toLowerCase().trim();
+    document.querySelectorAll('.card').forEach(card => {
+      const searchable = (card.dataset.search + ' ' + card.textContent).toLowerCase();
+      card.style.display = !q || searchable.includes(q) ? '' : 'none';
+    });
+  }
+
+  // Scroll animations
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.animate-in').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

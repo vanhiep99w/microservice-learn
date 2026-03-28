@@ -131,6 +131,13 @@
 |---|----------|--------|:----------:|
 | 25 | [Case Study: E-Commerce Platform](25-case-study-ecommerce.md) | Đề bài → phân tích domain → decompose services → chọn patterns → thiết kế infra → so sánh nhiều solutions | ✅ |
 | 26 | [Case Study: Food Delivery Platform](26-case-study-food-delivery.md) | Đề bài → domain/BC → service decomposition → dispatch flow → data/resilience/security → execution plan | ✅ |
+| 27 | [Bảng thuật ngữ (Glossary)](27-glossary.md) | Tổng hợp thuật ngữ Microservice: cơ bản, communication, patterns, infra, observability, security, AWS | ✅ |
+
+## 12. Cheat Sheet & Tham khảo nhanh
+
+| # | Tài liệu | Mô tả | Trạng thái |
+|---|----------|--------|:----------:|
+| 28 | [Cheat Sheet](28-cheat-sheet.md) | Microservice vs Monolith, communication matrix, data/resilience/deployment/AWS decision tables, security & observability checklist | ✅ |
 
 ## 12. Chủ đề nâng cao
 
