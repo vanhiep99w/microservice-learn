@@ -144,7 +144,6 @@
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
 | 27 | [Shared Code Strategy](27-shared-code-strategy.md) | Cái gì nên/không nên share, Shared Library vs Code Gen vs Sidecar, versioning, anti-patterns, best practices | ✅ |
-| 28 | [Multi-Tenancy Architecture](28-multi-tenancy.md) | Pool/Bridge/Silo models, tenant isolation, data management, rate limiting, observability, CI/CD, cloud deployment, case study | ✅ |
 
 ---
 
