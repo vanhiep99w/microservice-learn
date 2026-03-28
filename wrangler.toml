@@ -1,0 +1,5 @@
+name = "microservice-learn"
+compatibility_date = "2026-03-14"
+
+[assets]
+directory = "./dist"
