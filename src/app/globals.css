@@ -28,3 +28,7 @@
 .prose table {
   font-size: 0.9rem;
 }
+
+#nd-page article {
+  max-width: none;
+}
