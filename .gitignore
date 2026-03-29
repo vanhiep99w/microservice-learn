@@ -17,3 +17,6 @@ __pycache__/
 content/
 .next/
 .source/
+
+# TypeScript
+tsconfig.tsbuildinfo
