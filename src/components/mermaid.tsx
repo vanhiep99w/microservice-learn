@@ -1,31 +1,35 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 
-interface MermaidDiagramProps {
-  chart: string;
-}
-
-let initialized = false;
-
-export function MermaidDiagram({ chart }: MermaidDiagramProps) {
+export function MermaidDiagram({ chart }: { chart: string }) {
+  const id = useId();
   const ref = useRef<HTMLDivElement>(null);
+  const safeId = `mermaid-${id.replace(/:/g, '')}`;
 
   useEffect(() => {
     if (!ref.current) return;
+    let cancelled = false;
 
-    import('mermaid').then(({ default: mermaid }) => {
-      if (!initialized) {
-        mermaid.initialize({ startOnLoad: false, theme: 'default' });
-        initialized = true;
-      }
-
-      const id = `mermaid-${Math.random().toString(36).slice(2)}`;
-      mermaid.render(id, chart).then(({ svg }) => {
-        if (ref.current) ref.current.innerHTML = svg;
+    import('mermaid').then((m) => {
+      if (cancelled) return;
+      m.default.initialize({ startOnLoad: false });
+      m.default.render(safeId, chart).then(({ svg }) => {
+        if (!cancelled && ref.current) {
+          ref.current.innerHTML = svg;
+        }
       });
     });
-  }, [chart]);
 
-  return <div ref={ref} className="my-4 overflow-x-auto" />;
+    return () => {
+      cancelled = true;
+    };
+  }, [chart, safeId]);
+
+  return (
+    <div
+      ref={ref}
+      className="my-6 flex justify-center overflow-x-auto"
+    />
+  );
 }
