@@ -1,9 +1,29 @@
 @import 'fumadocs-ui/style.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+html,
 :root {
   --fd-font: 'Inter', system-ui, sans-serif;
   --fd-font-mono: 'JetBrains Mono', monospace;
+  --fd-layout-width: 100% !important;
+  /* Fallback if a future Fumadocs grid does not accept percentages: */
+  /* --fd-layout-width: 140rem !important; */
+}
+
+/* Keep the full docs grid close to the viewport edges. */
+#nd-docs-layout {
+  padding-inline: 0.5rem;
+}
+
+/* Tighten the gutter between the article and desktop TOC. */
+#nd-toc {
+  padding-inline-end: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  #nd-docs-layout {
+    padding-inline: 1rem;
+  }
 }
 
 /* Vietnamese text readability */

@@ -1,5 +1,10 @@
 import { source } from '@/lib/source';
-import { DocsPage, DocsBody, DocsTitle, DocsDescription } from 'fumadocs-ui/page';
+import {
+  DocsPage,
+  DocsBody,
+  DocsTitle,
+  DocsDescription,
+} from 'fumadocs-ui/layouts/docs/page';
 import { notFound, redirect } from 'next/navigation';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { MermaidDiagram } from '@/components/mermaid';
@@ -10,6 +15,7 @@ import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
 import { Accordion, Accordions } from 'fumadocs-ui/components/accordion';
 import { TypeTable } from 'fumadocs-ui/components/type-table';
 import type { Metadata } from 'next';
+import { DocsPageContainer } from '@/layouts/docs/page/slots/container';
 
 export default async function Page({
   params,
@@ -27,7 +33,11 @@ export default async function Page({
 
   const MDX = page.data.body;
   return (
-    <DocsPage toc={page.data.toc} full={false}>
+    <DocsPage
+      toc={page.data.toc}
+      full={false}
+      slots={{ container: DocsPageContainer }}
+    >
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>

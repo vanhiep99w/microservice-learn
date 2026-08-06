@@ -1,5 +1,6 @@
 import { source } from '@/lib/source';
 import { DocsLayout } from 'fumadocs-ui/layouts/docs';
+import { DocsLayoutContainer } from '@/layouts/docs/slots/container';
 import type { ReactNode } from 'react';
 
 export default function Layout({ children }: { children: ReactNode }) {
@@ -10,6 +11,8 @@ export default function Layout({ children }: { children: ReactNode }) {
       sidebar={{
         tabs: false,
       }}
+      slots={{ container: DocsLayoutContainer }}
+      containerProps={{ className: 'px-0' }}
     >
       {children}
     </DocsLayout>
