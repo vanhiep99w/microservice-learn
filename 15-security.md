@@ -1021,7 +1021,7 @@ OPA TRONG MICROSERVICE
 
 **Ví dụ Rego policy:**
 
-```rego
+```text
 # policy.rego — Order Service Authorization
 package order.authz
 
