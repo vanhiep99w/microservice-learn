@@ -94,6 +94,7 @@
 | 12 | [Containerization](12-containerization.md) | Docker, Docker Compose, multi-stage build, best practices | ✅ |
 | 13 | [Orchestration](13-orchestration.md) | Kubernetes, Service Mesh (Istio/Linkerd), Helm Charts | ✅ |
 | 14 | [CI/CD & Deployment](14-cicd-deployment.md) | Pipeline, Blue-Green, Canary, Rolling, GitOps | ✅ |
+| 29 | [Deployment Compatibility & Rollback](29-deployment-compatibility-and-rollback.md) | Backward compatibility khi nhiều version cùng chạy, Expand-Contract migration, rollback database, event, cache, config và business side effect | ✅ |
 
 ## 7. Security
 
