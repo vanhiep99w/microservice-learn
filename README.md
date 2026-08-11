@@ -47,7 +47,7 @@
 | Data & Reliability | Dữ liệu, chịu lỗi, quan sát | 09 → 11 |
 | Platform | Container, Orchestration, CI/CD, Security | 12 → 17 |
 | AWS | Triển khai Microservice trên AWS | 18 → 24 |
-| End-to-End | Case study tổng hợp | 25, 26, 30 |
+| End-to-End | Case study tổng hợp | 25, 26, 30, 31 |
 
 ---
 
@@ -133,6 +133,7 @@
 | 25 | [Case Study: E-Commerce Platform](25-case-study-ecommerce.md) | Đề bài → phân tích domain → decompose services → chọn patterns → thiết kế infra → so sánh nhiều solutions | ✅ |
 | 26 | [Case Study: Food Delivery Platform](26-case-study-food-delivery.md) | Đề bài → domain/BC → service decomposition → dispatch flow → data/resilience/security → execution plan | ✅ |
 | 30 | [Case Study: Livestream Platform](30-case-study-livestream-platform.md) | Ingest → transcoding/ABR → CDN → 2,1 triệu viewers → comments/viewer count → gift/ledger → resilience/observability | ✅ |
+| 31 | [Case Study: Dropbox System Design](31-case-study-dropbox-system-design.md) | Requirements → estimation → direct upload/download → metadata/versioning → multi-device sync → chunking/deduplication → reliability/security | ✅ |
 | 27 | [Bảng thuật ngữ (Glossary)](27-glossary.md) | Tổng hợp thuật ngữ Microservice: cơ bản, communication, patterns, infra, observability, security, AWS | ✅ |
 
 ## 12. Cheat Sheet & Tham khảo nhanh
@@ -175,4 +176,4 @@ Mỗi tài liệu đều có:
 
 ---
 
-> 💡 **Tip**: Đọc theo thứ tự từ 01 → 17 cho kiến thức nền tảng, 18 → 24 cho triển khai trên AWS, và 25, 26, 30 cho các case study tổng hợp!
+> 💡 **Tip**: Đọc theo thứ tự từ 01 → 17 cho kiến thức nền tảng, 18 → 24 cho triển khai trên AWS, và 25, 26, 30, 31 cho các case study tổng hợp!
