@@ -112,7 +112,15 @@
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
-| 17 | [Design Patterns](17-design-patterns.md) | Sidecar, Ambassador, Adapter, Anti-patterns, tổng hợp | ✅ |
+| 17 | [Design Patterns — Index & Decision Guide](17-design-patterns.md) | Bản đồ 8 nhóm pattern, decision matrix theo vấn đề và giai đoạn, ví dụ kết hợp E-Commerce, checklist tổng hợp | ✅ |
+| 17 | [Structural Patterns](17-structural-patterns.md) | Sidecar, Ambassador, Adapter — tổ chức cross-cutting concern cạnh service, khung ra quyết định và checklist triển khai | ✅ |
+| 17 | [Decomposition Patterns](17-decomposition-patterns.md) | Strangler Fig, Branch by Abstraction, Vine — tách dần monolith không big-bang, sync dữ liệu khi migrate | ✅ |
+| 17 | [Data Patterns](17-data-patterns.md) | Database per Service, Transactional Outbox, Saga, CQRS, Event Sourcing — góc nhìn pattern và kết hợp an toàn | ✅ |
+| 17 | [Communication Patterns](17-communication-patterns.md) | API Gateway, BFF, Service Mesh, Event-Driven, Async Request-Reply — sync vs async decision matrix | ✅ |
+| 17 | [Reliability Patterns](17-reliability-patterns.md) | Timeout, Retry, Circuit Breaker, Bulkhead, Health Check — phối hợp các pattern chống cascading failure | ✅ |
+| 17 | [Deployment Patterns](17-deployment-patterns.md) | Rolling, Blue-Green, Canary, Feature Toggle — rollback an toàn, tương thích nhiều version | ✅ |
+| 17 | [Observability Patterns](17-observability-patterns.md) | Log Aggregation, Distributed Tracing, Correlation ID, Health Check API — kiểm soát cardinality và dữ liệu nhạy cảm | ✅ |
+| 17 | [Anti-patterns](17-anti-patterns.md) | Distributed Monolith, Shared Database, Mega Service, Chatty Services, Sync Chain — nhận diện và khắc phục | ✅ |
 
 ## 10. Triển khai Microservice trên AWS
 
