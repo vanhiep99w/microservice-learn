@@ -47,7 +47,7 @@
 | Data & Reliability | Dữ liệu, chịu lỗi, quan sát | 09 → 11 |
 | Platform | Container, Orchestration, CI/CD, Security | 12 → 17 |
 | AWS | Triển khai Microservice trên AWS | 18 → 24 |
-| End-to-End | Case study tổng hợp | 25, 26, 30, 31 |
+| End-to-End | Case study tổng hợp | 25, 26, 31 |
 
 ---
 
@@ -113,14 +113,43 @@
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
 | 17 | [Design Patterns — Index & Decision Guide](17-design-patterns.md) | Bản đồ 8 nhóm pattern, decision matrix theo vấn đề và giai đoạn, ví dụ kết hợp E-Commerce, checklist tổng hợp | ✅ |
-| 17 | [Structural Patterns](17-structural-patterns.md) | Sidecar, Ambassador, Adapter — tổ chức cross-cutting concern cạnh service, khung ra quyết định và checklist triển khai | ✅ |
-| 17 | [Decomposition Patterns](17-decomposition-patterns.md) | Strangler Fig, Branch by Abstraction, Vine — tách dần monolith không big-bang, sync dữ liệu khi migrate | ✅ |
-| 17 | [Data Patterns](17-data-patterns.md) | Database per Service, Transactional Outbox, Saga, CQRS, Event Sourcing — góc nhìn pattern và kết hợp an toàn | ✅ |
-| 17 | [Communication Patterns](17-communication-patterns.md) | API Gateway, BFF, Service Mesh, Event-Driven, Async Request-Reply — sync vs async decision matrix | ✅ |
-| 17 | [Reliability Patterns](17-reliability-patterns.md) | Timeout, Retry, Circuit Breaker, Bulkhead, Health Check — phối hợp các pattern chống cascading failure | ✅ |
-| 17 | [Deployment Patterns](17-deployment-patterns.md) | Rolling, Blue-Green, Canary, Feature Toggle — rollback an toàn, tương thích nhiều version | ✅ |
-| 17 | [Observability Patterns](17-observability-patterns.md) | Log Aggregation, Distributed Tracing, Correlation ID, Health Check API — kiểm soát cardinality và dữ liệu nhạy cảm | ✅ |
-| 17 | [Anti-patterns](17-anti-patterns.md) | Distributed Monolith, Shared Database, Mega Service, Chatty Services, Sync Chain — nhận diện và khắc phục | ✅ |
+| 17.01 | [Sidecar Pattern](17-structural-patterns/sidecar.md) | Sidecar, lifecycle, resource isolation và cách tổ chức cross-cutting concern cạnh service | ✅ |
+| 17.02 | [Ambassador Pattern](17-structural-patterns/ambassador.md) | Local proxy cho outbound call, service discovery, retry, TLS và observability | ✅ |
+| 17.03 | [Adapter Pattern](17-structural-patterns/adapter.md) | Contract translation, Anti-corruption Layer và compatibility với hệ thống bên ngoài | ✅ |
+| 17.04 | [Strangler Fig Pattern](17-decomposition-patterns/strangler-fig.md) | Tách dần capability khỏi monolith bằng routing facade, migration phases và rollback | ✅ |
+| 17.05 | [Branch by Abstraction Pattern](17-decomposition-patterns/branch-by-abstraction.md) | Thay implementation an toàn qua abstraction layer, feature flag và rollout từng bước | ✅ |
+| 17.06 | [Vine Pattern](17-decomposition-patterns/vine.md) | Viết lại song song, parallel run, cutover có kiểm soát và đồng bộ dữ liệu | ✅ |
+| 17.07 | [Database per Service Pattern](17-data-patterns/database-per-service.md) | Data ownership, ranh giới truy cập và các cấp độ tách database cho từng service | ✅ |
+| 17.08 | [Transactional Outbox Pattern](17-data-patterns/transactional-outbox.md) | Ghi business data và ý định phát event atomic bằng local transaction | ✅ |
+| 17.09 | [Saga Pattern](17-data-patterns/saga.md) | Distributed transaction qua chuỗi local transaction và compensating action | ✅ |
+| 17.10 | [CQRS Pattern](17-data-patterns/cqrs.md) | Tách command/query, read model và các mức độ áp dụng CQRS | ✅ |
+| 17.11 | [Event Sourcing Pattern](17-data-patterns/event-sourcing.md) | Lưu event bất biến, replay state, snapshot và projection read model | ✅ |
+| 17.12 | [API Gateway Pattern](17-communication-patterns/api-gateway.md) | Single entry point, routing, authentication, rate limiting và API aggregation | ✅ |
+| 17.13 | [Backend for Frontend (BFF) Pattern](17-communication-patterns/backend-for-frontend.md) | API shape riêng cho Web, Mobile và các loại client khác | ✅ |
+| 17.14 | [Service Mesh Pattern](17-communication-patterns/service-mesh.md) | Data Plane, Control Plane, traffic management, mTLS và observability | ✅ |
+| 17.15 | [Event-Driven Architecture Pattern](17-communication-patterns/event-driven-architecture.md) | Giao tiếp qua event, fan-out, delivery semantics và loose coupling | ✅ |
+| 17.16 | [Async Request-Reply Pattern](17-communication-patterns/async-request-reply.md) | Xử lý tác vụ dài qua job, queue, polling, webhook hoặc WebSocket | ✅ |
+| 17.17 | [Timeout Pattern](17-reliability-patterns/timeout.md) | Giới hạn thời gian chờ, deadline propagation và time budget | ✅ |
+| 17.18 | [Retry with Backoff và Jitter Pattern](17-reliability-patterns/retry-with-backoff.md) | Retry lỗi tạm thời với exponential backoff, jitter, idempotency và retry budget | ✅ |
+| 17.19 | [Circuit Breaker Pattern](17-reliability-patterns/circuit-breaker.md) | Fail fast, state machine và ngăn cascading failure từ dependency lỗi | ✅ |
+| 17.20 | [Bulkhead Pattern](17-reliability-patterns/bulkhead.md) | Cô lập thread, connection, concurrency và queue giữa các dependency | ✅ |
+| 17.21 | [Health Check / Heartbeat Pattern](17-reliability-patterns/health-check-heartbeat.md) | Heartbeat, TTL, active check và hành động khi instance không khỏe | ✅ |
+| 17.22 | [Rolling Update Pattern](17-deployment-patterns/rolling-update.md) | Rollout tuần tự, readiness, compatibility và rollback cho nhiều version | ✅ |
+| 17.23 | [Blue-Green Deployment Pattern](17-deployment-patterns/blue-green.md) | Hai môi trường song song, switch traffic nhanh và rollback về version cũ | ✅ |
+| 17.24 | [Canary Deployment Pattern](17-deployment-patterns/canary.md) | Progressive rollout, traffic splitting, metrics gate và abort canary | ✅ |
+| 17.25 | [Feature Toggle Pattern](17-deployment-patterns/feature-toggle.md) | Tách deploy khỏi release, targeting, rollout và quản lý flag debt | ✅ |
+| 17.26 | [Log Aggregation Pattern](17-observability-patterns/log-aggregation.md) | Centralized logging, structured log, retention và truy vấn log phân tán | ✅ |
+| 17.27 | [Distributed Tracing Pattern](17-observability-patterns/distributed-tracing.md) | Trace, span, context propagation, sampling và phân tích latency | ✅ |
+| 17.28 | [Correlation ID Pattern](17-observability-patterns/correlation-id.md) | Propagation ID qua HTTP/message và liên kết log giữa các service | ✅ |
+| 17.29 | [Health Check API Pattern](17-observability-patterns/health-check-api.md) | Contract liveness, readiness, startup, dependency check và probes | ✅ |
+| 17.30 | [Distributed Monolith](17-anti-patterns/distributed-monolith.md) | Nhận diện coupling chặt, synchronous chain và remediation | ✅ |
+| 17.31 | [Shared Database Anti-pattern](17-anti-patterns/shared-database.md) | Phân tích data ownership bị phá vỡ và lộ trình tách dữ liệu | ✅ |
+| 17.32 | [Mega Service](17-anti-patterns/mega-service.md) | Nhận diện boundary quá rộng, trách nhiệm trộn lẫn và cách tách hợp lý | ✅ |
+| 17.33 | [Chatty Services](17-anti-patterns/chatty-services.md) | Nhận diện N+1 calls, round-trip dày đặc và coarse-grained API | ✅ |
+| 17.34 | [No API Versioning](17-anti-patterns/no-api-versioning.md) | Compatibility, tolerant reader, adapter và consumer-driven contract testing | ✅ |
+| 17.35 | [Hardcoded Configuration](17-anti-patterns/hardcoded-configuration.md) | Configuration drift, secrets exposure và remediation bằng artifact bất biến | ✅ |
+| 17.36 | [Sync Chain / Death Star Architecture](17-anti-patterns/sync-chain-death-star.md) | Latency chồng dồn, temporal coupling, cascading failure và blast radius | ✅ |
+| 17.37 | [Over-engineering](17-anti-patterns/over-engineering.md) | Nhận diện complexity không cần thiết, pattern hype và cách tối giản | ✅ |
 
 ## 10. Triển khai Microservice trên AWS
 
@@ -140,7 +169,6 @@
 |---|----------|--------|:----------:|
 | 25 | [Case Study: E-Commerce Platform](25-case-study-ecommerce.md) | Đề bài → phân tích domain → decompose services → chọn patterns → thiết kế infra → so sánh nhiều solutions | ✅ |
 | 26 | [Case Study: Food Delivery Platform](26-case-study-food-delivery.md) | Đề bài → domain/BC → service decomposition → dispatch flow → data/resilience/security → execution plan | ✅ |
-| 30 | [Case Study: Livestream Platform](30-case-study-livestream-platform.md) | Ingest → transcoding/ABR → CDN → 2,1 triệu viewers → comments/viewer count → gift/ledger → resilience/observability | ✅ |
 | 31 | [Case Study: Dropbox System Design](31-case-study-dropbox-system-design.md) | Requirements → estimation → direct upload/download → metadata/versioning → multi-device sync → chunking/deduplication → reliability/security | ✅ |
 | 27 | [Bảng thuật ngữ (Glossary)](27-glossary.md) | Tổng hợp thuật ngữ Microservice: cơ bản, communication, patterns, infra, observability, security, AWS | ✅ |
 
@@ -184,4 +212,4 @@ Mỗi tài liệu đều có:
 
 ---
 
-> 💡 **Tip**: Đọc theo thứ tự từ 01 → 17 cho kiến thức nền tảng, 18 → 24 cho triển khai trên AWS, và 25, 26, 30, 31 cho các case study tổng hợp!
+> 💡 **Tip**: Đọc theo thứ tự từ 01 → 17 cho kiến thức nền tảng, 18 → 24 cho triển khai trên AWS, và 25, 26, 31 cho các case study tổng hợp!
