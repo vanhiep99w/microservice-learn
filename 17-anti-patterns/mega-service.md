@@ -152,9 +152,9 @@ Giả sử `CommerceService` đảm nhiệm toàn bộ luồng thương mại:
 │  Order        → tạo và quản lý đơn hàng            │
 │  Promotion    → tính khuyến mãi                    │
 │  Payment      → charge thẻ và refund               │
-│  Inventory    → giữ hàng                            │
+│  Inventory    → giữ hàng                           │
 │  Shipping     → gọi hãng vận chuyển                │
-│  Reporting    → tạo báo cáo                         │
+│  Reporting    → tạo báo cáo                        │
 │  Notification → gửi email                          │
 └────────────────────────────────────────────────────┘
 ```

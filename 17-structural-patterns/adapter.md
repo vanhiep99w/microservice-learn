@@ -187,7 +187,7 @@ Ví dụ, `BankSoapPaymentAdapter implements PaymentPort` phù hợp khi chỉ C
 Dùng một service riêng khi nhiều service cần cùng một vendor contract, hoặc integration cần scale, credential, rate limit và lifecycle độc lập. Service này nhận contract đã chuẩn hóa rồi làm nhiệm vụ gọi provider.
 
 ```text
-Order Service ──┐
+Order Service  ──┐
 Refund Service ──┼──► Payment Integration Service ──► Bank / Vendor
 Billing Service ─┘             Adapter boundary
 ```

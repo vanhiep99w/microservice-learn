@@ -96,7 +96,7 @@ sequenceDiagram
 ### Vị trí trong topology
 
 ```text
-┌──────────────────── Workload ────────────────────┐
+┌──────────────────── Workload ─────────────────────┐
 │                                                   │
 │  ┌──────────────────┐     ┌───────────────────┐   │
 │  │ Checkout Service │────▶│ Ambassador        │   │
@@ -213,10 +213,10 @@ Giả sử `Checkout Service` gọi `Payment Service` trong một hệ thống E
 ```text
 ┌──────────────────── Pod của Checkout ────────────────────┐
 │                                                          │
-│  ┌──────────────────────┐     ┌──────────────────────┐  │
-│  │ Checkout Service      │     │ Ambassador           │  │
-│  │ gọi Payment client    │────▶│ 127.0.0.1:15001      │──┼── mTLS ──▶ Payment Service
-│  └──────────────────────┘     └──────────────────────┘  │
+│  ┌──────────────────────┐     ┌──────────────────────┐   │
+│  │ Checkout Service     │     │ Ambassador           │   │
+│  │ gọi Payment client   │────▶│ 127.0.0.1:15001      │───┼── mTLS ──▶ Payment Service
+│  └──────────────────────┘     └──────────────────────┘   │
 │                                                          │
 └──────────────────────────────────────────────────────────┘
 ```

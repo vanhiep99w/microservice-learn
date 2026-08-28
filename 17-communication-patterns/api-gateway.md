@@ -295,8 +295,8 @@ Internet
    │
    ▼
 ┌─────────────────────────┐
-│ Public Load Balancer     │  health check Gateway
-│ hoặc Ingress             │
+│ Public Load Balancer    │  health check Gateway
+│ hoặc Ingress            │
 └───────────┬─────────────┘
             │
       ┌─────┴─────┐

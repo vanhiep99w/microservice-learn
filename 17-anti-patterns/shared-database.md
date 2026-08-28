@@ -83,7 +83,7 @@ Mục tiêu của **Database per Service** không nhất thiết là mỗi servi
 ❌ Shared schema/table: implementation bị dùng chung
 
   Order Service ───────┐
-                        ├──> public.orders
+                       ├──> public.orders
   Shipping Service ────┘       └── shipping_status
 
   Shipping Service có thể UPDATE cột nội bộ của Order Service.
@@ -151,7 +151,7 @@ Giả sử Order Service và Shipping Service đã có codebase riêng nhưng c�
 ```text
 ❌ Cùng dùng một table
 
-  Order Service ───────────────┐
+  Order Service ────────────────┐
        │                        │
        │ reads/writes orders    ▼
        └──────────────────> orders table

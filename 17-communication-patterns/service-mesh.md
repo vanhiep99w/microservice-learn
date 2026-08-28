@@ -337,7 +337,7 @@ Gateway trả lời câu hỏi: **client bên ngoài đi vào hệ thống bằn
 ```text
 Client ── North-South ──▶ API Gateway ──▶ Service A
                                             │
-                         East-West         ▼
+                         East-West          ▼
                                       Service Mesh
                                             │
                                             ▼

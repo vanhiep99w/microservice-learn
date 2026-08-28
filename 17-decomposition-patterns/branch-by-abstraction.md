@@ -91,7 +91,7 @@ Trước migration, nhiều caller thường giữ dependency trực tiếp tớ
 ```text
 OrderController ────────┐
 RefundJob ──────────────┼──▶ LegacyPaymentGateway
-SubscriptionRenewal ───┘
+SubscriptionRenewal  ───┘
 ```
 
 Mỗi caller biết quá nhiều chi tiết của component cũ. Vì vậy, thay component đồng nghĩa với việc sửa nhiều call site cùng lúc. Nếu một caller bị bỏ sót, hệ thống vẫn có thể đi qua implementation cũ sau khi team tưởng rằng migration đã hoàn tất.
@@ -103,7 +103,7 @@ Bước đầu tiên là bọc component cũ sau contract mới. Hành vi runtim
 ```text
 OrderController ────────┐
 RefundJob ──────────────┼──▶ PaymentProcessor ──▶ LegacyPaymentAdapter
-SubscriptionRenewal ───┘
+SubscriptionRenewal  ───┘
 ```
 
 Ở trạng thái này, abstraction chưa tạo ra service mới. Nó chỉ tạo seam — điểm nối có thể kiểm soát — để các bước sau được triển khai mà không sửa toàn bộ caller trong một lần.

@@ -69,7 +69,7 @@ Trong hệ thống Microservice, một instance có thể lỗi mà các instanc
 ┌─────────────────────────────────────────────────────────────┐
 │                    HEALTH SIGNAL                            │
 │                                                             │
-│  Instance ── heartbeat hoặc health response ──▶ Hạ tầng    │
+│  Instance ── heartbeat hoặc health response ──▶ Hạ tầng     │
 │                                                     │       │
 │                    ┌────────────────────────────────┘       │
 │                    ▼                                        │

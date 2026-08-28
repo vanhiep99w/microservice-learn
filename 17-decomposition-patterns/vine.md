@@ -193,13 +193,13 @@ Trong parallel run, logical input từ flow đặt phòng hoặc các flow liên
 ┌───────────────────────────────────────────────────────────────┐
 │                         PARALLEL RUN                          │
 │                                                               │
-│  Reservation ──▶ Monolith Billing (FROZEN) ──▶ Invoice A     │
-│       │                                      ──▶ Report       │
+│  Reservation ──▶ Monolith Billing (FROZEN) ──▶ Invoice A      │
+│       │                                    ──▶ Report         │
 │       │                                                       │
-│       └──── mirror input ──▶ Billing Service ──▶ Invoice B   │
+│       └──── mirror input ──▶ Billing Service ──▶ Invoice B    │
 │                                                               │
 │  Comparer: đối chiếu A và B theo từng flow                    │
-│  Diff ≠ 0 → điều tra implementation hoặc hidden behavior     │
+│  Diff ≠ 0 → điều tra implementation hoặc hidden behavior      │
 │  Diff trong ngưỡng đã chấp nhận → đủ điều kiện xem xét switch │
 └───────────────────────────────────────────────────────────────┘
 ```

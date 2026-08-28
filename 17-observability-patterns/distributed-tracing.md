@@ -319,9 +319,9 @@ Trace ID: 4bf92f3577b34da6a3ce929d0e0e4736    Tổng: 245ms
 ├─ 00:00.000  POST /api/v1/orders                  [API Gateway]     8ms
 ├─ 00:00.008  OrderService.create                  [Order Service] 220ms
 │   ├─ 00:00.010  InventoryService.reserve         [Inventory Svc]  18ms
-│   ├─ 00:00.030  PaymentService.charge            [Payment Svc]  180ms
-│   │   └─ 00:00.035  POST /v1/charges              [Bank API]      165ms
-│   └─ 00:00.214  Saga: persist order               [Order Service]   6ms
+│   ├─ 00:00.030  PaymentService.charge            [Payment Svc]   180ms
+│   │   └─ 00:00.035  POST /v1/charges             [Bank API]      165ms
+│   └─ 00:00.214  Saga: persist order              [Order Service]   6ms
 └─ 00:00.245  201 → client
 ```
 
