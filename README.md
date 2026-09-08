@@ -182,6 +182,7 @@
 
 | # | Tài liệu | Mô tả | Trạng thái |
 |---|----------|--------|:----------:|
+| 30 | [Event-Driven Architecture vs Event Sourcing](30-event-driven-architecture-vs-event-sourcing.md) | Phân biệt kiến trúc giao tiếp EDA với mô hình persistence Event Sourcing; Outbox, idempotency, replay, projection và cách kết hợp | ✅ |
 | 27 | [Shared Code Strategy](27-shared-code-strategy.md) | Cái gì nên/không nên share, Shared Library vs Code Gen vs Sidecar, versioning, anti-patterns, best practices | ✅ |
 
 ---
