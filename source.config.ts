@@ -1,5 +1,7 @@
 import { defineDocs, defineConfig } from 'fumadocs-mdx/config';
 import { visit } from 'unist-util-visit';
+import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
+import { remarkSourceRefs } from './scripts/remark-source-refs.mjs';
 
 function remarkMermaid() {
   return (tree: any) => {
@@ -28,6 +30,14 @@ export const docs = defineDocs({
 
 export default defineConfig({
   mdxOptions: {
-    remarkPlugins: [remarkMermaid],
+    remarkPlugins: [
+      [remarkD2, {
+        cacheDir: '.next/cache/docs-kit/d2',
+        concurrency: 1,
+        defaultCaption: 'Sơ đồ',
+      }],
+      remarkMermaid,
+      remarkSourceRefs,
+    ],
   },
 });

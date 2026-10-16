@@ -103,17 +103,32 @@ return final_failure
 
 ### Luồng xử lý
 
-```mermaid
-flowchart TD
-    A[Gọi dependency] --> B{Kết quả?}
-    B -->|Thành công| C[Trả kết quả]
-    B -->|Lỗi| D{Lỗi có retry được?}
-    D -->|Không| E[Trả lỗi ngay]
-    D -->|Có| F{Còn attempt và deadline?}
-    F -->|Không| G[Trả lỗi hoặc trạng thái pending]
-    F -->|Có| H[Chờ Exponential Backoff + Jitter]
-    H --> I[Retry cùng operation identity]
-    I --> A
+```d2 title="Luồng xử lý"
+direction: down
+n1: "Gọi dependency"
+n2: "Kết quả?" {
+  shape: diamond
+}
+n3: "Trả kết quả"
+n4: "Lỗi có retry được?" {
+  shape: diamond
+}
+n5: "Trả lỗi ngay"
+n6: "Còn attempt và deadline?" {
+  shape: diamond
+}
+n7: "Trả lỗi hoặc trạng thái pending"
+n8: "Chờ Exponential Backoff + Jitter"
+n9: "Retry cùng operation identity"
+n1 -> n2
+n2 -> n3: "Thành công"
+n2 -> n4: "Lỗi"
+n4 -> n5: "Không"
+n4 -> n6: "Có"
+n6 -> n7: "Không"
+n6 -> n8: "Có"
+n8 -> n9
+n9 -> n1
 ```
 
 Nếu server gửi `Retry-After`, client nên tôn trọng khoảng chờ đó thay vì tự retry sớm hơn. Khoảng chờ vẫn phải nằm trong `overall deadline`; một header không thể cấp thêm thời gian cho request đã hết hạn.
@@ -312,19 +327,18 @@ Operation này nằm trên đường critical của checkout và có side effect
 
 ### Luồng retry an toàn
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Payment Service
-    participant B as Payment provider
-
-    O->>P: Charge order-123, Idempotency-Key = pay_order-123
-    P->>B: POST /payments với cùng key
-    B-->>P: Timeout hoặc response bị mất
-    Note over P: Kết quả chưa xác định; còn retry budget
-    P->>B: Retry POST /payments với cùng key
-    B-->>P: Trả kết quả đã lưu hoặc kết quả hiện tại
-    P-->>O: Thành công, thất bại hoặc pending theo contract
+```d2 title="Luồng retry an toàn"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Payment Service"
+"B": "Payment provider"
+"O" -> "P": "Charge order-123, Idempotency-Key = pay_order-123"
+"P" -> "B": "POST /payments với cùng key"
+"B" -> "P": "Timeout hoặc response bị mất" { style.stroke-dash: 5 }
+"P".note1: "Kết quả chưa xác định; còn retry budget"
+"P" -> "B": "Retry POST /payments với cùng key"
+"B" -> "P": "Trả kết quả đã lưu hoặc kết quả hiện tại" { style.stroke-dash: 5 }
+"P" -> "O": "Thành công, thất bại hoặc pending theo contract" { style.stroke-dash: 5 }
 ```
 
 Policy cho use case này có thể được đọc theo từng kết quả:

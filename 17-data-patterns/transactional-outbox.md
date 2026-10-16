@@ -42,14 +42,25 @@
 
 Sau khi transaction commit, một process riêng gọi là **Outbox Relay** đọc các row trong `outbox` và publish event tới broker. Relay có thể thử lại việc publish khi broker hoặc network tạm thời lỗi.
 
-```mermaid
-flowchart LR
-    C[Service xử lý command] --> T[Local transaction]
-    T --> D[(Business data)]
-    T --> O[(Outbox table)]
-    O --> R[Outbox Relay]
-    R --> B[Message Broker]
-    B --> K[Consumer]
+```d2 title="Tổng quan"
+direction: right
+n1: "Service xử lý command"
+n2: "Local transaction"
+n3: "Business data" {
+  shape: cylinder
+}
+n4: "Outbox table" {
+  shape: cylinder
+}
+n5: "Outbox Relay"
+n6: "Message Broker"
+n7: "Consumer"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
 ```
 
 Outbox làm cho việc **lưu business state và lưu ý định phát event** atomic trong phạm vi database local. Nó không biến database và broker thành một distributed transaction, không đảm bảo exactly-once delivery và không thay thế việc consumer xử lý duplicate.
@@ -109,25 +120,23 @@ Outbox không thay thế HA, và HA cũng không thay thế Outbox.
 
 Khi xử lý command, service ghi business data và event vào cùng database transaction:
 
-```mermaid
-sequenceDiagram
-    participant A as Order Service
-    participant D as Order DB
-    participant R as Outbox Relay
-    participant M as Message Broker
-    participant I as Inventory Service
-
-    A->>D: BEGIN local transaction
-    A->>D: INSERT orders (status = PENDING)
-    A->>D: INSERT outbox (OrderCreated)
-    A->>D: COMMIT
-    Note over D: Order và outbox row cùng commit
-
-    R->>D: Đọc outbox row chưa publish
-    R->>M: Publish OrderCreated
-    M-->>R: Broker xác nhận
-    R->>D: Đánh dấu hoặc dọn row theo policy
-    M-->>I: Deliver event
+```d2 title="Ghi business data và outbox trong local transaction"
+shape: sequence_diagram
+"A": "Order Service"
+"D": "Order DB"
+"R": "Outbox Relay"
+"M": "Message Broker"
+"I": "Inventory Service"
+"A" -> "D": "BEGIN local transaction"
+"A" -> "D": "INSERT orders (status = PENDING)"
+"A" -> "D": "INSERT outbox (OrderCreated)"
+"A" -> "D": "COMMIT"
+"D".note1: "Order và outbox row cùng commit"
+"R" -> "D": "Đọc outbox row chưa publish"
+"R" -> "M": "Publish OrderCreated"
+"M" -> "R": "Broker xác nhận" { style.stroke-dash: 5 }
+"R" -> "D": "Đánh dấu hoặc dọn row theo policy"
+"M" -> "I": "Deliver event" { style.stroke-dash: 5 }
 ```
 
 Nếu `INSERT orders` thành công nhưng `INSERT outbox` thất bại, local transaction bị rollback và order cũng không được commit. Ngược lại, nếu business validation thất bại trước khi commit, không có event nào được lưu để relay.

@@ -111,33 +111,21 @@ Tài liệu này bao gồm toàn bộ các khía cạnh bảo mật trong kiến
 
 ### 2.2. Attack Surface mở rộng
 
-```
-ATTACK SURFACE TRONG MICROSERVICE
-──────────────────────────────────
-
-                    ┌─ External Attacks ─┐
-                    │  • DDoS            │
-                    │  • SQL Injection   │
-                    │  • XSS             │
-                    │  • CSRF            │
-                    └────────┬───────────┘
-                             │
-                    ┌────────▼────────┐
-                    │   API Gateway   │ ◄── Rate Limiting, WAF
-                    └────────┬────────┘
-                             │
-              ┌──────────────┼────────────┐
-              │              │            │
-         ┌────▼────┐   ┌─────▼───┐   ┌────▼────┐
-         │ User    │   │ Order   │   │ Payment │
-         │ Service │   │ Service │   │ Service │
-         └────┬────┘   └────┬────┘   └────┬────┘
-              │             │             │
-              └──── Internal Attacks ─────┘
-                  • Rogue Service
-                  • Man-in-the-Middle
-                  • Privilege Escalation
-                  • Data Exfiltration
+```d2 title="Attack Surface trong Microservice"
+direction: down
+external: "External Attacks\nDDoS • SQL Injection • XSS • CSRF"
+gateway: "API Gateway\nRate Limiting • WAF"
+user: User Service
+order: Order Service
+payment: Payment Service
+internal: "Internal Attacks\nRogue Service • Man-in-the-Middle\nPrivilege Escalation • Data Exfiltration"
+external -> gateway
+gateway -> user
+gateway -> order
+gateway -> payment
+user -- internal
+order -- internal
+payment -- internal
 ```
 
 **Các vector tấn công phổ biến:**
@@ -423,20 +411,31 @@ GRANT TYPE GIỐNG NHƯ "CÁCH XIN VÀO TÒA NHÀ"
      (Thiết bị không có khả năng input)
 ```
 
-```mermaid
-flowchart TD
-    A[Client cần access token] --> B{Client type?}
-    B -->|Server-side app| C[Authorization Code]
-    B -->|SPA / Mobile| D[Authorization Code + PKCE]
-    B -->|Service-to-Service| E[Client Credentials]
-    B -->|Legacy / trusted app| F[Resource Owner Password - DEPRECATED]
-
-    C --> G[Có user interaction]
-    D --> G
-    E --> H[Không user interaction]
-    F --> G
-
-    style F fill:#661111,stroke:#ff4444,color:#ffffff
+```d2 title="3.5. Các OAuth 2.0 Grant Types"
+direction: down
+n1: "Client cần access token"
+n2: "Client type?" {
+  shape: diamond
+}
+n3: "Authorization Code"
+n4: "Authorization Code + PKCE"
+n5: "Client Credentials"
+n6: "Resource Owner Password - DEPRECATED" {
+  style.fill: "#661111"
+  style.stroke: "#ff4444"
+  style.font-color: "#ffffff"
+}
+n7: "Có user interaction"
+n8: "Không user interaction"
+n1 -> n2
+n2 -> n3: "Server-side app"
+n2 -> n4: "SPA / Mobile"
+n2 -> n5: "Service-to-Service"
+n2 -> n6: "Legacy / trusted app"
+n3 -> n7
+n4 -> n7
+n5 -> n8
+n6 -> n7
 ```
 
 | Grant Type | Use Case | User Interaction | Security |
@@ -723,7 +722,7 @@ abc123signature...
 
 **Chi tiết từng phần:**
 
-```json
+```json source="snippets/4-2-cau-truc-jwt.json"
 // 1. HEADER — Thuật toán ký
 {
   "alg": "RS256",        // Thuật toán: RS256, HS256, ES256
@@ -752,6 +751,8 @@ abc123signature...
 // RS256: RSASHA256(base64(header) + "." + base64(payload), privateKey)
 // HS256: HMACSHA256(base64(header) + "." + base64(payload), secret)
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F4-2-cau-truc-jwt.json)
 
 ### 4.3. JWT Signing — Symmetric vs Asymmetric
 
@@ -797,17 +798,31 @@ SYMMETRIC vs ASYMMETRIC TRONG MICROSERVICE
 
 ### 4.4. JWT Validation trong Microservice
 
-```mermaid
-flowchart LR
-    A[Request + JWT] --> B[API Gateway]
-    B --> C{Validate JWT}
-    C -->|Invalid/Expired| D[401 Unauthorized]
-    C -->|Valid| E[Extract Claims]
-    E --> F[Forward to Service]
-    F --> G[Service]
-    G --> H{Check Authorization}
-    H -->|Allowed| I[Process Request]
-    H -->|Denied| J[403 Forbidden]
+```d2 title="4.4. JWT Validation trong Microservice"
+direction: right
+n1: "Request + JWT"
+n2: "API Gateway"
+n3: "Validate JWT" {
+  shape: diamond
+}
+n4: "401 Unauthorized"
+n5: "Extract Claims"
+n6: "Forward to Service"
+n7: "Service"
+n8: "Check Authorization" {
+  shape: diamond
+}
+n9: "Process Request"
+n10: "403 Forbidden"
+n1 -> n2
+n2 -> n3
+n3 -> n4: "Invalid/Expired"
+n3 -> n5: "Valid"
+n5 -> n6
+n6 -> n7
+n7 -> n8
+n8 -> n9: "Allowed"
+n8 -> n10: "Denied"
 ```
 
 **JWT Validation checklist:**
@@ -955,7 +970,7 @@ RBAC MODEL
 
 **Triển khai trong service:**
 
-```python
+```python source="snippets/5-2-rbac-role-based-access-control.py"
 # Middleware kiểm tra quyền
 def require_permission(permission):
     def decorator(func):
@@ -972,6 +987,8 @@ def create_order(request):
     # Chỉ user có quyền "order:write" mới vào được
     pass
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F5-2-rbac-role-based-access-control.py)
 
 ### 5.3. ABAC — Attribute-Based Access Control
 
@@ -1164,7 +1181,7 @@ SERVICE MESH + mTLS TỰ ĐỘNG
 
 **Istio mTLS config:**
 
-```yaml
+```yaml source="snippets/6-3-service-mesh-va-mtls-tu-dong.yaml"
 # PeerAuthentication — Bắt buộc mTLS cho namespace
 apiVersion: security.istio.io/v1beta1
 kind: PeerAuthentication
@@ -1197,6 +1214,8 @@ spec:
         methods: ["GET", "POST"]
         paths: ["/api/orders/*"]
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F6-3-service-mesh-va-mtls-tu-dong.yaml)
 
 ### 6.4. Service Identity & SPIFFE
 
@@ -1292,7 +1311,7 @@ RATE LIMITING STRATEGIES
 
 **Rate Limiting ở API Gateway (Kong):**
 
-```yaml
+```yaml source="snippets/7-2-rate-limiting-throttling.yaml"
 # Kong Rate Limiting Plugin
 plugins:
   - name: rate-limiting
@@ -1305,6 +1324,8 @@ plugins:
       limit_by: consumer   # Limit theo consumer (user/app)
       # hoặc: ip, header, credential
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F7-2-rate-limiting-throttling.yaml)
 
 ### 7.3. Input Validation
 
@@ -1341,7 +1362,7 @@ INPUT VALIDATION LAYERS
 
 **Ví dụ — Input validation trong service:**
 
-```python
+```python source="snippets/7-3-input-validation.py"
 from pydantic import BaseModel, validator, constr
 from typing import Optional
 import re
@@ -1373,6 +1394,8 @@ class CreateOrderRequest(BaseModel):
             raise ValueError("Invalid characters in product_id")
         return v
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F7-3-input-validation.py)
 
 ### 7.4. CORS — Cross-Origin Resource Sharing
 
@@ -1509,16 +1532,20 @@ NGUYÊN TẮC ZERO TRUST
 
 ### 8.3. Zero Trust trong Microservice
 
-```mermaid
-flowchart TB
-    subgraph ZT["Zero Trust Layers"]
-        direction TB
-        A["1. Identity Verification<br/>OAuth2 + JWT + mTLS"] --> B["2. Device/Workload Trust<br/>SPIFFE/SPIRE, Pod Identity"]
-        B --> C["3. Network Segmentation<br/>Network Policies, Service Mesh"]
-        C --> D["4. Application Security<br/>RBAC/ABAC, OPA Policies"]
-        D --> E["5. Data Protection<br/>Encryption at rest & in transit"]
-        E --> F["6. Monitoring & Analytics<br/>Audit logs, anomaly detection"]
-    end
+```d2 title="8.3. Zero Trust trong Microservice"
+direction: down
+n1: "Zero Trust Layers" {}
+n1.n2: "1. Identity Verification\nOAuth2 + JWT + mTLS"
+n1.n3: "2. Device/Workload Trust\nSPIFFE/SPIRE, Pod Identity"
+n1.n4: "3. Network Segmentation\nNetwork Policies, Service Mesh"
+n1.n5: "4. Application Security\nRBAC/ABAC, OPA Policies"
+n1.n6: "5. Data Protection\nEncryption at rest & in transit"
+n1.n7: "6. Monitoring & Analytics\nAudit logs, anomaly detection"
+n1.n2 -> n1.n3
+n1.n3 -> n1.n4
+n1.n4 -> n1.n5
+n1.n5 -> n1.n6
+n1.n6 -> n1.n7
 ```
 
 **Áp dụng Zero Trust cho Microservice:**
@@ -1638,7 +1665,7 @@ VAULT TRONG MICROSERVICE
 
 **Vault với Kubernetes:**
 
-```yaml
+```yaml source="snippets/9-2-hashicorp-vault.yaml"
 # Vault Agent Injector — Tự động inject secrets vào Pod
 apiVersion: apps/v1
 kind: Deployment
@@ -1666,9 +1693,11 @@ spec:
         # Secret được mount tại /vault/secrets/db
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F9-2-hashicorp-vault.yaml)
+
 ### 9.3. Kubernetes Secrets
 
-```yaml
+```yaml source="snippets/9-3-kubernetes-secrets.yaml"
 # K8s Secret — Base64 encoded (KHÔNG phải encrypted!)
 apiVersion: v1
 kind: Secret
@@ -1698,6 +1727,8 @@ spec:
           name: db-credentials
           key: password
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F9-3-kubernetes-secrets.yaml)
 
 > ⚠️ **K8s Secrets chỉ base64-encoded, KHÔNG encrypted by default!** Cần bật **Encryption at Rest** hoặc dùng **Sealed Secrets** / **External Secrets Operator** để bảo mật hơn.
 
@@ -1741,7 +1772,7 @@ SECRETS MANAGEMENT BEST PRACTICES
 
 **Kubernetes Network Policies** kiểm soát traffic giữa các Pod — mặc định K8s cho phép tất cả Pod giao tiếp với nhau (flat network).
 
-```yaml
+```yaml source="snippets/10-1-network-policies.yaml"
 # Default deny all — QUAN TRỌNG: Bắt đầu với deny all
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -1802,6 +1833,8 @@ spec:
       port: 5432
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F10-1-network-policies.yaml)
+
 ### 10.2. Network Segmentation
 
 ```
@@ -1840,30 +1873,14 @@ NETWORK SEGMENTATION TRONG MICROSERVICE
 
 **WAF** bảo vệ API khỏi các tấn công web phổ biến (OWASP Top 10).
 
-```
-WAF PLACEMENT
-──────────────
-
-  Internet ──▶ WAF ──▶ Load Balancer ──▶ API Gateway ──▶ Services
-
-  WAF chặn:
-  ┌────────────────────────────────────────────┐
-  │  • SQL Injection:                          │
-  │    SELECT * FROM users WHERE 1=1 → BLOCK   │
-  │                                            │
-  │  • XSS:                                    │
-  │    <script>alert('xss')</script> → BLOCK   │
-  │                                            │
-  │  • Path Traversal:                         │
-  │    GET /../../etc/passwd → BLOCK           │
-  │                                            │
-  │  • Request size > 10MB → BLOCK             │
-  │                                            │
-  │  • Rate: >100 req/s from same IP → BLOCK   │
-  │                                            │
-  │  • Known bad IPs → BLOCK                   │
-  │  • GeoIP blocking → BLOCK                  │
-  └────────────────────────────────────────────┘
+```d2 title="WAF Placement"
+direction: right
+internet: Internet
+waf: WAF
+lb: Load Balancer
+gateway: API Gateway
+services: Services
+internet -> waf -> lb -> gateway -> services
 ```
 
 ---
@@ -1938,7 +1955,7 @@ CONTAINER RUNTIME SECURITY
 
 ### 11.3. Pod Security trong Kubernetes
 
-```yaml
+```yaml source="snippets/11-3-pod-security-trong-kubernetes.yaml"
 # Pod Security — Restricted Profile
 apiVersion: v1
 kind: Pod
@@ -1975,6 +1992,8 @@ spec:
   - name: tmp
     emptyDir: {}
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=15-security&snapshot=article&file=snippets%2F11-3-pod-security-trong-kubernetes.yaml)
 
 **Pod Security Standards (PSS):**
 

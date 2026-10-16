@@ -865,44 +865,25 @@ Decision:
 
 ### 4.2. CQRS với Aurora + ElastiCache
 
+```d2 title="CQRS — Aurora Write và Redis Read"
+direction: right
+client: Client
+order: Order Service
+aurora: Aurora PostgreSQL {shape: cylinder}
+event: EventBridge
+updater: Lambda — Cache updater
+redis: ElastiCache Redis {shape: cylinder}
+client -> order: POST /orders
+order -> aurora: Write
+order -> event: Publish sau DB write
+event -> updater -> redis: Update / Invalidate
+client -> order: "GET /orders/{id}"
+order -> redis: Cache lookup
+redis -> order: Hit — cached data
+order -> aurora: Miss — query DB rồi cache
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│          CQRS: Aurora (Write) + ElastiCache Redis (Read)              │
-│                                                                       │
-│  COMMAND SIDE:                                                        │
-│  ─────────────                                                        │
-│  Client ──▶ Order Service ──▶ Aurora PostgreSQL                       │
-│             POST /orders          │                                   │
-│                                   │                                   │
-│                            Publish Event (EventBridge)                │
-│                                   │                                   │
-│                                   ▼                                   │
-│                            Lambda (cache updater)                     │
-│                                   │                                   │
-│                            Update / Invalidate cache                  │
-│                                   │                                   │
-│                                   ▼                                   │
-│  QUERY SIDE:                 ElastiCache Redis                        │
-│  ───────────                                                          │
-│  Client ──▶ Order Service ──▶ Redis (cache hit?)                      │
-│             GET /orders/{id}     │                                    │
-│                                  ├── Hit  → return cached data        │
-│                                  └── Miss → query Aurora → cache it   │
-│                                                                       │
-│  Cache Strategies:                                                    │
-│  • Cache-Aside: app tự check cache → miss → query DB → write cache    │
-│  • Write-Through: write DB + write cache cùng lúc                     │
-│  • Write-Behind: write cache → async write DB (risky)                 │
-│  • Event-driven invalidation: DB change → event → invalidate cache    │
-│                                                                       │
-│  Phù hợp khi:                                                         │
-│  • Read/Write ratio > 10:1                                            │
-│  • Query patterns đơn giản (get by ID, get by user)                   │
-│  • Không cần full-text search                                         │
-│  • Cần sub-millisecond read latency                                   │
-│                                                                       │
-└───────────────────────────────────────────────────────────────────────┘
-```
+
+Cache-Aside: app lookup → miss → query DB → cache. Write-Through cập nhật DB và cache trên write path; Write-Behind ghi cache rồi async xuống DB nên rủi ro mất dữ liệu. Event-driven invalidation dùng event để vô hiệu hóa cache. Phù hợp read/write > 10:1, query đơn giản, không full-text search và cần cache latency thấp. Để tránh mất event sau DB commit, kết hợp Outbox/CDC thay vì coi DB write + publish là atomic.
 
 ### 4.3. Sync data giữa Write DB và Read DB
 
@@ -1028,49 +1009,30 @@ Recommend:
 
 ### 5.3. Event Sourcing kết hợp CQRS trên AWS
 
+```d2 title="AWS — Event Sourcing kết hợp CQRS"
+direction: down
+client: Client
+command: "Order Service — Command\nPOST /orders\nValidate → Append event"
+store: "DynamoDB Event Store\nOrderCreated và history bất biến" {shape: cylinder}
+streams: DynamoDB Streams
+projector: Lambda — Projector
+readmodels: Query Side {
+ aurora: "Aurora PostgreSQL\nOrder history / Reporting" {shape: cylinder}
+ redis: "ElastiCache Redis\nRecent orders / Dashboard" {shape: cylinder}
+ search: "OpenSearch\nFull-text order search" {shape: cylinder}
+}
+query: "Order Service — Query\nGET /orders?..."
+client -> command -> store -> streams -> projector
+projector -> readmodels.aurora
+projector -> readmodels.redis
+projector -> readmodels.search
+client -> query
+query -> readmodels.aurora
+query -> readmodels.redis
+query -> readmodels.search
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│         EVENT SOURCING + CQRS trên AWS                                 │
-│                                                                        │
-│  ┌─── Command Side ─────────────────────────────────────────────────┐  │
-│  │                                                                  │  │
-│  │  Client ──▶ Order Service ──▶ DynamoDB (Event Store)             │  │
-│  │             POST /orders         │                               │  │
-│  │                                  │ Append event:                 │  │
-│  │                                  │ { type: OrderCreated, ... }   │  │
-│  │                                  │                               │  │
-│  └──────────────────────────────────┼───────────────────────────────┘  │
-│                                     │                                  │
-│                              DynamoDB Streams                          │
-│                                     │                                  │
-│                                     ▼                                  │
-│                              Lambda (Projector)                        │
-│                                     │                                  │
-│                         ┌───────────┼───────────┐                      │
-│                         ▼           ▼           ▼                      │
-│  ┌─── Query Side ──────────────────────────────────────────────────┐   │
-│  │                                                                 │   │
-│  │  Aurora PostgreSQL      ElastiCache Redis     OpenSearch        │   │
-│  │  (order history,        (recent orders,       (order search,    │   │
-│  │   reporting)             dashboard)            full-text)       │   │
-│  │                                                                 │   │
-│  │  Client ──▶ Order Service ──▶ Read from appropriate store       │   │
-│  │             GET /orders?...                                     │   │
-│  │                                                                 │   │
-│  └─────────────────────────────────────────────────────────────────┘   │
-│                                                                        │
-│  Flow:                                                                 │
-│  1. Command → validate → append event to DynamoDB (Event Store)        │
-│  2. DynamoDB Streams trigger Lambda (Projector)                        │
-│  3. Projector builds/updates read models (Aurora, Redis, OpenSearch)   │
-│  4. Query → read from optimized store                                  │
-│                                                                        │
-│  Rebuild read model:                                                   │
-│  → Scan toàn bộ Event Store → replay events → rebuild projections      │
-│  → Có thể tạo read model MỚI mà không thay đổi write side              │
-│                                                                        │
-└────────────────────────────────────────────────────────────────────────┘
-```
+
+Projector xây dựng/cập nhật read models; query đọc store tối ưu cho nhu cầu cụ thể. Rebuild bằng cách đọc lại **Event Store** và replay theo đúng thứ tự từng stream, không dựa vào retention ngắn của DynamoDB Streams. Có thể tạo read model mới mà không đổi write side.
 
 ### 5.4. Snapshot Strategy trên DynamoDB
 
@@ -1503,37 +1465,68 @@ Blue-Green cho database — Khi cần thay đổi lớn (tách DB, đổi engine
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-```mermaid
-flowchart TB
-    subgraph Write["Write Path"]
-        OS[Order Service] --> AuroraO[(Aurora - Orders)]
-        US[User Service] --> AuroraU[(Aurora - Users)]
-        PS[Product Service] --> AuroraP[(Aurora - Products)]
-        IS[Inventory Service] --> AuroraI[(Aurora - Inventory)]
-        CS[Cart Service] --> DDB[(DynamoDB - Cart)]
-    end
-
-    subgraph Sync["Data Sync"]
-        AuroraO -->|Outbox + DMS CDC| EB[EventBridge]
-        AuroraP -->|DMS CDC| OpenS[(OpenSearch)]
-        DDB -->|Streams| Lambda[Lambda]
-    end
-
-    subgraph Read["Read Path"]
-        OpenS --> ProductSearch[Product Search]
-        Redis[(ElastiCache Redis)] --> ProductCache[Product Cache]
-        Redis --> Session[User Session]
-        AuroraRR[(Aurora Read Replica)] --> OrderHistory[Order History]
-    end
-
-    subgraph Saga["Order Saga"]
-        SF[Step Functions] --> OS
-        SF --> IS
-        SF --> PayS[Payment Service]
-    end
-
-    EB -->|Events| SQS[SQS Queues]
-    SQS --> Consumers[Consumer Services]
+```d2 title="8. Ví dụ thực tế — E-Commerce Data Architecture trên AWS"
+direction: down
+n4: "Order Saga" {}
+n3: "Read Path" {}
+n2: "Data Sync" {}
+n1: "Write Path" {}
+n1.n5: "Order Service"
+n1.n6: "Aurora - Orders" {
+  shape: cylinder
+}
+n1.n7: "User Service"
+n1.n8: "Aurora - Users" {
+  shape: cylinder
+}
+n1.n9: "Product Service"
+n1.n10: "Aurora - Products" {
+  shape: cylinder
+}
+n1.n11: "Inventory Service"
+n1.n12: "Aurora - Inventory" {
+  shape: cylinder
+}
+n1.n13: "Cart Service"
+n1.n14: "DynamoDB - Cart" {
+  shape: cylinder
+}
+n2.n15: "EventBridge"
+n2.n16: "OpenSearch" {
+  shape: cylinder
+}
+n2.n17: "Lambda"
+n3.n18: "Product Search"
+n3.n19: "ElastiCache Redis" {
+  shape: cylinder
+}
+n3.n20: "Product Cache"
+n3.n21: "User Session"
+n3.n22: "Aurora Read Replica" {
+  shape: cylinder
+}
+n3.n23: "Order History"
+n4.n24: "Step Functions"
+n4.n25: "Payment Service"
+n26: "SQS Queues"
+n27: "Consumer Services"
+n1.n5 -> n1.n6
+n1.n7 -> n1.n8
+n1.n9 -> n1.n10
+n1.n11 -> n1.n12
+n1.n13 -> n1.n14
+n1.n6 -> n2.n15: "Outbox + DMS CDC"
+n1.n10 -> n2.n16: "DMS CDC"
+n1.n14 -> n2.n17: "Streams"
+n2.n16 -> n3.n18
+n3.n19 -> n3.n20
+n3.n19 -> n3.n21
+n3.n22 -> n3.n23
+n4.n24 -> n1.n5
+n4.n24 -> n1.n11
+n4.n24 -> n4.n25
+n2.n15 -> n26: "Events"
+n26 -> n27
 ```
 
 ---

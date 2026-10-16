@@ -76,12 +76,15 @@ Adapter gom phần khác biệt vào một boundary có thể kiểm thử. Call
 
 Adapter boundary nên nằm ở phía sở hữu integration. Service hoặc Bounded Context sử dụng capability sẽ định nghĩa contract mà domain cần. Adapter ở phía đó sẽ dịch contract nội bộ sang request của external system và dịch response quay trở lại.
 
-```mermaid
-flowchart LR
-    C[Domain service] -->|PaymentPort<br/>contract nội bộ| A[Adapter boundary]
-    A -->|protocol và schema<br/>của provider| E[Legacy system hoặc<br/>vendor API]
-    E -->|response và error<br/>của provider| A
-    A -->|domain result<br/>đã chuẩn hóa| C
+```d2 title="2.1. Ranh giới contract"
+direction: right
+n1: "Domain service"
+n2: "Adapter boundary"
+n3: "Legacy system hoặc\nvendor API"
+n1 -> n2: "PaymentPort\ncontract nội bộ"
+n2 -> n3: "protocol và schema\ncủa provider"
+n3 -> n2: "response và error\ncủa provider"
+n2 -> n1: "domain result\nđã chuẩn hóa"
 ```
 
 Một boundary tốt có hai đặc điểm:
@@ -110,13 +113,12 @@ Adapter cũng là nơi phù hợp để giữ các chi tiết như pagination c�
 
 **Anti-corruption Layer (ACL)** là một lớp bảo vệ Bounded Context khỏi model và quy tắc của context bên ngoài. Trong nhiều integration, ACL chính là một Adapter có thêm mapping semantic, error và dữ liệu cần thiết.
 
-```text
-Hệ thống mới                         Hệ thống cũ
-┌──────────────┐     ┌─────────────┐     ┌───────────────┐
-│ Order Service│     │     ACL     │     │ Legacy ERP    │
-│ (domain JSON)│────►│ Adapter     │────►│ XML / SOAP    │
-│              │◄────│ JSON ↔ XML  │◄────│ model cũ      │
-└──────────────┘     └─────────────┘     └───────────────┘
+```d2 title="Adapter — Anti-corruption Layer"
+direction: right
+order: "Order Service\nDomain JSON — hệ thống mới"
+acl: "ACL Adapter\nJSON ↔ XML"
+legacy: "Legacy ERP\nXML / SOAP — model cũ"
+order <-> acl <-> legacy
 ```
 
 ACL bảo đảm Order Service không phải biết Legacy ERP dùng XML. Khi ERP đổi format, thay đổi tập trung ở ACL và các contract test liên quan. Domain vẫn dùng vocabulary của mình.
@@ -136,18 +138,17 @@ Khi provider đổi `authRef` thành `authorizationReference`, chỉ Adapter và
 
 Một Adapter thường có hai chiều dịch: request từ domain sang external contract, rồi response/error từ external contract về domain.
 
-```mermaid
-sequenceDiagram
-    participant D as Checkout domain
-    participant A as Payment Adapter
-    participant P as Payment provider
-
-    D->>A: authorize(command)
-    A->>A: Validate boundary và map request
-    A->>P: submitTransaction(provider request)
-    P-->>A: provider response hoặc provider error
-    A->>A: Map state, error và response
-    A-->>D: PaymentResult
+```d2 title="3.1. Luồng request và response"
+shape: sequence_diagram
+"D": "Checkout domain"
+"A": "Payment Adapter"
+"P": "Payment provider"
+"D" -> "A": "authorize(command)"
+"A" -> "A": "Validate boundary và map request"
+"A" -> "P": "submitTransaction(provider request)"
+"P" -> "A": "provider response hoặc provider error" { style.stroke-dash: 5 }
+"A" -> "A": "Map state, error và response"
+"A" -> "D": "PaymentResult" { style.stroke-dash: 5 }
 ```
 
 Các bước validation có thể gồm kiểm tra kiểu dữ liệu, currency được hỗ trợ hoặc field bắt buộc trước khi gọi provider. Adapter không nên tự quyết định policy nghiệp vụ như có cho phép order chuyển sang fulfillment hay không. Nó chỉ trả về kết quả đủ rõ để domain đưa ra quyết định.
@@ -289,11 +290,15 @@ Ngược lại, một Facade có thể chứa Adapter bên trong nếu subsystem
 
 Checkout có thể dùng Adapter trong process và Ambassador dưới dạng sidecar:
 
-```mermaid
-flowchart LR
-    C[Checkout domain] -->|PaymentPort| A[Payment Adapter]
-    A -->|contract đã chuẩn hóa| M[Ambassador localhost]
-    M -->|mTLS, discovery, retry policy| P[Payment Service hoặc provider]
+```d2 title="6.2. Kết hợp trong cùng một luồng"
+direction: right
+n1: "Checkout domain"
+n2: "Payment Adapter"
+n3: "Ambassador localhost"
+n4: "Payment Service hoặc provider"
+n1 -> n2: "PaymentPort"
+n2 -> n3: "contract đã chuẩn hóa"
+n3 -> n4: "mTLS, discovery, retry policy"
 ```
 
 Trong luồng này:

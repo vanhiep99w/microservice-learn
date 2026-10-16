@@ -139,14 +139,21 @@ Không có gateway, client phải gọi **trực tiếp từng service**:
 
 **API Gateway** (cổng API) là **single entry point** (điểm vào duy nhất) giữa client và hệ thống microservice. Mọi request từ client đều đi qua gateway, gateway thực hiện các cross-cutting concerns (chức năng cắt ngang — những việc mọi request đều cần) rồi route tới service phù hợp.
 
-```mermaid
-graph LR
-    C1["Web App"] --> GW["API Gateway<br/>auth • rate limit • routing<br/>aggregation • caching"]
-    C2["Mobile App"] --> GW
-    GW --> S1["User Service"]
-    GW --> S2["Order Service"]
-    GW --> S3["Product Service"]
-    GW --> S4["Review Service"]
+```d2 title="3.2. Cách hoạt động"
+direction: right
+n1: "Web App"
+n2: "API Gateway\nauth • rate limit • routing\naggregation • caching"
+n3: "Mobile App"
+n4: "User Service"
+n5: "Order Service"
+n6: "Product Service"
+n7: "Review Service"
+n1 -> n2
+n3 -> n2
+n2 -> n4
+n2 -> n5
+n2 -> n6
+n2 -> n7
 ```
 
 | Chức năng | Mô tả | Chi tiết |
@@ -474,14 +481,21 @@ Phân biệt quan trọng: **event** là *fact* quá khứ (`OrderCreated`, `Pay
 
 ### 6.3. Ví dụ thực tế — Fan-out xử lý đơn hàng
 
-```mermaid
-graph LR
-    A["Order Service"] -->|"publish OrderCreated"| B["Broker<br/>(Kafka topic: orders)"]
-    B -->|"OrderCreated"| P["Payment Service"]
-    B -->|"OrderCreated"| I["Inventory Service"]
-    B -->|"OrderCreated"| N["Notification Service"]
-    B -->|"OrderCreated"| AN["Analytics Service"]
-    B -->|"OrderCreated"| F["Fraud Service ✨ (mới thêm)"]
+```d2 title="6.3. Ví dụ thực tế — Fan-out xử lý đơn hàng"
+direction: right
+n1: "Order Service"
+n2: "Broker\n(Kafka topic: orders)"
+n3: "Payment Service"
+n4: "Inventory Service"
+n5: "Notification Service"
+n6: "Analytics Service"
+n7: "Fraud Service ✨ (mới thêm)"
+n1 -> n2: "publish OrderCreated"
+n2 -> n3: "OrderCreated"
+n2 -> n4: "OrderCreated"
+n2 -> n5: "OrderCreated"
+n2 -> n6: "OrderCreated"
+n2 -> n7: "OrderCreated"
 ```
 
 Giá trị của pattern nằm ở consumer **Fraud Service**: thêm vào **không sửa một dòng nào** ở Order Service hay broker — chỉ cần subscribe topic. Producer và consumer không biết về nhau (loose coupling), và nếu Fraud Service đang down, event chờ trong broker, xử lý khi nó sống lại (không temporal coupling).
@@ -546,23 +560,19 @@ Một số thao tác **chạy lâu hơn thời gian request bình thường** �
 
 **Async Request-Reply** (yêu cầu–phản hồi bất đồng bộ): client gửi request, server **nhận ngay việc cần làm** và trả về ngay `202 Accepted` kèm **URL tra cứu trạng thái**. Client **poll** (hỏi vòng) URL đó cho tới khi hoàn tất:
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant API as API / Gateway
-    participant W as Worker (qua queue)
-
-    C->>API: POST /reports {type: "monthly"}
-    API->>W: enqueue job (id: 123)
-    API-->>C: 202 Accepted<br/>Location: /reports/123/status
-
-    Note over W: Xử lý 4 phút...
-
-    C->>API: GET /reports/123/status
-    API-->>C: 200 {"state": "processing", "progress": 40}
-
-    C->>API: GET /reports/123/status
-    API-->>C: 200 {"state": "completed",<br/>"downloadUrl": "/reports/123/file"}
+```d2 title="7.2. Cách hoạt động"
+shape: sequence_diagram
+"C": "Client"
+"API": "API / Gateway"
+"W": "Worker (qua queue)"
+"C" -> "API": "POST /reports {type: \"monthly\"}"
+"API" -> "W": "enqueue job (id: 123)"
+"API" -> "C": "202 Accepted\nLocation: /reports/123/status" { style.stroke-dash: 5 }
+"W".note1: "Xử lý 4 phút..."
+"C" -> "API": "GET /reports/123/status"
+"API" -> "C": "200 {\"state\": \"processing\", \"progress\": 40}" { style.stroke-dash: 5 }
+"C" -> "API": "GET /reports/123/status"
+"API" -> "C": "200 {\"state\": \"completed\",\n\"downloadUrl\": \"/reports/123/file\"}" { style.stroke-dash: 5 }
 ```
 
 Ba trạng thái chuẩn: `processing` → `completed` (kèm kết quả) hoặc `failed` (kèm lý do + có retry được không).
@@ -634,20 +644,37 @@ Có 3 cách client nhận kết quả — pattern không quy định phải poll
 
 ### 8.1. Decision Framework
 
-```mermaid
-flowchart TD
-    A["Service A cần giao tiếp Service B"] --> B{"Caller CẦN kết quả<br/>ngay lập tức?"}
-    B -->|"Có"| C{"Tác vụ xử lý<br/>nhanh không?"}
-    C -->|"< ~1s"| D["Sync call<br/>REST / gRPC"]
-    C -->|"Chậm (report, video...)"| E["Async Request-Reply<br/>202 + status URL"]
-    B -->|"Không"| F{"Nhiều consumer<br/>cùng quan tâm?"}
-    F -->|"Nhiều"| G["Event-Driven<br/>Pub/Sub hoặc Streaming"]
-    F -->|"Một, kiểu work queue"| H["Message Queue<br/>RabbitMQ / SQS"]
-
-    style D fill:#c8e6c9
-    style E fill:#fff9c4
-    style G fill:#bbdefb
-    style H fill:#bbdefb
+```d2 title="8.1. Decision Framework"
+direction: down
+n1: "Service A cần giao tiếp Service B"
+n2: "Caller CẦN kết quả\nngay lập tức?" {
+  shape: diamond
+}
+n3: "Tác vụ xử lý\nnhanh không?" {
+  shape: diamond
+}
+n4: "Sync call\nREST / gRPC" {
+  style.fill: "#c8e6c9"
+}
+n5: "Async Request-Reply\n202 + status URL" {
+  style.fill: "#fff9c4"
+}
+n6: "Nhiều consumer\ncùng quan tâm?" {
+  shape: diamond
+}
+n7: "Event-Driven\nPub/Sub hoặc Streaming" {
+  style.fill: "#bbdefb"
+}
+n8: "Message Queue\nRabbitMQ / SQS" {
+  style.fill: "#bbdefb"
+}
+n1 -> n2
+n2 -> n3: "Có"
+n3 -> n4: "< ~1s"
+n3 -> n5: "Chậm (report, video...)"
+n2 -> n6: "Không"
+n6 -> n7: "Nhiều"
+n6 -> n8: "Một, kiểu work queue"
 ```
 
 > 📖 Framework chi tiết hơn theo góc độ transport (REST/gRPC/Queue/PubSub): [06 §4.1](06-inter-service-communication.md#41-decision-framework)

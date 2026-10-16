@@ -75,22 +75,30 @@ Gateway không làm mất các vấn đề trong service. Nó tạo ra một ran
 
 Trong môi trường production, một public endpoint thường trỏ đến một cụm Gateway thay vì một instance duy nhất. Public Load Balancer hoặc Ingress phân phối request đến các Gateway instance. Gateway sau đó route đến service discovery, internal Load Balancer hoặc trực tiếp đến service tùy hạ tầng.
 
-```mermaid
-flowchart LR
-    W[Web App] --> LB[Public Load Balancer hoặc Ingress]
-    M[Mobile App] --> LB
-    P[Partner Client] --> LB
-
-    LB --> G1[API Gateway instance 1]
-    LB --> G2[API Gateway instance 2]
-
-    G1 --> R[Internal routing và load balancing]
-    G2 --> R
-
-    R --> U[User Service]
-    R --> O[Order Service]
-    R --> C[Catalog Service]
-    R --> Pay[Payment Service]
+```d2 title="Topology tham chiếu"
+direction: right
+n1: "Web App"
+n2: "Public Load Balancer hoặc Ingress"
+n3: "Mobile App"
+n4: "Partner Client"
+n5: "API Gateway instance 1"
+n6: "API Gateway instance 2"
+n7: "Internal routing và load balancing"
+n8: "User Service"
+n9: "Order Service"
+n10: "Catalog Service"
+n11: "Payment Service"
+n1 -> n2
+n3 -> n2
+n4 -> n2
+n2 -> n5
+n2 -> n6
+n5 -> n7
+n6 -> n7
+n7 -> n8
+n7 -> n9
+n7 -> n10
+n7 -> n11
 ```
 
 Gateway có thể gọi nhiều service trong một request aggregation. Tuy nhiên, các cuộc gọi như `Order Service` gọi `Payment Service` thường là service-to-service traffic riêng. Luồng đó cần cơ chế bảo vệ và tracing ở application hoặc [Service Mesh](../13-orchestration.md), không mặc nhiên đi qua Gateway.

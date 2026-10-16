@@ -94,30 +94,19 @@ Một service được coi là **autonomous** khi:
 
 ### 2.2. Bốn cấp độ Autonomy
 
-```mermaid
-graph TB
-    subgraph L4 ["Level 4: Full Autonomy 🏆"]
-        D4[Service tự vận hành hoàn toàn<br/>Self-healing, auto-scaling<br/>Zero coordination needed]
-    end
-    
-    subgraph L3 ["Level 3: Deployment Autonomy"]
-        D3[Deploy bất kỳ lúc nào<br/>Không cần sync với team khác<br/>Có CI/CD pipeline riêng]
-    end
-    
-    subgraph L2 ["Level 2: Development Autonomy"]
-        D2[Team tự chọn tech stack<br/>Tự thiết kế internal architecture<br/>Nhưng deploy vẫn cần coordinate]
-    end
-    
-    subgraph L1 ["Level 1: Code Autonomy"]
-        D1["Codebase riêng (separate repo)<br/>Nhưng share DB, share deploy<br/>Vẫn cần sync nhiều"]
-    end
-
-    L1 --> L2 --> L3 --> L4
-
-    style L1 fill:#f44336,color:#fff
-    style L2 fill:#FF9800,color:#fff
-    style L3 fill:#4CAF50,color:#fff
-    style L4 fill:#2196F3,color:#fff
+```d2 title="2.2. Bốn cấp độ Autonomy"
+direction: down
+n4: "Level 1: Code Autonomy" {}
+n3: "Level 2: Development Autonomy" {}
+n2: "Level 3: Deployment Autonomy" {}
+n1: "Level 4: Full Autonomy 🏆" {}
+n1.n5: "Service tự vận hành hoàn toàn\nSelf-healing, auto-scaling\nZero coordination needed"
+n2.n6: "Deploy bất kỳ lúc nào\nKhông cần sync với team khác\nCó CI/CD pipeline riêng"
+n3.n7: "Team tự chọn tech stack\nTự thiết kế internal architecture\nNhưng deploy vẫn cần coordinate"
+n4.n8: "Codebase riêng (separate repo)\nNhưng share DB, share deploy\nVẫn cần sync nhiều"
+n4 -> n3
+n3 -> n2
+n2 -> n1
 ```
 
 | Level | Tên | Đặc điểm | Ví dụ |
@@ -202,21 +191,33 @@ Autonomy là yếu tố then chốt giúp team đạt **Elite Performer** level.
 
 ### 3.2. Yêu cầu để đạt Independent Deployment
 
-```mermaid
-graph TD
-    ID[Independent Deployment] --> A[API Backward<br/>Compatibility]
-    ID --> B[Database<br/>per Service]
-    ID --> C[Separate<br/>CI/CD Pipeline]
-    ID --> D[Contract<br/>Testing]
-    ID --> E[Feature<br/>Flags]
-    ID --> F[Independent<br/>Config]
-
-    A --> A1[Không breaking changes<br/>Versioning API]
-    B --> B1[Không shared schema<br/>Migration riêng]
-    C --> C1[Build riêng<br/>Deploy riêng<br/>Rollback riêng]
-    D --> D1[Consumer-Driven<br/>Contract Test]
-    E --> E1[Deploy code trước<br/>Enable feature sau]
-    F --> F1[Mỗi service có<br/>config riêng]
+```d2 title="3.2. Yêu cầu để đạt Independent Deployment"
+direction: down
+n1: "Independent Deployment"
+n2: "API Backward\nCompatibility"
+n3: "Database\nper Service"
+n4: "Separate\nCI/CD Pipeline"
+n5: "Contract\nTesting"
+n6: "Feature\nFlags"
+n7: "Independent\nConfig"
+n8: "Không breaking changes\nVersioning API"
+n9: "Không shared schema\nMigration riêng"
+n10: "Build riêng\nDeploy riêng\nRollback riêng"
+n11: "Consumer-Driven\nContract Test"
+n12: "Deploy code trước\nEnable feature sau"
+n13: "Mỗi service có\nconfig riêng"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n1 -> n6
+n1 -> n7
+n2 -> n8
+n3 -> n9
+n4 -> n10
+n5 -> n11
+n6 -> n12
+n7 -> n13
 ```
 
 | Yêu cầu | Mô tả | Tại sao cần |
@@ -260,26 +261,23 @@ Phase 3: CONTRACT — Xóa API cũ khi tất cả đã migrate
   Consumers: tất cả đã dùng v2
 ```
 
-```mermaid
-sequenceDiagram
-    participant P as Provider
-    participant C1 as Consumer 1
-    participant C2 as Consumer 2
-
-    Note over P: Phase 1: EXPAND
-    P->>P: Thêm API v2 (giữ v1)
-    C1->>P: GET /api/v1/users/1 (vẫn OK)
-    C2->>P: GET /api/v1/users/1 (vẫn OK)
-
-    Note over P: Phase 2: MIGRATE
-    C1->>P: GET /api/v2/users/1 (migrate xong ✅)
-    C2->>P: GET /api/v1/users/1 (chưa migrate)
-    C2->>P: GET /api/v2/users/1 (migrate xong ✅)
-
-    Note over P: Phase 3: CONTRACT
-    P->>P: Xóa API v1
-    C1->>P: GET /api/v2/users/1 ✅
-    C2->>P: GET /api/v2/users/1 ✅
+```d2 title="Expand and Contract Pattern (Parallel Change)"
+shape: sequence_diagram
+"P": "Provider"
+"C1": "Consumer 1"
+"C2": "Consumer 2"
+"P".note1: "Phase 1: EXPAND"
+"P" -> "P": "Thêm API v2 (giữ v1)"
+"C1" -> "P": "GET /api/v1/users/1 (vẫn OK)"
+"C2" -> "P": "GET /api/v1/users/1 (vẫn OK)"
+"P".note2: "Phase 2: MIGRATE"
+"C1" -> "P": "GET /api/v2/users/1 (migrate xong ✅)"
+"C2" -> "P": "GET /api/v1/users/1 (chưa migrate)"
+"C2" -> "P": "GET /api/v2/users/1 (migrate xong ✅)"
+"P".note3: "Phase 3: CONTRACT"
+"P" -> "P": "Xóa API v1"
+"C1" -> "P": "GET /api/v2/users/1 ✅"
+"C2" -> "P": "GET /api/v2/users/1 ✅"
 ```
 
 #### Tolerant Reader Pattern
@@ -358,16 +356,31 @@ Version mới (v2):
 └──────────────────────────────────────────────────────────┘
 ```
 
-```mermaid
-flowchart TD
-    A[API cần thay đổi] --> B{Logic nghiệp vụ<br/>có thay đổi?}
-    B -->|Không| C{Có thể giữ<br/>backward compatible?}
-    C -->|Có| D["✅ Expand & Contract<br/>Giữ v1, thêm v2"]
-    C -->|Không| E["⚠️ Breaking change<br/>nhưng impact nhỏ"]
-    B -->|Có| F{Version cũ chạy<br/>logic cũ có gây<br/>sai data không?}
-    F -->|Không| G["✅ Giữ v1 với logic cũ<br/>Deprecate dần"]
-    F -->|Có| H["❌ KHÔNG giữ v1<br/>Forced migration"]
-    H --> I["Thông báo trước 2-4 tuần<br/>Sunset header<br/>Migration guide"]
+```d2 title="Khi nào giữ version cũ, khi nào không?"
+direction: down
+n1: "API cần thay đổi"
+n2: "Logic nghiệp vụ\ncó thay đổi?" {
+  shape: diamond
+}
+n3: "Có thể giữ\nbackward compatible?" {
+  shape: diamond
+}
+n4: "✅ Expand & Contract\nGiữ v1, thêm v2"
+n5: "⚠️ Breaking change\nnhưng impact nhỏ"
+n6: "Version cũ chạy\nlogic cũ có gây\nsai data không?" {
+  shape: diamond
+}
+n7: "✅ Giữ v1 với logic cũ\nDeprecate dần"
+n8: "❌ KHÔNG giữ v1\nForced migration"
+n9: "Thông báo trước 2-4 tuần\nSunset header\nMigration guide"
+n1 -> n2
+n2 -> n3: "Không"
+n3 -> n4: "Có"
+n3 -> n5: "Không"
+n2 -> n6: "Có"
+n6 -> n7: "Không"
+n6 -> n8: "Có"
+n8 -> n9
 ```
 
 > **Nguyên tắc vàng**: Nếu giữ version cũ mà có thể gây **data inconsistency** hoặc **sai logic nghiệp vụ** → **bắt buộc breaking change**. Đừng giữ API cũ chỉ vì sợ phá consumer — data sai còn nguy hiểm hơn API bị break.
@@ -409,53 +422,16 @@ flowchart TD
 
 ### 3.5. Ví dụ thực tế — Deploy Pipeline
 
+```d2 title="Independent Deployment Pipeline"
+direction: right
+push: Developer push code
+ci: "CI Pipeline\n1. Lint & Format\n2. Unit Tests — logic nội bộ\n3. Integration Tests — DB/MQ riêng\n4. Contract Tests — bảo vệ consumer\n5. Security Scan\n6. Build Image"
+staging: "Staging Deploy\nDeploy → Smoke Tests\n→ Performance Tests"
+prod: "Production Deploy\nCanary 5% → Monitor 15min\nExpand 25% → Monitor 15min\nFull rollout → Health check"
+push -> ci -> staging -> prod
 ```
-┌──────────────────────────────────────────────────────────┐
-│          INDEPENDENT DEPLOYMENT PIPELINE                 │
-│                                                          │
-│  Developer push code                                     │
-│       │                                                  │
-│       ▼                                                  │
-│  ┌─────────────────────┐                                 │
-│  │   CI Pipeline       │                                 │
-│  │   ─────────────     │                                 │
-│  │   1. Lint & Format  │                                 │
-│  │   2. Unit Tests     │ ← Test logic nội bộ             │
-│  │   3. Integration    │ ← Test với DB, MQ riêng         │
-│  │      Tests          │                                 │
-│  │   4. Contract Tests │ ← Đảm bảo không phá consumer    │
-│  │   5. Security Scan  │                                 │
-│  │   6. Build Image    │                                 │
-│  └──────────┬──────────┘                                 │
-│             │                                            │
-│             ▼                                            │
-│  ┌─────────────────────┐                                 │
-│  │   Staging Deploy    │                                 │
-│  │   ─────────────     │                                 │
-│  │   1. Deploy to      │                                 │
-│  │      staging        │                                 │
-│  │   2. Smoke Tests    │                                 │
-│  │   3. Performance    │                                 │
-│  │      Tests          │                                 │
-│  └──────────┬──────────┘                                 │
-│             │                                            │
-│             ▼                                            │
-│  ┌─────────────────────┐                                 │
-│  │   Production Deploy │                                 │
-│  │   ─────────────     │                                 │
-│  │   1. Canary (5%)    │ ← 5% traffic vào version mới    │
-│  │   2. Monitor 15min  │                                 │
-│  │   3. Expand (25%)   │                                 │
-│  │   4. Monitor 15min  │                                 │
-│  │   5. Full rollout   │                                 │
-│  │   6. Post-deploy    │                                 │
-│  │      health check   │                                 │
-│  └─────────────────────┘                                 │
-│                                                          │
-│  Tổng thời gian: ~30–45 phút                             │
-│  Không cần chờ bất kỳ team nào                           │
-└──────────────────────────────────────────────────────────┘
-```
+
+Tổng thời gian minh họa: khoảng 30–45 phút, không phải chờ team khác.
 
 ---
 
@@ -528,15 +504,19 @@ Vertical Scaling (Scale Up) ⬆️          Horizontal Scaling (Scale Out) ➡�
 
 #### 4.3.1. Auto-scaling dựa trên Metrics
 
-```mermaid
-graph LR
-    subgraph "Auto-scaling Flow"
-        M[Metrics<br/>CPU/Memory/RPS] -->|threshold| AS[Auto-scaler<br/>HPA / KEDA]
-        AS -->|scale up| S1[Service<br/>Replica 1]
-        AS -->|scale up| S2[Service<br/>Replica 2]
-        AS -->|scale up| S3[Service<br/>Replica 3]
-        AS -->|scale down<br/>khi load giảm| S2
-    end
+```d2 title="4.3.1. Auto-scaling dựa trên Metrics"
+direction: right
+n1: "Auto-scaling Flow" {}
+n1.n2: "Metrics\nCPU/Memory/RPS"
+n1.n3: "Auto-scaler\nHPA / KEDA"
+n1.n4: "Service\nReplica 1"
+n1.n5: "Service\nReplica 2"
+n1.n6: "Service\nReplica 3"
+n1.n2 -> n1.n3: "threshold"
+n1.n3 -> n1.n4: "scale up"
+n1.n3 -> n1.n5: "scale up"
+n1.n3 -> n1.n6: "scale up"
+n1.n3 -> n1.n5: "scale down\nkhi load giảm"
 ```
 
 | Metric | Scale Up khi | Scale Down khi | Phù hợp với |
@@ -658,21 +638,44 @@ Tương tự, mỗi service chọn **loại database** phù hợp nhất:
 | File Storage | **S3** | Binary objects, CDN integration, cost-effective |
 | Event Store | **Apache Kafka** | Event streaming, high throughput, replay capability |
 
-```mermaid
-graph TD
-    subgraph "Polyglot Persistence"
-        US[User Service] --> PG[(PostgreSQL)]
-        CS[Catalog Service] --> MG[(MongoDB)]
-        CT[Cart Service] --> RD[(Redis)]
-        SS[Search Service] --> ES[(Elasticsearch)]
-        AN[Analytics Service] --> CH[(ClickHouse)]
-    end
-
-    style PG fill:#336791,color:#fff
-    style MG fill:#4DB33D,color:#fff
-    style RD fill:#DC382D,color:#fff
-    style ES fill:#F0BF1A,color:#000
-    style CH fill:#FFCC00,color:#000
+```d2 title="5.2. Polyglot Persistence"
+direction: down
+n1: "Polyglot Persistence" {}
+n1.n2: "User Service"
+n1.n3: "PostgreSQL" {
+  shape: cylinder
+  style.fill: "#336791"
+  style.font-color: "#fff"
+}
+n1.n4: "Catalog Service"
+n1.n5: "MongoDB" {
+  shape: cylinder
+  style.fill: "#4DB33D"
+  style.font-color: "#fff"
+}
+n1.n6: "Cart Service"
+n1.n7: "Redis" {
+  shape: cylinder
+  style.fill: "#DC382D"
+  style.font-color: "#fff"
+}
+n1.n8: "Search Service"
+n1.n9: "Elasticsearch" {
+  shape: cylinder
+  style.fill: "#F0BF1A"
+  style.font-color: "#000"
+}
+n1.n10: "Analytics Service"
+n1.n11: "ClickHouse" {
+  shape: cylinder
+  style.fill: "#FFCC00"
+  style.font-color: "#000"
+}
+n1.n2 -> n1.n3
+n1.n4 -> n1.n5
+n1.n6 -> n1.n7
+n1.n8 -> n1.n9
+n1.n10 -> n1.n11
 ```
 
 ### 5.3. Khi nào nên / không nên đa công nghệ
@@ -749,16 +752,18 @@ Tổ chức theo domain:                → Kiến trúc theo service:
 
 **Ý tưởng**: Thay vì để tổ chức quyết định kiến trúc (Conway's Law), **thiết kế tổ chức** để ra đúng kiến trúc mong muốn.
 
-```mermaid
-graph LR
-    subgraph "Conway's Law (tự nhiên)"
-        O1[Org Structure] -->|produces| A1[Architecture]
-    end
-
-    subgraph "Inverse Conway Maneuver (chủ động)"
-        A2[Desired Architecture] -->|design| O2[Org Structure]
-        O2 -->|produces| A3[Architecture<br/>= Desired ✅]
-    end
+```d2 title="6.2. Inverse Conway Maneuver"
+direction: right
+n2: "Inverse Conway Maneuver (chủ động)" {}
+n1: "Conway's Law (tự nhiên)" {}
+n1.n3: "Org Structure"
+n1.n4: "Architecture"
+n2.n5: "Desired Architecture"
+n2.n6: "Org Structure"
+n2.n7: "Architecture\n= Desired ✅"
+n1.n3 -> n1.n4: "produces"
+n2.n5 -> n2.n6: "design"
+n2.n6 -> n2.n7: "produces"
 ```
 
 **Ví dụ**: Muốn chuyển từ monolith sang microservice?
@@ -880,35 +885,21 @@ Self-Contained ✅:
 
 ### 7.2. Các thành phần của Self-Contained Service
 
-```
-┌─────────────────────────────────────────────┐
-│          SELF-CONTAINED SERVICE             │
-│                                             │
-│  ┌───────────────────────────────────────┐  │
-│  │           API Layer                   │  │
-│  │  REST / gRPC / GraphQL endpoints      │  │
-│  └───────────────────┬───────────────────┘  │
-│                      │                      │
-│  ┌───────────────────▼───────────────────┐  │
-│  │         Business Logic                │  │
-│  │  Domain models, rules, workflows      │  │
-│  └───────────────────┬───────────────────┘  │
-│                      │                      │
-│  ┌──────────┬────────▼────────┬──────────┐  │
-│  │ Primary  │  Local Cache    │  Event   │  │
-│  │ Database │  (Redis/In-mem) │  Store   │  │
-│  │          │                 │          │  │
-│  │ Own data │  Cached data    │  Outbox  │  │
-│  │          │  từ services    │  events  │  │
-│  │          │  khác           │          │  │
-│  └──────────┘  └──────────────┘  └────┬──┘  │
-│                                       │     │
-│  ┌───────────────────────────────────┐│     │
-│  │       Event Publisher/Consumer    ││     │
-│  │  Publish events & consume events  ◀┘     │
-│  │  từ/tới Event Bus                 │      │
-│  └───────────────────────────────────┘      │
-└─────────────────────────────────────────────┘
+```d2 title="Self-contained Service"
+direction: down
+service: Self-contained Service {
+ api: "API Layer\nREST / gRPC / GraphQL endpoints"
+ logic: "Business Logic\nDomain models, rules, workflows"
+ primary: "Primary Database\nOwn data" {shape: cylinder}
+ cache: "Local Cache\nRedis / In-memory\nCached data từ service khác" {shape: cylinder}
+ outbox: "Event Store\nOutbox events" {shape: cylinder}
+ events: "Event Publisher / Consumer\nPublish & consume từ/tới Event Bus"
+ api -> logic
+ logic -> primary
+ logic -> cache
+ logic -> outbox
+ outbox -> events
+}
 ```
 
 ### 7.3. Data Locality — Sao chép dữ liệu cần thiết
@@ -997,26 +988,14 @@ Có Fault Isolation ✅:
 | **Fallback** | Trả kết quả dự phòng khi service lỗi | Khi có alternative response hợp lý |
 | **Async Communication** | Giao tiếp qua message queue, không cần service kia online | Non-critical flows |
 
-```
-Circuit Breaker States:
-                    
-  ┌────────┐   failure threshold    ┌────────┐
-  │ CLOSED │ ──────────────────────▶│  OPEN  │
-  │        │   reached              │        │
-  │ Normal │                        │ Reject │
-  │ flow   │                        │  all   │
-  └───┬────┘                        │requests│
-      ▲                             └───┬────┘
-      │                                 │
-      │   success                  timeout
-      │                                 │
-      │         ┌──────────┐            │
-      └─────────┤HALF-OPEN │◀───────────┘
-                │          │
-                │ Test with│
-                │ limited  │
-                │ requests │
-                └──────────┘
+```d2 title="Circuit Breaker — chuyển trạng thái"
+direction: right
+closed: "CLOSED\nNormal flow"
+open: "OPEN\nReject all requests"
+half: "HALF-OPEN\nTest với số request giới hạn"
+closed -> open: Failure threshold reached
+open -> half: Timeout
+half -> closed: Success
 ```
 
 > 📖 Chi tiết Circuit Breaker và Resilience patterns → [10-resilience-patterns.md](10-resilience-patterns.md)

@@ -113,12 +113,17 @@ EDA cũng giảm các **sync chain** dài như `A → B → C → D`. Tuy nhiên
 
 ### Các thành phần
 
-```mermaid
-flowchart LR
-    P["Producer<br/>Order Service"] -->|"publish OrderCreated"| B["Message Broker<br/>topic hoặc queue"]
-    B -->|"deliver"| C1["Consumer<br/>Payment Service"]
-    B -->|"deliver"| C2["Consumer<br/>Inventory Service"]
-    B -->|"deliver"| C3["Consumer<br/>Notification Service"]
+```d2 title="Các thành phần"
+direction: right
+n1: "Producer\nOrder Service"
+n2: "Message Broker\ntopic hoặc queue"
+n3: "Consumer\nPayment Service"
+n4: "Consumer\nInventory Service"
+n5: "Consumer\nNotification Service"
+n1 -> n2: "publish OrderCreated"
+n2 -> n3: "deliver"
+n2 -> n4: "deliver"
+n2 -> n5: "deliver"
 ```
 
 | Thành phần | Vai trò | Ví dụ |
@@ -160,22 +165,21 @@ Một flow điển hình gồm các bước sau:
 6. Consumer thực hiện local transaction, áp dụng side effect (tác động nghiệp vụ như charge hoặc gửi email) và chỉ ACK sau thời điểm an toàn theo contract.
 7. Lỗi tạm thời được retry. Message không xử lý được sau giới hạn retry được chuyển vào **Dead Letter Queue (DLQ)**.
 
-```mermaid
-sequenceDiagram
-    participant P as Producer
-    participant D as Producer DB
-    participant R as Outbox Relay
-    participant B as Broker
-    participant C as Consumer
-
-    P->>D: Ghi business data + event intent
-    D-->>P: Commit local transaction
-    R->>D: Đọc event chưa publish
-    R->>B: Publish event
-    B-->>R: Broker ACK
-    B->>C: Deliver event
-    C->>C: Dedupe + local transaction
-    C-->>B: ACK hoặc commit offset
+```d2 title="Vòng đời một event"
+shape: sequence_diagram
+"P": "Producer"
+"D": "Producer DB"
+"R": "Outbox Relay"
+"B": "Broker"
+"C": "Consumer"
+"P" -> "D": "Ghi business data + event intent"
+"D" -> "P": "Commit local transaction" { style.stroke-dash: 5 }
+"R" -> "D": "Đọc event chưa publish"
+"R" -> "B": "Publish event"
+"B" -> "R": "Broker ACK" { style.stroke-dash: 5 }
+"B" -> "C": "Deliver event"
+"C" -> "C": "Dedupe + local transaction"
+"C" -> "B": "ACK hoặc commit offset" { style.stroke-dash: 5 }
 ```
 
 Không phải mọi triển khai đều dùng Outbox Relay. Điểm cần giữ là producer không được để business state và event rơi vào hai kết quả không thể đối soát mà không có chủ ý.
@@ -186,13 +190,19 @@ Không phải mọi triển khai đều dùng Outbox Relay. Điểm cần giữ 
 
 Giả sử Order Service tạo một order thành công. Event `OrderCreated` được publish vào topic `orders`:
 
-```mermaid
-flowchart LR
-    O["Order Service"] -->|"publish OrderCreated"| K["Broker<br/>orders topic"]
-    K -->|"OrderCreated"| P["Payment Service<br/>charge payment"]
-    K -->|"OrderCreated"| I["Inventory Service<br/>reserve stock"]
-    K -->|"OrderCreated"| N["Notification Service<br/>send email hoặc push"]
-    K -->|"OrderCreated"| A["Analytics Service<br/>ghi nhận conversion"]
+```d2 title="Luồng OrderCreated"
+direction: right
+n1: "Order Service"
+n2: "Broker\norders topic"
+n3: "Payment Service\ncharge payment"
+n4: "Inventory Service\nreserve stock"
+n5: "Notification Service\nsend email hoặc push"
+n6: "Analytics Service\nghi nhận conversion"
+n1 -> n2: "publish OrderCreated"
+n2 -> n3: "OrderCreated"
+n2 -> n4: "OrderCreated"
+n2 -> n5: "OrderCreated"
+n2 -> n6: "OrderCreated"
 ```
 
 Mỗi consumer sở hữu cách phản ứng của domain mình:
@@ -210,13 +220,19 @@ Order Service chỉ công bố fact `OrderCreated`. Nó không cần biết cons
 
 Khi thêm Fraud Service, topology có thể mở rộng như sau:
 
-```mermaid
-flowchart LR
-    O["Order Service"] -->|"OrderCreated"| B["Broker<br/>orders topic"]
-    B --> P["Payment"]
-    B --> I["Inventory"]
-    B --> N["Notification"]
-    B --> F["Fraud Service mới"]
+```d2 title="Thêm consumer mới"
+direction: right
+n1: "Order Service"
+n2: "Broker\norders topic"
+n3: "Payment"
+n4: "Inventory"
+n5: "Notification"
+n6: "Fraud Service mới"
+n1 -> n2: "OrderCreated"
+n2 -> n3
+n2 -> n4
+n2 -> n5
+n2 -> n6
 ```
 
 Order Service không cần sửa code để gọi Fraud Service. Tuy vậy, việc thêm consumer không phải bằng không: team vẫn phải tạo subscription, cấu hình quyền truy cập, triển khai consumer, định nghĩa cách xử lý duplicate và theo dõi lag của consumer mới.
@@ -273,14 +289,21 @@ Order tồn tại nhưng Inventory không biết.
 
 **Transactional Outbox** ghi business data và event intent vào cùng database transaction. Một relay riêng publish các row đã commit:
 
-```mermaid
-flowchart LR
-    S["Order Service"] --> T["Local transaction"]
-    T --> D["Order DB<br/>business data"]
-    T --> O["Outbox table<br/>OrderCreated"]
-    O --> R["Outbox Relay"]
-    R --> B["Message Broker"]
-    B --> C["Consumers"]
+```d2 title="Transactional Outbox"
+direction: right
+n1: "Order Service"
+n2: "Local transaction"
+n3: "Order DB\nbusiness data"
+n4: "Outbox table\nOrderCreated"
+n5: "Outbox Relay"
+n6: "Message Broker"
+n7: "Consumers"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
 ```
 
 Outbox cung cấp các đảm bảo sau:
@@ -401,12 +424,17 @@ EDA thường được nhắc cùng hai cách phối hợp workflow. Cần phân
 
 Trong **Choreography**, không có một coordinator trung tâm. Mỗi service subscribe event, thực hiện logic local và phát event tiếp theo nếu cần:
 
-```mermaid
-flowchart LR
-    O["Order Service"] -->|"OrderCreated event"| P["Payment Service"]
-    P -->|"PaymentCompleted event"| I["Inventory Service"]
-    I -->|"StockReserved event"| S["Shipping Service"]
-    O -->|"OrderCreated event"| N["Notification Service"]
+```d2 title="Choreography"
+direction: right
+n1: "Order Service"
+n2: "Payment Service"
+n3: "Inventory Service"
+n4: "Shipping Service"
+n5: "Notification Service"
+n1 -> n2: "OrderCreated event"
+n2 -> n3: "PaymentCompleted event"
+n3 -> n4: "StockReserved event"
+n1 -> n5: "OrderCreated event"
 ```
 
 Đặc điểm:
@@ -421,11 +449,15 @@ flowchart LR
 
 Trong **Orchestration**, một **orchestrator** nắm state của workflow và gửi command tới từng participant:
 
-```mermaid
-flowchart LR
-    O["Order Saga Orchestrator"] -->|"ChargePayment command"| P["Payment Service"]
-    O -->|"ReserveStock command"| I["Inventory Service"]
-    O -->|"CreateShipment command"| S["Shipping Service"]
+```d2 title="Orchestration"
+direction: right
+n1: "Order Saga Orchestrator"
+n2: "Payment Service"
+n3: "Inventory Service"
+n4: "Shipping Service"
+n1 -> n2: "ChargePayment command"
+n1 -> n3: "ReserveStock command"
+n1 -> n4: "CreateShipment command"
 ```
 
 Orchestrator biết service nào thực hiện bước nào, xử lý kết quả và quyết định bước kế tiếp hoặc compensation. Cách này giúp flow nhiều bước, điều kiện và rollback dễ quan sát hơn, nhưng tạo coupling tập trung vào orchestrator.

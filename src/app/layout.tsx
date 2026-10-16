@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import './globals.css';
+import { SourceExplorer } from '@/components/source-explorer';
 
 export const metadata = {
   title: 'Microservices',
@@ -12,7 +13,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="vi" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <RootProvider search={{ options: { type: 'static' } }}>
-          {children}
+          <SourceExplorer>{children}</SourceExplorer>
         </RootProvider>
       </body>
     </html>

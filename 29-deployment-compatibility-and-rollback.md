@@ -112,14 +112,15 @@ Nhiều version cùng tồn tại trong các chiến lược sau:
 
 Trong Rolling Update, request có thể đi qua hai version khác nhau:
 
-```text
-                 ┌─────────┐
-User A ─────────►│  v1 pod │──┐
-                 └─────────┘  │
-                              ├──► Shared Database
-                 ┌─────────┐  │
-User B ─────────►│  v2 pod │──┘
-                 └─────────┘
+```d2 title="Mixed Versions — Shared Database"
+direction: right
+a: User A
+b: User B
+v1: v1 pod
+v2: v2 pod
+db: Shared Database {shape: cylinder}
+a -> v1 -> db
+b -> v2 -> db
 ```
 
 Do đó, v1 và v2 phải cùng hiểu:
@@ -147,7 +148,7 @@ Thay đổi an toàn thường là:
 
 Ví dụ response có thể thêm field:
 
-```json
+```json source="snippets/2-1-api-compatibility.json"
 {
   "id": 123,
   "name": "Keyboard",
@@ -155,6 +156,8 @@ Ví dụ response có thể thêm field:
   "category": "hardware"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=29-deployment-compatibility-and-rollback&snapshot=article&file=snippets%2F2-1-api-compatibility.json)
 
 Consumer cũ chỉ đọc `id`, `name` và `price` vẫn hoạt động.
 
@@ -354,13 +357,15 @@ Rollback image về v1 cũng không giải quyết được vì schema đã bị
 
 Các thao tác thường nguy hiểm:
 
-```sql
+```sql source="snippets/3-1-vi-du-migration-nguy-hiem.sql"
 DROP COLUMN old_column;
 RENAME COLUMN old_column TO new_column;
 ALTER COLUMN type theo hướng không tương thích;
 Đổi enum hoặc status mà v1 không hiểu;
 Đổi format JSON lưu trong một column;
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=29-deployment-compatibility-and-rollback&snapshot=article&file=snippets%2F3-1-vi-du-migration-nguy-hiem.sql)
 
 ### 3.2. Quy trình Expand-Contract an toàn
 
@@ -575,40 +580,41 @@ Migration job nên có:
 
 Một Rolling Update an toàn có thể gồm các bước sau:
 
-```mermaid
-sequenceDiagram
-    participant CI as CI/CD Pipeline
-    participant DB as Database
-    participant K8s as Kubernetes
-    participant V1 as Pods v1
-    participant V2 as Pods v2
-    participant M as Monitoring
-
-    CI->>DB: Run backward-compatible migration
-    DB-->>CI: Migration successful
-    CI->>K8s: Update image to v2
-    K8s->>V2: Create pod v2
-    V2->>V2: Readiness check
-    V2-->>K8s: Ready
-    K8s->>V1: Drain and terminate one pod v1
-    K8s->>V2: Create next pod v2
-    V2-->>K8s: Ready
-    K8s->>M: Observe v1 + v2 metrics
-    M-->>CI: Error rate and latency stable
-    CI->>CI: Complete rollout
+```d2 title="4.1. Luồng triển khai"
+shape: sequence_diagram
+"CI": "CI/CD Pipeline"
+"DB": "Database"
+"K8s": "Kubernetes"
+"V1": "Pods v1"
+"V2": "Pods v2"
+"M": "Monitoring"
+"CI" -> "DB": "Run backward-compatible migration"
+"DB" -> "CI": "Migration successful" { style.stroke-dash: 5 }
+"CI" -> "K8s": "Update image to v2"
+"K8s" -> "V2": "Create pod v2"
+"V2" -> "V2": "Readiness check"
+"V2" -> "K8s": "Ready" { style.stroke-dash: 5 }
+"K8s" -> "V1": "Drain and terminate one pod v1"
+"K8s" -> "V2": "Create next pod v2"
+"V2" -> "K8s": "Ready" { style.stroke-dash: 5 }
+"K8s" -> "M": "Observe v1 + v2 metrics"
+"M" -> "CI": "Error rate and latency stable" { style.stroke-dash: 5 }
+"CI" -> "CI": "Complete rollout"
 ```
 
 Trong thời gian này, service phải chấp nhận request từ cả v1 và v2.
 
 Một cấu hình Kubernetes thường dùng:
 
-```yaml
+```yaml source="snippets/4-1-luong-trien-khai.yaml"
 strategy:
   type: RollingUpdate
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 0
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=29-deployment-compatibility-and-rollback&snapshot=article&file=snippets%2F4-1-luong-trien-khai.yaml)
 
 Ý nghĩa:
 
@@ -708,18 +714,15 @@ Trong lúc pod v2 bị thay thế hoặc rollback, có thể vẫn có request �
 - Dùng idempotency cho request có thể retry.
 - Thiết lập timeout rõ ràng cho downstream call.
 
-```text
-Pod v2 nhận SIGTERM
-       ↓
-Readiness = false
-       ↓
-Không nhận request mới
-       ↓
-Hoàn tất request đang xử lý
-       ↓
-Commit hoặc rollback local transaction
-       ↓
-Shutdown
+```d2 title="Graceful Shutdown khi Pod nhận SIGTERM"
+direction: right
+term: Pod v2 nhận SIGTERM
+readiness: Readiness false
+stop: Không nhận request mới
+drain: Hoàn tất request đang xử lý
+tx: Commit hoặc rollback local transaction
+shutdown: Shutdown
+term -> readiness -> stop -> drain -> tx -> shutdown
 ```
 
 Graceful shutdown không giải quyết breaking schema, nhưng giúp tránh request bị cắt và message bị xử lý nửa chừng.
@@ -732,14 +735,15 @@ Blue-Green và Canary giảm một số rủi ro deployment, nhưng không tự 
 
 Mô hình thường gặp:
 
-```text
-                 ┌──────────────┐
-100% traffic ───►│ Blue v1      │──┐
-                 └──────────────┘  │
-                                   ├──► Shared Database
-                 ┌──────────────┐  │
-0% traffic ─────►│ Green v2     │──┘
-                 └──────────────┘
+```d2 title="Blue-Green cùng Shared Database"
+direction: right
+current: 100% traffic
+idle: 0% traffic
+blue: Blue v1
+green: Green v2
+db: Shared Database {shape: cylinder}
+current -> blue -> db
+idle -> green -> db
 ```
 
 Green có thể được test trước khi switch traffic, nhưng Green vẫn có thể:
@@ -765,16 +769,23 @@ Blue-Green giúp rollback **traffic/code** nhanh hơn, không làm database tự
 
 Một số hệ thống tạo Green database riêng:
 
-```text
-Blue Service ──► Blue DB
-
-Green Service ─► Green DB
+```d2 title="Blue-Green tách Database"
+direction: right
+blue: Blue Service
+green: Green Service
+bd: Blue DB {shape: cylinder}
+gd: Green DB {shape: cylinder}
+blue -> bd
+green -> gd
 ```
 
 Muốn cutover an toàn phải đồng bộ dữ liệu:
 
-```text
-Blue DB ── full load + CDC ──► Green DB
+```d2 title="Database Migration — Full Load và CDC"
+direction: right
+blue: Blue DB {shape: cylinder}
+green: Green DB {shape: cylinder}
+blue -> green: Full load + CDC
 ```
 
 Nhưng sau cutover:
@@ -800,10 +811,15 @@ Nếu tài liệu chỉ nói “switch connection string về Blue DB để roll
 
 Canary có mô hình:
 
-```text
-95% traffic ──► v1 ──┐
-                     ├──► Shared Database
-5% traffic ───► v2 ──┘
+```d2 title="Canary cùng Shared Database"
+direction: right
+stable: 95% traffic
+canary: 5% traffic
+v1: v1
+v2: v2
+db: Shared Database {shape: cylinder}
+stable -> v1 -> db
+canary -> v2 -> db
 ```
 
 Canary giảm blast radius của lỗi code, nhưng v1 và v2 vẫn cùng đọc/ghi:
@@ -884,14 +900,13 @@ Session cần thận trọng hơn vì xóa session có thể làm user logout. N
 
 Config cũng phải được quản lý như một contract:
 
-```text
-Add config mới
-    ↓
-Code hỗ trợ cũ + mới
-    ↓
-Deploy toàn bộ pod
-    ↓
-Xóa config cũ sau rollback window
+```d2 title="Config Migration và Rollback Window"
+direction: right
+config: Add config mới
+code: Code hỗ trợ cũ + mới
+deploy: Deploy toàn bộ pod
+contract: Xóa config cũ sau rollback window
+config -> code -> deploy -> contract
 ```
 
 Khi rollback:
@@ -950,16 +965,14 @@ Compensate 1: Cancel Order
 
 **Feature Flag** cho phép deploy code trước nhưng bật business behavior sau.
 
-```text
-Deploy code v2
-    ↓
-Feature mới vẫn OFF
-    ↓
-Kiểm tra compatibility và metrics
-    ↓
-Bật cho internal user hoặc 1% traffic
-    ↓
-Mở rộng dần
+```d2 title="Feature Flag — Deploy khác Release"
+direction: right
+deploy: Deploy code v2
+off: Feature mới vẫn OFF
+check: Kiểm tra compatibility và metrics
+internal: Bật internal user hoặc 1% traffic
+expand: Mở rộng dần
+deploy -> off -> check -> internal -> expand
 ```
 
 Feature Flag hữu ích khi:
@@ -1024,24 +1037,40 @@ Phân loại lỗi trước khi hành động:
 
 Một flow tổng quát:
 
-```mermaid
-flowchart TD
-    A[Phát hiện lỗi sau deploy] --> B{Lỗi ở đâu?}
-    B -->|Code / pod / API| C[Dừng rollout và rollback image]
-    B -->|Feature behavior| D[Tắt Feature Flag]
-    B -->|Database schema| E[Giữ schema, đánh giá forward fix]
-    B -->|Data business| F[Dừng write và chạy reconciliation]
-    B -->|Event / queue| G[Pause consumer, dùng DLQ]
-    B -->|External side effect| H[Compensation: refund / release / cancel]
-    C --> I[Theo dõi metrics]
-    D --> I
-    E --> I
-    F --> I
-    G --> I
-    H --> I
-    I --> J{Ổn định?}
-    J -->|Có| K[Điều tra nguyên nhân và fix forward]
-    J -->|Không| L[Escalate incident và dùng DR plan]
+```d2 title="8.2. Khi phát hiện lỗi"
+direction: down
+n1: "Phát hiện lỗi sau deploy"
+n2: "Lỗi ở đâu?" {
+  shape: diamond
+}
+n3: "Dừng rollout và rollback image"
+n4: "Tắt Feature Flag"
+n5: "Giữ schema, đánh giá forward fix"
+n6: "Dừng write và chạy reconciliation"
+n7: "Pause consumer, dùng DLQ"
+n8: "Compensation: refund / release / cancel"
+n9: "Theo dõi metrics"
+n10: "Ổn định?" {
+  shape: diamond
+}
+n11: "Điều tra nguyên nhân và fix forward"
+n12: "Escalate incident và dùng DR plan"
+n1 -> n2
+n2 -> n3: "Code / pod / API"
+n2 -> n4: "Feature behavior"
+n2 -> n5: "Database schema"
+n2 -> n6: "Data business"
+n2 -> n7: "Event / queue"
+n2 -> n8: "External side effect"
+n3 -> n9
+n4 -> n9
+n5 -> n9
+n6 -> n9
+n7 -> n9
+n8 -> n9
+n9 -> n10
+n10 -> n11: "Có"
+n10 -> n12: "Không"
 ```
 
 ### 8.3. Sau khi rollback
@@ -1077,18 +1106,17 @@ v2 đọc và ghi orders.full_name
 
 ### Cách làm sai
 
-```mermaid
-sequenceDiagram
-    participant M as Migration
-    participant V1 as Pod v1
-    participant V2 as Pod v2
-    participant DB as Database
-
-    M->>DB: Rename customer_name to full_name
-    V1->>DB: SELECT customer_name
-    DB-->>V1: Error: column does not exist
-    V2->>DB: SELECT full_name
-    DB-->>V2: Success
+```d2 title="Cách làm sai"
+shape: sequence_diagram
+"M": "Migration"
+"V1": "Pod v1"
+"V2": "Pod v2"
+"DB": "Database"
+"M" -> "DB": "Rename customer_name to full_name"
+"V1" -> "DB": "SELECT customer_name"
+"DB" -> "V1": "Error: column does not exist" { style.stroke-dash: 5 }
+"V2" -> "DB": "SELECT full_name"
+"DB" -> "V2": "Success" { style.stroke-dash: 5 }
 ```
 
 Trong Rolling Update, v1 vẫn tồn tại nên hệ thống bị lỗi. Nếu rollback code về v1, v1 vẫn không thể hoạt động vì column cũ đã bị rename.

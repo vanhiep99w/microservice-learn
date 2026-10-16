@@ -56,22 +56,17 @@ Sidecar không phải là một loại container đặc biệt. Đây là một 
 
 Trong một Pod, các container thường chia sẻ network namespace nên có thể gọi nhau qua `localhost`. Chúng cũng có thể chia sẻ volume. Pod được schedule cùng nhau và thay thế trong cùng một rollout, vì vậy sidecar tạo locality nhưng không tự tạo ra một đơn vị release hoàn toàn độc lập.
 
-```text
-┌──────────────────────────── Kubernetes Pod ────────────────────────────┐
-│                                                                        │
-│  ┌──────────────────────┐       localhost       ┌───────────────────┐  │
-│  │ Order Service        │ ─────────────────────▶│ Local proxy       │  │
-│  │ business logic :8080 │       outbound        │ hoặc agent        │  │
-│  └──────────┬───────────┘                       └───────────────────┘  │
-│             │                                                          │
-│             │ ghi log JSON                                             │
-│             ▼                                                          │
-│       /var/log/app  ◀──────────── shared volume ───────────────┐       │
-│                                                                │       │
-│                                     ┌──────────────────────────┴────┐  │
-│                                     │ Log sidecar: đọc, enrich, ship│  │
-│                                     └───────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
+```d2 title="Sidecar — cùng Pod và Shared Volume"
+direction: right
+pod: Kubernetes Pod {
+ app: "Order Service\nBusiness logic :8080"
+ proxy: Local Proxy / Agent
+ volume: /var/log/app — Shared Volume {shape: cylinder}
+ logger: Log Sidecar — Read / Enrich / Ship
+ app -> proxy: Localhost — outbound
+ app -> volume: Ghi log JSON
+ volume -> logger: Đọc shared volume
+}
 ```
 
 ### Phạm vi của tài liệu
@@ -229,13 +224,21 @@ Tên công cụ không quyết định pattern. Envoy có thể là Sidecar khi 
 
 Giả sử `Order Service` ghi structured log vào file dùng chung với log sidecar. Sidecar tail file, thêm metadata triển khai, lọc dữ liệu nhạy cảm rồi gửi đến backend logging. Application không cần biết endpoint hoặc credential của Log Store.
 
-```mermaid
-flowchart LR
-    O[Order Service] -->|JSON log| V[(Shared volume)]
-    V --> S[Log sidecar]
-    S -->|parse + enrich + redact| B[Buffer hoặc queue]
-    B -->|retry và export| L[Log Store]
-    L --> D[Search và dashboard]
+```d2 title="Luồng dữ liệu"
+direction: right
+n1: "Order Service"
+n2: "Shared volume" {
+  shape: cylinder
+}
+n3: "Log sidecar"
+n4: "Buffer hoặc queue"
+n5: "Log Store"
+n6: "Search và dashboard"
+n1 -> n2: "JSON log"
+n2 -> n3
+n3 -> n4: "parse + enrich + redact"
+n4 -> n5: "retry và export"
+n5 -> n6
 ```
 
 Trong Kubernetes, hãy cân nhắc `stdout` và node-level collector trước. Sidecar dùng shared volume phù hợp khi service bắt buộc ghi file, cần parser riêng hoặc cần xử lý log theo từng Pod. Buffer hoặc queue không phải cam kết mất log bằng không; khi queue đầy vẫn cần chính sách drop, backpressure và alert.
@@ -244,7 +247,7 @@ Trong Kubernetes, hãy cân nhắc `stdout` và node-level collector trước. S
 
 Manifest dưới đây minh họa topology, shared volume và việc cấp resource riêng cho log sidecar. Output `stdout` của Fluent Bit là một sink minh họa; khi triển khai thật, thay bằng output plugin và backend logging đã được cấu hình cùng retry, buffer, TLS và credential phù hợp.
 
-```yaml
+```yaml source="snippets/manifest-minh-hoa.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -287,13 +290,15 @@ spec:
           emptyDir: {}
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=sidecar&snapshot=article&file=snippets%2Fmanifest-minh-hoa.yaml)
+
 `emptyDir` trong ví dụ có vòng đời gắn với Pod. Nó không phải nơi lưu trữ log lâu dài. Nếu Pod bị thay thế trước khi sidecar gửi log, phần dữ liệu còn lại trong volume có thể mất. Vì vậy, cần ưu tiên shipping sớm, theo dõi buffer và cấu hình rotation/dung lượng cho file log.
 
 ### Structured log và metadata
 
 Log sidecar chỉ parse và gửi dữ liệu tốt khi application phát log có cấu trúc. Một entry minh họa cho `Order Service`:
 
-```json
+```json source="snippets/structured-log-va-metadata.json"
 {
   "timestamp": "2025-03-15T10:30:45.123Z",
   "level": "INFO",
@@ -307,6 +312,8 @@ Log sidecar chỉ parse và gửi dữ liệu tốt khi application phát log c�
   "message": "order created"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=sidecar&snapshot=article&file=snippets%2Fstructured-log-va-metadata.json)
 
 `correlation_id` giúp nối các log entry của cùng một request; `trace_id` giúp mở Distributed Tracing để xem quan hệ và thời lượng giữa các span. Sidecar có thể thêm `pod`, `namespace` hoặc `node`, nhưng application vẫn chịu trách nhiệm cho các field nghiệp vụ và trace context của nó.
 
@@ -436,13 +443,15 @@ Một rollout an toàn nên bắt đầu với một workload hoặc một nhóm
 
 Bắt đầu bằng việc tách lỗi ở application, sidecar và hạ tầng. Với một Pod cụ thể, các lệnh Kubernetes cơ bản có thể là:
 
-```bash
+```bash source="snippets/chan-doan-theo-trieu-chung.sh"
 kubectl get pod <pod-name> -o wide
 kubectl describe pod <pod-name>
 kubectl logs <pod-name> -c order-service --since=15m
 kubectl logs <pod-name> -c log-sidecar --since=15m
 kubectl get events --sort-by=.lastTimestamp
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=sidecar&snapshot=article&file=snippets%2Fchan-doan-theo-trieu-chung.sh)
 
 Sau đó đối chiếu theo triệu chứng:
 
@@ -516,17 +525,20 @@ Service Mesh thường dùng sidecar proxy, nhưng không phải mọi Sidecar �
 
 Các pattern có thể kết hợp khi mỗi lớp giữ đúng trách nhiệm:
 
-```mermaid
-flowchart LR
-    CP[Mesh Control Plane] --> P
-
-    subgraph POD[Order Service Pod]
-        O[Order Service] -->|outbound request| P[Proxy sidecar]
-        O -->|structured log| L[Log sidecar]
-    end
-
-    P -->|mTLS và route| PAY[Payment Service]
-    L -->|enrich và ship| OBS[Observability backend]
+```d2 title="Kết hợp có chủ đích"
+direction: right
+n1: "Order Service Pod" {}
+n2: "Mesh Control Plane"
+n1.n3: "Proxy sidecar"
+n1.n4: "Order Service"
+n1.n5: "Log sidecar"
+n6: "Payment Service"
+n7: "Observability backend"
+n2 -> n1.n3
+n1.n4 -> n1.n3: "outbound request"
+n1.n4 -> n1.n5: "structured log"
+n1.n3 -> n6: "mTLS và route"
+n1.n5 -> n7: "enrich và ship"
 ```
 
 Trong sơ đồ này:

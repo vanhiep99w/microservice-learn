@@ -47,23 +47,16 @@
 
 **Monolithic Architecture** (kiến trúc nguyên khối) là kiến trúc truyền thống, trong đó toàn bộ ứng dụng được xây dựng và triển khai **như một đơn vị duy nhất**.
 
-```
-┌─────────────────────────────────────────────────┐
-│                MONOLITHIC APP                   │
-│                                                 │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────────┐ │
-│  │    UI    │ │ Business │ │  Data Access     │ │
-│  │  Layer   │ │  Logic   │ │    Layer         │ │
-│  └──────────┘ └──────────┘ └──────────────────┘ │
-│                                                 │
-│  ┌─────────────────────────────────────────────┐│
-│  │         Shared Database                     ││
-│  └─────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────┘
-         │
-         ▼
-   Deploy as ONE unit
-   (WAR / JAR / single binary)
+```d2 title="Monolith — một đơn vị triển khai"
+direction: down
+app: Monolithic App {
+ ui: UI Layer
+ business: Business Logic
+ data: Data Access Layer
+ db: Shared Database {shape: cylinder}
+}
+deploy: "Deploy as ONE unit\nWAR / JAR / single binary"
+app -> deploy
 ```
 
 ### Đặc điểm của Monolith
@@ -97,18 +90,17 @@
 
 ## Kiến trúc Microservice
 
-```
-┌──────────┐  ┌───────────┐  ┌──────────┐  ┌──────────┐
-│ User     │  │ Order     │  │ Product  │  │ Payment  │
-│ Service  │  │ Service   │  │ Service  │  │ Service  │
-│          │  │           │  │          │  │          │
-│ ┌──────┐ │  │ ┌──────┐  │  │ ┌──────┐ │  │ ┌──────┐ │
-│ │ DB 1 │ │  │ │ DB 2 │  │  │ │ DB 3 │ │  │ │ DB 4 │ │
-│ └──────┘ │  │ └──────┘  │  │ └──────┘ │  │ └──────┘ │
-└────┬─────┘  └─────┬─────┘  └─────┬────┘  └─────┬────┘
-     │              │              │             │
-─────┴──────────────┴──────────────┴─────────────┴─────
-              API Gateway / Message Bus
+```d2 title="Microservice — service và database độc lập"
+direction: down
+user: User Service { db: DB 1 {shape: cylinder} }
+order: Order Service { db: DB 2 {shape: cylinder} }
+product: Product Service { db: DB 3 {shape: cylinder} }
+payment: Payment Service { db: DB 4 {shape: cylinder} }
+bus: API Gateway / Message Bus
+user -- bus
+order -- bus
+product -- bus
+payment -- bus
 ```
 
 ### Đặc điểm của Microservice
@@ -183,20 +175,14 @@ Timeline kiến trúc phần mềm:
 
 Trước SOA, doanh nghiệp lớn thường có nhiều hệ thống **rời rạc**, không nói chuyện được với nhau:
 
+```d2 title="Trước SOA — các hệ thống silo"
+direction: right
+hr: "Hệ thống HR (Nhân sự)\nKhông kết nối được"
+accounting: "Hệ thống Kế toán\nKhông kết nối được"
+sales: "Hệ thống Bán hàng\nKhông kết nối được"
 ```
-❌ Trước SOA — Các hệ thống "silo" (cô lập)
-═══════════════════════════════════════════════
 
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│ Hệ thống HR │  │ Hệ thống    │  │ Hệ thống    │
-│ (Nhân sự)   │  │ Kế toán     │  │ Bán hàng    │
-│             │  │             │  │             │
-│ Không kết   │  │ Không kết   │  │ Không kết   │
-│ nối được    │  │ nối được    │  │ nối được    │
-└─────────────┘  └─────────────┘  └─────────────┘
-     ❌ Muốn biết lương nhân viên?
-        → Phải vào 2 hệ thống khác nhau, copy paste thủ công!
-```
+Muốn biết lương nhân viên phải vào hai hệ thống khác nhau và copy/paste thủ công.
 
 SOA giải quyết bằng cách: **Mỗi hệ thống "bọc" chức năng của mình thành service**, rồi tất cả kết nối qua **một trung tâm điều phối gọi là ESB**.
 
@@ -208,65 +194,43 @@ SOA giải quyết bằng cách: **Mỗi hệ thống "bọc" chức năng của
 - **Orchestration** — điều phối thứ tự gọi nhiều service
 - **Protocol mediation** — dịch giữa các giao thức (SOAP, JMS, FTP...)
 
+```d2 title="Sau SOA — kết nối qua ESB"
+direction: down
+esb: "ESB (Bến xe trung tâm)\nRouting • Data transformation\nOrchestration • Logging"
+hr: "HR Service\ngetStaff • addStaff"
+accounting: "Accounting Service\ngetSalary • payroll"
+sales: "Sales Service\ngetOrders • getRevenue"
+db: "Shared Database\nOracle / DB2" {shape: cylinder}
+esb -> hr
+esb -> accounting
+esb -> sales
+hr -- db
+accounting -- db
+sales -- db
 ```
-✅ Sau SOA — Kết nối qua ESB
-═══════════════════════════════════════════════
 
-                    ┌─────────────────────────┐
-                    │     ESB (Bến xe TT)     │
-                    │                         │
-                    │  • Routing              │
-                    │  • Data transformation  │
-                    │  • Orchestration        │
-                    │  • Logging              │
-                    └────┬──────┬──────┬──────┘
-                         │      │      │
-              ┌──────────┘      │      └─────────┐
-              │                 │                │
-        ┌─────▼──────┐  ┌───────▼────┐  ┌────────▼────┐
-        │ HR Service │  │ Accounting │  │   Sales     │
-        │            │  │  Service   │  │  Service    │
-        │ • getStaff │  │ • getSalary│  │ • getOrders │
-        │ • addStaff │  │ • payroll  │  │ • getRevenue│
-        └────────────┘  └────────────┘  └─────────────┘
-              │                │                │
-              └────────────────┼────────────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │   Shared Database   │
-                    │   (Oracle / DB2)    │
-                    └─────────────────────┘
-
-💡 Giờ muốn biết lương nhân viên?
-   → HR Service lấy thông tin NV → ESB chuyển cho Accounting Service
-   → Accounting tính lương → ESB trả kết quả → Tự động!
-```
+HR lấy thông tin nhân viên → ESB chuyển cho Accounting → Accounting tính lương → ESB trả kết quả tự động.
 
 ### Ví dụ cụ thể: Luồng "Tạo đơn hàng" trong SOA
 
-```mermaid
-sequenceDiagram
-    participant Client as 🖥️ Ứng dụng
-    participant ESB as 📡 ESB (Trung tâm)
-    participant INV as 📦 Inventory Service
-    participant PAY as 💳 Payment Service
-    participant SHIP as 🚚 Shipping Service
-
-    Client->>ESB: Tạo đơn hàng (SOAP/XML)
-    Note over ESB: ESB nhận request<br/>và ĐIỀU PHỐI thứ tự gọi
-
-    ESB->>INV: 1. Kiểm tra tồn kho
-    INV-->>ESB: Còn hàng ✅
-
-    ESB->>PAY: 2. Xử lý thanh toán
-    Note over ESB: ESB chuyển XML → JSON<br/>(data transformation)
-    PAY-->>ESB: Thanh toán OK ✅
-
-    ESB->>SHIP: 3. Tạo vận đơn
-    SHIP-->>ESB: Vận đơn #12345 ✅
-
-    ESB-->>Client: Đơn hàng thành công!
-    Note over ESB: Toàn bộ logic điều phối<br/>nằm TRONG ESB
+```d2 title="Ví dụ cụ thể: Luồng \"Tạo đơn hàng\" trong SOA"
+shape: sequence_diagram
+"Client": "🖥️ Ứng dụng"
+"ESB": "📡 ESB (Trung tâm)"
+"INV": "📦 Inventory Service"
+"PAY": "💳 Payment Service"
+"SHIP": "🚚 Shipping Service"
+"Client" -> "ESB": "Tạo đơn hàng (SOAP/XML)"
+"ESB".note1: "ESB nhận request\nvà ĐIỀU PHỐI thứ tự gọi"
+"ESB" -> "INV": "1. Kiểm tra tồn kho"
+"INV" -> "ESB": "Còn hàng ✅" { style.stroke-dash: 5 }
+"ESB" -> "PAY": "2. Xử lý thanh toán"
+"ESB".note2: "ESB chuyển XML → JSON\n(data transformation)"
+"PAY" -> "ESB": "Thanh toán OK ✅" { style.stroke-dash: 5 }
+"ESB" -> "SHIP": "3. Tạo vận đơn"
+"SHIP" -> "ESB": "Vận đơn #12345 ✅" { style.stroke-dash: 5 }
+"ESB" -> "Client": "Đơn hàng thành công!" { style.stroke-dash: 5 }
+"ESB".note3: "Toàn bộ logic điều phối\nnằm TRONG ESB"
 ```
 
 **Điểm quan trọng:** Logic nghiệp vụ "tạo đơn hàng gồm 3 bước" nằm **trong ESB**, không phải trong service. ESB trở thành **bộ não trung tâm**.
@@ -282,37 +246,22 @@ sequenceDiagram
 | **Nặng nề** | SOAP/XML, WSDL, WS-* standards → phức tạp | Chậm, khó phát triển |
 | **Vendor lock-in** | ESB thường là sản phẩm thương mại đắt đỏ (IBM, Oracle, TIBCO) | Chi phí cao, phụ thuộc vendor |
 
-```
-SOA:  "Smart Pipes, Dumb Endpoints"
-       ┌──────────────────────────┐
-       │        ESB               │
-       │  ┌────────────────────┐  │
-       │  │ Business logic     │  │  ← Logic nằm ở đây
-       │  │ Routing rules      │  │
-       │  │ Data transformation│  │
-       │  │ Orchestration      │  │
-       │  └────────────────────┘  │
-       └──────────────────────────┘
-              │         │
-        ┌─────▼──┐ ┌────▼───┐
-        │Service │ │Service │  ← Service đơn giản,
-        │  (đơn  │ │  (đơn  │    chỉ nhận lệnh
-        │  giản) │ │  giản) │
-        └────────┘ └────────┘
-
-Microservice:  "Dumb Pipes, Smart Endpoints"
-       ┌──────────────────────────┐
-       │    API Gateway / MQ      │
-       │    (chỉ routing đơn giản)│  ← Pipe đơn giản
-       └──────────────────────────┘
-              │          │
-        ┌─────▼───┐ ┌────▼────┐
-        │Service  │ │Service  │  ← Service THÔNG MINH,
-        │ ┌─────┐ │ │ ┌─────┐ │    tự chứa logic
-        │ │Logic│ │ │ │Logic│ │
-        │ │ DB  │ │ │ │ DB  │ │
-        │ └─────┘ │ │ └─────┘ │
-        └─────────┘ └─────────┘
+```d2 title="Smart Pipes và Smart Endpoints"
+direction: down
+soa: "SOA — Smart Pipes, Dumb Endpoints" {
+ esb: ESB { logic: "Business logic\nRouting rules\nData transformation\nOrchestration" }
+ a: "Service đơn giản\nChỉ nhận lệnh"
+ b: "Service đơn giản\nChỉ nhận lệnh"
+ esb -> a
+ esb -> b
+}
+micro: "Microservice — Dumb Pipes, Smart Endpoints" {
+ pipe: "API Gateway / MQ\nChỉ routing đơn giản"
+ a: Service A { logic: Logic; db: DB {shape: cylinder} }
+ b: Service B { logic: Logic; db: DB {shape: cylinder} }
+ pipe -> a
+ pipe -> b
+}
 ```
 
 ### Tóm lại: SOA dễ hiểu qua phép ẩn dụ
@@ -339,26 +288,33 @@ Thoạt nhìn SOA giống Microservice dùng **Saga Orchestration pattern** — 
 | **Service** | Service lớn, **thụ động** (chờ ESB gọi) | Service nhỏ, **tự chủ** (tự chứa logic) |
 | **Tech** | Bắt buộc cùng stack (SOAP/XML) | Mỗi service tự chọn tech |
 
-```
-SOA — 1 ESB "ông vua" quản hết:
-
-       Service A ──┐
-       Service B ──┼──▶ [ ESB — God Object ]  ──▶ Shared DB
-       Service C ──┘      routing + transform
-                          + orchestrate + logging
-                          + protocol mediation
-                          (TẤT CẢ trong 1 chỗ)
-
-
-Microservice + Saga — nhiều orchestrator nhỏ, service tự chủ:
-
-  ┌─ Order Saga Orchestrator ──────── chỉ lo flow đặt hàng
-  ├─ Payment Saga Orchestrator ────── chỉ lo flow thanh toán
-  ├─ Refund Saga Orchestrator ─────── chỉ lo flow hoàn tiền
-  │
-  │  Service A ──▶ DB A  ┐
-  │  Service B ──▶ DB B  ├── mỗi service ĐỘC LẬP hoàn toàn
-  │  Service C ──▶ DB C  ┘
+```d2 title="ESB tập trung và Saga chuyên biệt"
+direction: down
+soa: "SOA — một ESB quản hết" {
+ a: Service A
+ b: Service B
+ c: Service C
+ esb: "ESB — God Object\nRouting, transform, orchestrate\nLogging, protocol mediation"
+ db: Shared DB {shape: cylinder}
+ a -> esb
+ b -> esb
+ c -> esb
+ esb -> db
+}
+saga: "Microservice + Saga — service tự chủ" {
+ order: "Order Saga Orchestrator\nChỉ flow đặt hàng"
+ payment: "Payment Saga Orchestrator\nChỉ flow thanh toán"
+ refund: "Refund Saga Orchestrator\nChỉ flow hoàn tiền"
+ a: Service A
+ b: Service B
+ c: Service C
+ da: DB A {shape: cylinder}
+ db: DB B {shape: cylinder}
+ dc: DB C {shape: cylinder}
+ a -> da
+ b -> db
+ c -> dc
+}
 ```
 
 > 💡 **Nói đơn giản:** ESB giống **1 ông giám đốc** quản hết mọi phòng ban. Saga Orchestrator giống **trưởng nhóm dự án** — mỗi dự án có 1 trưởng nhóm riêng, nhưng nhân viên (service) vẫn tự chủ trong công việc của mình.
@@ -384,13 +340,14 @@ Microservice + Saga — nhiều orchestrator nhỏ, service tự chủ:
 
 ## So sánh tổng hợp: Monolith vs SOA vs Microservice
 
-```mermaid
-graph LR
-    subgraph Evolution["Tiến hóa kiến trúc"]
-        direction LR
-        MON["🏢 Monolith<br/>All-in-one"] -->|"Tách service<br/>+ ESB"| SOA_E["🏭 SOA<br/>Service + ESB"]
-        SOA_E -->|"Lightweight<br/>Decentralized"| MIC["🔬 Microservice<br/>Small & Independent"]
-    end
+```d2 title="So sánh tổng hợp: Monolith vs SOA vs Microservice"
+direction: right
+n1: "Tiến hóa kiến trúc" {}
+n1.n2: "🏢 Monolith\nAll-in-one"
+n1.n3: "🏭 SOA\nService + ESB"
+n1.n4: "🔬 Microservice\nSmall & Independent"
+n1.n2 -> n1.n3: "Tách service\n+ ESB"
+n1.n3 -> n1.n4: "Lightweight\nDecentralized"
 ```
 
 | Tiêu chí | Monolith | SOA | Microservice |
@@ -438,39 +395,51 @@ graph LR
 
 **Monolith approach:**
 
-```
-┌────────────────────────────────────────────┐
-│            E-Commerce Monolith             │
-│                                            │
-│  User Module ← Order Module ← Product      │
-│       ↕            ↕           Module      │
-│  Payment Module ← Inventory ← Search       │
-│       ↕            Module      Module      │
-│  Notification Module                       │
-│                                            │
-│  ┌──────────────────────────────────────┐  │
-│  │         Shared PostgreSQL            │  │
-│  └──────────────────────────────────────┘  │
-└────────────────────────────────────────────┘
+```d2 title="E-Commerce Monolith"
+direction: down
+app: E-Commerce Monolith {
+ user: User Module
+ order: Order Module
+ product: Product Module
+ payment: Payment Module
+ inventory: Inventory Module
+ search: Search Module
+ notification: Notification Module
+ db: Shared PostgreSQL {shape: cylinder}
+ product -> order
+ order -> user
+ search -> inventory
+ inventory -> payment
+ user <-> payment
+ order <-> inventory
+ payment <-> notification
+}
 ```
 
 **Microservice approach:**
 
-```mermaid
-graph TB
-    Client["🌐 Client"] --> GW["API Gateway"]
-    
-    GW --> US["👤 User Service<br/>Node.js + PostgreSQL"]
-    GW --> OS["📦 Order Service<br/>Java + MongoDB"]
-    GW --> PS["🛍️ Product Service<br/>Go + PostgreSQL"]
-    GW --> PAY["💳 Payment Service<br/>Java + PostgreSQL"]
-    GW --> SS["🔍 Search Service<br/>Python + Elasticsearch"]
-    
-    OS -->|"event: order.created"| MQ["📨 Message Queue<br/>(Kafka)"]
-    MQ -->|"consume"| INV["📊 Inventory Service<br/>Go + Redis"]
-    MQ -->|"consume"| NOTI["🔔 Notification Service<br/>Node.js"]
-    
-    PAY -->|"event: payment.completed"| MQ
+```d2 title="Ví dụ 1: Hệ thống E-Commerce"
+direction: down
+n1: "🌐 Client"
+n2: "API Gateway"
+n3: "👤 User Service\nNode.js + PostgreSQL"
+n4: "📦 Order Service\nJava + MongoDB"
+n5: "🛍️ Product Service\nGo + PostgreSQL"
+n6: "💳 Payment Service\nJava + PostgreSQL"
+n7: "🔍 Search Service\nPython + Elasticsearch"
+n8: "📨 Message Queue\n(Kafka)"
+n9: "📊 Inventory Service\nGo + Redis"
+n10: "🔔 Notification Service\nNode.js"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n2 -> n5
+n2 -> n6
+n2 -> n7
+n4 -> n8: "event: order.created"
+n8 -> n9: "consume"
+n8 -> n10: "consume"
+n6 -> n8: "event: payment.completed"
 ```
 
 **Phân tích:**
@@ -518,27 +487,25 @@ Timeline:
 
 ## Các nguyên tắc cốt lõi của Microservice
 
-```mermaid
-graph TB
-    CENTER["🔬 Microservice<br/>Principles"]
-    
-    P1["1️⃣ Single Responsibility<br/>Mỗi service làm 1 việc"]
-    P2["2️⃣ Loose Coupling<br/>Service ít phụ thuộc nhau"]
-    P3["3️⃣ High Cohesion<br/>Code liên quan ở cùng nhau"]
-    P4["4️⃣ Database per Service<br/>Mỗi service có DB riêng"]
-    P5["5️⃣ Independent Deployment<br/>Deploy không cần đồng bộ"]
-    P6["6️⃣ Decentralized Governance<br/>Team tự quyết định tech"]
-    P7["7️⃣ Design for Failure<br/>Giả định mọi thứ sẽ lỗi"]
-    P8["8️⃣ API-First<br/>Contract rõ ràng giữa services"]
-    
-    CENTER --> P1
-    CENTER --> P2
-    CENTER --> P3
-    CENTER --> P4
-    CENTER --> P5
-    CENTER --> P6
-    CENTER --> P7
-    CENTER --> P8
+```d2 title="Các nguyên tắc cốt lõi của Microservice"
+direction: down
+n1: "🔬 Microservice\nPrinciples"
+n2: "1️⃣ Single Responsibility\nMỗi service làm 1 việc"
+n3: "2️⃣ Loose Coupling\nService ít phụ thuộc nhau"
+n4: "3️⃣ High Cohesion\nCode liên quan ở cùng nhau"
+n5: "4️⃣ Database per Service\nMỗi service có DB riêng"
+n6: "5️⃣ Independent Deployment\nDeploy không cần đồng bộ"
+n7: "6️⃣ Decentralized Governance\nTeam tự quyết định tech"
+n8: "7️⃣ Design for Failure\nGiả định mọi thứ sẽ lỗi"
+n9: "8️⃣ API-First\nContract rõ ràng giữa services"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n1 -> n6
+n1 -> n7
+n1 -> n8
+n1 -> n9
 ```
 
 | Nguyên tắc | Mô tả | Ví dụ |

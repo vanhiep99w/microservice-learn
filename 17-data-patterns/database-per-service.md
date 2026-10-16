@@ -68,16 +68,30 @@ Tên bảng và các trường trong bảng là chi tiết nội bộ của serv
 
 Sơ đồ dưới đây minh họa một service ghi database của chính nó. Khi cần dữ liệu của service khác, nó đi qua service đó hoặc qua event broker để xây dựng bản sao cục bộ; không có mũi tên nào đi thẳng vào database của service khác.
 
-```mermaid
-flowchart LR
-    C[Client] --> OS[Order Service]
-    OS --> ODB[(Order DB)]
-    OS -->|API request| PS[Product Service]
-    PS --> PDB[(Product DB)]
-    PS -->|publish event| B[Event Broker]
-    B --> CP[Consumer hoặc projector]
-    CP --> LDB[(Local read copy)]
-    OS -.->|Không được phép SELECT trực tiếp| PDB
+```d2 title="Kiến trúc và luồng truy cập"
+direction: right
+n1: "Client"
+n2: "Order Service"
+n3: "Order DB" {
+  shape: cylinder
+}
+n4: "Product Service"
+n5: "Product DB" {
+  shape: cylinder
+}
+n6: "Event Broker"
+n7: "Consumer hoặc projector"
+n8: "Local read copy" {
+  shape: cylinder
+}
+n1 -> n2
+n2 -> n3
+n2 -> n4: "API request"
+n4 -> n5
+n4 -> n6: "publish event"
+n6 -> n7
+n7 -> n8
+n2 -> n5: "Không được phép SELECT trực tiếp" { style.stroke-dash: 5 }
 ```
 
 Có thể đọc sơ đồ theo ba quy tắc:

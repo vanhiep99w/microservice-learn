@@ -80,21 +80,20 @@ Một sidecar không biến một request thành giao dịch phân tán an toàn
 
 ## Kiến trúc Service Mesh
 
-```mermaid
-flowchart TB
-    CP["Control Plane<br/>routing • policy • service discovery<br/>cấp và rotate certificate"]
-
-    subgraph POD_A["Pod Order Service"]
-        OA["Order Service<br/>business code"] <--> OP["Sidecar Proxy<br/>Data Plane"]
-    end
-
-    subgraph POD_B["Pod Payment Service"]
-        PA["Payment Service<br/>business code"] <--> PP["Sidecar Proxy<br/>Data Plane"]
-    end
-
-    CP -->|"push config và certs"| OP
-    CP -->|"push config và certs"| PP
-    OP <-->|"mTLS<br/>East-West traffic"| PP
+```d2 title="Kiến trúc Service Mesh"
+direction: down
+n2: "Pod Payment Service" {}
+n1: "Pod Order Service" {}
+n3: "Control Plane\nrouting • policy • service discovery\ncấp và rotate certificate"
+n1.n4: "Order Service\nbusiness code"
+n1.n5: "Sidecar Proxy\nData Plane"
+n2.n6: "Payment Service\nbusiness code"
+n2.n7: "Sidecar Proxy\nData Plane"
+n1.n4 <-> n1.n5
+n2.n6 <-> n2.n7
+n3 -> n1.n5: "push config và certs"
+n3 -> n2.n7: "push config và certs"
+n1.n5 <-> n2.n7: "mTLS\nEast-West traffic"
 ```
 
 Kiến trúc này có hai mặt phẳng:
@@ -249,12 +248,17 @@ Nếu application không forward context, proxy vẫn có thể ghi metrics và 
 
 Giả sử `Payment Service` có hai subset: `v1` là stable và `v2` là canary. Policy ban đầu đưa 95% request đến `v1` và 5% đến `v2`:
 
-```mermaid
-flowchart LR
-    O[Order Service] --> OP[Order Sidecar]
-    OP -->|"mTLS"| PP[Payment Sidecar]
-    PP -->|"95%"| V1[Payment v1<br/>stable]
-    PP -->|"5%"| V2[Payment v2<br/>canary]
+```d2 title="Luồng canary cho Payment Service"
+direction: right
+n1: "Order Service"
+n2: "Order Sidecar"
+n3: "Payment Sidecar"
+n4: "Payment v1\nstable"
+n5: "Payment v2\ncanary"
+n1 -> n2
+n2 -> n3: "mTLS"
+n3 -> n4: "95%"
+n3 -> n5: "5%"
 ```
 
 Không có mesh, quyết định chia traffic có thể phải nằm trong client, load balancer hoặc một lớp deploy khác. Những cách này đều cần phối hợp riêng để giữ route và identity nhất quán. Với mesh, route được khai báo ở Control Plane và proxy áp dụng cho traffic đi qua nó. Application của Order vẫn gọi cùng một service contract.

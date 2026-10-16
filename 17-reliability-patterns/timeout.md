@@ -46,15 +46,24 @@
 
 Trong Microservice, mọi cuộc gọi đi qua network đều có thể bị chậm hoặc không trả lời. Timeout biến trạng thái “chờ không biết đến bao giờ” thành một kết quả có giới hạn thời gian. Đây là nền tảng để caller fail fast hoặc chuyển sang cách xử lý khác.
 
-```mermaid
-flowchart LR
-    A[Request đến Order Service] --> B[Caller giữ thread và connection]
-    B --> C[Payment Service không phản hồi]
-    C --> D{Đã hết timeout?}
-    D -->|Chưa| B
-    D -->|Rồi| E[Hủy hoặc đánh dấu call thất bại]
-    E --> F[Giải phóng tài nguyên]
-    F --> G[Fallback, xử lý tiếp hoặc trả lỗi theo contract]
+```d2 title="Timeout Pattern là gì"
+direction: right
+n1: "Request đến Order Service"
+n2: "Caller giữ thread và connection"
+n3: "Payment Service không phản hồi"
+n4: "Đã hết timeout?" {
+  shape: diamond
+}
+n5: "Hủy hoặc đánh dấu call thất bại"
+n6: "Giải phóng tài nguyên"
+n7: "Fallback, xử lý tiếp hoặc trả lỗi theo contract"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n2: "Chưa"
+n4 -> n5: "Rồi"
+n5 -> n6
+n6 -> n7
 ```
 
 Timeout chỉ bảo vệ thời gian chờ của caller. Nó không tự làm cho dependency (service phụ thuộc) khỏe lại. Nó cũng không tự hoàn tác một side effect đã được dependency thực hiện.
@@ -253,21 +262,20 @@ local_timeout = min(local_cap, remaining_budget - local_margin)
 
 Deadline propagation truyền thời hạn của request qua các hop thay vì để mỗi service đặt timeout độc lập. Với gRPC, deadline có thể được truyền trong metadata của call. Với REST, team thường quy ước một header deadline hoặc remaining budget riêng và yêu cầu mọi tầng tôn trọng nó.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant G as API Gateway
-    participant O as Order Service
-    participant P as Payment Service
-    participant B as Bank API
-
-    C->>G: Checkout, deadline = t+5s
-    Note over G: Nhận sau 0.2s, còn khoảng 4.8s
-    G->>O: Forward deadline = t+5s
-    O->>P: Authorize, local cap 3s
-    Note over P: Chỉ được dùng phần budget còn lại
-    P->>B: Call Bank, local cap 2s
-    Note over B: Hết deadline thì dừng chờ
+```d2 title="Truyền deadline xuống service"
+shape: sequence_diagram
+"C": "Client"
+"G": "API Gateway"
+"O": "Order Service"
+"P": "Payment Service"
+"B": "Bank API"
+"C" -> "G": "Checkout, deadline = t+5s"
+"G".note1: "Nhận sau 0.2s, còn khoảng 4.8s"
+"G" -> "O": "Forward deadline = t+5s"
+"O" -> "P": "Authorize, local cap 3s"
+"P".note2: "Chỉ được dùng phần budget còn lại"
+"P" -> "B": "Call Bank, local cap 2s"
+"B".note3: "Hết deadline thì dừng chờ"
 ```
 
 Khi tự định nghĩa header cho REST, contract cần thống nhất đơn vị thời gian, format, cách xử lý giá trị thiếu hoặc không hợp lệ và giới hạn tối đa ở mỗi boundary. Service bên trong không nên âm thầm reset deadline về một timeout dài hơn.

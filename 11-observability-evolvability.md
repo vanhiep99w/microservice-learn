@@ -97,20 +97,37 @@ Hai khái niệm này thường bị nhầm lẫn:
 
 ### 1.3. Ba trụ cột của Observability
 
-```mermaid
-graph TB
-    O[🔍 Observability] --> L[📝 Logs]
-    O --> M[📊 Metrics]
-    O --> T[🔗 Traces]
-
-    L --> L1["Ghi lại SỰ KIỆN cụ thể<br/>What happened?"]
-    M --> M1["Đo lường SỐ LIỆU theo thời gian<br/>How much / How many?"]
-    T --> T1["Theo dõi HÀNH TRÌNH request<br/>Where did it go?"]
-
-    style O fill:#1a1a2e,stroke:#00d9ff,color:#ffffff
-    style L fill:#1a1a2e,stroke:#e94560,color:#ffffff
-    style M fill:#1a1a2e,stroke:#0f3460,color:#ffffff
-    style T fill:#1a1a2e,stroke:#16c79a,color:#ffffff
+```d2 title="1.3. Ba trụ cột của Observability"
+direction: down
+n1: "🔍 Observability" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#00d9ff"
+  style.font-color: "#ffffff"
+}
+n2: "📝 Logs" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#e94560"
+  style.font-color: "#ffffff"
+}
+n3: "📊 Metrics" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#0f3460"
+  style.font-color: "#ffffff"
+}
+n4: "🔗 Traces" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#16c79a"
+  style.font-color: "#ffffff"
+}
+n5: "Ghi lại SỰ KIỆN cụ thể\nWhat happened?"
+n6: "Đo lường SỐ LIỆU theo thời gian\nHow much / How many?"
+n7: "Theo dõi HÀNH TRÌNH request\nWhere did it go?"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n2 -> n5
+n3 -> n6
+n4 -> n7
 ```
 
 | Trụ cột | Mô tả | Công cụ phổ biến |
@@ -144,7 +161,7 @@ Thay vì log text thuần:
 
 Sử dụng **Structured Logging** (JSON format):
 
-```json
+```json source="snippets/2-2-structured-logging.json"
 {
   "timestamp": "2025-01-15T10:23:45.123Z",
   "level": "ERROR",
@@ -165,6 +182,8 @@ Sử dụng **Structured Logging** (JSON format):
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=11-observability-evolvability&snapshot=article&file=snippets%2F2-2-structured-logging.json)
 
 **Lợi ích của Structured Logging:**
 - **Tìm kiếm dễ dàng**: Query `level:ERROR AND service:payment-service AND context.error_code:INSUFFICIENT_FUNDS`
@@ -203,29 +222,24 @@ Sử dụng **Structured Logging** (JSON format):
 
 Correlation ID (hay Request ID) là một identifier duy nhất được truyền qua **tất cả service** mà request đi qua:
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant GW as API Gateway
-    participant OS as Order Service
-    participant PS as Payment Service
-    participant NS as Notification Service
-
-    U->>GW: POST /orders
-    Note over GW: Tạo Correlation ID:<br/>corr-id: req-abc-123
-
-    GW->>OS: Forward request<br/>Header: X-Correlation-ID: req-abc-123
-    OS->>OS: Log: [req-abc-123] Creating order #456
-
-    OS->>PS: Process payment<br/>Header: X-Correlation-ID: req-abc-123
-    PS->>PS: Log: [req-abc-123] Charging $99.99
-
-    PS-->>OS: Payment success
-    OS->>NS: Send notification<br/>Header: X-Correlation-ID: req-abc-123
-    NS->>NS: Log: [req-abc-123] Email sent
-
-    OS-->>GW: Order created
-    GW-->>U: 201 Created
+```d2 title="2.4. Correlation ID — Xuyên suốt các service"
+shape: sequence_diagram
+"U": "User"
+"GW": "API Gateway"
+"OS": "Order Service"
+"PS": "Payment Service"
+"NS": "Notification Service"
+"U" -> "GW": "POST /orders"
+"GW".note1: "Tạo Correlation ID:\ncorr-id: req-abc-123"
+"GW" -> "OS": "Forward request\nHeader: X-Correlation-ID: req-abc-123"
+"OS" -> "OS": "Log: [req-abc-123] Creating order #456"
+"OS" -> "PS": "Process payment\nHeader: X-Correlation-ID: req-abc-123"
+"PS" -> "PS": "Log: [req-abc-123] Charging \$99.99"
+"PS" -> "OS": "Payment success" { style.stroke-dash: 5 }
+"OS" -> "NS": "Send notification\nHeader: X-Correlation-ID: req-abc-123"
+"NS" -> "NS": "Log: [req-abc-123] Email sent"
+"OS" -> "GW": "Order created" { style.stroke-dash: 5 }
+"GW" -> "U": "201 Created" { style.stroke-dash: 5 }
 ```
 
 **Cách implement:**
@@ -331,38 +345,19 @@ Trong log của Order Service:
 
 ELK Stack (Elasticsearch + Logstash + Kibana) là giải pháp centralized logging phổ biến nhất:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      ELK STACK ARCHITECTURE                     │
-│                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                       │
-│  │ Service A│  │ Service B│  │ Service C│    Log Sources        │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘                       │
-│       │             │             │                             │
-│       ▼             ▼             ▼                             │
-│  ┌─────────────────────────────────────────┐                    │
-│  │          Filebeat / Fluentd             │    Log Shipper     │
-│  │    (Thu thập log từ containers)         │                    │
-│  └────────────────┬────────────────────────┘                    │
-│                   │                                             │
-│                   ▼                                             │
-│  ┌─────────────────────────────────────────┐                    │
-│  │            Logstash                     │    Processing      │
-│  │   (Parse, Transform, Enrich)            │                    │
-│  └────────────────┬────────────────────────┘                    │
-│                   │                                             │
-│                   ▼                                             │
-│  ┌─────────────────────────────────────────┐                    │
-│  │          Elasticsearch                  │    Storage &       │
-│  │   (Index, Search, Aggregate)            │    Search          │
-│  └────────────────┬────────────────────────┘                    │
-│                   │                                             │
-│                   ▼                                             │
-│  ┌─────────────────────────────────────────┐                    │
-│  │            Kibana                       │    Visualization   │
-│  │   (Dashboard, Search, Alerts)           │                    │
-│  └─────────────────────────────────────────┘                    │
-└─────────────────────────────────────────────────────────────────┘
+```d2 title="ELK Stack — từ log tới dashboard"
+direction: right
+a: Service A
+b: Service B
+c: Service C
+shipper: "Filebeat / Fluentd\nThu thập log containers"
+logstash: "Logstash\nParse • Transform • Enrich"
+elasticsearch: "Elasticsearch\nIndex • Search • Aggregate" {shape: cylinder}
+kibana: "Kibana\nDashboard • Search • Alerts"
+a -> shipper
+b -> shipper
+c -> shipper
+shipper -> logstash -> elasticsearch -> kibana
 ```
 
 **Các thành phần:**
@@ -465,23 +460,14 @@ Metrics: "50 orders failed in last 5 min"     → Xu hướng tổng hợp
 | **Histogram** | Phân bố giá trị, tính percentile | Request latency (P50, P95, P99) |
 | **Summary** | Tương tự Histogram, tính ở client | Request duration quantiles |
 
-```mermaid
-graph LR
-    subgraph Counter
-        C1["http_requests_total = 1000<br/>http_errors_total = 23<br/>→ Chỉ tăng ↑"]
-    end
-
-    subgraph Gauge
-        G1["temperature_celsius = 42<br/>active_connections = 150<br/>→ Tăng/giảm ↑↓"]
-    end
-
-    subgraph Histogram
-        H1["request_duration_seconds<br/>P50 = 120ms<br/>P95 = 450ms<br/>P99 = 1.2s<br/>→ Phân bố giá trị"]
-    end
-
-    style Counter fill:#1a1a2e,stroke:#e94560,color:#ffffff
-    style Gauge fill:#1a1a2e,stroke:#0f3460,color:#ffffff
-    style Histogram fill:#1a1a2e,stroke:#16c79a,color:#ffffff
+```d2 title="3.2. Các loại Metrics"
+direction: right
+n3: "Histogram" {}
+n2: "Gauge" {}
+n1: "Counter" {}
+n1.n4: "http_requests_total = 1000\nhttp_errors_total = 23\n→ Chỉ tăng ↑"
+n2.n5: "temperature_celsius = 42\nactive_connections = 150\n→ Tăng/giảm ↑↓"
+n3.n6: "request_duration_seconds\nP50 = 120ms\nP95 = 450ms\nP99 = 1.2s\n→ Phân bố giá trị"
 ```
 
 ### 3.3. RED Method & USE Method
@@ -543,34 +529,24 @@ Prometheus là hệ thống monitoring và alerting open-source, là tiêu chu�
 
 **Kiến trúc Prometheus:**
 
+```d2 title="Prometheus — Pull Metrics"
+direction: down
+prometheus: Prometheus Server {
+ retrieval: Retrieval — Pull
+ tsdb: TSDB — Time Series Database {shape: cylinder}
+ retrieval -> tsdb
+}
+alert: Alertmanager
+service_a: "Service A :8080\n/metrics"
+service_b: "Service B :8081\n/metrics"
+node: "Node Exporter\n:9100"
+prometheus.retrieval -> service_a: HTTP GET /metrics
+prometheus.retrieval -> service_b: HTTP GET /metrics
+prometheus.retrieval -> node: HTTP GET /metrics
+prometheus -> alert: Firing alerts
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                   PROMETHEUS ARCHITECTURE                       │
-│                                                                 │
-│  ┌──────────────────────────────────────────┐                   │
-│  │           Prometheus Server              │                   │
-│  │  ┌────────────┐  ┌──────────────────┐    │                   │
-│  │  │  Retrieval │  │   TSDB           │    │                   │
-│  │  │  (Pull)    │  │ (Time Series DB) │    │                   │
-│  │  └──────┬─────┘  └──────────────────┘    │                   │
-│  │         │         ┌──────────────────┐   │                   │
-│  │         │         │  Alert Manager   │   │                   │
-│  │         │         └──────────────────┘   │                   │
-│  └─────────┼────────────────────────────────┘                   │
-│            │                                                    │
-│       PULL metrics                                              │
-│       (HTTP GET /metrics)                                       │
-│            │                                                    │
-│    ┌───────┼───────────────────────┐                            │
-│    │       │                       │                            │
-│    ▼       ▼                       ▼                            │
-│  ┌──────┐ ┌──────┐             ┌──────────┐                     │
-│  │Svc A │ │Svc B │    ...      │ Node     │                     │
-│  │:8080 │ │:8081 │             │ Exporter │                     │
-│  │/metrics│/metrics│           │ :9100    │                     │
-│  └──────┘ └──────┘             └──────────┘                     │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Alertmanager là component riêng nhận alert từ Prometheus, không phải storage engine bên trong Prometheus Server.
 
 **Pull-based model:** Prometheus chủ động **kéo** (scrape) metrics từ các service endpoint `/metrics`, thay vì service **đẩy** metrics.
 
@@ -658,7 +634,7 @@ Grafana là công cụ visualization hàng đầu, kết nối với nhiều dat
 
 **Alerting Rules trong Prometheus:**
 
-```yaml
+```yaml source="snippets/3-7-alerting-canh-bao.yaml"
 # prometheus-alerts.yml
 groups:
   - name: microservice-alerts
@@ -695,6 +671,8 @@ groups:
         annotations:
           summary: "Service {{ $labels.instance }} is down"
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=11-observability-evolvability&snapshot=article&file=snippets%2F3-7-alerting-canh-bao.yaml)
 
 **Alert routing (AlertManager):**
 
@@ -953,7 +931,7 @@ Bước 4: Kafka → Notification Service (Async consume)
 
 Mỗi span là một bản ghi chứa đầy đủ thông tin để **tái dựng lại hành trình request**:
 
-```json
+```json source="snippets/moi-span-ghi-lai-nhung-thong-so-gi.json"
 {
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
   "span_id": "a1b2c3d4e5f6a7b8",
@@ -1001,6 +979,8 @@ Mỗi span là một bản ghi chứa đầy đủ thông tin để **tái dựn
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=11-observability-evolvability&snapshot=article&file=snippets%2Fmoi-span-ghi-lai-nhung-thong-so-gi.json)
+
 | Nhóm thông số | Cách thu thập | Ghi chú |
 |---------------|-------------|---------|
 | **trace_id, span_id, parent_span_id** | OTel SDK tự động generate/extract | Developer KHÔNG cần tự tạo |
@@ -1016,33 +996,24 @@ Mỗi span là một bản ghi chứa đầy đủ thông tin để **tái dựn
 
 OpenTelemetry (OTel) là dự án CNCF hợp nhất các tiêu chuẩn tracing/metrics trước đó (OpenTracing + OpenCensus):
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              OPENTELEMETRY ECOSYSTEM                        │
-│                                                             │
-│  ┌─────────────────────────────────────┐                    │
-│  │         Application Code            │                    │
-│  │  ┌───────────────────────────────┐  │                    │
-│  │  │     OTel SDK (Auto/Manual)    │  │                    │
-│  │  │  ┌────────┬────────┬────────┐ │  │                    │
-│  │  │  │ Traces │Metrics │  Logs  │ │  │                    │
-│  │  │  └────────┴────────┴────────┘ │  │                    │
-│  │  └───────────────┬───────────────┘  │                    │
-│  └──────────────────┼──────────────────┘                    │
-│                     │                                       │
-│                     ▼                                       │
-│  ┌─────────────────────────────────────┐                    │
-│  │      OTel Collector                 │                    │
-│  │  ┌──────────┬──────────┬──────────┐ │                    │
-│  │  │Receivers │Processors│Exporters │ │                    │
-│  │  └──────────┴──────────┴──────────┘ │                    │
-│  └──────────┬──────────┬───────────────┘                    │
-│             │          │                                    │
-│        ┌────▼───┐ ┌────▼─────┐ ┌─────────┐                  │
-│        │ Jaeger │ │Prometheus│ │  Loki   │                  │
-│        │(Traces)│ │(Metrics) │ │ (Logs)  │                  │
-│        └────────┘ └──────────┘ └─────────┘                  │
-└─────────────────────────────────────────────────────────────┘
+```d2 title="OpenTelemetry — SDK, Collector và Backends"
+direction: down
+app: Application Code {
+ sdk: "OTel SDK — Auto / Manual\nTraces • Metrics • Logs"
+}
+collector: OTel Collector {
+ receivers: Receivers
+ processors: Processors
+ exporters: Exporters
+ receivers -> processors -> exporters
+}
+jaeger: Jaeger — Traces
+prometheus: Prometheus — Metrics
+loki: Loki — Logs
+app.sdk -> collector.receivers
+collector.exporters -> jaeger
+collector.exporters -> prometheus
+collector.exporters -> loki
 ```
 
 **Tại sao nên dùng OpenTelemetry?**
@@ -1055,29 +1026,17 @@ OpenTelemetry (OTel) là dự án CNCF hợp nhất các tiêu chuẩn tracing/m
 
 Jaeger (phát triển bởi Uber) là platform tracing open-source phổ biến nhất:
 
+```d2 title="Jaeger — kiến trúc Agent và Collector"
+direction: right
+service: Service — OTel SDK
+agent: "jaeger-agent\nUDP 6831"
+collector: "jaeger-collector\nHTTP / gRPC"
+storage: "Storage / buffer theo deployment\nCassandra • Elasticsearch • Kafka" {shape: cylinder}
+ui: Jaeger UI — Query
+service -> agent -> collector -> storage -> ui
 ```
-┌───────────────────────────────────────────────────────────┐
-│                  JAEGER ARCHITECTURE                      │
-│                                                           │
-│  ┌──────────┐                                             │
-│  │ Service  │──▶ jaeger-agent ──▶ jaeger-collector        │
-│  │(OTel SDK)│    (UDP :6831)     (HTTP/gRPC)              │
-│  └──────────┘                         │                   │
-│                                       ▼                   │
-│                              ┌──────────────┐             │
-│                              │   Storage    │             │
-│                              │ (Cassandra / │             │
-│                              │ Elasticsearch│             │
-│                              │   / Kafka)   │             │
-│                              └──────┬───────┘             │
-│                                     │                     │
-│                                     ▼                     │
-│                              ┌──────────────┐             │
-│                              │  Jaeger UI   │             │
-│                              │  (Query)     │             │
-│                              └──────────────┘             │
-└──────────────────────────────────────────────────────────┘
-```
+
+Sơ đồ mô tả mô hình Jaeger Agent truyền thống trong ví dụ; deployment OTel hiện đại có thể gửi OTLP trực tiếp tới Collector.
 
 **Jaeger UI cung cấp:**
 - **Search traces**: Tìm theo service, operation, duration, tags
@@ -1214,16 +1173,31 @@ api-gateway         POST /api/orders         8.2s      OK
 
 Sức mạnh thực sự nằm ở việc **liên kết** ba trụ cột với nhau:
 
-```mermaid
-graph LR
-    A[📊 Metrics Alert<br/>Error rate > 5%] --> B[🔗 Traces<br/>Tìm trace của request lỗi]
-    B --> C[📝 Logs<br/>Xem chi tiết lỗi trong span]
-    C --> D[🎯 Root Cause<br/>Xác định nguyên nhân]
-
-    style A fill:#1a1a2e,stroke:#e94560,color:#ffffff
-    style B fill:#1a1a2e,stroke:#16c79a,color:#ffffff
-    style C fill:#1a1a2e,stroke:#0f3460,color:#ffffff
-    style D fill:#1a1a2e,stroke:#f0c929,color:#ffffff
+```d2 title="5.2. Correlating Logs, Metrics, Traces"
+direction: right
+n1: "📊 Metrics Alert\nError rate > 5%" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#e94560"
+  style.font-color: "#ffffff"
+}
+n2: "🔗 Traces\nTìm trace của request lỗi" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#16c79a"
+  style.font-color: "#ffffff"
+}
+n3: "📝 Logs\nXem chi tiết lỗi trong span" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#0f3460"
+  style.font-color: "#ffffff"
+}
+n4: "🎯 Root Cause\nXác định nguyên nhân" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#f0c929"
+  style.font-color: "#ffffff"
+}
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 **Cách liên kết:**
@@ -1301,7 +1275,7 @@ GET /health          → Tổng hợp (chi tiết)
 
 **Response mẫu cho `/health`:**
 
-```json
+```json source="snippets/6-2-health-check-endpoint-design.json"
 {
   "status": "UP",
   "version": "2.1.0",
@@ -1333,6 +1307,8 @@ GET /health          → Tổng hợp (chi tiết)
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=11-observability-evolvability&snapshot=article&file=snippets%2F6-2-health-check-endpoint-design.json)
 
 **Best practices:**
 - **Liveness probe**: Chỉ kiểm tra process còn sống (không kiểm tra dependencies)
@@ -1512,32 +1488,56 @@ Feature Flags (hay Feature Toggles) cho phép **bật/tắt tính năng** mà kh
 
 Khi cần rewrite hoặc migrate service, áp dụng Strangler Fig Pattern ([doc 05](05-decomposition-strategies.md)):
 
-```mermaid
-graph LR
-    subgraph "Phase 1: Route to old"
-        A1[Request] --> P1[Proxy/Router]
-        P1 -->|100%| O1[Old Service v1]
-        P1 -.->|0%| N1[New Service v2]
-    end
-
-    subgraph "Phase 2: Gradual migration"
-        A2[Request] --> P2[Proxy/Router]
-        P2 -->|70%| O2[Old Service v1]
-        P2 -->|30%| N2[New Service v2]
-    end
-
-    subgraph "Phase 3: Complete"
-        A3[Request] --> P3[Proxy/Router]
-        P3 -->|0%| O3["Old Service v1<br/>(decommission)"]
-        P3 -->|100%| N3[New Service v2]
-    end
-
-    style O1 fill:#1a1a2e,stroke:#e94560,color:#ffffff
-    style O2 fill:#1a1a2e,stroke:#e94560,color:#ffffff
-    style O3 fill:#1a1a2e,stroke:#666666,color:#999999
-    style N1 fill:#1a1a2e,stroke:#16c79a,color:#ffffff
-    style N2 fill:#1a1a2e,stroke:#16c79a,color:#ffffff
-    style N3 fill:#1a1a2e,stroke:#16c79a,color:#ffffff
+```d2 title="7.6. Strangler Fig cho Service Evolution"
+direction: right
+n3: "Phase 3: Complete" {}
+n2: "Phase 2: Gradual migration" {}
+n1: "Phase 1: Route to old" {}
+n1.n4: "Request"
+n1.n5: "Proxy/Router"
+n1.n6: "Old Service v1" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#e94560"
+  style.font-color: "#ffffff"
+}
+n1.n7: "New Service v2" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#16c79a"
+  style.font-color: "#ffffff"
+}
+n2.n8: "Request"
+n2.n9: "Proxy/Router"
+n2.n10: "Old Service v1" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#e94560"
+  style.font-color: "#ffffff"
+}
+n2.n11: "New Service v2" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#16c79a"
+  style.font-color: "#ffffff"
+}
+n3.n12: "Request"
+n3.n13: "Proxy/Router"
+n3.n14: "Old Service v1\n(decommission)" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#666666"
+  style.font-color: "#999999"
+}
+n3.n15: "New Service v2" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#16c79a"
+  style.font-color: "#ffffff"
+}
+n1.n4 -> n1.n5
+n1.n5 -> n1.n6: "100%"
+n1.n5 -> n1.n7: "0%" { style.stroke-dash: 5 }
+n2.n8 -> n2.n9
+n2.n9 -> n2.n10: "70%"
+n2.n9 -> n2.n11: "30%"
+n3.n12 -> n3.n13
+n3.n13 -> n3.n14: "0%"
+n3.n13 -> n3.n15: "100%"
 ```
 
 ### 7.7. Ví dụ thực tế — Phát triển Payment Service v2

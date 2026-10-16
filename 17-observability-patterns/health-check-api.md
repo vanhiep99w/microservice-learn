@@ -73,22 +73,40 @@ Health Check API biến những trạng thái này thành tín hiệu chuẩn h�
 
 Ba loại probe thường được dùng cùng nhau nhưng có trách nhiệm khác nhau. `Startup` bảo vệ giai đoạn boot. Sau khi startup thành công, `Liveness` và `Readiness` trả lời hai câu hỏi độc lập.
 
-```mermaid
-flowchart TD
-    S["Container bắt đầu"] --> U{"Startup probe pass?"}
-    U -->|"Chưa, còn trong threshold"| W["Chờ ứng dụng khởi động"]
-    W --> U
-    U -->|"Không, vượt threshold"| SR["Startup fail<br/>Kubernetes xử lý container"]
-    U -->|"Có"| P["Bắt đầu liveness và readiness"]
-
-    P --> L{"Liveness pass?"}
-    L -->|"Không hoặc timeout"| R["Restart container"]
-    L -->|"Có"| Q{"Readiness pass?"}
-    Q -->|"Không"| N["Gỡ Pod khỏi Service/LB endpoints<br/>Pod vẫn chạy"]
-    Q -->|"Có"| T["Giữ traffic"]
-    N --> Q2{"Readiness phục hồi?"}
-    Q2 -->|"Chưa"| N
-    Q2 -->|"Có"| T
+```d2 title="Mô hình liveness readiness và startup"
+direction: down
+n1: "Container bắt đầu"
+n2: "Startup probe pass?" {
+  shape: diamond
+}
+n3: "Chờ ứng dụng khởi động"
+n4: "Startup fail\nKubernetes xử lý container"
+n5: "Bắt đầu liveness và readiness"
+n6: "Liveness pass?" {
+  shape: diamond
+}
+n7: "Restart container"
+n8: "Readiness pass?" {
+  shape: diamond
+}
+n9: "Gỡ Pod khỏi Service/LB endpoints\nPod vẫn chạy"
+n10: "Giữ traffic"
+n11: "Readiness phục hồi?" {
+  shape: diamond
+}
+n1 -> n2
+n2 -> n3: "Chưa, còn trong threshold"
+n3 -> n2
+n2 -> n4: "Không, vượt threshold"
+n2 -> n5: "Có"
+n5 -> n6
+n6 -> n7: "Không hoặc timeout"
+n6 -> n8: "Có"
+n8 -> n9: "Không"
+n8 -> n10: "Có"
+n9 -> n11
+n11 -> n9: "Chưa"
+n11 -> n10: "Có"
 ```
 
 ### Liveness
@@ -117,7 +135,7 @@ Khi readiness fail, Kubernetes gỡ Pod khỏi Service endpoints. Load Balancer 
 
 Ví dụ response khi Payment Service không sẵn sàng:
 
-```http
+```http source="snippets/readiness.http"
 GET /health/ready HTTP/1.1
 Host: payment-service:8080
 
@@ -135,6 +153,8 @@ Content-Type: application/json
   "uptime_seconds": 259716
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=health-check-api&snapshot=article&file=snippets%2Freadiness.http)
 
 `503` trong ví dụ là tín hiệu máy đọc được. Field `status` và `checks` giúp con người điều tra, nhưng không được dùng để thay thế HTTP status code.
 
@@ -188,7 +208,7 @@ Nếu cần một endpoint tổng hợp cho operator, có thể thêm `GET /heal
 
 Response chi tiết là một schema minh họa, không phải format bắt buộc cho mọi framework:
 
-```json
+```json source="snippets/ba-endpoint-cot-loi.json"
 {
   "status": "UP",
   "version": "2.1.0",
@@ -209,6 +229,8 @@ Response chi tiết là một schema minh họa, không phải format bắt bu�
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=health-check-api&snapshot=article&file=snippets%2Fba-endpoint-cot-loi.json)
 
 `version`, `uptime_seconds`, `latency_ms` và `detail` chỉ nên xuất hiện khi chúng hữu ích cho vận hành và không làm lộ thông tin nhạy cảm. Response public, nếu bắt buộc phải có, nên tối giản hơn response nội bộ.
 
@@ -287,7 +309,7 @@ Kubernetes dùng ba loại probe với hành động khác nhau:
 
 Manifest dưới đây dùng các endpoint của contract ở trên:
 
-```yaml
+```yaml source="snippets/cau-hinh-probes-minh-hoa.yaml"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -322,6 +344,8 @@ spec:
             failureThreshold: 30
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=health-check-api&snapshot=article&file=snippets%2Fcau-hinh-probes-minh-hoa.yaml)
+
 Trong ví dụ, `failureThreshold × periodSeconds` của startup là `30 × 5 = 150` giây theo cách tính nominal. Khoảng thời gian thực tế còn phụ thuộc việc probe bắt đầu khi nào và timeout. Con số này phải lớn hơn thời gian boot cần thiết của app trong môi trường tương ứng.
 
 Các tham số không có giá trị đúng cho mọi service:
@@ -337,11 +361,15 @@ Nếu timeout quá ngắn hoặc threshold quá thấp, một lần GC, network 
 
 Load Balancer cần biết target có nhận traffic được hay không. Vì vậy, health check của Load Balancer thường nên trỏ vào readiness semantics, không phải liveness semantics:
 
-```text
-Load Balancer / Kubernetes Service
-  ├── Pod 1 — /health/ready → 200 ──► nhận traffic
-  ├── Pod 2 — /health/ready → 503 ──► tạm thời không nhận traffic
-  └── Pod 3 — timeout        ──► tạm thời không nhận traffic
+```d2 title="Readiness quyết định Traffic Routing"
+direction: right
+lb: Load Balancer / Kubernetes Service
+p1: "Pod 1\n/health/ready → 200\nNhận traffic"
+p2: "Pod 2\n/health/ready → 503\nTạm thời không nhận traffic"
+p3: "Pod 3\nTimeout\nTạm thời không nhận traffic"
+lb -> p1: Route
+lb -- p2: Excluded {style.stroke-dash: 5}
+lb -- p3: Excluded {style.stroke-dash: 5}
 ```
 
 Cách một Load Balancer đánh dấu target, số lần retry và thời gian đưa target trở lại phụ thuộc vào sản phẩm. Contract của service vẫn phải dùng HTTP status nhất quán để hạ tầng có thể phân biệt ready và not ready.

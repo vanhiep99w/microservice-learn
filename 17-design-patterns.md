@@ -147,36 +147,30 @@ Một sàn thương mại điện tử điển hình dùng **đồng thời cả
 
 ### Flow "Đặt hàng" — các pattern phối hợp
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant GW as API Gateway
-    participant O as Order Service
-    participant P as Payment Service
-    participant I as Inventory Service
-    participant K as Kafka
-
-    C->>GW: POST /api/v1/orders (Correlation ID)
-    GW->>GW: Auth, Rate Limit
-    GW->>O: Forward request
-
-    Note over O: Saga Orchestrator
-    O->>O: Create Order (PENDING)
-    O->>O: Save DB + Outbox (atomic)
-
-    O-->>K: OrderCreated event
-    K-->>P: Consume → Process Payment
-    Note over P: Circuit Breaker cho Bank API
-    P-->>K: PaymentCompleted event
-
-    K-->>I: Consume → Reserve Inventory
-    I-->>K: InventoryReserved event
-
-    K-->>O: Consume → Order CONFIRMED
-    O-->>GW: 201 Created
-    GW-->>C: Response
-
-    Note over K: Notification, Analytics<br/>subscribe OrderConfirmed (fan-out)
+```d2 title="Flow \"Đặt hàng\" — các pattern phối hợp"
+shape: sequence_diagram
+"C": "Client"
+"GW": "API Gateway"
+"O": "Order Service"
+"P": "Payment Service"
+"I": "Inventory Service"
+"K": "Kafka"
+"C" -> "GW": "POST /api/v1/orders (Correlation ID)"
+"GW" -> "GW": "Auth, Rate Limit"
+"GW" -> "O": "Forward request"
+"O".note1: "Saga Orchestrator"
+"O" -> "O": "Create Order (PENDING)"
+"O" -> "O": "Save DB + Outbox (atomic)"
+"O" -> "K": "OrderCreated event" { style.stroke-dash: 5 }
+"K" -> "P": "Consume → Process Payment" { style.stroke-dash: 5 }
+"P".note2: "Circuit Breaker cho Bank API"
+"P" -> "K": "PaymentCompleted event" { style.stroke-dash: 5 }
+"K" -> "I": "Consume → Reserve Inventory" { style.stroke-dash: 5 }
+"I" -> "K": "InventoryReserved event" { style.stroke-dash: 5 }
+"K" -> "O": "Consume → Order CONFIRMED" { style.stroke-dash: 5 }
+"O" -> "GW": "201 Created" { style.stroke-dash: 5 }
+"GW" -> "C": "Response" { style.stroke-dash: 5 }
+"K".note3: "Notification, Analytics\nsubscribe OrderConfirmed (fan-out)"
 ```
 
 ### Bảng phân công pattern

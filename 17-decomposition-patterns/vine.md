@@ -61,17 +61,28 @@ Team chọn một functional area có boundary đủ rõ để viết độc l�
 
 Trong lúc đó, service mới có thể thiết kế lại data model, API, test và technology stack theo requirements hiện tại. Không sao chép thiết kế cũ chỉ vì nó đang tồn tại. Tuy nhiên, mọi khác biệt hành vi cần được giải thích bằng requirements hoặc một quyết định nghiệp vụ có chủ đích.
 
-```mermaid
-flowchart LR
-    I[Input thật] --> O[Phần cũ trong Monolith<br/>frozen]
-    I -. Mirror input .-> N[Service mới<br/>parallel rewrite]
-    O --> A[Kết quả A]
-    N --> B[Kết quả B]
-    A --> C[Comparer / diff report]
-    B --> C
-    C --> D{Khác biệt trong<br/>ngưỡng chấp nhận?}
-    D -->|Chưa| X[Điều tra hidden behavior<br/>hoặc sửa implementation]
-    D -->|Rồi| R[Cutover qua<br/>routing layer]
+```d2 title="Parallel rewrite và trạng thái frozen"
+direction: right
+n1: "Input thật"
+n2: "Phần cũ trong Monolith\nfrozen"
+n3: "Service mới\nparallel rewrite"
+n4: "Kết quả A"
+n5: "Kết quả B"
+n6: "Comparer / diff report"
+n7: "Khác biệt trong\nngưỡng chấp nhận?" {
+  shape: diamond
+}
+n8: "Điều tra hidden behavior\nhoặc sửa implementation"
+n9: "Cutover qua\nrouting layer"
+n1 -> n2
+n1 -> n3: "Mirror input" { style.stroke-dash: 5 }
+n2 -> n4
+n3 -> n5
+n4 -> n6
+n5 -> n6
+n6 -> n7
+n7 -> n8: "Chưa"
+n7 -> n9: "Rồi"
 ```
 
 Sơ đồ chỉ thể hiện việc so sánh logic. Với thao tác có side effect, không nên gửi một input production tới cả hai hệ thống nếu điều đó có thể tạo ra hai lần charge, ghi dữ liệu hoặc phát event. Khi đó cần dùng sandbox, dry-run, shadow validation, idempotency hoặc một writer được chỉ định cho từng phase.
@@ -189,19 +200,21 @@ Lựa chọn Vine chỉ hợp lý vì scope Billing đã được chốt và tea
 
 Trong parallel run, logical input từ flow đặt phòng hoặc các flow liên quan được gửi tới Billing cũ và được mirror tới Billing Service mới theo cách không nhân đôi side effect.
 
-```text
-┌───────────────────────────────────────────────────────────────┐
-│                         PARALLEL RUN                          │
-│                                                               │
-│  Reservation ──▶ Monolith Billing (FROZEN) ──▶ Invoice A      │
-│       │                                    ──▶ Report         │
-│       │                                                       │
-│       └──── mirror input ──▶ Billing Service ──▶ Invoice B    │
-│                                                               │
-│  Comparer: đối chiếu A và B theo từng flow                    │
-│  Diff ≠ 0 → điều tra implementation hoặc hidden behavior      │
-│  Diff trong ngưỡng đã chấp nhận → đủ điều kiện xem xét switch │
-└───────────────────────────────────────────────────────────────┘
+```d2 title="Vine Pattern — Parallel Run"
+direction: right
+reservation: Reservation
+monolith: Monolith Billing — FROZEN
+service: Billing Service
+a: Invoice A
+b: Invoice B
+report: Report
+compare: "Comparer\nĐối chiếu A và B theo từng flow\nDiff khác 0 → điều tra implementation / hidden behavior\nTrong ngưỡng chấp nhận → xem xét switch"
+reservation -> monolith -> a
+monolith -> report
+reservation -> service: Mirror input
+service -> b
+a -> compare
+b -> compare
 ```
 
 Comparer cần xem các trường có ý nghĩa nghiệp vụ, chẳng hạn line item, amount, discount, thuế, rounding và trạng thái invoice. Nếu Billing Service thực hiện pricing theo requirements mới, các khác biệt được chủ đích cho phép phải được ghi rõ thay vì bị coi là lỗi.

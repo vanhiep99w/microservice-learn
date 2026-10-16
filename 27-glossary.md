@@ -150,17 +150,19 @@
 
 Khi user đặt hàng trên hệ thống e-commerce được xây dựng bằng Microservice, các thuật ngữ được áp dụng như sau:
 
-```
-┌────────┐     ┌─────────────┐     ┌──────────────┐     ┌───────────────┐
-│ Client │────▶│ API Gateway │────▶│ Order Service│────▶│ Payment Service│
-└────────┘     │ (REST/JWT)  │     │  (gRPC)      │     │  (gRPC)       │
-               └─────────────┘     └──────┬───────┘     └───────────────┘
-                                          │ Event (Saga)
-                                          ▼
-                                   ┌──────────────┐     ┌───────────────┐
-                                   │ Message Broker│────▶│Inventory Svc  │
-                                   │ (SQS/SNS)   │     │(Event-Driven) │
-                                   └──────────────┘     └───────────────┘
+```d2 title="Microservice — bản đồ thuật ngữ"
+direction: right
+client: Client
+gateway: "API Gateway\nREST / JWT"
+order: Order Service
+payment: Payment Service
+broker: "Message Broker\nSQS / SNS"
+inventory: "Inventory Service\nEvent-Driven"
+client -> gateway: REST / JWT
+gateway -> order: gRPC
+order -> payment: gRPC
+order -> broker: Event — Saga
+broker -> inventory
 ```
 
 1. **Client** gửi request qua **API Gateway** — xác thực bằng **JWT** (**OAuth2**)

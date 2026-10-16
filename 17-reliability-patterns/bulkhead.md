@@ -109,16 +109,28 @@ Concurrency khác với Rate Limiter:
 
 Một concurrency limit có thể bảo vệ dependency khỏi việc phải xử lý quá nhiều operation đồng thời. Nó cũng tạo một điểm rõ ràng để áp dụng backpressure khi không còn slot.
 
-```mermaid
-flowchart LR
-    A[Request cần gọi dependency] --> B{Còn slot?}
-    B -->|Có| C[Acquire slot]
-    C --> D[Gọi dependency]
-    D --> E[Release slot]
-    B -->|Không| F{Bounded queue còn chỗ?}
-    F -->|Có| G[Chờ trong thời hạn]
-    G --> B
-    F -->|Không| H[Reject hoặc fallback]
+```d2 title="Concurrency limit"
+direction: right
+n1: "Request cần gọi dependency"
+n2: "Còn slot?" {
+  shape: diamond
+}
+n3: "Acquire slot"
+n4: "Gọi dependency"
+n5: "Release slot"
+n6: "Bounded queue còn chỗ?" {
+  shape: diamond
+}
+n7: "Chờ trong thời hạn"
+n8: "Reject hoặc fallback"
+n1 -> n2
+n2 -> n3: "Có"
+n3 -> n4
+n4 -> n5
+n2 -> n6: "Không"
+n6 -> n7: "Có"
+n7 -> n2
+n6 -> n8: "Không"
 ```
 
 Nếu chờ slot, queue hoặc dependency không có giới hạn thời gian, concurrency limit chỉ đổi chỗ giữ tài nguyên. Vì vậy, acquisition timeout và request timeout vẫn là một phần của thiết kế Bulkhead.
@@ -246,16 +258,25 @@ Payment và Inventory có thể có criticality cao, trong khi Notification có 
 
 ### Phân vùng theo dependency
 
-```mermaid
-flowchart TB
-    H[Order Service request handlers] --> P[Payment pool<br/>100 slots · CRITICAL]
-    H --> I[Inventory pool<br/>60 slots · CRITICAL]
-    H --> S[Shipping pool<br/>40 slots · MEDIUM]
-    H --> N[Notification pool hoặc queue<br/>20 slots · LOW]
-    P --> PS[Payment Service]
-    I --> IS[Inventory Service]
-    S --> SS[Shipping Service]
-    N --> NS[Notification Service]
+```d2 title="Phân vùng theo dependency"
+direction: down
+n1: "Order Service request handlers"
+n2: "Payment pool\n100 slots · CRITICAL"
+n3: "Inventory pool\n60 slots · CRITICAL"
+n4: "Shipping pool\n40 slots · MEDIUM"
+n5: "Notification pool hoặc queue\n20 slots · LOW"
+n6: "Payment Service"
+n7: "Inventory Service"
+n8: "Shipping Service"
+n9: "Notification Service"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n2 -> n6
+n3 -> n7
+n4 -> n8
+n5 -> n9
 ```
 
 Cách phân vùng này tạo các giới hạn riêng:

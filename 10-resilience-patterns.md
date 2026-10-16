@@ -108,24 +108,44 @@ Một **Payment Service** lỗi có thể kéo theo **toàn bộ hệ thống** 
 | **Intermittent** (gián đoạn) | Lỗi xuất hiện rồi biến mất không theo quy luật | Flaky connection, memory pressure |
 | **Permanent** (vĩnh viễn) | Lỗi không tự khôi phục, cần can thiệp | Service crash, disk full, bug trong code |
 
-```mermaid
-graph LR
-    subgraph "Transient"
-        T1[Network blip] --> T2[Tự khôi phục]
-    end
-    subgraph "Intermittent"
-        I1[Lỗi ngẫu nhiên] --> I2[Khó dự đoán]
-    end
-    subgraph "Permanent"
-        P1[Service crash] --> P2[Cần can thiệp]
-    end
-
-    style T1 fill:#2d5016,stroke:#4ade80,color:#bbf7d0
-    style T2 fill:#2d5016,stroke:#4ade80,color:#bbf7d0
-    style I1 fill:#713f12,stroke:#facc15,color:#fef9c3
-    style I2 fill:#713f12,stroke:#facc15,color:#fef9c3
-    style P1 fill:#7f1d1d,stroke:#f87171,color:#fecaca
-    style P2 fill:#7f1d1d,stroke:#f87171,color:#fecaca
+```d2 title="1.2. Các loại lỗi trong hệ thống phân tán"
+direction: right
+n3: "Permanent" {}
+n2: "Intermittent" {}
+n1: "Transient" {}
+n1.n4: "Network blip" {
+  style.fill: "#2d5016"
+  style.stroke: "#4ade80"
+  style.font-color: "#bbf7d0"
+}
+n1.n5: "Tự khôi phục" {
+  style.fill: "#2d5016"
+  style.stroke: "#4ade80"
+  style.font-color: "#bbf7d0"
+}
+n2.n6: "Lỗi ngẫu nhiên" {
+  style.fill: "#713f12"
+  style.stroke: "#facc15"
+  style.font-color: "#fef9c3"
+}
+n2.n7: "Khó dự đoán" {
+  style.fill: "#713f12"
+  style.stroke: "#facc15"
+  style.font-color: "#fef9c3"
+}
+n3.n8: "Service crash" {
+  style.fill: "#7f1d1d"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+}
+n3.n9: "Cần can thiệp" {
+  style.fill: "#7f1d1d"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+}
+n1.n4 -> n1.n5
+n2.n6 -> n2.n7
+n3.n8 -> n3.n9
 ```
 
 **Quan trọng**: Resilience Pattern phù hợp phụ thuộc vào **loại lỗi**:
@@ -359,27 +379,53 @@ Retry Pattern tự động **thử lại** request khi gặp lỗi tạm thời 
 
 ### 3.2. Các chiến lược Retry
 
-```mermaid
-graph TD
-    A[Request thất bại] --> B{Lỗi có retry được?}
-    B -->|Không| C[Trả về lỗi ngay]
-    B -->|Có| D{Còn retry attempts?}
-    D -->|Không| E[Trả về lỗi sau max retries]
-    D -->|Có| F[Chọn chiến lược chờ]
-    F --> G[Immediate Retry]
-    F --> H[Fixed Delay]
-    F --> I[Exponential Backoff]
-    F --> J[Exponential Backoff + Jitter]
-    G --> K[Thử lại ngay]
-    H --> K
-    I --> K
-    J --> K
-    K --> A
-
-    style A fill:#7f1d1d,stroke:#f87171,color:#fecaca
-    style C fill:#7f1d1d,stroke:#f87171,color:#fecaca
-    style E fill:#7f1d1d,stroke:#f87171,color:#fecaca
-    style J fill:#2d5016,stroke:#4ade80,color:#bbf7d0
+```d2 title="3.2. Các chiến lược Retry"
+direction: down
+n1: "Request thất bại" {
+  style.fill: "#7f1d1d"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+}
+n2: "Lỗi có retry được?" {
+  shape: diamond
+}
+n3: "Trả về lỗi ngay" {
+  style.fill: "#7f1d1d"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+}
+n4: "Còn retry attempts?" {
+  shape: diamond
+}
+n5: "Trả về lỗi sau max retries" {
+  style.fill: "#7f1d1d"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+}
+n6: "Chọn chiến lược chờ"
+n7: "Immediate Retry"
+n8: "Fixed Delay"
+n9: "Exponential Backoff"
+n10: "Exponential Backoff + Jitter" {
+  style.fill: "#2d5016"
+  style.stroke: "#4ade80"
+  style.font-color: "#bbf7d0"
+}
+n11: "Thử lại ngay"
+n1 -> n2
+n2 -> n3: "Không"
+n2 -> n4: "Có"
+n4 -> n5: "Không"
+n4 -> n6: "Có"
+n6 -> n7
+n6 -> n8
+n6 -> n9
+n6 -> n10
+n7 -> n11
+n8 -> n11
+n9 -> n11
+n10 -> n11
+n11 -> n1
 ```
 
 | Chiến lược | Delay giữa các lần | Ưu điểm | Nhược điểm |
@@ -658,25 +704,51 @@ Failure rate = 15/25 = 60% > 50% → OPEN!
 
 Nghĩa là: Circuit Breaker **bọc ngoài**, kiểm tra trạng thái trước. Nếu mạch đóng → mới cho Retry thực hiện bên trong.
 
-```mermaid
-graph TD
-    A[Request đến] --> B{Circuit Breaker<br/>Mạch đang mở?}
-    B -->|🔴 OPEN| C[Reject ngay / Fallback]
-    B -->|🟢 CLOSED| D[Cho request đi qua]
-    D --> E[Gọi Service]
-    E -->|✅ Thành công| F[Trả kết quả]
-    E -->|❌ Thất bại| G{Retry còn<br/>lượt không?}
-    G -->|Còn| H[Chờ backoff rồi thử lại]
-    H --> E
-    G -->|Hết lượt| I[Báo lỗi cho Circuit Breaker]
-    I --> J[CB đếm thêm 1 failure]
-    J --> C
-
-    style A fill:#1e293b,stroke:#94a3b8,color:#e2e8f0
-    style C fill:#7f1d1d,stroke:#f87171,color:#fecaca
-    style F fill:#2d5016,stroke:#4ade80,color:#bbf7d0
-    style B fill:#4c1d95,stroke:#a78bfa,color:#ede9fe
-    style G fill:#713f12,stroke:#facc15,color:#fef9c3
+```d2 title="4.6. Circuit Breaker + Retry — Kết hợp"
+direction: down
+n1: "Request đến" {
+  style.fill: "#1e293b"
+  style.stroke: "#94a3b8"
+  style.font-color: "#e2e8f0"
+}
+n2: "Circuit Breaker\nMạch đang mở?" {
+  shape: diamond
+  style.fill: "#4c1d95"
+  style.stroke: "#a78bfa"
+  style.font-color: "#ede9fe"
+}
+n3: "Reject ngay / Fallback" {
+  style.fill: "#7f1d1d"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+}
+n4: "Cho request đi qua"
+n5: "Gọi Service"
+n6: "Trả kết quả" {
+  style.fill: "#2d5016"
+  style.stroke: "#4ade80"
+  style.font-color: "#bbf7d0"
+}
+n7: "Retry còn\nlượt không?" {
+  shape: diamond
+  style.fill: "#713f12"
+  style.stroke: "#facc15"
+  style.font-color: "#fef9c3"
+}
+n8: "Chờ backoff rồi thử lại"
+n9: "Báo lỗi cho Circuit Breaker"
+n10: "CB đếm thêm 1 failure"
+n1 -> n2
+n2 -> n3: "🔴 OPEN"
+n2 -> n4: "🟢 CLOSED"
+n4 -> n5
+n5 -> n6: "✅ Thành công"
+n5 -> n7: "❌ Thất bại"
+n7 -> n8: "Còn"
+n8 -> n5
+n7 -> n9: "Hết lượt"
+n9 -> n10
+n10 -> n3
 ```
 
 **Ví dụ cụ thể — 1 request đi qua cả 2 lớp**:
@@ -1173,29 +1245,18 @@ Kết hợp Fixed Window + trọng số:
 
 **Rate Limiting trong distributed system** — Cần shared storage:
 
+```d2 title="Distributed Rate Limiter dùng Redis"
+direction: down
+a: Instance 1
+b: Instance 2
+c: Instance 3
+redis: "Redis\nkey user:123 • count 85 • TTL 55s" {shape: cylinder}
+a -> redis
+b -> redis
+c -> redis
 ```
-┌──────────────────────────────────────────────────────┐
-│          DISTRIBUTED RATE LIMITER                    │
-│                                                      │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-│   │Instance 1│  │Instance 2│  │Instance 3│           │
-│   └────┬─────┘  └────┬─────┘  └────┬─────┘           │ 
-│        │             │             │                 │
-│        └─────────────┼─────────────┘                 │
-│                      │                               │
-│                      ▼                               │
-│              ┌──────────────┐                        │
-│              │    Redis     │                        │
-│              │              │                        │
-│              │ key: user:123│                        │
-│              │ count: 85    │                        │
-│              │ TTL: 55s     │                        │
-│              └──────────────┘                        │
-│                                                      │
-│   Dùng Redis INCR + EXPIRE (atomic)                  │
-│   hoặc Lua script cho chính xác                      │
-└──────────────────────────────────────────────────────┘
-```
+
+Dùng Lua script hoặc thao tác atomic phù hợp để việc tăng counter và thiết lập expiry không bị tách rời.
 
 ---
 
@@ -1236,47 +1297,26 @@ Fallback cung cấp **phương án dự phòng** khi service chính không hoạ
 
 ### 7.3. Ví dụ thực tế — Recommendation Service
 
+```d2 title="Product Page — Fallback Chain"
+direction: down
+user: "User xem iPhone 15"
+recommendation: "1. Recommendation Service\nGợi ý cá nhân hóa"
+personal: Hiển thị personalized
+cache: "2. Cache\nGợi ý từ hai giờ trước"
+cached: Hiển thị cached data
+popular: "3. Popular Items\nTop 10 bán chạy cùng danh mục"
+popular_result: Hiển thị popular items
+static: "4. Static Default\nPhụ kiện iPhone — luôn có dữ liệu tĩnh"
+user -> recommendation
+recommendation -> personal: Success
+recommendation -> cache: Failure
+cache -> cached: Hit
+cache -> popular: Miss
+popular -> popular_result: Có data
+popular -> static: Không có data
 ```
-┌───────────────────────────────────────────────────────────────┐
-│       PRODUCT PAGE — FALLBACK CHAIN                           │
-│                                                               │
-│   User xem sản phẩm "iPhone 15"                               │
-│                                                               │
-│   ┌────────────────────────────────────────┐                  │
-│   │  Bước 1: Gọi Recommendation Service    │                  │
-│   │  "Sản phẩm gợi ý cho user này"         │                  │
-│   │                                        │                  │
-│   │  ✅ Success → Hiển thị personalized    │                  │
-│   │  ❌ Failure ↓                          │                  │
-│   └────────────────────────────────────────┘                  │
-│                                                               │
-│   ┌────────────────────────────────────────┐                  │
-│   │  Bước 2: Fallback — Cache              │                  │
-│   │  "Gợi ý từ cache (2 giờ trước)"        │                  │
-│   │                                        │                  │
-│   │  ✅ Cache hit → Hiển thị cached data   │                  │
-│   │  ❌ Cache miss ↓                       │                  │
-│   └────────────────────────────────────────┘                  │
-│                                                               │
-│   ┌────────────────────────────────────────┐                  │
-│   │  Bước 3: Fallback — Popular Items      │                  │
-│   │  "Top 10 sản phẩm bán chạy cùng danh   │                  │
-│   │   mục"                                 │                  │
-│   │                                        │                  │
-│   │  ✅ Có data → Hiển thị popular items   │                  │
-│   │  ❌ Không có ↓                         │                  │
-│   └────────────────────────────────────────┘                  │
-│                                                               │
-│   ┌────────────────────────────────────────┐                  │
-│   │  Bước 4: Fallback — Static Default     │                  │
-│   │  "Hiển thị: Phụ kiện iPhone"           │                  │
-│   │                                        │                  │
-│   │  ✅ Luôn có dữ liệu tĩnh               │                  │
-│   └────────────────────────────────────────┘                  │
-│                                                               │
-│   → User LUÔN thấy gợi ý, không bao giờ thấy lỗi              │
-└───────────────────────────────────────────────────────────────┘
-```
+
+User vẫn thấy gợi ý khi dependency lỗi thay vì một lỗi của toàn bộ trang.
 
 ### 7.4. Graceful Degradation vs Fail Fast
 
@@ -1422,27 +1462,62 @@ Khi quá tải, **chủ động từ chối** một phần request để bảo v
 
 Các pattern nên được áp dụng **theo thứ tự từ ngoài vào trong**:
 
-```mermaid
-graph LR
-    A[Request] --> B[Rate Limiter]
-    B --> C[Bulkhead]
-    C --> D[Circuit Breaker]
-    D --> E[Retry + Backoff]
-    E --> F[Timeout]
-    F --> G[Service Call]
-    G -->|Fail| H[Fallback]
-    G -->|Success| I[Response]
-    H --> I
-
-    style A fill:#1e293b,stroke:#94a3b8,color:#e2e8f0
-    style B fill:#4c1d95,stroke:#a78bfa,color:#ede9fe
-    style C fill:#1e3a5f,stroke:#60a5fa,color:#dbeafe
-    style D fill:#713f12,stroke:#facc15,color:#fef9c3
-    style E fill:#164e63,stroke:#22d3ee,color:#cffafe
-    style F fill:#3b0764,stroke:#c084fc,color:#f3e8ff
-    style G fill:#1e293b,stroke:#94a3b8,color:#e2e8f0
-    style H fill:#7f1d1d,stroke:#f87171,color:#fecaca
-    style I fill:#2d5016,stroke:#4ade80,color:#bbf7d0
+```d2 title="9.1. Thứ tự áp dụng"
+direction: right
+n1: "Request" {
+  style.fill: "#1e293b"
+  style.stroke: "#94a3b8"
+  style.font-color: "#e2e8f0"
+}
+n2: "Rate Limiter" {
+  style.fill: "#4c1d95"
+  style.stroke: "#a78bfa"
+  style.font-color: "#ede9fe"
+}
+n3: "Bulkhead" {
+  style.fill: "#1e3a5f"
+  style.stroke: "#60a5fa"
+  style.font-color: "#dbeafe"
+}
+n4: "Circuit Breaker" {
+  style.fill: "#713f12"
+  style.stroke: "#facc15"
+  style.font-color: "#fef9c3"
+}
+n5: "Retry + Backoff" {
+  style.fill: "#164e63"
+  style.stroke: "#22d3ee"
+  style.font-color: "#cffafe"
+}
+n6: "Timeout" {
+  style.fill: "#3b0764"
+  style.stroke: "#c084fc"
+  style.font-color: "#f3e8ff"
+}
+n7: "Service Call" {
+  style.fill: "#1e293b"
+  style.stroke: "#94a3b8"
+  style.font-color: "#e2e8f0"
+}
+n8: "Fallback" {
+  style.fill: "#7f1d1d"
+  style.stroke: "#f87171"
+  style.font-color: "#fecaca"
+}
+n9: "Response" {
+  style.fill: "#2d5016"
+  style.stroke: "#4ade80"
+  style.font-color: "#bbf7d0"
+}
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8: "Fail"
+n7 -> n9: "Success"
+n8 -> n9
 ```
 
 ```

@@ -70,22 +70,14 @@ Document này sẽ đi qua các pattern và chiến lược quản lý data tron
 
 ### 2.1. Tại sao mỗi service cần database riêng?
 
+```d2 title="Database per Service — data ownership"
+direction: right
+order: Order Service { db: Order DB {shape: cylinder} }
+product: Product Service { db: Product DB {shape: cylinder} }
+user: User Service { db: User DB {shape: cylinder} }
 ```
-Nguyên tắc: Mỗi service SỞ HỮU data của mình
-──────────────────────────────────────────────
 
-  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-  │ Order       │   │ Product     │   │ User        │
-  │ Service     │   │ Service     │   │ Service     │
-  │             │   │             │   │             │
-  │  ┌───────┐  │   │  ┌───────┐  │   │  ┌───────┐  │
-  │  │Order  │  │   │  │Product│  │   │  │User   │  │
-  │  │  DB   │  │   │  │  DB   │  │   │  │  DB   │  │
-  │  └───────┘  │   │  └───────┘  │   │  └───────┘  │
-  └─────────────┘   └─────────────┘   └─────────────┘
-       ❌ Không ai khác được truy cập Order DB trực tiếp
-       ✅ Muốn data Order? → Gọi Order Service API
-```
+Mỗi service sở hữu data của mình. Service khác không được truy cập Order DB trực tiếp; muốn data Order thì gọi Order Service API.
 
 **Lý do:**
 
@@ -286,45 +278,18 @@ Database per Service → 3 thách thức lớn:
 
 ### 3.1. Tại sao Shared Database là anti-pattern?
 
+```d2 title="Shared Database — coupling qua schema chung"
+direction: down
+order: Order Service
+product: Product Service
+user: User Service
+db: Shared Database {shape: cylinder}
+order -> db
+product -> db
+user -> db
 ```
-❌ Shared Database:
-──────────────────
 
-  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐
-  │ Order       │   │ Product     │   │ User        │
-  │ Service     │   │ Service     │   │ Service     │
-  └──────┬──────┘   └──────┬──────┘   └──────┬──────┘
-         │                 │                 │
-         └────────────┬────┴────────────────┘
-                      │
-                ┌─────▼─────┐
-                │           │
-                │  Shared   │
-                │ Database  │
-                │           │
-                └───────────┘
-
-  Vấn đề:
-  ────────
-  1. TIGHT COUPLING
-     Order Service đọc trực tiếp bảng users
-     → User Service đổi schema → Order Service BỂ
-
-  2. KHÔNG THỂ INDEPENDENT DEPLOY
-     Migration bảng products → phải coordinate với TẤT CẢ
-     services đang đọc bảng này
-
-  3. KHÔNG THỂ SCALE ĐỘC LẬP
-     Product Service cần read replica
-     → phải scale cả DB chung → ảnh hưởng tất cả
-
-  4. SINGLE POINT OF FAILURE
-     DB chết → TẤT CẢ services chết
-
-  5. OWNERSHIP KHÔNG RÕ RÀNG
-     Bảng orders có cột product_name — ai own cột này?
-     Order Service hay Product Service? → conflict
-```
+Các vấn đề: **tight coupling** (đổi bảng `users` có thể làm Order lỗi); migration phải coordinate tất cả consumers; không scale DB độc lập cho Product; DB trở thành single point of failure; ownership của dữ liệu như `orders.product_name` không rõ ràng.
 
 ### 3.2. Khi nào chấp nhận Shared Database?
 
@@ -753,27 +718,23 @@ Saga có 2 cách triển khai: **Choreography** và **Orchestration**.
 
 Mỗi service **tự lắng nghe event** và quyết định bước tiếp theo — **không có coordinator trung tâm**.
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Order as Order Service
-    participant Payment as Payment Service
-    participant Inventory as Inventory Service
-    participant Notification as Notification Service
-
-    Client->>Order: Đặt hàng
-    Order->>Order: T1: Tạo order (PENDING)
-    Order-->>Payment: Event: OrderCreated
-
-    Payment->>Payment: T2: Trừ tiền
-    Payment-->>Inventory: Event: PaymentCompleted
-
-    Inventory->>Inventory: T3: Trừ tồn kho
-    Inventory-->>Order: Event: InventoryReserved
-    Inventory-->>Notification: Event: InventoryReserved
-
-    Order->>Order: Update order → CONFIRMED
-    Notification->>Notification: Gửi email xác nhận
+```d2 title="6.2. Choreography Saga"
+shape: sequence_diagram
+"Client": "Client"
+"Order": "Order Service"
+"Payment": "Payment Service"
+"Inventory": "Inventory Service"
+"Notification": "Notification Service"
+"Client" -> "Order": "Đặt hàng"
+"Order" -> "Order": "T1: Tạo order (PENDING)"
+"Order" -> "Payment": "Event: OrderCreated" { style.stroke-dash: 5 }
+"Payment" -> "Payment": "T2: Trừ tiền"
+"Payment" -> "Inventory": "Event: PaymentCompleted" { style.stroke-dash: 5 }
+"Inventory" -> "Inventory": "T3: Trừ tồn kho"
+"Inventory" -> "Order": "Event: InventoryReserved" { style.stroke-dash: 5 }
+"Inventory" -> "Notification": "Event: InventoryReserved" { style.stroke-dash: 5 }
+"Order" -> "Order": "Update order → CONFIRMED"
+"Notification" -> "Notification": "Gửi email xác nhận"
 ```
 
 ```
@@ -815,25 +776,21 @@ Choreography — Ưu / Nhược:
 
 Có **1 Orchestrator** (điều phối viên) biết toàn bộ flow, ra lệnh cho từng service theo thứ tự.
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Orchestrator as Order Saga<br/>Orchestrator
-    participant Order as Order Service
-    participant Payment as Payment Service
-    participant Inventory as Inventory Service
-
-    Client->>Orchestrator: Đặt hàng
-    Orchestrator->>Order: Tạo order (PENDING)
-    Order-->>Orchestrator: OK
-
-    Orchestrator->>Payment: Trừ tiền
-    Payment-->>Orchestrator: OK
-
-    Orchestrator->>Inventory: Trừ tồn kho
-    Inventory-->>Orchestrator: OK
-
-    Orchestrator->>Order: Update order → CONFIRMED
+```d2 title="6.3. Orchestration Saga"
+shape: sequence_diagram
+"Client": "Client"
+"Orchestrator": "Order Saga\nOrchestrator"
+"Order": "Order Service"
+"Payment": "Payment Service"
+"Inventory": "Inventory Service"
+"Client" -> "Orchestrator": "Đặt hàng"
+"Orchestrator" -> "Order": "Tạo order (PENDING)"
+"Order" -> "Orchestrator": "OK" { style.stroke-dash: 5 }
+"Orchestrator" -> "Payment": "Trừ tiền"
+"Payment" -> "Orchestrator": "OK" { style.stroke-dash: 5 }
+"Orchestrator" -> "Inventory": "Trừ tồn kho"
+"Inventory" -> "Orchestrator": "OK" { style.stroke-dash: 5 }
+"Orchestrator" -> "Order": "Update order → CONFIRMED"
 ```
 
 ```

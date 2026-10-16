@@ -72,14 +72,23 @@ Trong cách làm truyền thống, deploy xong thường đồng nghĩa với re
 | Release | Bật flag cho một cohort (nhóm user có cùng rule). | Flag quyết định caller dùng path nào. |
 | Mở rộng | Tăng phạm vi từ nhóm nhỏ tới toàn bộ user. | Giữ khả năng dừng ở từng mốc. |
 
-```mermaid
-flowchart LR
-    A["Build artifact<br/>code cũ + code mới"] --> B["Deploy production<br/>flag OFF"]
-    B --> C["Kiểm tra startup,<br/>compatibility và telemetry"]
-    C --> D["Bật cho cohort nhỏ"]
-    D --> E{"Metrics đạt ngưỡng?"}
-    E -->|"Có"| F["Mở rộng rollout<br/>đến 100%"]
-    E -->|"Không"| G["Tắt flag<br/>giữ phần deploy khác"]
+```d2 title="Deploy và release là hai thời điểm khác nhau"
+direction: right
+n1: "Build artifact\ncode cũ + code mới"
+n2: "Deploy production\nflag OFF"
+n3: "Kiểm tra startup,\ncompatibility và telemetry"
+n4: "Bật cho cohort nhỏ"
+n5: "Metrics đạt ngưỡng?" {
+  shape: diamond
+}
+n6: "Mở rộng rollout\nđến 100%"
+n7: "Tắt flag\ngiữ phần deploy khác"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6: "Có"
+n5 -> n7: "Không"
 ```
 
 Trạng thái `OFF` này thường được gọi là **dark launch** (triển khai ngầm): code đã có mặt trên production nhưng behavior mới chưa được phát hành rộng. Dark launch giúp kiểm tra artifact và đường tích hợp trước khi mở feature. Nếu muốn thực sự chạy thử code path mới để so sánh kết quả, cần giới hạn cohort và tránh side effect không thể hoàn tác.
@@ -88,14 +97,22 @@ Trạng thái `OFF` này thường được gọi là **dark launch** (triển k
 
 Một flag có thể được đọc từ Feature Flag Service hoặc một hệ thống dynamic configuration. Cách lưu trữ, cache và thời gian refresh phụ thuộc implementation; không nên mặc định rằng mọi thay đổi đều được áp dụng tức thời.
 
-```mermaid
-flowchart LR
-    A["Request<br/>userId, plan, cohort"] --> B["Flag evaluator<br/>đọc rule runtime"]
-    B --> C{"Flag ON?"}
-    C -->|"Không"| D["Code path cũ"]
-    C -->|"Có"| E["Code path mới"]
-    D --> F["Telemetry theo flag<br/>và variant"]
-    E --> F
+```d2 title="Đánh giá flag tại runtime"
+direction: right
+n1: "Request\nuserId, plan, cohort"
+n2: "Flag evaluator\nđọc rule runtime"
+n3: "Flag ON?" {
+  shape: diamond
+}
+n4: "Code path cũ"
+n5: "Code path mới"
+n6: "Telemetry theo flag\nvà variant"
+n1 -> n2
+n2 -> n3
+n3 -> n4: "Không"
+n3 -> n5: "Có"
+n4 -> n6
+n5 -> n6
 ```
 
 **Flag evaluator** là phần quyết định giá trị của flag dựa trên key và context. Nên đặt việc đánh giá ở một abstraction dùng chung thay vì rải các chuỗi key và điều kiện riêng lẻ trong nhiều module. Khi hệ thống flag không truy cập được nguồn cấu hình, behavior fallback phải được định nghĩa trước. Với release toggle mới, default về behavior cũ thường là lựa chọn an toàn hơn.

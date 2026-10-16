@@ -250,62 +250,63 @@ Peak ≈ 5,800 downloads/s
 
 ## 5. High-Level Architecture
 
-```mermaid
-flowchart LR
-    subgraph Clients[Client Devices]
-        WEB[Web Client]
-        DESK[Desktop Sync Agent]
-        MOB[Mobile Client]
-    end
-
-    EDGE[API Gateway<br/>Auth + Rate Limit]
-    META[Metadata Service]
-    UPL[Upload Service]
-    SYNC[Sync Service]
-    SHARE[Sharing Service]
-    NOTIFY[Realtime Notification]
-
-    MDB[(Metadata DB)]
-    CACHE[(Redis Cache)]
-    LOG[(Durable Change Log)]
-    QUEUE[[SQS / Event Bus]]
-    WORKER[Async Workers]
-    CDN[CDN]
-    S3[(Object Storage)]
-
-    WEB --> EDGE
-    DESK --> EDGE
-    MOB --> EDGE
-
-    EDGE --> META
-    EDGE --> UPL
-    EDGE --> SYNC
-    EDGE --> SHARE
-    EDGE --> NOTIFY
-
-    META --> MDB
-    META --> CACHE
-    SHARE --> MDB
-    SYNC --> LOG
-    SYNC --> MDB
-    NOTIFY -.->|change available| WEB
-    NOTIFY -.->|change available| DESK
-    NOTIFY -.->|change available| MOB
-
-    UPL -->|create signed URL| S3
-    WEB ==>|file bytes| S3
-    DESK ==>|file bytes| S3
-    MOB ==>|file bytes| S3
-
-    S3 -->|object event| QUEUE
-    QUEUE --> WORKER
-    WORKER --> MDB
-    WORKER --> LOG
-
-    WEB ==>|download bytes| CDN
-    DESK ==>|download bytes| CDN
-    MOB ==>|download bytes| CDN
-    CDN -->|origin fetch| S3
+```d2 title="5. High-Level Architecture"
+direction: right
+n1: "Client Devices" {}
+n1.n2: "Web Client"
+n1.n3: "Desktop Sync Agent"
+n1.n4: "Mobile Client"
+n5: "API Gateway\nAuth + Rate Limit"
+n6: "Metadata Service"
+n7: "Upload Service"
+n8: "Sync Service"
+n9: "Sharing Service"
+n10: "Realtime Notification"
+n11: "Metadata DB" {
+  shape: cylinder
+}
+n12: "Redis Cache" {
+  shape: cylinder
+}
+n13: "Durable Change Log" {
+  shape: cylinder
+}
+n14: "SQS / Event Bus" {
+  style.double-border: true
+}
+n15: "Async Workers"
+n16: "CDN"
+n17: "Object Storage" {
+  shape: cylinder
+}
+n1.n2 -> n5
+n1.n3 -> n5
+n1.n4 -> n5
+n5 -> n6
+n5 -> n7
+n5 -> n8
+n5 -> n9
+n5 -> n10
+n6 -> n11
+n6 -> n12
+n9 -> n11
+n8 -> n13
+n8 -> n11
+n10 -> n1.n2: "change available" { style.stroke-dash: 5 }
+n10 -> n1.n3: "change available" { style.stroke-dash: 5 }
+n10 -> n1.n4: "change available" { style.stroke-dash: 5 }
+n7 -> n17: "create signed URL"
+n1.n2 -> n17: "file bytes" { style.stroke-width: 3 }
+n1.n3 -> n17: "file bytes" { style.stroke-width: 3 }
+n1.n4 -> n17: "file bytes" { style.stroke-width: 3 }
+n17 -> n14: "object event"
+n14 -> n15
+n15 -> n11
+n15 -> n13
+n1.n2 -> n16: "download bytes" { style.stroke-width: 3 }
+n1.n3 -> n16: "download bytes" { style.stroke-width: 3 }
+n1.n4 -> n16: "download bytes" { style.stroke-width: 3 }
+n16 -> n17: "origin fetch"
 ```
 
 Mũi tên nét đậm biểu diễn **file bytes**. File content đi trực tiếp giữa client với S3/CDN. Application services chỉ xử lý metadata, authorization, upload session và signed URL.
@@ -511,7 +512,7 @@ DELETE /v1/uploads/{uploadId}
 
 Khởi tạo upload:
 
-```json
+```json source="snippets/7-1-upload-apis.json"
 POST /v1/uploads
 Idempotency-Key: 93c851c7-...
 
@@ -523,6 +524,8 @@ Idempotency-Key: 93c851c7-...
   "contentChecksum": "sha256:..."
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=31-case-study-dropbox-system-design&snapshot=article&file=snippets%2F7-1-upload-apis.json)
 
 Response:
 
@@ -538,7 +541,7 @@ Response:
 
 Complete upload:
 
-```json
+```json source="snippets/7-1-upload-apis-2.json"
 POST /v1/uploads/upload-789:complete
 
 {
@@ -551,6 +554,8 @@ POST /v1/uploads/upload-789:complete
   ]
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=31-case-study-dropbox-system-design&snapshot=article&file=snippets%2F7-1-upload-apis-2.json)
 
 ### 7.2. File và download APIs
 
@@ -746,25 +751,19 @@ Các lưu ý:
 
 ### 10.1. Thành phần phía client
 
-```text
-┌────────────────────────────────────────────────────────────┐
-│                    Desktop Sync Agent                      │
-│                                                            │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
-│  │ File Watcher │───▶│   Indexer    │───▶│ Chunker/Hash │  │
-│  └──────────────┘    └──────┬───────┘    └──────┬───────┘  │
-│                             │                   │          │
-│                             ▼                   ▼          │
-│                      ┌──────────────┐    ┌──────────────┐  │
-│                      │   Local DB   │    │Upload Manager│  │
-│                      │path/version/ │    │retry/resume  │  │
-│                      │hash/cursor   │    └──────────────┘  │
-│                      └──────┬───────┘                      │
-│                             ▼                              │
-│                      ┌──────────────┐                      │
-│                      │ Sync Engine  │                      │
-│                      └──────────────┘                      │
-└────────────────────────────────────────────────────────────┘
+```d2 title="Desktop Sync Agent — các thành phần"
+direction: right
+agent: Desktop Sync Agent {
+ watcher: File Watcher
+ indexer: Indexer
+ chunker: Chunker / Hash
+ db: "Local DB\npath / version / hash / cursor" {shape: cylinder}
+ upload: "Upload Manager\nRetry / Resume"
+ sync: Sync Engine
+ watcher -> indexer -> chunker
+ indexer -> db -> sync
+ chunker -> upload
+}
 ```
 
 - **File Watcher:** phát hiện create, modify, rename và delete.
@@ -826,15 +825,25 @@ Giả sử laptop và phone đều sửa từ `baseVersionId=41`:
 4. Hệ thống không overwrite im lặng.
 5. Hệ thống tạo `conflicted copy` hoặc yêu cầu merge.
 
-```mermaid
-flowchart TD
-    A[Client submits new version] --> B{baseVersionId equals currentVersionId?}
-    B -->|Yes| C[Commit new current version]
-    B -->|No| D{File type supports merge?}
-    D -->|Yes| E[Attempt semantic merge]
-    D -->|No| F[Create conflicted copy]
-    E -->|Merge succeeds| C
-    E -->|Merge fails| F
+```d2 title="10.4. Conflict resolution"
+direction: down
+n1: "Client submits new version"
+n2: "baseVersionId equals currentVersionId?" {
+  shape: diamond
+}
+n3: "Commit new current version"
+n4: "File type supports merge?" {
+  shape: diamond
+}
+n5: "Attempt semantic merge"
+n6: "Create conflicted copy"
+n1 -> n2
+n2 -> n3: "Yes"
+n2 -> n4: "No"
+n4 -> n5: "Yes"
+n4 -> n6: "No"
+n5 -> n3: "Merge succeeds"
+n5 -> n6: "Merge fails"
 ```
 
 Đối với binary file như ZIP hoặc PSD, conflicted copy thường an toàn hơn last-write-wins vì không làm mất dữ liệu của một thiết bị.
@@ -907,7 +916,7 @@ Nếu chèn một byte ở đầu file, fixed-size chunking có thể làm check
 
 Một file version có thể được biểu diễn bằng ordered manifest:
 
-```json
+```json source="snippets/11-4-chunk-manifest.json"
 {
   "versionId": "version-42",
   "totalSize": 12582912,
@@ -930,6 +939,8 @@ Một file version có thể được biểu diễn bằng ordered manifest:
   ]
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=31-case-study-dropbox-system-design&snapshot=article&file=snippets%2F11-4-chunk-manifest.json)
 
 Client gửi danh sách hash. Server trả những block chưa tồn tại trong phạm vi được phép deduplicate. Sau khi upload đủ block, server atomically publish manifest thành một `READY` version.
 
@@ -965,15 +976,27 @@ Một lựa chọn an toàn là deduplicate trong phạm vi một tenant hoặc 
 
 ## 12. File Sharing và Authorization
 
-```mermaid
-flowchart LR
-    OWNER[File Owner] -->|grant VIEW or EDIT| SHARE[Sharing Service]
-    SHARE --> ACL[(Permission Store)]
-    USER[Recipient] --> API[Download or Metadata API]
-    API --> AUTHZ{Authorize}
-    AUTHZ -->|Allowed| URL[Issue signed URL]
-    AUTHZ -->|Denied| DENY[403 Forbidden]
-    ACL --> AUTHZ
+```d2 title="12. File Sharing và Authorization"
+direction: right
+n1: "File Owner"
+n2: "Sharing Service"
+n3: "Permission Store" {
+  shape: cylinder
+}
+n4: "Recipient"
+n5: "Download or Metadata API"
+n6: "Authorize" {
+  shape: diamond
+}
+n7: "Issue signed URL"
+n8: "403 Forbidden"
+n1 -> n2: "grant VIEW or EDIT"
+n2 -> n3
+n4 -> n5
+n5 -> n6
+n6 -> n7: "Allowed"
+n6 -> n8: "Denied"
+n3 -> n6
 ```
 
 Một permission record cần ít nhất:
@@ -1040,13 +1063,25 @@ Nếu event lặp lại, transition `READY → READY` không được tạo thê
 
 Nếu Metadata DB cập nhật current version thành công nhưng publish sync event thất bại, thiết bị khác sẽ không biết có thay đổi mới. Transactional Outbox giải quyết dual-write này.
 
-```mermaid
-flowchart LR
-    S[Metadata Service] -->|one DB transaction| DB[(Metadata Tables)]
-    S -->|same transaction| O[(Outbox Table)]
-    O --> R[Outbox Relay]
-    R --> B[[Change Log / Event Bus]]
-    B --> N[Notification + Sync Consumers]
+```d2 title="13.3. Transactional Outbox"
+direction: right
+n1: "Metadata Service"
+n2: "Metadata Tables" {
+  shape: cylinder
+}
+n3: "Outbox Table" {
+  shape: cylinder
+}
+n4: "Outbox Relay"
+n5: "Change Log / Event Bus" {
+  style.double-border: true
+}
+n6: "Notification + Sync Consumers"
+n1 -> n2: "one DB transaction"
+n1 -> n3: "same transaction"
+n3 -> n4
+n4 -> n5
+n5 -> n6
 ```
 
 Metadata update và outbox insert commit trong cùng transaction. Relay có thể publish lặp, vì vậy consumer vẫn phải idempotent.

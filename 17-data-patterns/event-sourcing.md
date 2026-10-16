@@ -49,15 +49,26 @@ Trong cách lưu dữ liệu thông thường, database giữ **state hiện t�
 
 Ví dụ, một order có thể có các event `OrderCreated`, `PaymentReceived`, `OrderShipped` và `OrderDelivered`. State `DELIVERED` là kết quả của chuỗi đó, không phải bản ghi duy nhất được cập nhật nhiều lần.
 
-```mermaid
-flowchart LR
-    C[Command] --> A[Aggregate<br/>validate invariant]
-    A -->|event mới| E[(Event Store<br/>append-only)]
-    E -->|replay stream| A
-    E --> P[Projector]
-    P --> R[(Read model)]
-    E --> I[Integration publisher]
-    I --> B[Message broker]
+```d2 title="Tổng quan"
+direction: right
+n1: "Command"
+n2: "Aggregate\nvalidate invariant"
+n3: "Event Store\nappend-only" {
+  shape: cylinder
+}
+n4: "Projector"
+n5: "Read model" {
+  shape: cylinder
+}
+n6: "Integration publisher"
+n7: "Message broker"
+n1 -> n2
+n2 -> n3: "event mới"
+n3 -> n2: "replay stream"
+n3 -> n4
+n4 -> n5
+n3 -> n6
+n6 -> n7
 ```
 
 Event Sourcing giải quyết bài toán lưu **lịch sử nghiệp vụ có ý nghĩa**, không chỉ bài toán phát message. Event store, projection và các contract liên quan cần được thiết kế như một hệ thống lưu trữ lâu dài.
@@ -91,7 +102,7 @@ Event Sourcing không có nghĩa mọi bản sao state đều bị cấm. Snapsh
 
 Một event record thường có các trường nhận diện và truy nguyên tương tự sau:
 
-```json
+```json source="snippets/cac-khai-niem-cot-loi.json"
 {
   "event_id": "evt-8f2c",
   "aggregate_id": "account-001",
@@ -106,6 +117,8 @@ Một event record thường có các trường nhận diện và truy nguyên t
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=event-sourcing&snapshot=article&file=snippets%2Fcac-khai-niem-cot-loi.json)
 
 `event_id` nhận diện một event duy nhất. `aggregate_id` xác định stream cần đọc hoặc append. `sequence` giúp kiểm tra thứ tự và phát hiện concurrent write. Metadata như `correlation_id`, actor hoặc request context có thể được lưu theo chính sách audit, nhưng không nên đưa secret vào event record.
 
@@ -263,22 +276,21 @@ Event stream là nguồn tốt cho append và replay nhưng không phải lúc n
 
 Projector đọc events, transform dữ liệu và ghi projection. Projector không nên quyết định invariant của aggregate. Ví dụ, projector có thể tính cột `balance`, nhưng không được tự chấp nhận một lệnh rút tiền chỉ vì read model đang hiển thị đủ số dư.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant S as Account Service
-    participant ES as Event Store
-    participant P as Balance Projector
-    participant R as Read Model
-
-    C->>S: WithdrawMoney command
-    S->>ES: Load stream và rehydrate aggregate
-    S->>S: Validate invariant
-    S->>ES: Append MoneyWithdrawn
-    ES-->>P: Deliver event theo stream version
-    P->>R: Upsert balance view
-    S-->>C: Command đã commit
-    C->>R: Query balance view
+```d2 title="Projector biến events thành view"
+shape: sequence_diagram
+"C": "Client"
+"S": "Account Service"
+"ES": "Event Store"
+"P": "Balance Projector"
+"R": "Read Model"
+"C" -> "S": "WithdrawMoney command"
+"S" -> "ES": "Load stream và rehydrate aggregate"
+"S" -> "S": "Validate invariant"
+"S" -> "ES": "Append MoneyWithdrawn"
+"ES" -> "P": "Deliver event theo stream version" { style.stroke-dash: 5 }
+"P" -> "R": "Upsert balance view"
+"S" -> "C": "Command đã commit" { style.stroke-dash: 5 }
+"C" -> "R": "Query balance view"
 ```
 
 Một command có thể đã commit trước khi projector cập nhật xong read model. Vì vậy, response của command và dữ liệu query cần có contract rõ về trạng thái xử lý và độ mới.
@@ -334,22 +346,21 @@ State hiện tại không được tính bằng cách sửa một dòng `balance
 
 Một command `WithdrawMoney(account_id = account-001, amount = 100000)` có thể đi qua các bước sau:
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant A as Account Service
-    participant E as Event Store
-    participant P as Balance Projector
-
-    C->>A: WithdrawMoney(account-001, 100000)
-    A->>E: Load snapshot + events
-    E-->>A: State balance = 450000, version = 5
-    A->>A: Aggregate kiểm tra amount > 0 và balance đủ
-    A->>E: Append MoneyWithdrawn, expected_version = 5
-    E-->>A: Commit version = 6
-    A-->>C: Accepted, account_version = 6
-    E-->>P: MoneyWithdrawn version = 6
-    P->>P: Cập nhật projection
+```d2 title="Luồng nạp và rút tiền"
+shape: sequence_diagram
+"C": "Client"
+"A": "Account Service"
+"E": "Event Store"
+"P": "Balance Projector"
+"C" -> "A": "WithdrawMoney(account-001, 100000)"
+"A" -> "E": "Load snapshot + events"
+"E" -> "A": "State balance = 450000, version = 5" { style.stroke-dash: 5 }
+"A" -> "A": "Aggregate kiểm tra amount > 0 và balance đủ"
+"A" -> "E": "Append MoneyWithdrawn, expected_version = 5"
+"E" -> "A": "Commit version = 6" { style.stroke-dash: 5 }
+"A" -> "C": "Accepted, account_version = 6" { style.stroke-dash: 5 }
+"E" -> "P": "MoneyWithdrawn version = 6" { style.stroke-dash: 5 }
+"P" -> "P": "Cập nhật projection"
 ```
 
 Nếu số tiền rút lớn hơn số dư, aggregate từ chối command và **không append** `MoneyWithdrawn`. Nếu hai lệnh rút cùng đọc version 5, chỉ một lệnh có thể append với `expected_version = 5`; lệnh còn lại phải load lại state trước khi quyết định.
@@ -379,7 +390,7 @@ Mỗi event nên có `event_type` ổn định và một cách nhận biết sch
 
 Ví dụ schema version 1:
 
-```json
+```json source="snippets/version-event-contract.json"
 {
   "event_type": "MoneyDeposited",
   "schema_version": 1,
@@ -389,9 +400,11 @@ Ví dụ schema version 1:
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=event-sourcing&snapshot=article&file=snippets%2Fversion-event-contract.json)
+
 Nếu thêm currency mà không làm thay đổi ý nghĩa event, producer có thể phát schema mới theo quy tắc tương thích:
 
-```json
+```json source="snippets/version-event-contract-2.json"
 {
   "event_type": "MoneyDeposited",
   "schema_version": 2,
@@ -401,6 +414,8 @@ Nếu thêm currency mà không làm thay đổi ý nghĩa event, producer có t
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=event-sourcing&snapshot=article&file=snippets%2Fversion-event-contract-2.json)
 
 Nếu thay đổi semantics, đơn vị tiền hoặc quy tắc tính theo cách làm consumer cũ hiểu sai, không nên chỉ đổi payload dưới cùng một version. Có thể tạo event type/version mới và hỗ trợ cả dạng cũ trong giai đoạn chuyển tiếp.
 

@@ -208,35 +208,32 @@ Công ty **FastBite** đang vận hành nền tảng giao đồ ăn trên một 
 | **Identity & Auth** | ⚪ Generic | Đăng nhập, social login, profile — bài toán đã có lời giải chuẩn | Cognito / Keycloak + custom profile |
 | **Support** | ⚪ Generic | Ticket khiếu nại, escalation — có thể dùng SaaS hoặc giải pháp sẵn | Tích hợp Zendesk hoặc tự build đơn giản |
 
-```mermaid
-graph TB
-    subgraph "🔴 Core Domain"
-        ORD[Order Management]
-        DSP[Dispatch]
-        PAY[Payment]
-    end
-    subgraph "🟡 Supporting Domain"
-        MER[Merchant/Catalog]
-        MNU[Menu Management]
-        SEA[Search & Discovery]
-        TRK[Fleet Tracking]
-        PRM[Promotion]
-        CRT[Cart]
-        REV[Review & Rating]
-    end
-    subgraph "⚪ Generic Domain"
-        NTF[Notification]
-        IDN[Identity & Auth]
-        SUP[Support]
-    end
-    CRT --> ORD
-    ORD --> PAY
-    ORD --> DSP
-    DSP --> TRK
-    MER --> MNU
-    MNU --> SEA
-    ORD --> NTF
-    ORD --> REV
+```d2 title="1.1. Subdomain Classification"
+direction: down
+n3: "⚪ Generic Domain" {}
+n2: "🟡 Supporting Domain" {}
+n1: "🔴 Core Domain" {}
+n1.n4: "Order Management"
+n1.n5: "Dispatch"
+n1.n6: "Payment"
+n2.n7: "Merchant/Catalog"
+n2.n8: "Menu Management"
+n2.n9: "Search & Discovery"
+n2.n10: "Fleet Tracking"
+n2.n11: "Promotion"
+n2.n12: "Cart"
+n2.n13: "Review & Rating"
+n3.n14: "Notification"
+n3.n15: "Identity & Auth"
+n3.n16: "Support"
+n2.n12 -> n1.n4
+n1.n4 -> n1.n6
+n1.n4 -> n1.n5
+n1.n5 -> n2.n10
+n2.n7 -> n2.n8
+n2.n8 -> n2.n9
+n1.n4 -> n3.n14
+n1.n4 -> n2.n13
 ```
 
 ### 1.2. Bounded Context Mapping
@@ -271,42 +268,46 @@ graph TB
 
 ### 1.4. Context Map Patterns
 
-```mermaid
-graph TB
-    IAM[Identity & Access]
-    MER[Merchant]
-    MNU[Menu]
-    DIS[Search/Discovery]
-    CRT[Cart]
-    ORD[Order]
-    PAY[Payment]
-    DSP[Dispatch]
-    TRK[Tracking]
-    PRM[Promotion]
-    ENG[Engagement/Notification]
-    TRU[Trust/Review]
-    SUP[Support]
-
-    MNU -->|"Published Language<br/>MenuUpdated event"| DIS
-    DIS -.->|"Conformist<br/>Consume Menu data"| MNU
-    MER -->|"Published Language<br/>RestaurantUpdated"| MNU
-    CRT -->|"Customer-Supplier"| ORD
-    ORD -->|"Customer-Supplier"| PAY
-    ORD -->|"Customer-Supplier<br/>Assign driver"| DSP
-    ORD -->|"Customer-Supplier"| PRM
-    DSP -->|"Customer-Supplier<br/>Query location"| TRK
-    PAY -.->|"ACL<br/>Wrap e-wallet/card"| EXT_PAY[External Payment]
-    DSP -.->|"ACL<br/>Wrap map/routing API"| EXT_MAP[External Map/Routing]
-    ORD -->|"Published Language<br/>OrderPlaced event"| ENG
-    ORD -->|"Published Language<br/>OrderDelivered"| TRU
-    ORD -->|"Published Language"| SUP
-    TRU -->|"Published Language<br/>ReviewCreated"| MER
-    IAM -->|"Open Host Service<br/>JWT validation"| ORD
-    IAM -->|"Open Host Service"| CRT
-    IAM -->|"Open Host Service"| DSP
-
-    style EXT_PAY fill:#f9f1,stroke:#333
-    style EXT_MAP fill:#f9f1,stroke:#333
+```d2 title="1.4. Context Map Patterns"
+direction: down
+n1: "Identity & Access"
+n2: "Merchant"
+n3: "Menu"
+n4: "Search/Discovery"
+n5: "Cart"
+n6: "Order"
+n7: "Payment"
+n8: "Dispatch"
+n9: "Tracking"
+n10: "Promotion"
+n11: "Engagement/Notification"
+n12: "Trust/Review"
+n13: "Support"
+n14: "External Payment" {
+  style.fill: "#f9f"
+  style.stroke: "#333"
+}
+n15: "External Map/Routing" {
+  style.fill: "#f9f"
+  style.stroke: "#333"
+}
+n3 -> n4: "Published Language\nMenuUpdated event"
+n4 -> n3: "Conformist\nConsume Menu data" { style.stroke-dash: 5 }
+n2 -> n3: "Published Language\nRestaurantUpdated"
+n5 -> n6: "Customer-Supplier"
+n6 -> n7: "Customer-Supplier"
+n6 -> n8: "Customer-Supplier\nAssign driver"
+n6 -> n10: "Customer-Supplier"
+n8 -> n9: "Customer-Supplier\nQuery location"
+n7 -> n14: "ACL\nWrap e-wallet/card" { style.stroke-dash: 5 }
+n8 -> n15: "ACL\nWrap map/routing API" { style.stroke-dash: 5 }
+n6 -> n11: "Published Language\nOrderPlaced event"
+n6 -> n12: "Published Language\nOrderDelivered"
+n6 -> n13: "Published Language"
+n12 -> n2: "Published Language\nReviewCreated"
+n1 -> n6: "Open Host Service\nJWT validation"
+n1 -> n5: "Open Host Service"
+n1 -> n8: "Open Host Service"
 ```
 
 **Chi tiết Context Mapping Patterns:**
@@ -375,15 +376,23 @@ graph TB
 
 **Flowchart tổng quan:**
 
-```mermaid
-flowchart LR
-    C1[Command: PlaceOrder] --> E1[Event: order.placed.v1]
-    E1 --> C2[Command: InitiatePayment]
-    C2 --> E2[Event: payment.captured.v1]
-    E2 --> C3[Command: AssignDriver]
-    C3 --> E3[Event: driver.assigned.v1]
-    E3 --> E4[Event: order.in_delivery.v1]
-    E4 --> E5[Event: order.delivered.v1]
+```d2 title="1.5. Event Storming cho Place Order"
+direction: right
+n1: "Command: PlaceOrder"
+n2: "Event: order.placed.v1"
+n3: "Command: InitiatePayment"
+n4: "Event: payment.captured.v1"
+n5: "Command: AssignDriver"
+n6: "Event: driver.assigned.v1"
+n7: "Event: order.in_delivery.v1"
+n8: "Event: order.delivered.v1"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
 ```
 
 **Key takeaways:**
@@ -462,28 +471,38 @@ flowchart LR
 
 ### 2.3. Dependency Graph
 
-```mermaid
-graph TD
-    GW[Gateway] --> ORD[Order]
-    GW --> CART[Cart]
-    GW --> SEA[Search]
-    GW --> USR[User]
-
-    ORD --> PAY[Payment]
-    ORD --> DSP[Dispatch]
-    ORD --> PRM[Promotion]
-    ORD --> NTF[Notification]
-
-    DSP --> TRK[Tracking]
-    SEA --> MENU[Menu]
-    MENU --> MER[Merchant]
+```d2 title="2.3. Dependency Graph"
+direction: down
+n1: "Gateway"
+n2: "Order"
+n3: "Cart"
+n4: "Search"
+n5: "User"
+n6: "Payment"
+n7: "Dispatch"
+n8: "Promotion"
+n9: "Notification"
+n10: "Tracking"
+n11: "Menu"
+n12: "Merchant"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n2 -> n6
+n2 -> n7
+n2 -> n8
+n2 -> n9
+n7 -> n10
+n4 -> n11
+n11 -> n12
 ```
 
 ### 2.4. API Contracts quan trọng
 
 **Create Order request**
 
-```json
+```json source="snippets/2-4-api-contracts-quan-trong.json"
 {
   "userId": "USR-1001",
   "restaurantId": "RES-902",
@@ -496,6 +515,8 @@ graph TD
   "paymentMethod": "wallet"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F2-4-api-contracts-quan-trong.json)
 
 **Create Order response**
 
@@ -929,7 +950,7 @@ sequenceDiagram
 
 **`order.placed.v1`**
 
-```json
+```json source="snippets/3-9-event-payload-samples-json.json"
 {
   "eventId": "evt-9bda-1201",
   "eventType": "order.placed.v1",
@@ -951,9 +972,11 @@ sequenceDiagram
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F3-9-event-payload-samples-json.json)
+
 **`payment.captured.v1`**
 
-```json
+```json source="snippets/3-9-event-payload-samples-json-2.json"
 {
   "eventId": "evt-a112-8821",
   "eventType": "payment.captured.v1",
@@ -968,9 +991,11 @@ sequenceDiagram
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F3-9-event-payload-samples-json-2.json)
+
 **`driver.assigned.v1`**
 
-```json
+```json source="snippets/3-9-event-payload-samples-json-3.json"
 {
   "eventId": "evt-cx21-7788",
   "eventType": "driver.assigned.v1",
@@ -984,6 +1009,8 @@ sequenceDiagram
   "retryRound": 1
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F3-9-event-payload-samples-json-3.json)
 
 **Quy tắc schema cho events:**
 
@@ -1107,12 +1134,17 @@ sequenceDiagram
 
 ### 4.3. Outbox Pattern
 
-```mermaid
-flowchart LR
-    TX[Business Transaction] --> BIZ[Business Tables]
-    TX --> OUT[Outbox Table]
-    OUT --> RELAY[Outbox Relay]
-    RELAY --> BUS[Kafka/Event Bus]
+```d2 title="4.3. Outbox Pattern"
+direction: right
+n1: "Business Transaction"
+n2: "Business Tables"
+n3: "Outbox Table"
+n4: "Outbox Relay"
+n5: "Kafka/Event Bus"
+n1 -> n2
+n1 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 **Service nào cần Outbox?**
@@ -1130,7 +1162,7 @@ flowchart LR
 
 **Outbox schema mẫu**
 
-```sql
+```sql source="snippets/4-3-outbox-pattern.sql"
 CREATE TABLE outbox_events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   aggregate_type VARCHAR(60) NOT NULL,   -- 'Order', 'Payment', 'Assignment'
@@ -1141,6 +1173,8 @@ CREATE TABLE outbox_events (
   published_at TIMESTAMP NULL            -- NULL = chưa publish
 );
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F4-3-outbox-pattern.sql)
 
 ### 4.4. CQRS cho Search/Tracking
 
@@ -1165,22 +1199,32 @@ CREATE TABLE outbox_events (
 
 **CQRS Flow cho Menu/Search:**
 
-```mermaid
-flowchart LR
-    subgraph "Command Side (Write)"
-        M[Merchant Portal] --> MW[Menu Write API]
-        MW --> PG[(PostgreSQL)]
-        PG --> DEB[Debezium CDC]
-    end
-    subgraph "Event Bus"
-        DEB --> K[Kafka]
-    end
-    subgraph "Query Side (Read)"
-        K --> SC[Search Consumer]
-        SC --> OS[(OpenSearch Index)]
-        U[User App] --> SRA[Search API]
-        SRA --> OS
-    end
+```d2 title="4.4. CQRS cho Search/Tracking"
+direction: right
+n3: "Query Side (Read)" {}
+n2: "Event Bus" {}
+n1: "Command Side (Write)" {}
+n1.n4: "Merchant Portal"
+n1.n5: "Menu Write API"
+n1.n6: "PostgreSQL" {
+  shape: cylinder
+}
+n1.n7: "Debezium CDC"
+n2.n8: "Kafka"
+n3.n9: "Search Consumer"
+n3.n10: "OpenSearch Index" {
+  shape: cylinder
+}
+n3.n11: "User App"
+n3.n12: "Search API"
+n1.n4 -> n1.n5
+n1.n5 -> n1.n6
+n1.n6 -> n1.n7
+n1.n7 -> n2.n8
+n2.n8 -> n3.n9
+n3.n9 -> n3.n10
+n3.n11 -> n3.n12
+n3.n12 -> n3.n10
 ```
 
 **Ví dụ thực tế:** ứng dụng người dùng đọc ETA từ Redis Hash projection thay vì query trực tiếp Redis Streams. Merchant cập nhật menu -> CDC -> Kafka -> Search consumer -> OpenSearch index cập nhật trong 1-3 giây.
@@ -1203,7 +1247,7 @@ flowchart LR
 
 **Order tables:**
 
-```sql
+```sql source="snippets/4-6-schema-mau-order-dispatch.sql"
 CREATE TABLE orders (
   order_id VARCHAR(40) PRIMARY KEY,
   user_id VARCHAR(40) NOT NULL,
@@ -1232,9 +1276,11 @@ CREATE TABLE order_items (
 );
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F4-6-schema-mau-order-dispatch.sql)
+
 **Dispatch tables:**
 
-```sql
+```sql source="snippets/4-6-schema-mau-order-dispatch-2.sql"
 CREATE TABLE assignments (
   assignment_id VARCHAR(40) PRIMARY KEY,
   order_id VARCHAR(40) NOT NULL,
@@ -1249,9 +1295,11 @@ CREATE TABLE assignments (
 );
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F4-6-schema-mau-order-dispatch-2.sql)
+
 **Menu tables:**
 
-```sql
+```sql source="snippets/4-6-schema-mau-order-dispatch-3.sql"
 CREATE TABLE menu_items (
   item_id VARCHAR(40) PRIMARY KEY,
   restaurant_id VARCHAR(40) NOT NULL,
@@ -1277,6 +1325,8 @@ CREATE TABLE menu_item_options (
 );
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F4-6-schema-mau-order-dispatch-3.sql)
+
 ### 4.7. Concurrency Control & Reconciliation Jobs
 
 | Bài toán | Cách xử lý |
@@ -1292,7 +1342,7 @@ CREATE TABLE menu_item_options (
 
 Scenario: Giờ cao điểm, 2 request cùng lúc cố gắng assign cùng 1 driver cho 2 đơn khác nhau.
 
-```sql
+```sql source="snippets/4-7-concurrency-control-reconciliation-jobs.sql"
 -- ❌ Cách sai — đọc rồi ghi riêng lẻ → 1 driver nhận 2 đơn overlap
 SELECT status FROM drivers WHERE driver_id = 'DRV-0901';  -- 'AVAILABLE'
 -- 2 request cùng đọc = AVAILABLE → đều nghĩ driver rảnh
@@ -1309,6 +1359,8 @@ WHERE driver_id = :driver_id
   AND version = :expected_version;
 -- Nếu affected_rows = 0 → driver đã được assign cho đơn khác, chọn driver tiếp theo.
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F4-7-concurrency-control-reconciliation-jobs.sql)
 
 Với Redis (dùng cho pre-check trước khi vào DB):
 
@@ -1468,24 +1520,13 @@ Routing API (Google Maps) bị chậm (timeout 5s mỗi request)
 
 **Giải pháp: Tách thread pool riêng cho từng downstream**
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│               ORDER SERVICE — BULKHEAD ISOLATION                 │
-│                                                                  │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐      │
-│  │ Payment Pool    │  │ Dispatch Pool   │  │ Other Pool   │      │
-│  │ Max: 25 threads │  │ Max: 30 threads │  │ Max: 45      │      │
-│  │ Queue: 10       │  │ Queue: 15       │  │ Queue: 20    │      │
-│  │                 │  │                 │  │              │      │
-│  │ Wallet API chậm │  │ Routing API chậm│  │ Promo, Notif │      │
-│  │ → chỉ 25 thread │  │ → chỉ 30 thread │  │ → hoạt động  │      │
-│  │   bị block      │  │   bị block      │  │   bình thường│      │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘      │
-│                                                                  │
-│  ✅ Routing API chậm → chỉ 30 thread Dispatch pool bị kẹt        │
-│  ✅ Payment pool vẫn có 25 thread riêng → authorize bình thường  │
-│  ✅ Promotion, Notification vẫn có 45 thread → không bị ảnh hưởng│
-└──────────────────────────────────────────────────────────────────┘
+```d2 title="FastBite — Bulkhead Isolation"
+direction: right
+order: Order Service {
+ payment: "Payment Pool\nMax 25 threads • Queue 10\nWallet API chậm chỉ block pool này"
+ dispatch: "Dispatch Pool\nMax 30 threads • Queue 15\nRouting API chậm chỉ block pool này"
+ other: "Other Pool\nMax 45 threads • Queue 20\nPromotion / Notification vẫn chạy"
+}
 ```
 
 - Tracking stream consumer tách khỏi notification worker (bulkhead ở mức consumer group).
@@ -1746,22 +1787,29 @@ Sau 3 phút — Circuit Breaker HALF-OPEN:
 
 ### 6.1. Telemetry Architecture
 
-```mermaid
-flowchart LR
-    SVC[Services: Gateway/Order/Payment/Dispatch/Tracking] -->|Logs| FB[Fluent Bit]
-    SVC -->|Metrics| PRM[Prometheus]
-    SVC -->|Traces OTLP| OTL[OpenTelemetry Collector]
-
-    FB --> CW[CloudWatch Logs]
-    PRM --> AMP[Managed Prometheus]
-    OTL --> XRY[X-Ray]
-
-    CW --> GRAF[Grafana]
-    AMP --> GRAF
-    XRY --> GRAF
-
-    AMP --> ALT[Alertmanager]
-    ALT --> PD[PagerDuty/Slack/Email]
+```d2 title="6.1. Telemetry Architecture"
+direction: right
+n1: "Services: Gateway/Order/Payment/Dispatch/Tracking"
+n2: "Fluent Bit"
+n3: "Prometheus"
+n4: "OpenTelemetry Collector"
+n5: "CloudWatch Logs"
+n6: "Managed Prometheus"
+n7: "X-Ray"
+n8: "Grafana"
+n9: "Alertmanager"
+n10: "PagerDuty/Slack/Email"
+n1 -> n2: "Logs"
+n1 -> n3: "Metrics"
+n1 -> n4: "Traces OTLP"
+n2 -> n5
+n3 -> n6
+n4 -> n7
+n5 -> n8
+n6 -> n8
+n7 -> n8
+n6 -> n9
+n9 -> n10
 ```
 
 ### 6.2. Metrics & SLO
@@ -1828,7 +1876,7 @@ FastBite áp dụng kết hợp:
 
 **Ví dụ log thực tế (dispatch timeout):**
 
-```json
+```json source="snippets/6-3-logging-standard.json"
 {
   "timestamp": "2026-02-28T11:48:32.456Z",
   "service": "dispatch-service",
@@ -1846,30 +1894,31 @@ FastBite áp dụng kết hợp:
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F6-3-logging-standard.json)
+
 ### 6.4. Distributed Tracing
 
 **Trace flow xuyên suốt Place Order:**
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant G as API Gateway
-    participant O as Order Service
-    participant P as Payment Service
-    participant D as Dispatch Service
-    participant K as Kafka
-    participant N as Notification
-
-    U->>G: POST /orders
-    G->>O: Forward (traceparent)
-    O->>P: authorizePayment (child span)
-    P-->>O: authorized
-    O->>K: publish order.ready_for_dispatch.v1
-    K->>D: consume order.ready_for_dispatch.v1
-    D->>K: publish driver.assigned.v1
-    K->>O: consume driver.assigned.v1
-    K->>N: consume driver.assigned.v1
-    N-->>U: push "Tài xế đang đến nhà hàng"
+```d2 title="6.4. Distributed Tracing"
+shape: sequence_diagram
+"U": "User"
+"G": "API Gateway"
+"O": "Order Service"
+"P": "Payment Service"
+"D": "Dispatch Service"
+"K": "Kafka"
+"N": "Notification"
+"U" -> "G": "POST /orders"
+"G" -> "O": "Forward (traceparent)"
+"O" -> "P": "authorizePayment (child span)"
+"P" -> "O": "authorized" { style.stroke-dash: 5 }
+"O" -> "K": "publish order.ready_for_dispatch.v1"
+"K" -> "D": "consume order.ready_for_dispatch.v1"
+"D" -> "K": "publish driver.assigned.v1"
+"K" -> "O": "consume driver.assigned.v1"
+"K" -> "N": "consume driver.assigned.v1"
+"N" -> "U": "push \"Tài xế đang đến nhà hàng\"" { style.stroke-dash: 5 }
 ```
 
 - Sampling 15% bình thường, 100% khi incident.
@@ -1959,16 +2008,23 @@ sequenceDiagram
 
 ### 7.1. AuthN/AuthZ
 
-```mermaid
-flowchart LR
-    U[User/Driver App] --> G[API Gateway]
-    G --> IAM[Identity Service / IdP]
-    IAM --> JWT[JWT Access Token]
-    JWT --> G
-    G --> O[Order Service]
-    G --> D[Dispatch Service]
-    O --> PDP[Policy Engine]
-    D --> PDP
+```d2 title="7.1. AuthN/AuthZ"
+direction: right
+n1: "User/Driver App"
+n2: "API Gateway"
+n3: "Identity Service / IdP"
+n4: "JWT Access Token"
+n5: "Order Service"
+n6: "Dispatch Service"
+n7: "Policy Engine"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n2
+n2 -> n5
+n2 -> n6
+n5 -> n7
+n6 -> n7
 ```
 
 **Luồng chuẩn 5 bước:**
@@ -2221,15 +2277,25 @@ T+48 giờ   │ POST-MORTEM:
 
 ### 8.3. Network Topology
 
-```mermaid
-flowchart LR
-    U[Users / Drivers] --> CDN[CloudFront]
-    CDN --> WAF[AWS WAF]
-    WAF --> APIGW[API Gateway / ALB]
-    APIGW --> SVC[Microservices in Private Subnets]
-    SVC --> DB[(RDS / ElastiCache)]
-    SVC --> MQ[Kafka / SQS]
-    SVC --> S3[S3 Backup / Media]
+```d2 title="8.3. Network Topology"
+direction: right
+n1: "Users / Drivers"
+n2: "CloudFront"
+n3: "AWS WAF"
+n4: "API Gateway / ALB"
+n5: "Microservices in Private Subnets"
+n6: "RDS / ElastiCache" {
+  shape: cylinder
+}
+n7: "Kafka / SQS"
+n8: "S3 Backup / Media"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n5 -> n7
+n5 -> n8
 ```
 
 **Thiết kế mạng:**
@@ -2267,16 +2333,25 @@ flowchart LR
 
 ### 8.6. CI/CD Strategy
 
-```mermaid
-flowchart LR
-    A[Git Push] --> B[CI: test/lint/scan]
-    B --> C[Build image]
-    C --> D[Push ECR]
-    D --> E[Deploy staging]
-    E --> F[Contract + integration test]
-    F --> G[Approval Gate]
-    G --> H[Canary/Blue-Green prod]
-    H --> I[SLO check + auto rollback]
+```d2 title="8.6. CI/CD Strategy"
+direction: right
+n1: "Git Push"
+n2: "CI: test/lint/scan"
+n3: "Build image"
+n4: "Push ECR"
+n5: "Deploy staging"
+n6: "Contract + integration test"
+n7: "Approval Gate"
+n8: "Canary/Blue-Green prod"
+n9: "SLO check + auto rollback"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
+n8 -> n9
 ```
 
 **Gate bắt buộc trước production:**

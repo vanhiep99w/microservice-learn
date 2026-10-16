@@ -209,14 +209,21 @@ ALB không phải "API Gateway" theo đúng nghĩa, nhưng có thể đóng vai 
 
 ### 2.4. CloudFront + API Gateway/ALB — Edge Layer
 
-```mermaid
-flowchart LR
-    Client --> CF[CloudFront]
-    CF -->|Cache miss| APIGW[API Gateway]
-    CF -->|Static assets| S3[S3 Bucket]
-    APIGW -->|VPC Link| ALB[Internal ALB]
-    ALB --> ECS1[User Service]
-    ALB --> ECS2[Order Service]
+```d2 title="2.4. CloudFront + API Gateway/ALB — Edge Layer"
+direction: right
+n1: "Client"
+n2: "CloudFront"
+n3: "API Gateway"
+n4: "S3 Bucket"
+n5: "Internal ALB"
+n6: "User Service"
+n7: "Order Service"
+n1 -> n2
+n2 -> n3: "Cache miss"
+n2 -> n4: "Static assets"
+n3 -> n5: "VPC Link"
+n5 -> n6
+n5 -> n7
 ```
 
 **Tại sao đặt CloudFront trước?**
@@ -496,27 +503,17 @@ Enterprise (cần mTLS, traffic management phức tạp):
 
 **SQS** = managed message queue — **point-to-point** (1 message → 1 consumer).
 
-```
-┌───────────────────────────────────────────────────────────┐
-│                    SQS Queue                              │
-│                                                           │
-│  Producer                   Queue                Consumer │
-│  (Order Svc)                ┌──────┐            (Worker)  │
-│       │    SendMessage      │ msg1 │   ReceiveMessage     │
-│       ├───────────────────▶ │ msg2 │ ──────────────────▶  │
-│       │                     │ msg3 │                      │
-│       │                     │ ...  │   DeleteMessage      │
-│       │                     └──────┘ ◀──────────────────  │
-│                                                           │
-│  Visibility Timeout: 30s (default)                        │
-│  → Consumer nhận msg → msg "ẩn" khỏi queue 30s            │
-│  → Nếu consumer xử lý xong → delete msg                   │
-│  → Nếu consumer crash → msg xuất hiện lại → retry         │
-│                                                           │
-│  Dead Letter Queue (DLQ):                                 │
-│  → Msg fail sau N lần → chuyển sang DLQ để debug          │
-│                                                           │
-└───────────────────────────────────────────────────────────┘
+```d2 title="SQS — Receive, Delete và Retry"
+direction: right
+producer: Producer — Order Service
+queue: "SQS Queue\nmsg1 • msg2 • msg3\nVisibility Timeout 30s mặc định" {shape: queue}
+consumer: Consumer — Worker
+dlq: Dead Letter Queue {shape: queue}
+producer -> queue: SendMessage
+queue -> consumer: ReceiveMessage
+consumer -> queue: DeleteMessage khi thành công
+consumer -> queue: Hiện lại sau timeout nếu crash {style.stroke-dash: 5}
+queue -> dlq: Vượt maxReceiveCount
 ```
 
 **SQS Standard vs FIFO:**
@@ -542,24 +539,24 @@ Enterprise (cần mTLS, traffic management phức tạp):
 
 **SNS** = managed pub/sub — **1 message → N subscribers** (fan-out).
 
+```d2 title="SNS — Fan-out Order Events"
+direction: right
+order: Order Service
+topic: SNS Topic — order-events
+inventory: SQS — Inventory Service
+notification: SQS — Notification
+analytics: Lambda — Analytics
+email: Email — Admin alert
+http: HTTP endpoint
+order -> topic: Publish order.created
+topic -> inventory
+topic -> notification
+topic -> analytics
+topic -> email
+topic -> http
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                    SNS Topic: order-events                    │
-│                                                               │
-│  Publisher                Topic              Subscribers      │
-│  (Order Svc)               ┌─────┐                            │
-│       │     Publish        │     │  ──▶ SQS (Inventory Svc)   │
-│       ├──────────────────▶ │ SNS │  ──▶ SQS (Notification)    │
-│       │  "order.created"   │Topic│  ──▶ Lambda (Analytics)    │
-│       │                    │     │  ──▶ Email (admin alert)   │
-│       │                    │     │  ──▶ HTTP endpoint         │
-│                            └─────┘                            │
-│                                                               │
-│  1 publish → fan-out tới TẤT CẢ subscribers                   │
-│  Subscribers nhận message gần như real-time (< 100ms)         │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
-```
+
+Một publish được fan-out tới tất cả subscribers. Độ trễ phụ thuộc dịch vụ đích, retry và tải, không phải cam kết cố định dưới 100ms.
 
 **SNS Subscription types:**
 
@@ -576,15 +573,23 @@ Enterprise (cần mTLS, traffic management phức tạp):
 
 **Pattern phổ biến nhất** trên AWS — kết hợp SNS (fan-out) + SQS (reliable processing):
 
-```mermaid
-flowchart LR
-    Order[Order Service] -->|publish| SNS[SNS: order-events]
-    SNS -->|subscribe| SQS1[SQS: inventory-queue]
-    SNS -->|subscribe| SQS2[SQS: notification-queue]
-    SNS -->|subscribe| SQS3[SQS: analytics-queue]
-    SQS1 --> Inv[Inventory Service]
-    SQS2 --> Notif[Notification Service]
-    SQS3 --> Analytics[Analytics Lambda]
+```d2 title="4.3. SQS + SNS — Fanout Pattern"
+direction: right
+n1: "Order Service"
+n2: "SNS: order-events"
+n3: "SQS: inventory-queue"
+n4: "SQS: notification-queue"
+n5: "SQS: analytics-queue"
+n6: "Inventory Service"
+n7: "Notification Service"
+n8: "Analytics Lambda"
+n1 -> n2: "publish"
+n2 -> n3: "subscribe"
+n2 -> n4: "subscribe"
+n2 -> n5: "subscribe"
+n3 -> n6
+n4 -> n7
+n5 -> n8
 ```
 
 **Tại sao không SNS → Lambda trực tiếp?**
@@ -699,15 +704,29 @@ flowchart LR
 
 ### 4.6. SQS vs SNS vs EventBridge vs MSK — Chọn cái nào?
 
-```mermaid
-flowchart TD
-    A[Chọn Async Service] --> B{Cần event replay / event sourcing?}
-    B -->|Có| C[✅ MSK Kafka]
-    B -->|Không| D{Cần content-based routing?}
-    D -->|Có, filter trên event fields| E[✅ EventBridge]
-    D -->|Không, simple fan-out| F{1 consumer hay N consumers?}
-    F -->|1 consumer point-to-point| G[✅ SQS]
-    F -->|N consumers fan-out| H[✅ SNS + SQS]
+```d2 title="4.6. SQS vs SNS vs EventBridge vs MSK — Chọn cái nào?"
+direction: down
+n1: "Chọn Async Service"
+n2: "Cần event replay / event sourcing?" {
+  shape: diamond
+}
+n3: "✅ MSK Kafka"
+n4: "Cần content-based routing?" {
+  shape: diamond
+}
+n5: "✅ EventBridge"
+n6: "1 consumer hay N consumers?" {
+  shape: diamond
+}
+n7: "✅ SQS"
+n8: "✅ SNS + SQS"
+n1 -> n2
+n2 -> n3: "Có"
+n2 -> n4: "Không"
+n4 -> n5: "Có, filter trên event fields"
+n4 -> n6: "Không, simple fan-out"
+n6 -> n7: "1 consumer point-to-point"
+n6 -> n8: "N consumers fan-out"
 ```
 
 **Tóm tắt nhanh:**
@@ -728,32 +747,27 @@ flowchart TD
 
 > 🔗 Lý thuyết Choreography tại [doc 06 — Section 5.3](06-inter-service-communication.md#53-choreography-vs-orchestration--phân-biệt-rõ-ràng)
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Order as Order Service
-    participant EB as EventBridge
-    participant Inv as Inventory Service
-    participant Pay as Payment Service
-    participant Notif as Notification Service
-
-    Client->>Order: POST /orders
-    Order->>Order: Create order (PENDING)
-    Order->>EB: OrderCreated event
-    
-    EB->>Inv: Rule: OrderCreated → Inventory
-    Inv->>Inv: Reserve stock
-    Inv->>EB: StockReserved event
-    
-    EB->>Pay: Rule: StockReserved → Payment
-    Pay->>Pay: Charge customer
-    Pay->>EB: PaymentCompleted event
-    
-    EB->>Order: Rule: PaymentCompleted → Order
-    Order->>Order: Update status: CONFIRMED
-    
-    EB->>Notif: Rule: PaymentCompleted → Notification
-    Notif->>Client: Email confirmation
+```d2 title="5.1. Choreography với EventBridge"
+shape: sequence_diagram
+"Client": "Client"
+"Order": "Order Service"
+"EB": "EventBridge"
+"Inv": "Inventory Service"
+"Pay": "Payment Service"
+"Notif": "Notification Service"
+"Client" -> "Order": "POST /orders"
+"Order" -> "Order": "Create order (PENDING)"
+"Order" -> "EB": "OrderCreated event"
+"EB" -> "Inv": "Rule: OrderCreated → Inventory"
+"Inv" -> "Inv": "Reserve stock"
+"Inv" -> "EB": "StockReserved event"
+"EB" -> "Pay": "Rule: StockReserved → Payment"
+"Pay" -> "Pay": "Charge customer"
+"Pay" -> "EB": "PaymentCompleted event"
+"EB" -> "Order": "Rule: PaymentCompleted → Order"
+"Order" -> "Order": "Update status: CONFIRMED"
+"EB" -> "Notif": "Rule: PaymentCompleted → Notification"
+"Notif" -> "Client": "Email confirmation"
 ```
 
 **Ưu điểm:** Loose coupling, mỗi service independent, dễ thêm service mới (chỉ thêm rule).
@@ -878,37 +892,19 @@ Vấn đề: Service cần **write DB** và **publish event** — cả 2 phải 
 
 > 🔗 Lý thuyết DLQ tại [doc 06 — Section 6.4](06-inter-service-communication.md#64-dead-letter-queue)
 
-```
-┌───────────────────────────────────────────────────────────┐
-│                    DLQ Flow trên AWS                      │
-│                                                           │
-│  SQS Queue (main)                                         │
-│  ┌──────────┐     ┌──────────┐                            │
-│  │ message  │────▶│ Consumer │──▶ Processing FAIL         │
-│  └──────────┘     └──────────┘         │                  │
-│       ▲                                │                  │
-│       │          retry (visibility     │                  │
-│       └──────── timeout expires) ◀─────┘                  │
-│                                                           │
-│  After maxReceiveCount (e.g., 3 retries):                 │
-│  ┌──────────┐                                             │
-│  │ message  │────▶ DLQ (Dead Letter Queue)                │
-│  └──────────┘     ┌──────────────────────────┐            │
-│                   │ Messages that failed     │            │
-│                   │ after 3 attempts         │            │
-│                   │                          │            │
-│                   │ → CloudWatch Alarm       │            │
-│                   │   (DLQ depth > 0)        │            │
-│                   │ → Manual investigation   │            │
-│                   │ → Redrive to source queue│            │
-│                   └──────────────────────────┘            │
-│                                                           │
-│  SQS Redrive:                                             │
-│  Sau khi fix bug → "Start DLQ Redrive"                    │
-│  → Messages tự động chuyển từ DLQ về main queue           │
-│  → Reprocess tự động                                      │
-│                                                           │
-└───────────────────────────────────────────────────────────┘
+```d2 title="SQS — DLQ và Redrive"
+direction: right
+queue: Main SQS Queue {shape: queue}
+consumer: Consumer
+fail: Processing FAIL
+dlq: DLQ {shape: queue}
+alarm: CloudWatch Alarm — DLQ depth > 0
+investigate: Manual investigation / Fix bug
+queue -> consumer -> fail
+fail -> queue: Visibility timeout hết — retry
+queue -> dlq: Vượt maxReceiveCount — ví dụ 3 lần nhận
+dlq -> alarm -> investigate
+investigate -> queue: Start DLQ Redrive → reprocess
 ```
 
 **Best practices DLQ:**

@@ -85,24 +85,23 @@ Một heuristic hữu ích là hỏi **service thay đổi vì những lý do n�
 
 Service nên được tổ chức quanh business capability hoặc **Bounded Context**, không phải quanh technical layer. Khi một service vừa sở hữu trạng thái đơn hàng, vừa quyết định cách charge thẻ, giữ hàng, tạo vận đơn và gửi thông báo, các lý do thay đổi của những phần đó bị trộn vào một boundary.
 
-```mermaid
-flowchart LR
-    C["CommerceService"]
-    O["Order"]
-    PR["Promotion"]
-    PA["Payment"]
-    I["Inventory"]
-    S["Shipping"]
-    R["Reporting"]
-    N["Notification"]
-
-    C --> O
-    C --> PR
-    C --> PA
-    C --> I
-    C --> S
-    C --> R
-    C --> N
+```d2 title="Boundary và data ownership"
+direction: right
+n1: "CommerceService"
+n2: "Order"
+n3: "Promotion"
+n4: "Payment"
+n5: "Inventory"
+n6: "Shipping"
+n7: "Reporting"
+n8: "Notification"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n1 -> n6
+n1 -> n7
+n1 -> n8
 ```
 
 Hình trên minh họa nhiều capability cùng nằm trong một deployment unit. Nó không có nghĩa mọi capability phải trở thành một service riêng ngay lập tức. Câu hỏi cần trả lời là: capability nào có model, data owner, team owner và nhịp thay đổi khác nhau?
@@ -192,14 +191,21 @@ Thay đổi quy tắc refund
 
 Sau khi xác định capability và ownership, có thể tổ chức lại thành các service hoặc module có boundary rõ hơn:
 
-```mermaid
-flowchart LR
-    O["Order Service"] -->|"contract"| P["Payment Service"]
-    O -->|"contract"| I["Inventory Service"]
-    O -->|"contract"| S["Shipping Service"]
-    O -->|"contract"| N["Notification Service"]
-    PR["Promotion Service"] -->|"contract"| O
-    R["Reporting"] -->|"projection hoặc API"| O
+```d2 title="Một boundary hợp lý hơn"
+direction: right
+n1: "Order Service"
+n2: "Payment Service"
+n3: "Inventory Service"
+n4: "Shipping Service"
+n5: "Notification Service"
+n6: "Promotion Service"
+n7: "Reporting"
+n1 -> n2: "contract"
+n1 -> n3: "contract"
+n1 -> n4: "contract"
+n1 -> n5: "contract"
+n6 -> n1: "contract"
+n7 -> n1: "projection hoặc API"
 ```
 
 Đây là topology minh họa, không phải công thức bắt buộc. Một số tương tác cần kết quả ngay có thể dùng API đồng bộ. Side effect hoặc projection không cần phản hồi tức thời có thể dùng event hoặc queue. Cách chọn communication phải dựa trên yêu cầu business, consistency và khả năng vận hành.
@@ -338,17 +344,29 @@ Sau khi caller và traffic đã chuyển ổn định:
 
 Một phase chưa hoàn tất chỉ vì service mới đã nhận traffic. Đường coupling cũ cũng phải được dọn hoặc được quản lý như technical debt có thời hạn.
 
-```mermaid
-flowchart TD
-    A["Map capability và change driver"] --> B{"Boundary và ownership đã rõ?"}
-    B -->|"Chưa"| C["Làm rõ module và data owner"]
-    C --> A
-    B -->|"Rồi"| D["Tạo contract và đường chuyển tiếp"]
-    D --> E["Chuyển caller và data từng phần"]
-    E --> F["Theo dõi deploy và vận hành"]
-    F --> G{"Còn consumer của đường cũ?"}
-    G -->|"Còn"| E
-    G -->|"Không"| H["Xóa facade, route và code cũ"]
+```d2 title="Bước 7 Dọn đường cũ"
+direction: down
+n1: "Map capability và change driver"
+n2: "Boundary và ownership đã rõ?" {
+  shape: diamond
+}
+n3: "Làm rõ module và data owner"
+n4: "Tạo contract và đường chuyển tiếp"
+n5: "Chuyển caller và data từng phần"
+n6: "Theo dõi deploy và vận hành"
+n7: "Còn consumer của đường cũ?" {
+  shape: diamond
+}
+n8: "Xóa facade, route và code cũ"
+n1 -> n2
+n2 -> n3: "Chưa"
+n3 -> n1
+n2 -> n4: "Rồi"
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n5: "Còn"
+n7 -> n8: "Không"
 ```
 
 ## Trade off và quyết định gộp hay tách

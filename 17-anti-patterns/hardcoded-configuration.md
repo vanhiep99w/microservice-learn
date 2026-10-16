@@ -71,15 +71,27 @@ Phân loại trước khi chọn cơ chế lưu trữ giúp tránh dùng một g
 
 > Externalized chỉ nói về vị trí và cách phân phối config. Environment variable có thể đơn giản nhưng không tự động trở thành nơi lưu secret an toàn; source về [Configuration & Secrets Management](../16-configuration-secrets-management.md) trình bày chi tiết các lựa chọn này.
 
-```mermaid
-flowchart TD
-    A[Giá trị được dùng bởi service] --> B{Thay đổi theo environment?}
-    B -->|Không| C[Giữ trong code nếu là invariant hoặc domain rule]
-    B -->|Có| D[Externalized configuration]
-    D --> E{Sensitive?}
-    E -->|Không| F[Environment variable ConfigMap hoặc Config Server]
-    E -->|Có| G[Vault hoặc Cloud Secret Manager]
-    G --> H[Inject với least privilege và audit]
+```d2 title="Config và Secret không có cùng yêu cầu bảo vệ"
+direction: down
+n1: "Giá trị được dùng bởi service"
+n2: "Thay đổi theo environment?" {
+  shape: diamond
+}
+n3: "Giữ trong code nếu là invariant hoặc domain rule"
+n4: "Externalized configuration"
+n5: "Sensitive?" {
+  shape: diamond
+}
+n6: "Environment variable ConfigMap hoặc Config Server"
+n7: "Vault hoặc Cloud Secret Manager"
+n8: "Inject với least privilege và audit"
+n1 -> n2
+n2 -> n3: "Không"
+n2 -> n4: "Có"
+n4 -> n5
+n5 -> n6: "Không"
+n5 -> n7: "Có"
+n7 -> n8
 ```
 
 ## Dấu hiệu, nguyên nhân và hậu quả
@@ -136,23 +148,27 @@ Tên host, giá trị timeout và key trong các ví dụ dưới đây chỉ ma
 
 Một implementation hardcode có thể trông như sau:
 
-```js
+```js source="snippets/endpoint-va-api-key-trong-payment-service.js"
 // ❌ Giá trị production và secret nằm trong source code
 const paymentUrl = "https://payment-prod.example";
 const paymentApiKey = "hardcoded-example-key";
 const requestTimeoutMs = 3000;
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=hardcoded-configuration&snapshot=article&file=snippets%2Fendpoint-va-api-key-trong-payment-service.js)
+
 Khi developer muốn test `staging`, họ phải sửa source, tạo build riêng và có nguy cơ commit key. Nếu source hoặc image bị chia sẻ, endpoint và credential cũng đi theo artifact.
 
 Một implementation externalized chỉ đọc giá trị từ runtime:
 
-```js
+```js source="snippets/endpoint-va-api-key-trong-payment-service-2.js"
 // ✅ Artifact không chứa giá trị theo environment
 const paymentUrl = process.env.PAYMENT_URL;
 const paymentApiKey = process.env.PAYMENT_API_KEY;
 const requestTimeoutMs = Number(process.env.PAYMENT_TIMEOUT_MS ?? 3000);
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=hardcoded-configuration&snapshot=article&file=snippets%2Fendpoint-va-api-key-trong-payment-service-2.js)
 
 Trong production, `PAYMENT_URL` có thể đến từ ConfigMap hoặc Config Server. `PAYMENT_API_KEY` nên được inject từ Secret Manager hoặc một cơ chế tương đương; việc đọc qua environment variable không thay thế cho access control và rotation. Code có thể giống nhau ở mọi environment, còn values được quản lý tại deployment boundary.
 
@@ -200,7 +216,7 @@ Trong local development, `.env` có thể thuận tiện nhưng không commit fi
 
 Ví dụ Kubernetes dưới đây chỉ minh họa cách tách hai loại dữ liệu:
 
-```yaml
+```yaml source="snippets/buoc-2-externalized-configuration.yaml"
 containers:
   - name: payment-service
     image: payment-service:v1
@@ -216,6 +232,8 @@ containers:
             name: payment-service-secrets
             key: PAYMENT_API_KEY
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=hardcoded-configuration&snapshot=article&file=snippets%2Fbuoc-2-externalized-configuration.yaml)
 
 `ConfigMap` không phải nơi lưu secret. Trong GitOps (quản lý deployment bằng Git), K8s Secret dạng YAML chỉ base64-encoded nên không nên commit giá trị thật. Dùng **Sealed Secrets** để encrypt trước khi commit, hoặc **External Secrets Operator** để Git chỉ chứa reference tới Vault, AWS Secrets Manager hay external store.
 
@@ -307,14 +325,21 @@ Ví dụ, code có `LOG_LEVEL=INFO`, ConfigMap đặt `DEBUG`, nhưng environmen
 
 Một quy trình thay đổi an toàn nên có các bước sau:
 
-```mermaid
-flowchart LR
-    A[Đề xuất config change] --> B[Validate và review]
-    B -->|Không hợp lệ| C[Từ chối thay đổi]
-    B -->|Hợp lệ| D[Rollout theo phase]
-    D --> E[Theo dõi error latency và health]
-    E -->|Tín hiệu xấu| F[Rollback config hoặc traffic]
-    E -->|Ổn định| G[Audit version và hoàn tất]
+```d2 title="Vận hành khi config store hoặc secret thay đổi"
+direction: right
+n1: "Đề xuất config change"
+n2: "Validate và review"
+n3: "Từ chối thay đổi"
+n4: "Rollout theo phase"
+n5: "Theo dõi error latency và health"
+n6: "Rollback config hoặc traffic"
+n7: "Audit version và hoàn tất"
+n1 -> n2
+n2 -> n3: "Không hợp lệ"
+n2 -> n4: "Hợp lệ"
+n4 -> n5
+n5 -> n6: "Tín hiệu xấu"
+n5 -> n7: "Ổn định"
 ```
 
 - Với static config, cập nhật nguồn rồi rolling restart đúng service thay vì rebuild image.

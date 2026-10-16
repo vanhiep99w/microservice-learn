@@ -124,7 +124,7 @@ ECS sử dụng **Application Auto Scaling** để scale số lượng task (con
 
 #### Cấu hình ECS Auto Scaling (Terraform)
 
-```hcl
+```hcl source="snippets/cau-hinh-ecs-auto-scaling-terraform.tf"
 # ECS Service
 resource "aws_ecs_service" "order_service" {
   name            = "order-service"
@@ -204,6 +204,8 @@ resource "aws_appautoscaling_scheduled_action" "peak_hours" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fcau-hinh-ecs-auto-scaling-terraform.tf)
+
 #### Metric nào để scale ECS?
 
 | Metric | Khi nào dùng | Target Value khuyến nghị |
@@ -255,7 +257,7 @@ EKS có **ba tầng scaling** — Pod level, Node level, và Cluster level.
 
 #### HPA — Horizontal Pod Autoscaler
 
-```yaml
+```yaml source="snippets/hpa-horizontal-pod-autoscaler.yaml"
 # HPA dựa trên CPU + Custom Metric
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -302,9 +304,11 @@ spec:
           averageValue: "1000"              # 1000 RPS per pod
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fhpa-horizontal-pod-autoscaler.yaml)
+
 #### Karpenter — Node Auto Provisioning
 
-```yaml
+```yaml source="snippets/karpenter-node-auto-provisioning.yaml"
 # Karpenter NodePool
 apiVersion: karpenter.sh/v1beta1
 kind: NodePool
@@ -340,6 +344,8 @@ spec:
     consolidationPolicy: WhenUnderutilized  # Tự gom Pod, terminate node thừa
     expireAfter: 720h                       # Rotate node mỗi 30 ngày
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fkarpenter-node-auto-provisioning.yaml)
 
 ### 2.3. Lambda Concurrency & Scaling
 
@@ -379,7 +385,7 @@ Lambda có cơ chế scaling **hoàn toàn tự động** — mỗi request tạ
 
 #### Cấu hình Lambda Scaling (Terraform)
 
-```hcl
+```hcl source="snippets/cau-hinh-lambda-scaling-terraform.tf"
 # Lambda Function với Reserved Concurrency
 resource "aws_lambda_function" "payment_processor" {
   function_name = "payment-processor"
@@ -428,6 +434,8 @@ resource "aws_appautoscaling_policy" "lambda_scaling" {
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fcau-hinh-lambda-scaling-terraform.tf)
 
 ### 2.4. So sánh Auto Scaling: ECS vs EKS vs Lambda
 
@@ -594,7 +602,7 @@ Circuit Breaker có thể triển khai ở 2 tầng:
 
 > Phần cấu hình dưới đây giữ lại để hỗ trợ hệ thống cũ đang chạy App Mesh; không khuyến nghị cho dự án greenfield.
 
-```hcl
+```hcl source="snippets/cau-hinh-outlier-detection-legacy-app-mesh-chi-tham-khao-migration.tf"
 # App Mesh Virtual Node với Outlier Detection
 resource "aws_appmesh_virtual_node" "payment_service" {
   name      = "payment-service"
@@ -715,6 +723,8 @@ resource "aws_appmesh_route" "payment_route" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fcau-hinh-outlier-detection-legacy-app-mesh-chi-tham-khao-migration.tf)
+
 #### Service Layer vs Application-Level Circuit Breaker
 
 | Tiêu chí | Service Layer (Service Connect/VPC Lattice/Istio) | Application-Level (Resilience4j, Polly) |
@@ -744,7 +754,7 @@ Ngoài service layer, nhiều AWS service có **built-in retry**:
 
 #### Step Functions — Retry & Error Handling
 
-```json
+```json source="snippets/step-functions-retry-error-handling.json"
 {
   "ProcessPayment": {
     "Type": "Task",
@@ -781,6 +791,8 @@ Ngoài service layer, nhiều AWS service có **built-in retry**:
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fstep-functions-retry-error-handling.json)
 
 ### 4.3. Bulkhead trên AWS
 
@@ -843,7 +855,7 @@ Bulkhead trên AWS được triển khai qua nhiều tầng:
 
 #### API Gateway Throttling (Terraform)
 
-```hcl
+```hcl source="snippets/api-gateway-throttling-terraform.tf"
 # Usage Plan — Rate limiting per client
 resource "aws_api_gateway_usage_plan" "partner_plan" {
   name = "partner-tier"
@@ -872,6 +884,8 @@ resource "aws_api_gateway_usage_plan" "partner_plan" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fapi-gateway-throttling-terraform.tf)
+
 ### 4.5. Fallback Patterns trên AWS
 
 | Pattern | AWS Implementation | Ví dụ |
@@ -882,30 +896,20 @@ resource "aws_api_gateway_usage_plan" "partner_plan" {
 | **Default Response** | API Gateway Mock | Recommendation down → return default list |
 | **Async Fallback** | EventBridge + Lambda | Sync call fails → emit event for async processing |
 
-```
-┌────────────────────────────────────────────────────────┐
-│        FALLBACK FLOW — Product Service                 │
-│                                                        │
-│  Request ──▶ Product Service                           │
-│                 │                                      │
-│           ┌─────▼─────┐                                │
-│           │ DB Query  │                                │
-│           └─────┬─────┘                                │
-│                 │                                      │
-│          Success│     Fail/Timeout                     │
-│                 │         │                            │
-│           ┌─────▼──┐  ┌──▼──────────┐                  │
-│           │Response│  │ Redis Cache │                  │
-│           │ (fresh)│  │ (stale OK)  │                  │
-│           └────────┘  └──┬──────────┘                  │
-│                          │                             │
-│                   Cache Hit│    Cache Miss             │
-│                          │         │                   │
-│                    ┌─────▼──┐  ┌──▼──────────┐         │
-│                    │Response│  │ S3 Static   │         │
-│                    │(cached)│  │ (default)   │         │
-│                    └────────┘  └─────────────┘         │
-└────────────────────────────────────────────────────────┘
+```d2 title="Product Service — Fallback từ DB tới S3"
+direction: down
+request: Request
+service: Product Service
+db: DB Query
+fresh: Response — fresh
+redis: Redis Cache — stale OK
+cached: Response — cached
+s3: S3 Static — default
+request -> service -> db
+db -> fresh: Success
+db -> redis: Fail / Timeout
+redis -> cached: Cache Hit
+redis -> s3: Cache Miss
 ```
 
 ---
@@ -916,7 +920,7 @@ resource "aws_api_gateway_usage_plan" "partner_plan" {
 
 ECS hỗ trợ **2 loại health check**: Container-level và ALB Target Group.
 
-```hcl
+```hcl source="snippets/5-1-health-check-tren-ecs.tf"
 # ECS Task Definition — Container Health Check
 resource "aws_ecs_task_definition" "order_service" {
   family = "order-service"
@@ -946,6 +950,8 @@ resource "aws_ecs_task_definition" "order_service" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2F5-1-health-check-tren-ecs.tf)
+
 #### Health Check Endpoint Design
 
 ```
@@ -954,7 +960,7 @@ GET /health/ready    → Readiness (check dependencies: DB, cache, queue)
 GET /health/detailed → Deep check (chi tiết từng dependency — chỉ internal)
 ```
 
-```json
+```json source="snippets/health-check-endpoint-design.json"
 // GET /health/ready — 200 OK
 {
   "status": "UP",
@@ -976,9 +982,11 @@ GET /health/detailed → Deep check (chi tiết từng dependency — chỉ inte
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fhealth-check-endpoint-design.json)
+
 ### 5.2. Health Check trên EKS
 
-```yaml
+```yaml source="snippets/5-2-health-check-tren-eks.yaml"
 # Kubernetes Pod — Liveness & Readiness Probes
 apiVersion: apps/v1
 kind: Deployment
@@ -1023,9 +1031,11 @@ spec:
             failureThreshold: 30        # 30 × 5s = 150s max startup time
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2F5-2-health-check-tren-eks.yaml)
+
 ### 5.3. ALB/NLB Health Check
 
-```hcl
+```hcl source="snippets/5-3-alb-nlb-health-check.tf"
 # ALB Target Group Health Check
 resource "aws_lb_target_group" "order_service" {
   name        = "order-service-tg"
@@ -1057,11 +1067,13 @@ resource "aws_lb_target_group" "order_service" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2F5-3-alb-nlb-health-check.tf)
+
 ### 5.4. Route 53 Health Check
 
 Route 53 Health Check dùng cho **DNS-level failover** — chuyển traffic giữa regions hoặc endpoints.
 
-```hcl
+```hcl source="snippets/5-4-route-53-health-check.tf"
 # Route 53 Health Check — Primary Region
 resource "aws_route53_health_check" "primary" {
   fqdn              = "api-primary.example.com"
@@ -1131,6 +1143,8 @@ resource "aws_route53_record" "api_dr" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2F5-4-route-53-health-check.tf)
+
 ---
 
 ## 6. Chaos Engineering trên AWS
@@ -1139,31 +1153,18 @@ resource "aws_route53_record" "api_dr" {
 
 **AWS FIS** (Fault Injection Service) là managed service cho Chaos Engineering — inject failures vào hệ thống để kiểm tra resilience.
 
+```d2 title="AWS FIS — Experiment Lifecycle"
+direction: right
+template: "Experiment Template\nTargets — EC2 / ECS / EKS / RDS\nActions — stop instance / kill container\nStop conditions — CloudWatch alarms\nDuration"
+run: "Run Experiment\n1. Inject fault\n2. Monitor CloudWatch\n3. Stop theo stop condition\n4. Analyze → improve resilience"
+template -> run
 ```
-┌────────────────────────────────────────────────────────────┐
-│              AWS FAULT INJECTION SERVICE                   │
-│                                                            │
-│  ┌─── Experiment Template ────────────────────────────┐    │
-│  │  Define:                                           │    │
-│  │  • Targets: EC2, ECS, EKS Pods, RDS, etc.          │    │
-│  │  • Actions: stop instance, kill container, etc.    │    │
-│  │  • Stop conditions: CloudWatch alarm thresholds    │    │
-│  │  • Duration: how long to inject fault              │    │
-│  └────────────────────────────────────────────────────┘    │
-│           │                                                │
-│           ▼                                                │
-│  ┌─── Run Experiment ─────────────────────────────────┐    │
-│  │  1. FIS inject fault vào target                    │    │
-│  │  2. Monitor via CloudWatch                         │    │
-│  │  3. Stop condition triggered → auto rollback       │    │
-│  │  4. Analyze results → improve resilience           │    │
-│  └────────────────────────────────────────────────────┘    │
-└────────────────────────────────────────────────────────────┘
-```
+
+Stop condition dừng experiment. Việc khôi phục/rollback phụ thuộc action và tài nguyên; không mặc định mọi lỗi được tự động hoàn tác.
 
 #### FIS Experiment Template (Terraform)
 
-```hcl
+```hcl source="snippets/fis-experiment-template-terraform.tf"
 # FIS Experiment — Kill ECS Tasks
 resource "aws_fis_experiment_template" "ecs_task_kill" {
   description = "Kill 50% ECS tasks to test auto-recovery"
@@ -1260,6 +1261,8 @@ resource "aws_fis_experiment_template" "network_latency" {
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Ffis-experiment-template-terraform.tf)
 
 ### 6.2. Các thí nghiệm Chaos phổ biến
 
@@ -1372,7 +1375,7 @@ Failover Steps (automated via Lambda + Step Functions):
 
 #### Active-Active — Cho Mission-Critical Services
 
-```hcl
+```hcl source="snippets/active-active-cho-mission-critical-services.tf"
 # DynamoDB Global Tables — Active-Active
 resource "aws_dynamodb_table" "orders" {
   name         = "orders"
@@ -1424,6 +1427,8 @@ resource "aws_rds_cluster" "dr" {
   # DR cluster không cần master credentials (replicate từ primary)
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Factive-active-cho-mission-critical-services.tf)
 
 ### 7.3. Failover tự động với Route 53
 

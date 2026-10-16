@@ -239,20 +239,19 @@ Nguyên tắc chọn giá trị:
 
 Use case: **Order Service hiển thị trang giỏ hàng cần số tồn kho từ Inventory Service**. Inventory thỉnh thoảng quá tải lúc flash-sale.
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant O as Order Service
-    participant I as Inventory Service
-    participant C as Cache
-
-    U->>O: Xem giỏ hàng
-    O->>I: GET /stock/SKU-123 (timeout 3s)
-    Note over I: Đang quá tải,<br/>không phản hồi
-    Note over O: ⏰ Hết 3s — TIMEOUT,<br/>thread được giải phóng
-    O->>C: Đọc tồn kho từ cache
-    C-->>O: stock = 42 (data 5 phút trước)
-    O-->>U: Trang giỏ hàng ✅ (kèm nhãn "tồn kho tham khảo")
+```d2 title="3.3. Ví dụ thực tế"
+shape: sequence_diagram
+"U": "User"
+"O": "Order Service"
+"I": "Inventory Service"
+"C": "Cache"
+"U" -> "O": "Xem giỏ hàng"
+"O" -> "I": "GET /stock/SKU-123 (timeout 3s)"
+"I".note1: "Đang quá tải,\nkhông phản hồi"
+"O".note2: "⏰ Hết 3s — TIMEOUT,\nthread được giải phóng"
+"O" -> "C": "Đọc tồn kho từ cache"
+"C" -> "O": "stock = 42 (data 5 phút trước)" { style.stroke-dash: 5 }
+"O" -> "U": "Trang giỏ hàng ✅ (kèm nhãn \"tồn kho tham khảo\")" { style.stroke-dash: 5 }
 ```
 
 Kết quả so sánh:
@@ -344,16 +343,28 @@ So sánh các chiến lược delay:
 
 Use case: **mobile app đồng bộ giỏ hàng lên Order Service qua mạng 4G yếu** — lỗi mạng thoáng qua rất phổ biến.
 
-```mermaid
-graph TD
-    A[Yêu cầu thất bại] --> B{Lỗi có thể retry?}
-    B -->|4xx / business error| X[Trả lỗi ngay — retry vô nghĩa]
-    B -->|5xx / timeout / network error| C{Còn lượt retry?<br/>Còn deadline?}
-    C -->|Không| Y[Báo lỗi / fallback]
-    C -->|Còn| D[Chờ exp. backoff + jitter]
-    D --> E[Gọi lại]
-    E -->|Thành công| Z[Trả kết quả ✅]
-    E -->|Thất bại| C
+```d2 title="4.3. Ví dụ thực tế"
+direction: down
+n1: "Yêu cầu thất bại"
+n2: "Lỗi có thể retry?" {
+  shape: diamond
+}
+n3: "Trả lỗi ngay — retry vô nghĩa"
+n4: "Còn lượt retry?\nCòn deadline?" {
+  shape: diamond
+}
+n5: "Báo lỗi / fallback"
+n6: "Chờ exp. backoff + jitter"
+n7: "Gọi lại"
+n8: "Trả kết quả ✅"
+n1 -> n2
+n2 -> n3: "4xx / business error"
+n2 -> n4: "5xx / timeout / network error"
+n4 -> n5: "Không"
+n4 -> n6: "Còn"
+n6 -> n7
+n7 -> n8: "Thành công"
+n7 -> n4: "Thất bại"
 ```
 
 Timeline cụ thể (base delay 1s, full jitter, max 3 retries, deadline 10s):
@@ -736,15 +747,23 @@ Ví dụ cho thấy cần cả hai: Payment Service deploy một bản có memor
 
 Các pattern không hoạt động rời rạc — chúng tạo thành **một chuỗi phòng thủ** trong caller, và **thứ tự trong chuỗi quyết định tính đúng đắn**:
 
-```mermaid
-graph LR
-    A[Request] --> B[Bulkhead<br/>còn slot?]
-    B --> C[Circuit Breaker<br/>mạch đóng?]
-    C --> D[Retry + Backoff<br/>lỗi tạm?]
-    D --> E[Timeout<br/>từng lần thử]
-    E --> F[Service Call]
-    F -->|Thành công| G[Response ✅]
-    F -->|Thất bại| H[Fallback / báo lỗi]
+```d2 title="8.1. Thứ tự phối hợp chuẩn"
+direction: right
+n1: "Request"
+n2: "Bulkhead\ncòn slot?"
+n3: "Circuit Breaker\nmạch đóng?"
+n4: "Retry + Backoff\nlỗi tạm?"
+n5: "Timeout\ntừng lần thử"
+n6: "Service Call"
+n7: "Response ✅"
+n8: "Fallback / báo lỗi"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7: "Thành công"
+n6 -> n8: "Thất bại"
 ```
 
 Lý do của từng vị trí:

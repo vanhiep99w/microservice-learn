@@ -88,20 +88,32 @@ Nói ngắn gọn: CQRS đáng cân nhắc khi một model không thể phục v
 
 Sơ đồ dưới đây mô tả CQRS ở mức 3, trong đó read model được cập nhật bất đồng bộ từ write side:
 
-```mermaid
-flowchart LR
-    C[Client] --> CA[Command API]
-    CA --> CH[Command handler]
-    CH --> WM[Write model<br/>validation + business rules]
-    WM --> WDB[(Write DB<br/>normalized, source of truth)]
-
-    WDB -->|Events hoặc CDC| P[Projector]
-    P --> RM[Read model<br/>denormalized theo use case]
-    RM --> RDB[(Read DB)]
-
-    C --> QA[Query API]
-    QA --> QH[Query handler]
-    QH --> RDB
+```d2 title="Kiến trúc CQRS"
+direction: right
+n1: "Client"
+n2: "Command API"
+n3: "Command handler"
+n4: "Write model\nvalidation + business rules"
+n5: "Write DB\nnormalized, source of truth" {
+  shape: cylinder
+}
+n6: "Projector"
+n7: "Read model\ndenormalized theo use case"
+n8: "Read DB" {
+  shape: cylinder
+}
+n9: "Query API"
+n10: "Query handler"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6: "Events hoặc CDC"
+n6 -> n7
+n7 -> n8
+n1 -> n9
+n9 -> n10
+n10 -> n8
 ```
 
 `Projector` là process chuyển events hoặc thay đổi dữ liệu thành bản ghi của read model. Ở mức 3, write transaction có thể commit trước khi projector cập nhật xong read database. Khoảng thời gian đó là một phần của contract consistency, không phải dấu hiệu cho thấy command đã thất bại.
@@ -122,9 +134,17 @@ CQRS là một spectrum (phổ mức độ), không phải công tắc chỉ có
 
 Ở mức 1, một service có hai đường code riêng:
 
-```text
-CreateOrder command  ──▶ Command handler ──▶ Write logic ──▶ Database
-GetOrderHistory query ──▶ Query handler   ──▶ Read logic  ──▶ Database
+```d2 title="CQRS dùng chung Database — tách Logic"
+direction: right
+command: CreateOrder Command
+ch: Command Handler
+write: Write Logic
+query: GetOrderHistory Query
+qh: Query Handler
+read: Read Logic
+db: Database {shape: cylinder}
+command -> ch -> write -> db
+query -> qh -> read -> db
 ```
 
 Hai handler có thể dùng cùng entity hoặc cùng database schema. Mức này giúp business logic của command không bị trộn với logic định dạng response của query. Nó không tự tạo ra eventual consistency vì cả hai phía vẫn đọc và ghi cùng một database.
@@ -207,21 +227,20 @@ Một pipeline mức 3 thường có các bước sau:
 3. Projector consume event, transform payload và upsert (insert hoặc update theo cùng một identity) bản ghi vào read database.
 4. Query handler đọc read model sau khi projection đã bắt kịp event tương ứng.
 
-```mermaid
-sequenceDiagram
-    participant A as Command API
-    participant W as Write DB
-    participant B as Event stream hoặc CDC
-    participant P as Projector
-    participant R as Read DB
-    participant Q as Query API
-
-    A->>W: Commit business state
-    W-->>B: Phát thay đổi đã commit
-    B-->>P: Deliver event hoặc change
-    P->>R: Upsert read model
-    Q->>R: Query view
-    R-->>Q: Representation theo use case
+```d2 title="Luồng đồng bộ ở mức 3"
+shape: sequence_diagram
+"A": "Command API"
+"W": "Write DB"
+"B": "Event stream hoặc CDC"
+"P": "Projector"
+"R": "Read DB"
+"Q": "Query API"
+"A" -> "W": "Commit business state"
+"W" -> "B": "Phát thay đổi đã commit" { style.stroke-dash: 5 }
+"B" -> "P": "Deliver event hoặc change" { style.stroke-dash: 5 }
+"P" -> "R": "Upsert read model"
+"Q" -> "R": "Query view"
+"R" -> "Q": "Representation theo use case" { style.stroke-dash: 5 }
 ```
 
 Ở đây, `event` hoặc change record phải đại diện cho dữ liệu mà projector cần. Nếu event chỉ chứa một phần thông tin, projector có thể phải gọi lại write service; khi đó cần đánh giá thêm network dependency và khả năng xử lý khi write service tạm thời unavailable.
@@ -280,22 +299,21 @@ Projector dựng `order_history_view` theo đúng nhu cầu của trang "Lịch 
 
 Luồng đọc không phải JOIN các bảng normalized trên mỗi request. Query tải nặng của nhiều người dùng có thể đọc read database hoặc index dành riêng cho view lịch sử, trong khi write transaction vẫn tập trung ở write side.
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant O as Order Service
-    participant W as PostgreSQL
-    participant P as Order projector
-    participant R as Order history view
-
-    U->>O: CreateOrder command
-    O->>W: Ghi order và order items
-    W-->>P: Order* events hoặc CDC
-    P->>R: Dựng denormalized history view
-    U->>O: GetOrderHistory query
-    O->>R: Đọc theo customer_id
-    R-->>O: Danh sách order
-    O-->>U: Order history
+```d2 title="Order history"
+shape: sequence_diagram
+"U": "User"
+"O": "Order Service"
+"W": "PostgreSQL"
+"P": "Order projector"
+"R": "Order history view"
+"U" -> "O": "CreateOrder command"
+"O" -> "W": "Ghi order và order items"
+"W" -> "P": "Order* events hoặc CDC" { style.stroke-dash: 5 }
+"P" -> "R": "Dựng denormalized history view"
+"U" -> "O": "GetOrderHistory query"
+"O" -> "R": "Đọc theo customer_id"
+"R" -> "O": "Danh sách order" { style.stroke-dash: 5 }
+"O" -> "U": "Order history" { style.stroke-dash: 5 }
 ```
 
 Ngay sau `CreateOrder`, query lịch sử có thể chưa thấy order mới. UI có thể hiển thị trạng thái đang xử lý, chờ projection theo version hoặc dùng một đường đọc phù hợp với yêu cầu freshness.

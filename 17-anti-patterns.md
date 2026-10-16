@@ -51,17 +51,31 @@ Tài liệu này dùng cùng các tài liệu về [Bounded Context](02-single-r
 
 ## 2. Bản đồ anti-pattern và cách chẩn đoán
 
-```mermaid
-flowchart TB
-    B[Business capability và Bounded Context chưa rõ] --> M[Service boundary sai]
-    M --> G[Mega Service]
-    M --> C[Chatty Services]
-    D[Data ownership không rõ] --> S[Shared Database]
-    S --> DM[Distributed Monolith]
-    A[Ưu tiên đồng bộ cho mọi việc] --> X[Sync Chain / Death Star]
-    P[Contract và config không được quản trị] --> V[No API Versioning]
-    P --> H[Hardcoded Configuration]
-    F[Thiếu nhu cầu và năng lực vận hành] --> O[Over-engineering]
+```d2 title="2. Bản đồ anti-pattern và cách chẩn đoán"
+direction: down
+n1: "Business capability và Bounded Context chưa rõ"
+n2: "Service boundary sai"
+n3: "Mega Service"
+n4: "Chatty Services"
+n5: "Data ownership không rõ"
+n6: "Shared Database"
+n7: "Distributed Monolith"
+n8: "Ưu tiên đồng bộ cho mọi việc"
+n9: "Sync Chain / Death Star"
+n10: "Contract và config không được quản trị"
+n11: "No API Versioning"
+n12: "Hardcoded Configuration"
+n13: "Thiếu nhu cầu và năng lực vận hành"
+n14: "Over-engineering"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n5 -> n6
+n6 -> n7
+n8 -> n9
+n10 -> n11
+n10 -> n12
+n13 -> n14
 ```
 
 ### 2.1. Anti-pattern là gì?
@@ -286,18 +300,29 @@ Xem [16 — Configuration & Secrets Management](16-configuration-secrets-managem
 
 **Ví dụ:** Client gọi Gateway, Gateway gọi Order, Order gọi Payment, Payment gọi Fraud, Fraud gọi ngân hàng. Nếu Fraud chậm, toàn bộ checkout bị treo dù việc gửi email hay analytics không cần kết quả ngay.
 
-```mermaid
-flowchart LR
-    C[Client] --> G[Gateway]
-    G --> O[Order]
-    O --> P[Payment]
-    P --> F[Fraud]
-    F --> B[Bank]
-    N[Notification]:::async
-    A[Analytics]:::async
-    O -.OrderCreated.-> N
-    O -.OrderCreated.-> A
-    classDef async fill:#e8f5e9,stroke:#2e7d32
+```d2 title="9.2. Ví dụ và remediation"
+direction: right
+n1: "Client"
+n2: "Gateway"
+n3: "Order"
+n4: "Payment"
+n5: "Fraud"
+n6: "Bank"
+n7: "Notification" {
+  style.fill: "#e8f5e9"
+  style.stroke: "#2e7d32"
+}
+n8: "Analytics" {
+  style.fill: "#e8f5e9"
+  style.stroke: "#2e7d32"
+}
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n3 -> n7: "OrderCreated" { style.stroke-dash: 5 }
+n3 -> n8: "OrderCreated" { style.stroke-dash: 5 }
 ```
 
 **Remediation:**

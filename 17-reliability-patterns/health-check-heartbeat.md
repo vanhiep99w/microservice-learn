@@ -65,16 +65,13 @@ Pattern này không chỉ hỏi process có còn tồn tại. Nó nối một k�
 
 Trong hệ thống Microservice, một instance có thể lỗi mà các instance khác vẫn hoạt động. Mục tiêu của pattern là giới hạn traffic đi vào instance đó và để hạ tầng tự phản ứng thay vì chờ người vận hành phát hiện thủ công.
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    HEALTH SIGNAL                            │
-│                                                             │
-│  Instance ── heartbeat hoặc health response ──▶ Hạ tầng     │
-│                                                     │       │
-│                    ┌────────────────────────────────┘       │
-│                    ▼                                        │
-│       Route traffic / loại khỏi endpoints / restart         │
-└─────────────────────────────────────────────────────────────┘
+```d2 title="Health Signal và phản ứng của Hạ tầng"
+direction: right
+instance: Instance
+infra: Hạ tầng
+action: Route Traffic / Loại khỏi Endpoints / Restart
+instance -> infra: Heartbeat / Health Response
+infra -> action: Theo loại signal và policy
 ```
 
 Health signal cần phản ánh đúng câu hỏi mà consumer đang cần. Load Balancer cần biết có nên route request. Kubelet cần biết container có cần restart. Registry cần biết registration còn hiệu lực. Một tín hiệu duy nhất không nhất thiết trả lời đúng cả ba câu hỏi.
@@ -141,16 +138,15 @@ Nếu chỉ nhìn process còn tồn tại, hạ tầng có thể giữ một zo
 
 Trong mô hình **Heartbeat push**, service chủ động gửi ping hoặc renew registration tới Service Registry theo chu kỳ. Registry giữ registration trong một **TTL** (*Time-To-Live*, thời gian hiệu lực). Nếu không nhận được heartbeat trước khi TTL hết, registry đánh dấu instance `DOWN` hoặc loại instance khỏi danh sách.
 
-```text
-Payment Service ── heartbeat mỗi 30s ──▶ Eureka / Registry
-       │
-       └── crash hoặc mất kết nối
-                    │
-                    ▼
-        Không renew trước TTL khoảng 90s
-                    │
-                    ▼
-        Registry đánh dấu instance DOWN
+```d2 title="Heartbeat và TTL — Eureka"
+direction: right
+payment: Payment Service
+registry: Eureka / Registry
+crash: Crash / Mất kết nối
+expire: Không renew trước TTL khoảng 90s
+down: Registry đánh dấu DOWN
+payment -> registry: Heartbeat mỗi 30s
+payment -> crash -> expire -> down
 ```
 
 Các con số trên chỉ là ví dụ minh họa từ mô hình nguồn. Interval và TTL cần được chọn cùng nhau. TTL quá ngắn dễ loại nhầm instance vì một lần network jitter. TTL quá dài khiến entry cũ tiếp tục tồn tại và traffic có thể bị route sai lâu hơn.
@@ -161,14 +157,17 @@ Heartbeat có ưu điểm là protocol đơn giản và registry không cần g�
 
 Trong mô hình **Active Health Check**, registry, Load Balancer hoặc orchestrator chủ động gọi health endpoint của instance theo chu kỳ. Consumer đọc HTTP status, timeout và semantics của endpoint để quyết định instance có healthy hay không.
 
-```text
-Registry / Load Balancer
-        │ GET /health/ready mỗi 10s
-        ▼
-Payment Service instance
-        ├── 200 OK ──▶ giữ instance trong vòng route
-        ├── 503     ──▶ tạm thời gỡ instance khỏi traffic
-        └── timeout ─▶ coi là không healthy theo policy
+```d2 title="Active Health Check — Readiness"
+direction: right
+lb: Registry / Load Balancer
+payment: Payment Service Instance
+ok: Giữ instance trong vòng route
+unhealthy: Tạm thời gỡ khỏi traffic
+timeout: Không healthy theo policy
+lb -> payment: GET /health/ready mỗi 10s
+payment -> ok: 200 OK
+payment -> unhealthy: 503
+payment -> timeout: Timeout
 ```
 
 Active check có thể kiểm tra trạng thái phục vụ thực tế, gồm những dependency bắt buộc. Đổi lại, nó tạo ra một lượng polling đều đặn lên mọi instance. Nếu endpoint thực hiện deep check nặng ở mỗi lần poll, chính health system có thể làm tăng tải lên database hoặc downstream đang gặp sự cố.
@@ -195,17 +194,25 @@ Một triển khai có thể kết hợp:
 - Liveness để orchestrator restart process bị treo.
 - Startup để bảo vệ thời gian initialization.
 
-```mermaid
-flowchart TD
-    I[Service instance] --> H[Heartbeat hoặc TTL renew]
-    H --> R[Service Registry]
-    R -->|Registration hết hạn| X[Loại instance khỏi danh sách]
-
-    L[Load Balancer hoặc Kubelet] -->|GET health endpoint| I
-    I -->|Readiness 200| T[Giữ traffic]
-    I -->|Readiness 503 hoặc timeout| N[Gỡ khỏi endpoints]
-    I -->|Liveness fail| S[Restart container]
-    I -->|Startup chưa pass| W[Chờ app khởi động]
+```d2 title="Kết hợp các tín hiệu"
+direction: down
+n1: "Service instance"
+n2: "Heartbeat hoặc TTL renew"
+n3: "Service Registry"
+n4: "Loại instance khỏi danh sách"
+n5: "Load Balancer hoặc Kubelet"
+n6: "Giữ traffic"
+n7: "Gỡ khỏi endpoints"
+n8: "Restart container"
+n9: "Chờ app khởi động"
+n1 -> n2
+n2 -> n3
+n3 -> n4: "Registration hết hạn"
+n5 -> n1: "GET health endpoint"
+n1 -> n6: "Readiness 200"
+n1 -> n7: "Readiness 503 hoặc timeout"
+n1 -> n8: "Liveness fail"
+n1 -> n9: "Startup chưa pass"
 ```
 
 Các tín hiệu có thể cùng quan sát một instance nhưng không nên có cùng semantics. Đặc biệt, readiness fail không nên tự động được diễn giải thành liveness fail.
@@ -421,11 +428,15 @@ Một readiness check fail hai lần không có cùng ý nghĩa với liveness f
 
 Load Balancer thường nên dùng readiness semantics để quyết định có route request tới target hay không:
 
-```text
-Load Balancer / Kubernetes Service
-  ├── Pod 1 — /health/ready → 200 ──► nhận traffic
-  ├── Pod 2 — /health/ready → 503 ──► tạm thời không nhận traffic
-  └── Pod 3 — timeout        ──► tạm thời không nhận traffic
+```d2 title="Health Check — Endpoint Removal"
+direction: right
+lb: Load Balancer / Kubernetes Service
+p1: "Pod 1\n/health/ready → 200\nNhận traffic"
+p2: "Pod 2\n/health/ready → 503\nTạm thời không nhận traffic"
+p3: "Pod 3\nTimeout\nTạm thời không nhận traffic"
+lb -> p1: Route
+lb -- p2: Excluded {style.stroke-dash: 5}
+lb -- p3: Excluded {style.stroke-dash: 5}
 ```
 
 Liveness không phải lúc nào cũng là health check phù hợp cho routing. Một process có thể vẫn phản hồi endpoint liveness nhưng chưa có database connection cần thiết cho request. Ngược lại, readiness fail không nhất thiết có nghĩa process cần restart.

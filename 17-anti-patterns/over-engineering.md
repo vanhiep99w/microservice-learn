@@ -292,14 +292,20 @@ Remediation cũng cần được triển khai theo phase:
 5. So sánh kết quả với baseline, gồm cả failure mode và trải nghiệm local development.
 6. Chỉ deprecate, gộp hoặc xóa thành phần cũ sau khi usage và behavior đã được xác nhận.
 
-```mermaid
-flowchart LR
-    R["Yêu cầu hiện hữu đã được xác minh"] --> S["Chọn giải pháp đơn giản nhất"]
-    S --> B["Baseline và thử nghiệm nhỏ"]
-    B --> E["Đánh giá kết quả"]
-    E -->|"Đủ đáp ứng"| K["Giữ và vận hành"]
-    E -->|"Chưa đáp ứng"| C["Thêm một capability có owner"]
-    C --> B
+```d2 title="Bước 5 Thử nghiệm nhỏ và có đường quay lại"
+direction: right
+n1: "Yêu cầu hiện hữu đã được xác minh"
+n2: "Chọn giải pháp đơn giản nhất"
+n3: "Baseline và thử nghiệm nhỏ"
+n4: "Đánh giá kết quả"
+n5: "Giữ và vận hành"
+n6: "Thêm một capability có owner"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5: "Đủ đáp ứng"
+n4 -> n6: "Chưa đáp ứng"
+n6 -> n3
 ```
 
 Mục tiêu của remediation không phải là làm topology nhỏ bằng mọi giá. Mục tiêu là giảm complexity không cần thiết mà vẫn giữ khả năng đáp ứng yêu cầu đã xác minh.

@@ -170,35 +170,29 @@ DDD:           Dev + Business Expert cùng trao đổi
 
 DDD rất rộng, nhưng trong Microservice, ta chủ yếu quan tâm đến **Strategic DDD** — bao gồm:
 
-```mermaid
-graph TB
-    DDD["🎯 Domain-Driven Design"]
-    
-    STRAT["📐 Strategic DDD<br/>(Quan trọng cho Microservice)"]
-    TAC["🔧 Tactical DDD<br/>(Chi tiết implementation)"]
-    
-    UL["Ubiquitous Language<br/>Ngôn ngữ chung"]
-    DOM["Domain & Subdomain<br/>Miền nghiệp vụ"]
-    BC["Bounded Context<br/>Ranh giới ngữ cảnh"]
-    CM["Context Map<br/>Bản đồ quan hệ"]
-    
-    ENT["Entity"]
-    VO["Value Object"]
-    AGG["Aggregate"]
-    REPO["Repository"]
-    
-    DDD --> STRAT
-    DDD --> TAC
-    
-    STRAT --> UL
-    STRAT --> DOM
-    STRAT --> BC
-    STRAT --> CM
-    
-    TAC --> ENT
-    TAC --> VO
-    TAC --> AGG
-    TAC --> REPO
+```d2 title="DDD là gì?"
+direction: down
+n1: "🎯 Domain-Driven Design"
+n2: "📐 Strategic DDD\n(Quan trọng cho Microservice)"
+n3: "🔧 Tactical DDD\n(Chi tiết implementation)"
+n4: "Ubiquitous Language\nNgôn ngữ chung"
+n5: "Domain & Subdomain\nMiền nghiệp vụ"
+n6: "Bounded Context\nRanh giới ngữ cảnh"
+n7: "Context Map\nBản đồ quan hệ"
+n8: "Entity"
+n9: "Value Object"
+n10: "Aggregate"
+n11: "Repository"
+n1 -> n2
+n1 -> n3
+n2 -> n4
+n2 -> n5
+n2 -> n6
+n2 -> n7
+n3 -> n8
+n3 -> n9
+n3 -> n10
+n3 -> n11
 ```
 
 ### Ubiquitous Language
@@ -272,25 +266,19 @@ Từ "Khách hàng" trong công ty Tiki:
 
 Biểu đồ tổng quan:
 
-```mermaid
-graph TB
-    subgraph Domain["🏢 Domain: E-Commerce"]
-        subgraph Core["⭐ Core Subdomain<br/>(Lợi thế cạnh tranh)"]
-            S1["Pricing & Promotion<br/>Chiến lược giá thông minh"]
-            S2["Recommendation<br/>Gợi ý sản phẩm"]
-        end
-        
-        subgraph Support["🔧 Supporting Subdomain<br/>(Hỗ trợ core, tự build)"]
-            S3["Order Management<br/>Quản lý đơn hàng"]
-            S4["Inventory<br/>Quản lý tồn kho"]
-        end
-        
-        subgraph Generic["📦 Generic Subdomain<br/>(Chung chung, mua/dùng SaaS)"]
-            S5["Payment<br/>Thanh toán (Stripe)"]
-            S6["Email/SMS<br/>Thông báo (SendGrid)"]
-            S7["Auth<br/>Xác thực (Auth0)"]
-        end
-    end
+```d2 title="Domain, Subdomain và Bounded Context"
+direction: down
+n4: "🏢 Domain: E-Commerce" {}
+n4.n3: "📦 Generic Subdomain\n(Chung chung, mua/dùng SaaS)" {}
+n4.n2: "🔧 Supporting Subdomain\n(Hỗ trợ core, tự build)" {}
+n4.n1: "⭐ Core Subdomain\n(Lợi thế cạnh tranh)" {}
+n4.n1.n5: "Pricing & Promotion\nChiến lược giá thông minh"
+n4.n1.n6: "Recommendation\nGợi ý sản phẩm"
+n4.n2.n7: "Order Management\nQuản lý đơn hàng"
+n4.n2.n8: "Inventory\nQuản lý tồn kho"
+n4.n3.n9: "Payment\nThanh toán (Stripe)"
+n4.n3.n10: "Email/SMS\nThông báo (SendGrid)"
+n4.n3.n11: "Auth\nXác thực (Auth0)"
 ```
 
 | Loại Subdomain | Đặc điểm | Chiến lược | Ví dụ |
@@ -392,23 +380,24 @@ class InventoryItem {
 
 Các Bounded Context không hoàn toàn cô lập — chúng cần **trao đổi dữ liệu** với nhau. **Context Map** là bản đồ mô tả cách chúng tương tác.
 
-```mermaid
-graph LR
-    CAT["📦 Catalog<br/>Context"]
-    PRICE["💰 Pricing<br/>Context"]
-    INV["📊 Inventory<br/>Context"]
-    ORDER["🛒 Order<br/>Context"]
-    SHIP["🚚 Shipping<br/>Context"]
-    PAY["💳 Payment<br/>Context"]
-
-    CAT -->|"productId,<br/>name"| ORDER
-    PRICE -->|"finalPrice"| ORDER
-    INV -->|"isAvailable"| ORDER
-    ORDER -->|"orderId,<br/>items"| SHIP
-    ORDER -->|"totalAmount"| PAY
-    INV -->|"weight,<br/>dimensions"| SHIP
-
-    style ORDER fill:#1a1a2e,stroke:#00d9ff,color:#fff
+```d2 title="Context Map — Mối quan hệ giữa các Bounded Context"
+direction: right
+n1: "📦 Catalog\nContext"
+n2: "💰 Pricing\nContext"
+n3: "📊 Inventory\nContext"
+n4: "🛒 Order\nContext" {
+  style.fill: "#1a1a2e"
+  style.stroke: "#00d9ff"
+  style.font-color: "#fff"
+}
+n5: "🚚 Shipping\nContext"
+n6: "💳 Payment\nContext"
+n1 -> n4: "productId,\nname"
+n2 -> n4: "finalPrice"
+n3 -> n4: "isAvailable"
+n4 -> n5: "orderId,\nitems"
+n4 -> n6: "totalAmount"
+n3 -> n5: "weight,\ndimensions"
 ```
 
 > 💡 **Lưu ý:** Mỗi context chỉ chia sẻ **dữ liệu cần thiết**, không phải toàn bộ model. Order Context chỉ cần `productId` + `name` từ Catalog, không cần `images[]` hay `specifications`.
@@ -426,21 +415,16 @@ Khi 2 Bounded Context cần tương tác, có nhiều cách thiết kế mối q
 | **Open Host Service** | Context public hóa API rõ ràng cho nhiều consumer | Khi nhiều context cần dùng | Product Catalog cung cấp REST API public |
 | **Published Language** | Dùng format chung để trao đổi (JSON, Protobuf, Avro) | Khi cần interoperability | Event dùng Avro schema trên Kafka |
 
+```d2 title="Anti-corruption Layer — JSON và Legacy SOAP"
+direction: right
+order: "Order Service\nNew • JSON"
+acl: "ACL / Adapter\nJSON ↔ XML"
+legacy: "Legacy ERP\nOld • XML / SOAP"
+order <-> acl
+acl <-> legacy
 ```
-Anti-corruption Layer — Ví dụ thực tế:
 
-Hệ thống mới (Microservice) tích hợp hệ thống cũ (Legacy):
-
-┌──────────────┐     ┌─────────────┐     ┌───────────────┐
-│ Order Service│     │    ACL      │     │ Legacy ERP    │
-│ (new, JSON)  │────▶│ (Adapter)   │────▶│ (old, XML/    │
-│              │◀────│ JSON ↔ XML  │◀────│  SOAP)        │
-└──────────────┘     └─────────────┘     └───────────────┘
-
-ACL đảm bảo:
-  → Order Service không cần biết Legacy dùng XML
-  → Legacy thay đổi format → chỉ sửa ACL, không sửa Order Service
-```
+Order Service không cần biết Legacy dùng XML. Legacy thay đổi format thì chỉ sửa ACL, không sửa Order Service.
 
 ---
 
@@ -450,14 +434,12 @@ ACL đảm bảo:
 
 **Thường thì đúng, nhưng không phải luôn luôn.**
 
-```mermaid
-graph TB
-    subgraph Rule["Quy tắc chuyển đổi"]
-        direction TB
-        R1["1 Bounded Context<br/>= 1 Microservice ✅<br/>(trường hợp phổ biến nhất)"]
-        R2["1 Bounded Context<br/>= N Microservices ✅<br/>(khi context quá lớn)"]
-        R3["N Bounded Contexts<br/>= 1 Microservice ⚠️<br/>(khi context quá nhỏ,<br/>nên gộp lại)"]
-    end
+```d2 title="1 Bounded Context = 1 Microservice?"
+direction: down
+n1: "Quy tắc chuyển đổi" {}
+n1.n2: "1 Bounded Context\n= 1 Microservice ✅\n(trường hợp phổ biến nhất)"
+n1.n3: "1 Bounded Context\n= N Microservices ✅\n(khi context quá lớn)"
+n1.n4: "N Bounded Contexts\n= 1 Microservice ⚠️\n(khi context quá nhỏ,\nnên gộp lại)"
 ```
 
 | Trường hợp | Khi nào | Ví dụ |
@@ -472,28 +454,22 @@ graph TB
 
 Từ phân tích domain → subdomain → bounded context → microservice:
 
-```mermaid
-graph TB
-    subgraph Domain["🏢 Domain: E-Commerce Platform"]
-        subgraph Core["⭐ Core Subdomain"]
-            BC1["📦 Catalog Context<br/>→ Catalog Service"]
-            BC2["💰 Pricing Context<br/>→ Pricing Service"]
-            BC3["🎯 Recommendation Context<br/>→ Recommendation Service"]
-        end
-        
-        subgraph Support["🔧 Supporting Subdomain"]
-            BC4["🛒 Order Context<br/>→ Order Service"]
-            BC5["📊 Inventory Context<br/>→ Inventory Service"]
-            BC6["🚚 Shipping Context<br/>→ Shipping Service"]
-            BC7["👤 Customer Context<br/>→ Customer Service"]
-        end
-        
-        subgraph Generic["📦 Generic Subdomain"]
-            BC8["💳 Payment Context<br/>→ Payment Service<br/>(wrap Stripe)"]
-            BC9["📧 Notification Context<br/>→ Notification Service<br/>(wrap SendGrid)"]
-            BC10["🔐 Auth Context<br/>→ Auth Service<br/>(wrap Auth0)"]
-        end
-    end
+```d2 title="Ví dụ thực tế: Hệ thống E-Commerce"
+direction: down
+n4: "🏢 Domain: E-Commerce Platform" {}
+n4.n3: "📦 Generic Subdomain" {}
+n4.n2: "🔧 Supporting Subdomain" {}
+n4.n1: "⭐ Core Subdomain" {}
+n4.n1.n5: "📦 Catalog Context\n→ Catalog Service"
+n4.n1.n6: "💰 Pricing Context\n→ Pricing Service"
+n4.n1.n7: "🎯 Recommendation Context\n→ Recommendation Service"
+n4.n2.n8: "🛒 Order Context\n→ Order Service"
+n4.n2.n9: "📊 Inventory Context\n→ Inventory Service"
+n4.n2.n10: "🚚 Shipping Context\n→ Shipping Service"
+n4.n2.n11: "👤 Customer Context\n→ Customer Service"
+n4.n3.n12: "💳 Payment Context\n→ Payment Service\n(wrap Stripe)"
+n4.n3.n13: "📧 Notification Context\n→ Notification Service\n(wrap SendGrid)"
+n4.n3.n14: "🔐 Auth Context\n→ Auth Service\n(wrap Auth0)"
 ```
 
 Mỗi service có **model riêng** cho khái niệm "Customer":
@@ -634,32 +610,27 @@ Cân nhắc gộp:
 
 **Bước 4: Luồng giao tiếp — "Bệnh nhân đi khám bệnh"**
 
-```mermaid
-sequenceDiagram
-    participant APP as 🗓️ Appointment
-    participant CLI as 🩺 Clinical
-    participant LAB as 🧪 Laboratory
-    participant PHA as 💊 Pharmacy
-    participant BIL as 💰 Billing
-    participant NOTI as 📧 Notification
-
-    Note over APP: Bệnh nhân đặt lịch khám
-    APP->>CLI: patientId, appointmentId (sync)
-    
-    Note over CLI: Bác sĩ khám, chẩn đoán
-    CLI->>LAB: Yêu cầu xét nghiệm máu (sync)
-    LAB-->>CLI: Kết quả: chỉ số bình thường ✅
-    
-    Note over CLI: Bác sĩ kê đơn thuốc
-    CLI--)PHA: Event: PrescriptionCreated (async)
-    CLI--)BIL: Event: ConsultationCompleted (async)
-    
-    Note over PHA: Chuẩn bị thuốc
-    PHA--)BIL: Event: MedicineDispensed (async)
-    
-    Note over BIL: Tổng hợp viện phí
-    BIL--)NOTI: Event: InvoiceReady (async)
-    Note over NOTI: Gửi SMS hóa đơn cho bệnh nhân
+```d2 title="Ví dụ thực tế: Hệ thống quản lý Bệnh viện"
+shape: sequence_diagram
+"APP": "🗓️ Appointment"
+"CLI": "🩺 Clinical"
+"LAB": "🧪 Laboratory"
+"PHA": "💊 Pharmacy"
+"BIL": "💰 Billing"
+"NOTI": "📧 Notification"
+"APP".note1: "Bệnh nhân đặt lịch khám"
+"APP" -> "CLI": "patientId, appointmentId (sync)"
+"CLI".note2: "Bác sĩ khám, chẩn đoán"
+"CLI" -> "LAB": "Yêu cầu xét nghiệm máu (sync)"
+"LAB" -> "CLI": "Kết quả: chỉ số bình thường ✅" { style.stroke-dash: 5 }
+"CLI".note3: "Bác sĩ kê đơn thuốc"
+"CLI" -> "PHA": "Event: PrescriptionCreated (async)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"CLI" -> "BIL": "Event: ConsultationCompleted (async)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"PHA".note4: "Chuẩn bị thuốc"
+"PHA" -> "BIL": "Event: MedicineDispensed (async)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"BIL".note5: "Tổng hợp viện phí"
+"BIL" -> "NOTI": "Event: InvoiceReady (async)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"NOTI".note6: "Gửi SMS hóa đơn cho bệnh nhân"
 ```
 
 **Bước 5: Mỗi service giữ data riêng**
@@ -824,77 +795,62 @@ Từ **"LOCATION"** — khác biệt rất rõ:
 
 **Bước 3: Mapping Bounded Context → Microservice**
 
-```mermaid
-graph TB
-    subgraph Core["⭐ Core — Tự build, team giỏi nhất"]
-        MS1["🔍 Matching Service<br/>Ghép rider ↔ driver<br/>Tech: Go + Redis"]
-        MS2["💰 Pricing Service<br/>Tính giá, surge pricing<br/>Tech: Go + Redis"]
-        MS3["⏱️ ETA Service<br/>Ước tính thời gian<br/>Tech: Python + ML Model"]
-    end
-
-    subgraph Support["🔧 Supporting — Tự build"]
-        MS4["🚗 Ride Service<br/>Quản lý chuyến đi<br/>Tech: Java + PostgreSQL"]
-        MS5["👤 Rider Service<br/>Quản lý khách hàng<br/>Tech: Node.js + PostgreSQL"]
-        MS6["🚙 Driver Service<br/>Quản lý tài xế<br/>Tech: Java + PostgreSQL"]
-        MS7["🍔 Food Service<br/>Đặt đồ ăn<br/>Tech: Java + MongoDB"]
-        MS8["🏪 Restaurant Service<br/>Quản lý nhà hàng<br/>Tech: Node.js + PostgreSQL"]
-        MS9["⭐ Rating Service<br/>Đánh giá<br/>Tech: Node.js + MongoDB"]
-        MS10["👛 Wallet Service<br/>Ví GrabPay<br/>Tech: Java + PostgreSQL"]
-        MS11["🎁 Promotion Service<br/>Voucher, mã giảm giá<br/>Tech: Go + Redis"]
-    end
-
-    subgraph Generic["📦 Generic — Dùng SaaS / wrap API"]
-        MS12["🔐 Auth Service<br/>wrap Firebase Auth"]
-        MS13["💳 Payment Gateway<br/>wrap Stripe/VNPay"]
-        MS14["📧 Notification Service<br/>wrap Twilio + FCM"]
-        MS15["🗺️ Map Service<br/>wrap Google Maps API"]
-        MS16["💬 Chat Service<br/>wrap SendBird"]
-    end
+```d2 title="Ví dụ thực tế: Grab — Super App (chi tiết từng bước)"
+direction: down
+n3: "📦 Generic — Dùng SaaS / wrap API" {}
+n2: "🔧 Supporting — Tự build" {}
+n1: "⭐ Core — Tự build, team giỏi nhất" {}
+n1.n4: "🔍 Matching Service\nGhép rider ↔ driver\nTech: Go + Redis"
+n1.n5: "💰 Pricing Service\nTính giá, surge pricing\nTech: Go + Redis"
+n1.n6: "⏱️ ETA Service\nƯớc tính thời gian\nTech: Python + ML Model"
+n2.n7: "🚗 Ride Service\nQuản lý chuyến đi\nTech: Java + PostgreSQL"
+n2.n8: "👤 Rider Service\nQuản lý khách hàng\nTech: Node.js + PostgreSQL"
+n2.n9: "🚙 Driver Service\nQuản lý tài xế\nTech: Java + PostgreSQL"
+n2.n10: "🍔 Food Service\nĐặt đồ ăn\nTech: Java + MongoDB"
+n2.n11: "🏪 Restaurant Service\nQuản lý nhà hàng\nTech: Node.js + PostgreSQL"
+n2.n12: "⭐ Rating Service\nĐánh giá\nTech: Node.js + MongoDB"
+n2.n13: "👛 Wallet Service\nVí GrabPay\nTech: Java + PostgreSQL"
+n2.n14: "🎁 Promotion Service\nVoucher, mã giảm giá\nTech: Go + Redis"
+n3.n15: "🔐 Auth Service\nwrap Firebase Auth"
+n3.n16: "💳 Payment Gateway\nwrap Stripe/VNPay"
+n3.n17: "📧 Notification Service\nwrap Twilio + FCM"
+n3.n18: "🗺️ Map Service\nwrap Google Maps API"
+n3.n19: "💬 Chat Service\nwrap SendBird"
 ```
 
 **Bước 4: Luồng giao tiếp — "Khách gọi xe GrabBike"**
 
-```mermaid
-sequenceDiagram
-    participant R as 👤 Rider App
-    participant RIDE as 🚗 Ride Service
-    participant PRICE as 💰 Pricing Service
-    participant ETA as ⏱️ ETA Service
-    participant MATCH as 🔍 Matching Service
-    participant DRIVER as 🚙 Driver Service
-    participant NOTI as 📧 Notification
-    participant WALLET as 👛 Wallet
-    participant RATE as ⭐ Rating
-
-    R->>RIDE: Đặt xe (pickup, dropoff)
-    
-    RIDE->>PRICE: Tính giá? (distance, time)
-    PRICE-->>RIDE: 35.000đ (surge x1.2)
-    
-    RIDE->>ETA: Ước tính thời gian?
-    ETA-->>RIDE: ~15 phút
-    
-    RIDE-->>R: Hiển thị: 35.000đ, ~15 phút
-    R->>RIDE: Xác nhận đặt xe ✅
-    
-    RIDE->>MATCH: Tìm tài xế gần nhất
-    MATCH->>DRIVER: Lấy vị trí tài xế online
-    DRIVER-->>MATCH: [Driver A: 1.2km, Driver B: 2.5km]
-    MATCH-->>RIDE: Driver A được chọn
-    
-    RIDE--)NOTI: Event: DriverAssigned (async)
-    Note over NOTI: Push notification cho cả rider + driver
-    
-    Note over RIDE: ... Tài xế đón khách, chạy, trả khách ...
-    
-    RIDE--)WALLET: Event: RideCompleted (async)
-    Note over WALLET: Trừ 35.000đ từ rider<br/>Cộng 28.000đ cho driver (trừ 20% phí)
-    
-    RIDE--)RATE: Event: RideCompleted (async)
-    Note over RATE: Hiển thị form đánh giá
-    
-    RIDE--)NOTI: Event: RideCompleted (async)
-    Note over NOTI: Gửi hóa đơn qua email
+```d2 title="Ví dụ thực tế: Grab — Super App (chi tiết từng bước)"
+shape: sequence_diagram
+"R": "👤 Rider App"
+"RIDE": "🚗 Ride Service"
+"PRICE": "💰 Pricing Service"
+"ETA": "⏱️ ETA Service"
+"MATCH": "🔍 Matching Service"
+"DRIVER": "🚙 Driver Service"
+"NOTI": "📧 Notification"
+"WALLET": "👛 Wallet"
+"RATE": "⭐ Rating"
+"R" -> "RIDE": "Đặt xe (pickup, dropoff)"
+"RIDE" -> "PRICE": "Tính giá? (distance, time)"
+"PRICE" -> "RIDE": "35.000đ (surge x1.2)" { style.stroke-dash: 5 }
+"RIDE" -> "ETA": "Ước tính thời gian?"
+"ETA" -> "RIDE": "~15 phút" { style.stroke-dash: 5 }
+"RIDE" -> "R": "Hiển thị: 35.000đ, ~15 phút" { style.stroke-dash: 5 }
+"R" -> "RIDE": "Xác nhận đặt xe ✅"
+"RIDE" -> "MATCH": "Tìm tài xế gần nhất"
+"MATCH" -> "DRIVER": "Lấy vị trí tài xế online"
+"DRIVER" -> "MATCH": "[Driver A: 1.2km, Driver B: 2.5km]" { style.stroke-dash: 5 }
+"MATCH" -> "RIDE": "Driver A được chọn" { style.stroke-dash: 5 }
+"RIDE" -> "NOTI": "Event: DriverAssigned (async)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"NOTI".note1: "Push notification cho cả rider + driver"
+"RIDE".note2: "... Tài xế đón khách, chạy, trả khách ..."
+"RIDE" -> "WALLET": "Event: RideCompleted (async)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"WALLET".note3: "Trừ 35.000đ từ rider\nCộng 28.000đ cho driver (trừ 20% phí)"
+"RIDE" -> "RATE": "Event: RideCompleted (async)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"RATE".note4: "Hiển thị form đánh giá"
+"RIDE" -> "NOTI": "Event: RideCompleted (async)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"NOTI".note5: "Gửi hóa đơn qua email"
 ```
 
 **Bước 5: Mỗi service giữ data riêng**
@@ -1061,26 +1017,22 @@ Sai ❌:  Tất cả service import chung "shared-models" package
 
 ### Bước 4: Xác định giao tiếp giữa các context
 
-```mermaid
-sequenceDiagram
-    participant OC as 🛒 Order Context
-    participant IC as 📊 Inventory Context
-    participant PC as 💳 Payment Context
-    participant NC as 📧 Notification Context
-
-    Note over OC: Customer đặt hàng
-    OC->>IC: Kiểm tra tồn kho? (sync - REST/gRPC)
-    IC-->>OC: Còn hàng ✅
-    
-    OC->>PC: Xử lý thanh toán (sync)
-    PC-->>OC: Thanh toán OK ✅
-    
-    Note over OC: Publish event
-    OC--)IC: Event: OrderPlaced (async - Kafka)
-    OC--)NC: Event: OrderPlaced (async - Kafka)
-    
-    Note over IC: Giảm tồn kho
-    Note over NC: Gửi email xác nhận
+```d2 title="Bước 4: Xác định giao tiếp giữa các context"
+shape: sequence_diagram
+"OC": "🛒 Order Context"
+"IC": "📊 Inventory Context"
+"PC": "💳 Payment Context"
+"NC": "📧 Notification Context"
+"OC".note1: "Customer đặt hàng"
+"OC" -> "IC": "Kiểm tra tồn kho? (sync - REST/gRPC)"
+"IC" -> "OC": "Còn hàng ✅" { style.stroke-dash: 5 }
+"OC" -> "PC": "Xử lý thanh toán (sync)"
+"PC" -> "OC": "Thanh toán OK ✅" { style.stroke-dash: 5 }
+"OC".note2: "Publish event"
+"OC" -> "IC": "Event: OrderPlaced (async - Kafka)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"OC" -> "NC": "Event: OrderPlaced (async - Kafka)" { style.stroke-dash: 5; target-arrowhead.style.filled: false }
+"IC".note3: "Giảm tồn kho"
+"NC".note4: "Gửi email xác nhận"
 ```
 
 **Nguyên tắc chọn sync vs async:**
@@ -1097,65 +1049,50 @@ sequenceDiagram
 
 ### 1. Distributed Monolith
 
+```d2 title="Anti-pattern — tách service nhưng chia sẻ database"
+direction: down
+a: Service A
+b: Service B
+c: Service C
+db: "Shared DB\nĐổi schema có thể break tất cả" {shape: cylinder}
+a -> db
+b -> db
+c -> db
 ```
-❌ "Tách service nhưng vẫn share database"
 
-┌──────────┐  ┌──────────┐  ┌──────────┐
-│Service A │  │Service B │  │Service C │
-└────┬─────┘  └─────┬────┘  └──────┬───┘
-     │              │              │
-     └──────────────┼──────────────┘
-                    │
-             ┌──────▼──────┐
-             │ Shared DB   │  ← Thay đổi schema = break tất cả
-             └─────────────┘
-
-→ Có vẻ là Microservice nhưng thực tế là Monolith phân tán
-→ Có TẤT CẢ nhược điểm của cả Monolith lẫn Microservice!
-```
+Đây có thể trở thành Distributed Monolith: service vẫn phụ thuộc schema chung và khó deploy độc lập.
 
 ### 2. Nano-service (tách quá nhỏ)
 
+```d2 title="Nano-services — chia nhỏ quá mức"
+direction: right
+validate: Validate Email Svc
+save: Save Email Svc
+format: Format Email Svc
+send: Send Email Svc
+log: Log Email Svc
+validate -> save -> format -> send -> log
 ```
-❌ Tách quá mức:
 
-┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐ ┌──────────┐
-│Validate │ │ Save    │ │ Format  │ │ Send     │ │ Log      │
-│Email Svc│→│Email Svc│→│Email Svc│→│Email Svc │→│Email Svc │
-└─────────┘ └─────────┘ └─────────┘ └──────────┘ └──────────┘
-
-→ Mỗi service quá nhỏ, chỉ làm 1 bước
-→ Network overhead cực lớn
-→ Impossible to debug
-
-✅ Nên gộp thành 1:  Email Notification Service
-```
+Mỗi service chỉ làm một bước gây nhiều network overhead và khó debug. Nên gộp thành một **Email Notification Service**.
 
 ### 3. Chia theo layer thay vì business capability
 
+```d2 title="Technical layer và Business Capability"
+direction: right
+horizontal: "Sai — Technical Layer" {
+ ui: "UI Service\nAll UI"
+ business: "Business Logic Service\nAll logic"
+ data: "Data Access Service\nAll DB"
+}
+vertical: "Đúng — Business Capability" {
+ user: "User Service\nUI + Logic + DB"
+ order: "Order Service\nUI + Logic + DB"
+ product: "Product Service\nUI + Logic + DB"
+}
 ```
-❌ Tách theo technical layer:
 
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ UI Service   │  │ Business     │  │ Data Access  │
-│              │  │ Logic Service│  │ Service      │
-│ (all UI)     │  │ (all logic)  │  │ (all DB)     │
-└──────────────┘  └──────────────┘  └──────────────┘
-
-→ Thêm feature mới = sửa CẢ 3 service
-→ Không có team ownership rõ ràng
-
-✅ Tách theo business capability:
-
-┌──────────────┐  ┌──────────────┐  ┌───────────────┐
-│ User Service │  │ Order Service│  │Product Service│
-│ UI+Logic+DB  │  │ UI+Logic+DB  │  │ UI+Logic+DB   │
-│ (vertical)   │  │ (vertical)   │  │ (vertical)    │
-└──────────────┘  └──────────────┘  └───────────────┘
-
-→ Thêm feature Order = chỉ sửa Order Service
-→ Team Order sở hữu toàn bộ từ UI đến DB
-```
+Tách theo layer: một feature có thể phải sửa cả ba service, ownership không rõ. Tách theo capability: feature Order chủ yếu đổi Order Service; team Order sở hữu từ UI đến DB.
 
 ---
 

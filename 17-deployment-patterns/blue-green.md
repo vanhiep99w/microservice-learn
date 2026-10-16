@@ -46,17 +46,28 @@ Pattern này tách hai thời điểm: đưa version mới lên một environmen
 
 Hai environment cần tương đương về capacity, image, configuration, secrets, network policy và cách kết nối dependency. “Giống nhau” không nhất thiết có nghĩa là dùng hai database độc lập. Mô hình phổ biến là Blue và Green cùng truy cập shared state, chẳng hạn database, cache hoặc queue.
 
-```mermaid
-flowchart LR
-    C[Client] --> R[Load Balancer / Ingress]
-    R -->|100% trước switch| B[BLUE v1<br/>LIVE]
-    R -.->|0% trước switch| G[GREEN v2<br/>Deploy và kiểm thử]
-    B --> D[(Shared state)]
-    G --> D
-    G --> V{Readiness và smoke test đạt?}
-    V -->|Chưa| G
-    V -->|Đạt| S[Cho phép switch traffic]
-    S --> R
+```d2 title="Blue và Green"
+direction: right
+n1: "Client"
+n2: "Load Balancer / Ingress"
+n3: "BLUE v1\nLIVE"
+n4: "GREEN v2\nDeploy và kiểm thử"
+n5: "Shared state" {
+  shape: cylinder
+}
+n6: "Readiness và smoke test đạt?" {
+  shape: diamond
+}
+n7: "Cho phép switch traffic"
+n1 -> n2
+n2 -> n3: "100% trước switch"
+n2 -> n4: "0% trước switch" { style.stroke-dash: 5 }
+n3 -> n5
+n4 -> n5
+n4 -> n6
+n6 -> n4: "Chưa"
+n6 -> n7: "Đạt"
+n7 -> n2
 ```
 
 Blue và Green có thể là hai Kubernetes `Deployment`, hai target group phía sau Load Balancer hoặc hai nhóm task của cùng một service. Điều quan trọng là routing có thể chọn đúng một environment đang live, còn environment kia vẫn được khởi động và kiểm tra độc lập.

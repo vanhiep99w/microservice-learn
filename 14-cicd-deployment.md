@@ -220,7 +220,7 @@ MONO-REPO vs MULTI-REPO — CI STRATEGY:
 
 ### 2.4. Ví dụ — GitHub Actions CI Pipeline
 
-```yaml
+```yaml source="snippets/2-4-vi-du-github-actions-ci-pipeline.yaml"
 # .github/workflows/ci.yml — CI Pipeline cho Order Service
 name: Order Service CI
 
@@ -335,6 +335,8 @@ jobs:
           cache-to: type=gha,mode=max
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F2-4-vi-du-github-actions-ci-pipeline.yaml)
+
 ---
 
 ## 3. CD — Continuous Delivery vs Continuous Deployment
@@ -380,46 +382,15 @@ CONTINUOUS DELIVERY vs CONTINUOUS DEPLOYMENT:
 
 ### 3.2. CD Pipeline cho Microservice
 
-```
-CD PIPELINE — TỪ CI IMAGE ĐẾN PRODUCTION:
-──────────────────────────────────────────
-
-  CI Pipeline (đã pass)
-       │
-       ▼ Image: order-service:a1b2c3d
-       │
-  ┌────▼─────────────────────────────────────────────────────────┐
-  │  1. DEPLOY → STAGING                                         │
-  │     • Update K8s manifests (image tag)                       │
-  │     • Apply to staging cluster                               │
-  │     • Wait for rollout complete                              │
-  └──────┬───────────────────────────────────────────────────────┘
-         │
-  ┌──────▼───────────────────────────────────────────────────────┐
-  │  2. ACCEPTANCE TESTS trên STAGING                            │
-  │     • API integration tests                                  │
-  │     • E2E tests (Cypress, Playwright)                        │
-  │     • Performance tests (k6, Gatling)                        │
-  │     • Contract tests (Pact)                                  │
-  └──────┬───────────────────────────────────────────────────────┘
-         │
-  ┌──────▼───────────────────────────────────────────────────────┐
-  │  3. MANUAL APPROVAL (Continuous Delivery)                    │
-  │     hoặc AUTO (Continuous Deployment)                        │
-  └──────┬───────────────────────────────────────────────────────┘
-         │
-  ┌──────▼───────────────────────────────────────────────────────┐
-  │  4. DEPLOY → PRODUCTION                                      │
-  │     • Strategy: Blue-Green / Canary / Rolling                │
-  │     • Progressive rollout                                    │
-  └──────┬───────────────────────────────────────────────────────┘
-         │
-  ┌──────▼───────────────────────────────────────────────────────┐
-  │  5. POST-DEPLOY VERIFICATION                                 │
-  │     • Smoke tests                                            │
-  │     • Monitor error rate, latency, throughput                │
-  │     • Auto-rollback nếu metrics vượt threshold               │
-  └──────────────────────────────────────────────────────────────┘
+```d2 title="CD Pipeline — Image tới Production"
+direction: right
+ci: "CI đã pass\nImage order-service:a1b2c3d"
+staging: "1. Deploy Staging\nUpdate image tag / manifests\nApply → Wait rollout"
+test: "2. Acceptance Tests\nAPI integration • E2E\nCypress / Playwright\nk6 / Gatling • Pact"
+approval: "3. Manual Approval — Delivery\nhoặc Auto — Deployment"
+prod: "4. Production\nBlue-Green / Canary / Rolling\nProgressive rollout"
+verify: "5. Post-deploy Verification\nSmoke tests\nError rate • Latency • Throughput\nAuto-rollback khi vượt threshold"
+ci -> staging -> test -> approval -> prod -> verify
 ```
 
 ---
@@ -449,7 +420,7 @@ RECREATE STRATEGY — TẮT CŨ, BẬT MỚI:
   ❌ Chỉ dùng cho: dev/staging, hoặc services không critical
 ```
 
-```yaml
+```yaml source="snippets/4-1-recreate.yaml"
 # Kubernetes — Recreate Strategy
 apiVersion: apps/v1
 kind: Deployment
@@ -465,6 +436,8 @@ spec:
         - name: order-service
           image: order-service:v2.0
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-1-recreate.yaml)
 
 ### 4.2. Rolling Update
 
@@ -507,7 +480,7 @@ ROLLING UPDATE — THAY THẾ TỪNG BƯỚC:
   ⚠️ Rollback = rolling lại từng pod → CHẬM (vài phút)
 ```
 
-```yaml
+```yaml source="snippets/4-2-rolling-update.yaml"
 # Kubernetes — Rolling Update Strategy (MẶC ĐỊNH)
 apiVersion: apps/v1
 kind: Deployment
@@ -533,7 +506,9 @@ spec:
             periodSeconds: 5
 ```
 
-```bash
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-2-rolling-update.yaml)
+
+```bash source="snippets/4-2-rolling-update-2.sh"
 # Deploy + monitoring
 kubectl set image deployment/order-service order-service=order-service:v2.0
 kubectl rollout status deployment/order-service    # Watch progress
@@ -543,6 +518,8 @@ kubectl rollout history deployment/order-service   # Xem revision history
 kubectl rollout undo deployment/order-service                    # Về revision trước
 kubectl rollout undo deployment/order-service --to-revision=3    # Về revision cụ thể
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-2-rolling-update-2.sh)
 
 ### 4.3. Blue-Green Deployment
 
@@ -590,7 +567,7 @@ BLUE-GREEN — HAI MÔI TRƯỜNG, SWITCH TRAFFIC:
   ❌ Database migration phải backward compatible
 ```
 
-```yaml
+```yaml source="snippets/4-3-blue-green-deployment.yaml"
 # Blue-Green trên Kubernetes bằng Service selector
 # ───────────────────────────────────────────────
 
@@ -652,7 +629,9 @@ spec:
       targetPort: 8082
 ```
 
-```bash
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-3-blue-green-deployment.yaml)
+
+```bash source="snippets/4-3-blue-green-deployment-2.sh"
 # Switch traffic: Blue → Green
 kubectl patch service order-service \
   -p '{"spec":{"selector":{"version":"green"}}}'
@@ -664,6 +643,8 @@ kubectl patch service order-service \
 # Cleanup Blue sau khi Green stable
 kubectl delete deployment order-service-blue
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-3-blue-green-deployment-2.sh)
 
 ### 4.4. Canary Deployment
 
@@ -710,7 +691,7 @@ CANARY — TRIỂN KHAI TỪNG PHẦN, THEO DÕI METRICS:
   ❌ v1 + v2 chạy đồng thời lâu hơn
 ```
 
-```yaml
+```yaml source="snippets/4-4-canary-deployment.yaml"
 # Canary với Istio VirtualService
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
@@ -746,9 +727,11 @@ spec:
         version: v2
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-4-canary-deployment.yaml)
+
 **Progressive Delivery với Flagger** — tự động hóa Canary:
 
-```yaml
+```yaml source="snippets/4-4-canary-deployment-2.yaml"
 # Flagger — Auto Canary Deployment
 apiVersion: flagger.app/v1beta1
 kind: Canary
@@ -784,6 +767,8 @@ spec:
           cmd: "curl -s http://order-service-canary/actuator/health"
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-4-canary-deployment-2.yaml)
+
 ### 4.5. A/B Testing
 
 ```
@@ -806,7 +791,7 @@ A/B TESTING — ROUTING DỰA TRÊN ĐIỀU KIỆN:
   └─────────────────────────────────────────────────────────┘
 ```
 
-```yaml
+```yaml source="snippets/4-5-a-b-testing.yaml"
 # A/B Testing với Istio — Route dựa trên header
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
@@ -831,6 +816,8 @@ spec:
             host: order-service
             subset: v1-stable
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-5-a-b-testing.yaml)
 
 ### 4.6. Rolling Update vs Blue-Green — Khác nhau thế nào?
 
@@ -881,19 +868,40 @@ BLUE-GREEN — Deploy FULL BỘ V2, rồi SWITCH 1 LẦN:
 | **Canary** | ✅ Không | Nhanh (stop canary) | 1.x× | ⭐⭐⭐⭐ | High-traffic, data-driven |
 | **A/B Testing** | ✅ Không | Nhanh | 1.x× | ⭐⭐⭐⭐⭐ | Feature testing, UX experiments |
 
-```mermaid
-flowchart TD
-    A[Chọn Deployment Strategy] --> B{Service critical?}
-    B -->|Không| C{Cần zero downtime?}
-    C -->|Không| D[Recreate]
-    C -->|Có| E[Rolling Update]
-    B -->|Có| F{Cần instant rollback?}
-    F -->|Có| G[Blue-Green]
-    F -->|Không| H{Cần progressive rollout?}
-    H -->|Có| I{Dựa trên user group?}
-    I -->|Có| J[A/B Testing]
-    I -->|Không| K[Canary]
-    H -->|Không| E
+```d2 title="4.7. So sánh tổng hợp các Deployment Strategies"
+direction: down
+n1: "Chọn Deployment Strategy"
+n2: "Service critical?" {
+  shape: diamond
+}
+n3: "Cần zero downtime?" {
+  shape: diamond
+}
+n4: "Recreate"
+n5: "Rolling Update"
+n6: "Cần instant rollback?" {
+  shape: diamond
+}
+n7: "Blue-Green"
+n8: "Cần progressive rollout?" {
+  shape: diamond
+}
+n9: "Dựa trên user group?" {
+  shape: diamond
+}
+n10: "A/B Testing"
+n11: "Canary"
+n1 -> n2
+n2 -> n3: "Không"
+n3 -> n4: "Không"
+n3 -> n5: "Có"
+n2 -> n6: "Có"
+n6 -> n7: "Có"
+n6 -> n8: "Không"
+n8 -> n9: "Có"
+n9 -> n10: "Có"
+n9 -> n11: "Không"
+n8 -> n5: "Không"
 ```
 
 ---
@@ -1181,35 +1189,18 @@ VẬY TẠI SAO CẦN GITOPS? PUSH-BASED CÓ 3 VẤN ĐỀ:
 
 ### 5.3. ArgoCD
 
-```
-ARGOCD — GITOPS CONTROLLER CHO KUBERNETES:
-──────────────────────────────────────────
-
-  ┌──────────────────────────────────────────────────────────┐
-  │  ArgoCD Architecture:                                    │
-  │                                                          │
-  │  ┌────────────────┐     ┌─────────────────────────────┐  │
-  │  │  Git Repo      │     │  Kubernetes Cluster         │  │
-  │  │                │     │                             │  │
-  │  │  k8s-manifests/│     │  ┌──────────────────────┐   │  │
-  │  │  ├── base/     │◀────│──│  ArgoCD              │   │  │
-  │  │  ├── staging/  │pull │  │                      │   │  │
-  │  │  └── prod/     │     │  │  • API Server        │   │  │
-  │  │                │     │  │  • Repo Server       │   │  │
-  │  └────────────────┘     │  │  • Application       │   │  │
-  │                         │  │    Controller        │   │  │
-  │  ┌────────────────┐     │  │  • Redis (cache)     │   │  │
-  │  │  ArgoCD UI     │     │  │                      │   │  │
-  │  │  (Web Dashboard│─────│──│  Sync status:        │   │  │
-  │  │   + CLI)       │     │  │  ✅ Synced           │   │  │
-  │  └────────────────┘     │  │  ⚠️ OutOfSync        │   │  │
-  │                         │  │  ❌ Degraded         │   │  │
-  │                         │  └──────────────────────┘   │  │
-  │                         └─────────────────────────────┘  │
-  └──────────────────────────────────────────────────────────┘
+```d2 title="ArgoCD — GitOps Controller"
+direction: right
+git: "Git Repo\nk8s-manifests/base\nk8s-manifests/staging\nk8s-manifests/prod"
+ui: ArgoCD UI / CLI
+cluster: Kubernetes Cluster {
+ argo: "ArgoCD\nAPI Server • Repo Server\nApplication Controller • Redis cache\nSynced / OutOfSync / Degraded"
+}
+cluster.argo -> git: Pull
+ui -- cluster.argo: Dashboard / Sync status
 ```
 
-```yaml
+```yaml source="snippets/5-3-argocd.yaml"
 # ArgoCD Application — Deploy order-service
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -1247,6 +1238,8 @@ spec:
         factor: 2
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F5-3-argocd.yaml)
+
 ```bash
 # ArgoCD CLI
 argocd app list                                    # List applications
@@ -1276,7 +1269,7 @@ FLUXCD — LIGHTWEIGHT GITOPS:
   └────────────────────────────────────────────────────┘
 ```
 
-```yaml
+```yaml source="snippets/5-4-fluxcd.yaml"
 # FluxCD — GitRepository + Kustomization
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
@@ -1308,6 +1301,8 @@ spec:
       name: order-service
       namespace: production
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F5-4-fluxcd.yaml)
 
 ### 5.5. So sánh ArgoCD vs FluxCD
 
@@ -1619,7 +1614,7 @@ JENKINS — TỔNG QUAN:
   └──────────────────────────────────────────────────────────┘
 ```
 
-```groovy
+```groovy source="snippets/8-1-jenkins-ci-cd-server-lau-doi-nhat.groovy"
 // Jenkinsfile — Declarative Pipeline cho Order Service
 pipeline {
     agent {
@@ -1717,6 +1712,8 @@ pipeline {
     }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F8-1-jenkins-ci-cd-server-lau-doi-nhat.groovy)
 
 ```
 JENKINS vs GITHUB ACTIONS — KHI NÀO DÙNG GÌ?

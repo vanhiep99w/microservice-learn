@@ -57,55 +57,46 @@ Doc này trả lời câu hỏi đầu tiên: **Microservice chạy ở đâu tr
 
 ### 2.1. Kiến trúc tổng quan
 
+```d2 title="AWS Cloud — Microservice Reference Architecture"
+direction: down
+client: Client
+aws: AWS Cloud {
+ dns: "Route 53\nDNS routing • Health check • Failover"
+ cdn: "CloudFront\nCDN • Static cache • DDoS protection"
+ ingress: API Gateway / ALB
+ waf: WAF — Web Application Firewall
+ vpc: VPC — 10.0.0.0/16 {
+  public: Public Subnets { nat: NAT Gateway }
+  private: Private Subnets {
+   lb: Internal ALB
+   user: User Service
+   product: Product Service
+   order: Order Service
+   payment: Payment Service
+   lb -> user
+   lb -> product
+   lb -> order
+   lb -> payment
+  }
+  data: Data Subnets {
+   rds: RDS / Aurora {shape: cylinder}
+   cache: ElastiCache {shape: cylinder}
+  }
+  endpoints: VPC Endpoints { dynamo: DynamoDB Endpoint; sqs: SQS Endpoint }
+ }
+ dns -- cdn: DNS resolution — không phải data-plane hop
+ cdn -> ingress
+ waf -- ingress: Protection
+ ingress -> vpc.private.lb
+ vpc.private.user -> vpc.data.rds
+ vpc.private.product -> vpc.endpoints.dynamo
+ vpc.private.order -> vpc.data.cache
+ vpc.private.payment -> vpc.endpoints.sqs
+}
+client -> aws.cdn: HTTPS sau DNS lookup
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              AWS CLOUD                                      │
-│                                                                             │
-│  ┌──────────────┐                                                           │
-│  │  CloudFront  │ ◄── CDN, cache static content, DDoS protection            │
-│  │  (CDN)       │                                                           │
-│  └──────┬───────┘                                                           │
-│         │                                                                   │
-│  ┌──────▼───────┐                                                           │
-│  │  Route 53    │ ◄── DNS routing, health check, failover                   │
-│  │  (DNS)       │                                                           │
-│  └──────┬───────┘                                                           │
-│         │                                                                   │
-│  ┌──────▼───────┐     ┌─────────────┐                                       │
-│  │  API Gateway │ ──▶ │   WAF       │ ◄── Web Application Firewall          │
-│  │  / ALB       │     └─────────────┘                                       │
-│  └──────┬───────┘                                                           │
-│         │                                                                   │
-│  ┌──────▼──────────────────────────────────────────────────────┐            │
-│  │                     VPC (10.0.0.0/16)                       │            │
-│  │                                                             │            │
-│  │  ┌─── Public Subnets ─────────────────────────────────┐     │            │
-│  │  │  ┌──────────┐  ┌──────────┐                        │     │            │
-│  │  │  │   NAT    │  │   ALB    │ ◄── Internal LB        │     │            │
-│  │  │  │ Gateway  │  │(Internal)│                        │     │            │
-│  │  │  └──────────┘  └────┬─────┘                        │     │            │
-│  │  └─────────────────────┼──────────────────────────────┘     │            │
-│  │                        │                                    │            │
-│  │  ┌─── Private Subnets ─▼──────────────────────────────┐     │            │
-│  │  │                                                    │     │            │
-│  │  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐   │     │            │
-│  │  │  │ User    │ │ Product │ │  Order  │ │ Payment │   │     │            │
-│  │  │  │ Service │ │ Service │ │ Service │ │ Service │   │     │            │
-│  │  │  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘   │     │            │
-│  │  │       │           │           │           │        │     │            │
-│  │  └───────┼───────────┼───────────┼───────────┼────────┘     │            │
-│  │          │           │           │           │              │            │
-│  │  ┌───── Data Subnets ▼───────────▼───────────▼──────────┐   │            │
-│  │  │  ┌────────┐ ┌────────────┐ ┌───────┐ ┌───────────┐   │   │            │
-│  │  │  │  RDS   │ │ DynamoDB   │ │ElastiC│ │    SQS    │   │   │            │
-│  │  │  │(Aurora)│ │(Endpoint)  │ │ ache  │ │(Endpoint) │   │   │            │
-│  │  │  └────────┘ └────────────┘ └───────┘ └───────────┘   │   │            │
-│  │  └──────────────────────────────────────────────────────┘   │            │
-│  │                                                             │            │
-│  └─────────────────────────────────────────────────────────────┘            │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+
+Route 53 thực hiện DNS, không proxy từng HTTP request. Internal ALB đặt ở private subnets; DynamoDB/SQS là managed services được truy cập qua VPC endpoints, không phải database instances nằm trong data subnets. NAT Gateway ở public subnet phục vụ outbound khi cần.
 
 ### 2.2. Các tầng (Layers) trong kiến trúc
 
@@ -303,30 +294,18 @@ Giống ECS Fargate nhưng tasks chạy trên **EC2 instances do bạn quản l�
 
 **Lambda** = Function-as-a-Service — chạy code mà không cần quản lý bất kỳ server/container nào.
 
-```
-┌──────────────────────────────────────────────────────┐
-│                   API Gateway                        │
-│                                                      │
-│   /users/*  ──▶  ┌─────────────────────┐             │
-│                  │  User Lambda        │             │
-│                  │  (Node.js)          │             │
-│                  └─────────────────────┘             │
-│                                                      │
-│   /orders/* ──▶  ┌─────────────────────┐             │
-│                  │  Order Lambda       │             │
-│                  │  (Python)           │             │
-│                  └─────────────────────┘             │
-│                                                      │
-│   /payments/*──▶ ┌─────────────────────┐             │
-│                  │  Payment Lambda     │             │
-│                  │  (Java)             │             │
-│                  └─────────────────────┘             │
-│                                                      │
-│   SQS Queue ──▶  ┌─────────────────────┐             │
-│                  │  Notification Lambda│             │
-│                  │  (Python)           │             │
-│                  └─────────────────────┘             │
-└──────────────────────────────────────────────────────┘
+```d2 title="Serverless — API Gateway và Lambda"
+direction: right
+gateway: API Gateway
+user: "User Lambda\nNode.js"
+order: "Order Lambda\nPython"
+payment: "Payment Lambda\nJava"
+sqs: SQS Queue
+notification: "Notification Lambda\nPython"
+gateway -> user: /users/*
+gateway -> order: /orders/*
+gateway -> payment: /payments/*
+sqs -> notification
 ```
 
 **Ưu điểm:**
@@ -367,28 +346,51 @@ Giống ECS Fargate nhưng tasks chạy trên **EC2 instances do bạn quản l�
 
 ### 3.6. Khi nào chọn gì? — Decision Tree
 
-```mermaid
-flowchart TD
-    A[Bắt đầu: Chọn Compute cho Microservice] --> B{Team có kinh nghiệm Kubernetes?}
-    
-    B -->|Có, team ≥ 10 người| C{Cần portable multi-cloud?}
-    C -->|Có| D[✅ EKS]
-    C -->|Không| E{Số services > 20?}
-    E -->|Có| D
-    E -->|Không| F[✅ ECS Fargate]
-    
-    B -->|Không, team nhỏ| G{Workload pattern?}
-    G -->|Traffic ổn định 24/7| H{Budget?}
-    H -->|Tối ưu chi phí| I[✅ ECS EC2 + Reserved/Spot]
-    H -->|Ưu tiên đơn giản| F
-    
-    G -->|Spiky / Event-driven| J{Execution time > 15 phút?}
-    J -->|Có| F
-    J -->|Không| K{Cần response < 100ms?}
-    K -->|Có, không chấp nhận cold start| F
-    K -->|OK với cold start| L[✅ Lambda]
-    
-    G -->|Mix: vừa ổn định vừa spiky| M[✅ Hybrid: ECS + Lambda]
+```d2 title="3.6. Khi nào chọn gì? — Decision Tree"
+direction: down
+n1: "Bắt đầu: Chọn Compute cho Microservice"
+n2: "Team có kinh nghiệm Kubernetes?" {
+  shape: diamond
+}
+n3: "Cần portable multi-cloud?" {
+  shape: diamond
+}
+n4: "✅ EKS"
+n5: "Số services > 20?" {
+  shape: diamond
+}
+n6: "✅ ECS Fargate"
+n7: "Workload pattern?" {
+  shape: diamond
+}
+n8: "Budget?" {
+  shape: diamond
+}
+n9: "✅ ECS EC2 + Reserved/Spot"
+n10: "Execution time > 15 phút?" {
+  shape: diamond
+}
+n11: "Cần response < 100ms?" {
+  shape: diamond
+}
+n12: "✅ Lambda"
+n13: "✅ Hybrid: ECS + Lambda"
+n1 -> n2
+n2 -> n3: "Có, team ≥ 10 người"
+n3 -> n4: "Có"
+n3 -> n5: "Không"
+n5 -> n4: "Có"
+n5 -> n6: "Không"
+n2 -> n7: "Không, team nhỏ"
+n7 -> n8: "Traffic ổn định 24/7"
+n8 -> n9: "Tối ưu chi phí"
+n8 -> n6: "Ưu tiên đơn giản"
+n7 -> n10: "Spiky / Event-driven"
+n10 -> n6: "Có"
+n10 -> n11: "Không"
+n11 -> n6: "Có, không chấp nhận cold start"
+n11 -> n12: "OK với cold start"
+n7 -> n13: "Mix: vừa ổn định vừa spiky"
 ```
 
 ### 3.7. Hybrid Approach — Kết hợp nhiều compute
@@ -438,31 +440,20 @@ Trong thực tế, **không bắt buộc chọn 1 compute** cho tất cả servi
 
 **VPC** (Virtual Private Cloud) là nền tảng network cho mọi thứ trên AWS. Thiết kế VPC tốt rất quan trọng vì **rất khó thay đổi sau này**.
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│                     VPC: 10.0.0.0/16                          │
-│                     (65,536 IPs)                              │
-│                                                               │
-│  ┌───── AZ-a ──────────────┐  ┌───── AZ-b ──────────────┐     │
-│  │                         │  │                         │     │
-│  │ Public:  10.0.1.0/24    │  │ Public:  10.0.2.0/24    │     │
-│  │ ┌─────────────────────┐ │  │ ┌─────────────────────┐ │     │
-│  │ │ NAT GW, ALB, Bastion│ │  │ │ NAT GW, ALB         │ │     │
-│  │ └─────────────────────┘ │  │ └─────────────────────┘ │     │
-│  │                         │  │                         │     │
-│  │ Private: 10.0.11.0/24   │  │ Private: 10.0.12.0/24   │     │
-│  │ ┌─────────────────────┐ │  │ ┌─────────────────────┐ │     │
-│  │ │ ECS Tasks / EKS Pods│ │  │ │ ECS Tasks / EKS Pods│ │     │
-│  │ └─────────────────────┘ │  │ └─────────────────────┘ │     │
-│  │                         │  │                         │     │
-│  │ Data:    10.0.21.0/24   │  │ Data:    10.0.22.0/24   │     │
-│  │ ┌─────────────────────┐ │  │ ┌─────────────────────┐ │     │
-│  │ │ RDS, ElastiCache    │ │  │ │ RDS (Standby)       │ │     │
-│  │ └─────────────────────┘ │  │ └─────────────────────┘ │     │
-│  │                         │  │                         │     │
-│  └─────────────────────────┘  └─────────────────────────┘     │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
+```d2 title="VPC — phân tầng qua hai Availability Zones"
+direction: right
+vpc: "VPC 10.0.0.0/16 — 65,536 địa chỉ IPv4" {
+ a: AZ-a {
+  public: "Public 10.0.1.0/24\nNAT GW • ALB • Bastion"
+  private: "Private 10.0.11.0/24\nECS Tasks / EKS Pods"
+  data: "Data 10.0.21.0/24\nRDS • ElastiCache"
+ }
+ b: AZ-b {
+  public: "Public 10.0.2.0/24\nNAT GW • ALB"
+  private: "Private 10.0.12.0/24\nECS Tasks / EKS Pods"
+  data: "Data 10.0.22.0/24\nRDS Standby"
+ }
+}
 ```
 
 ### 4.2. Subnet Strategy
@@ -527,25 +518,13 @@ Khi Service A cần gọi Service B **trong cùng VPC**, có 3 cách:
 
 **ECR** (Elastic Container Registry) là managed Docker registry trên AWS.
 
-```
-┌───────────────────────────────────────────────────┐
-│                    ECR                            │
-│                                                   │
-│  ┌──── Repository: user-service ───────────┐      │
-│  │  :latest                                │      │
-│  │  :v1.2.3                                │      │
-│  │  :abc123f (git commit SHA)              │      │
-│  └─────────────────────────────────────────┘      │
-│                                                   │
-│  ┌──── Repository: order-service ──────────┐      │
-│  │  :latest                                │      │
-│  │  :v2.0.1                                │      │
-│  └─────────────────────────────────────────┘      │
-│                                                   │
-│  ┌──── Repository: payment-service ────────┐      │
-│  │  ...                                    │      │
-│  └─────────────────────────────────────────┘      │
-└───────────────────────────────────────────────────┘
+```d2 title="ECR — repositories và tags"
+direction: right
+ecr: ECR {
+ user: "Repository user-service\nlatest • v1.2.3 • abc123f (Git SHA)"
+ order: "Repository order-service\nlatest • v2.0.1"
+ payment: Repository payment-service
+}
 ```
 
 **Best practices:**
@@ -558,7 +537,7 @@ Khi Service A cần gọi Service B **trong cùng VPC**, có 3 cách:
 
 Tránh tích lũy hàng nghìn images cũ tốn storage:
 
-```json
+```json source="snippets/5-2-image-lifecycle-policy.json"
 {
   "rules": [
     {
@@ -585,6 +564,8 @@ Tránh tích lũy hàng nghìn images cũ tốn storage:
   ]
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=18-aws-deployment-architecture&snapshot=article&file=snippets%2F5-2-image-lifecycle-policy.json)
 
 ### 5.3. Image Scanning
 
@@ -613,7 +594,7 @@ Với Monolith, bạn có thể setup infra thủ công qua Console. Với Micro
 
 **CDK** (Cloud Development Kit) — viết infrastructure bằng ngôn ngữ lập trình (TypeScript, Python, Java, Go).
 
-```typescript
+```typescript source="snippets/6-2-aws-cdk.ts"
 // CDK Example: Tạo ECS Fargate Service
 import * as cdk from 'aws-cdk-lib';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
@@ -644,6 +625,8 @@ scaling.scaleOnCpuUtilization('CpuScaling', {
 });
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=18-aws-deployment-architecture&snapshot=article&file=snippets%2F6-2-aws-cdk.ts)
+
 **Ưu điểm CDK:**
 - Viết bằng ngôn ngữ quen thuộc (TypeScript, Python...)
 - IDE support: autocomplete, type checking, refactor
@@ -660,7 +643,7 @@ scaling.scaleOnCpuUtilization('CpuScaling', {
 
 **Terraform** (by HashiCorp) — khai báo infrastructure bằng HCL (HashiCorp Configuration Language).
 
-```hcl
+```hcl source="snippets/6-3-terraform.tf"
 # Terraform Example: Tạo ECS Fargate Service
 resource "aws_ecs_service" "user_service" {
   name            = "user-service"
@@ -690,6 +673,8 @@ resource "aws_appautoscaling_target" "user_service" {
   service_namespace  = "ecs"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=18-aws-deployment-architecture&snapshot=article&file=snippets%2F6-3-terraform.tf)
 
 **Ưu điểm Terraform:**
 - **Multi-cloud** — AWS, GCP, Azure, Kubernetes, Datadog, PagerDuty...

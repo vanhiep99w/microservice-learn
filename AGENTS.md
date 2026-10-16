@@ -2,7 +2,7 @@
 
 ## Mục đích của Repository
 
-Repository này là tài liệu học tập về **Microservice Architecture**. Chỉ chứa các file markdown (`.md`) — không có source code.
+Repository này là tài liệu học tập về **Microservice Architecture**. Tài liệu gốc là Markdown (`.md`), kèm website Next.js/Fumadocs và scripts sinh nội dung. Chỉnh các file Markdown gốc hoặc `17-*/`; không chỉnh `content/docs/` vì đây là output được sinh lại bởi `scripts/prepare-content.mjs`.
 
 ## Cấu trúc thư mục
 
@@ -45,8 +45,9 @@ microservice-learn/
 2. **Mục lục (TOC)** — Ngay sau tiêu đề, sử dụng anchor links (`[text](#anchor)`) tới từng section H2/H3
 3. **Nội dung** — Phân theo H2 (`##`) và H3 (`###`)
 4. **Diagrams** — Sử dụng:
-   - **Mermaid** (`mermaid` code block) cho flowchart, sequence diagram
-   - **ASCII art** cho kiến trúc tổng quan
+   - **D2** (`d2` code block có `title`) cho kiến trúc, dependency graph, flowchart và sequence đơn giản; render build-time qua `@vanhiep99w/docs-kit`
+   - **Mermaid** cho sơ đồ chuyên biệt cần semantics chưa chuyển tương đương (parallel/alternative fragments, activation, state machine, ER, Gantt)
+   - **Text / ASCII art** cho cây thư mục, logs, payloads và ví dụ phụ thuộc căn cột; không ưu tiên ASCII cho sơ đồ kiến trúc mới
    - **Tables** cho so sánh, tổng hợp
 5. **Ví dụ thực tế** — Mỗi khái niệm cần có ít nhất 1 ví dụ / use case
 6. **Links liên quan** — Link tới các docs khác trong repo khi có liên quan
@@ -73,7 +74,16 @@ microservice-learn/
 ### Diagrams
 
 ```
-# Mermaid — Dùng cho flow, sequence, class diagram
+# D2 — Ưu tiên cho kiến trúc và flow (fence có title)
+​```d2 title="Giao tiếp giữa các service"
+direction: right
+client: Client
+service: Order Service
+db: Order DB {shape: cylinder}
+client -> service -> db
+​```
+
+# Mermaid — Giữ cho sơ đồ chuyên biệt khi chuyển sẽ mất semantics
 ​```mermaid
 graph LR
     A --> B --> C
@@ -91,6 +101,16 @@ graph LR
 |----------|----------|----------|
 | Tốc độ   | Nhanh    | Chậm     |
 ```
+
+### SourceExplorer và kiểm tra website
+
+- Bài cần đối chiếu nhiều code dùng code fence có metadata `source="snippets/tên-artifact.ext"` và link `[Đọc source](?source=tên-file-không-đuôi&snapshot=article&file=snippets%2Ftên-artifact.ext)`; remark plugin chuyển link thành `SourceRef` của docs-kit.
+- Có thể thêm `&lines=1-4` để highlight. Không khai báo `region` nếu pipeline chưa có region đó.
+- Trích đoạn phải giữ code nguyên bản, có language hợp lệ, không trùng artifact path trong một bài. Không ngụ ý các snippets độc lập là một project chạy được.
+- `prepare-content` tự sinh/validate manifest và snapshots tại `public/source-examples/`. Không chỉnh/commit output hoặc cache `.next/cache/docs-kit/d2`.
+- Chỉ publish source tin cậy, không chứa secrets thật. HTML highlight và SVG D2 được nhúng vào trang, không phải dữ liệu input công khai.
+- Yêu cầu Node.js 22+. Chạy `npm test`, `npm run check-diagrams`, `npm run build` khi thay pipeline/component/diagram; thêm `npm run typecheck` sau khi build đã tạo types.
+- Tham khảo hướng dẫn authoring trong README, mục “Website docs và quy ước D2 / SourceExplorer”.
 
 ### Khi thêm doc mới
 

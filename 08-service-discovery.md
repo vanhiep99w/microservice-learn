@@ -129,37 +129,18 @@ Trong [doc 07](07-api-gateway.md), chúng ta đã tìm hiểu API Gateway — "c
 
 ### 2.3. Các thành phần chính
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              SERVICE DISCOVERY — CÁC THÀNH PHẦN                 │
-│                                                                 │
-│                                                                 │
-│      ┌──────────────────┐                                       │
-│      │  Service Registry│◄──── Trung tâm lưu trữ thông tin      │
-│      │  (Consul, Eureka)│      tất cả service instances         │
-│      └───────────────┬──┘                                       │
-│                      │                                          │
-│     ┌────────────────┼──────────────────────┐                   │
-│     │                │                      │                   │
-│     ▼                ▼                      ▼                   │
-│  ┌──────────┐  ┌──────────┐          ┌──────────────┐           │
-│  │Register  │  │  Query   │          │ Health Check │           │
-│  │(đăng ký) │  │(tìm kiếm)│          │ (kiểm tra    │           │
-│  │          │  │          │          │  sức khỏe)   │           │
-│  └──────────┘  └──────────┘          └──────────────┘           │
-│       ▲             ▲                       │                   │
-│       │             │                       ▼                   │
-│  ┌─────────┐  ┌─────────┐           ┌──────────────┐            │
-│  │ Service │  │ Service │           │ Unhealthy?   │            │
-│  │Provider │  │Consumer │           │ → Deregister │            │
-│  │(Payment)│  │ (Order) │           └──────────────┘            │
-│  └─────────┘  └─────────┘                                       │
-│                                                                 │
-│  3 hoạt động chính:                                             │
-│  1. REGISTER: Service khởi động → đăng ký vào registry          │
-│  2. QUERY:    Service cần gọi service khác → hỏi registry       │
-│  3. HEALTH:   Registry kiểm tra → xóa instance không healthy    │
-└─────────────────────────────────────────────────────────────────┘
+```d2 title="Service Discovery — Register, Query và Health Check"
+direction: right
+provider: Payment Service — Provider
+consumer: Order Service — Consumer
+registry: "Service Registry\nConsul / Eureka\nThông tin service instances"
+register: Register — đăng ký
+query: Query — tìm kiếm
+health: Health Check
+remove: Unhealthy → Deregister
+provider -> register -> registry
+consumer -> query -> registry
+registry -> health -> remove
 ```
 
 ---

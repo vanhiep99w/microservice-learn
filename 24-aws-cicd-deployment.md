@@ -105,65 +105,42 @@ MAPPING: LÝ THUYẾT CI/CD → AWS SERVICES
 
 ### 2.1. AWS-native CI/CD Stack
 
+```d2 title="AWS-native CI/CD — CodePipeline điều phối"
+direction: right
+pipeline: "CodePipeline — Orchestrator\nSource → Build → Test → Deploy\nManual approval • Cross-account" {
+ source: CodeCommit / GitHub / GitLab
+ build: "CodeBuild\nBuild • Test • Scan • Push image\nManaged compute • Docker support\nPay per minute"
+ deploy: "CodeDeploy\nDeployment automation\nBlue-Green / Canary theo target\nAuto rollback"
+ source -> build -> deploy
+}
 ```
-AWS-NATIVE CI/CD STACK
-───────────────────────
 
-  ┌── Source ──────────┐
-  │  CodeCommit        │  ← AWS Git repository (hoặc GitHub/GitLab)
-  └────────┬───────────┘
-           │
-  ┌────────▼───────────┐
-  │  CodeBuild         │  ← Build, test, scan, push image
-  │  • Managed compute │
-  │  • Pay per minute  │
-  │  • Docker support  │
-  └────────┬───────────┘
-           │
-  ┌────────▼───────────┐
-  │  CodeDeploy        │  ← Deployment automation
-  │  • Blue-Green      │
-  │  • Canary          │
-  │  • Rolling         │
-  │  • Auto rollback   │
-  └────────┬───────────┘
-           │
-  ┌────────▼───────────┐
-  │  CodePipeline      │  ← Orchestrator — kết nối tất cả stages
-  │  • Source → Build  │
-  │    → Test → Deploy │
-  │  • Manual approval │
-  │  • Cross-account   │
-  └────────────────────┘
-```
+Deployment strategy phụ thuộc compute target. Ví dụ ECS rolling update do ECS scheduler quản lý, không phải CodeDeploy ECS blue-green.
 
 ### 2.2. GitHub Actions + AWS — Hybrid Approach
 
 Nhiều team chọn **GitHub Actions** cho CI/CD thay vì AWS-native stack — linh hoạt hơn, ecosystem lớn hơn, developer experience tốt hơn.
 
+```d2 title="GitHub Actions và AWS — Hybrid Stack"
+direction: down
+github: GitHub {
+ repo: "Repository — .github/workflows\nci.yml — Build + Test\ndeploy-staging.yml\ndeploy-prod.yml"
+ runners: "GitHub Actions Runners\nGitHub-hosted / Self-hosted EC2"
+ repo -> runners
+}
+aws: AWS {
+ ecr: ECR
+ ecs: ECS
+ eks: EKS
+ lambda: Lambda
+ ecr -> ecs
+ ecr -> eks
+ ecr -> lambda
+}
+github.runners -> aws.ecr: OIDC — không lưu access keys
 ```
-GITHUB ACTIONS + AWS — HYBRID STACK
-──────────────────────────────────────
 
-  ┌── GitHub ──────────────────────────────────────┐
-  │                                                │
-  │  Repository                                    │
-  │  └── .github/workflows/                        │
-  │       ├── ci.yml          ← Build + Test       │
-  │       ├── deploy-staging.yml  ← Deploy staging │
-  │       └── deploy-prod.yml     ← Deploy prod    │
-  │                                                │
-  │  GitHub Actions Runners                        │
-  │  • GitHub-hosted (free for public repos)       │
-  │  • Self-hosted on EC2 (private repos, faster)  │
-  └──────────────┬─────────────────────────────────┘
-                 │ OIDC (no access keys!)
-                 ▼
-  ┌── AWS ─────────────────────────────────────────┐
-  │  ECR → ECS / EKS / Lambda                      │
-  │  (chỉ dùng AWS cho infra, không cho CI/CD)     │
-  └────────────────────────────────────────────────┘
-```
+GitHub Actions đảm nhiệm CI/CD; AWS đảm nhiệm hạ tầng deployment.
 
 ### 2.3. So sánh CodePipeline vs GitHub Actions vs GitLab CI
 
@@ -339,7 +316,7 @@ CROSS-ACCOUNT PIPELINE
 
 ### 4.2. Buildspec.yml — Chi tiết
 
-```yaml
+```yaml source="snippets/4-2-buildspec-yml-chi-tiet.yaml"
 # buildspec.yml — Complete CI pipeline cho microservice
 version: 0.2
 
@@ -417,6 +394,8 @@ reports:
     file-format: JACOCOXML
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F4-2-buildspec-yml-chi-tiet.yaml)
+
 ### 4.3. Caching & Performance Optimization
 
 ```
@@ -488,7 +467,7 @@ CODEDEPLOY + ECS — BLUE-GREEN FLOW
 
 **AppSpec cho ECS Blue-Green:**
 
-```yaml
+```yaml source="snippets/5-1-codedeploy-cho-ecs.yaml"
 # appspec.yaml — ECS Blue-Green deployment
 version: 0.0
 
@@ -509,6 +488,8 @@ Hooks:
   - BeforeAllowTraffic: "LambdaFunctionToValidateBeforeTraffic"
   - AfterAllowTraffic: "LambdaFunctionToRunSmokeTests"
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F5-1-codedeploy-cho-ecs.yaml)
 
 **Lifecycle hooks — Khi nào chạy test:**
 
@@ -586,7 +567,7 @@ LAMBDA DEPLOYMENT STRATEGIES
   └─────────────────────────────────────────────────┘
 ```
 
-```yaml
+```yaml source="snippets/5-2-codedeploy-cho-lambda.yaml"
 # SAM template — Lambda Canary deployment
 Resources:
   OrderFunction:
@@ -619,6 +600,8 @@ Resources:
         - Name: FunctionName
           Value: !Ref OrderFunction
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F5-2-codedeploy-cho-lambda.yaml)
 
 ### 5.3. CodeDeploy cho EKS
 
@@ -659,7 +642,7 @@ ECS ROLLING UPDATE
   Done!    [v2] [v2] [v2] [v2]           ← 100% v2 ✅
 ```
 
-```hcl
+```hcl source="snippets/6-1-rolling-update-ecs-default.tf"
 # Terraform — ECS Service Rolling Update
 resource "aws_ecs_service" "order" {
   name            = "order-service"
@@ -684,11 +667,13 @@ resource "aws_ecs_service" "order" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F6-1-rolling-update-ecs-default.tf)
+
 ### 6.2. Blue-Green Deployment — ECS + ALB
 
 **Blue-Green** dùng **CodeDeploy** + 2 Target Groups trên ALB — instant rollback, zero downtime.
 
-```hcl
+```hcl source="snippets/6-2-blue-green-deployment-ecs-alb.tf"
 # Terraform — ECS Blue-Green với CodeDeploy
 resource "aws_ecs_service" "order" {
   name            = "order-service"
@@ -763,6 +748,8 @@ resource "aws_codedeploy_deployment_group" "order" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F6-2-blue-green-deployment-ecs-alb.tf)
+
 ### 6.3. Canary Deployment — Lambda & EKS
 
 **Canary** shift traffic dần dần — phát hiện lỗi sớm trước khi ảnh hưởng toàn bộ users.
@@ -779,7 +766,7 @@ resource "aws_codedeploy_deployment_group" "order" {
 
 **Custom canary config:**
 
-```hcl
+```hcl source="snippets/6-3-canary-deployment-lambda-eks.tf"
 # Custom: 5% traffic trong 10 phút, rồi 100%
 resource "aws_codedeploy_deployment_config" "custom_canary" {
   deployment_config_name = "CustomCanary5Percent10Minutes"
@@ -794,6 +781,8 @@ resource "aws_codedeploy_deployment_config" "custom_canary" {
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F6-3-canary-deployment-lambda-eks.tf)
 
 ### 6.4. So sánh Deployment Strategies trên AWS
 
@@ -828,29 +817,26 @@ CHỌN STRATEGY NÀO? DECISION TREE
 
 ### 7.1. OIDC Authentication — Không cần Access Keys
 
-```
-GITHUB ACTIONS OIDC + AWS
-───────────────────────────
-
-  ❌ OLD WAY: Stored Access Keys
-  ┌────────────┐     Access Key / Secret    ┌─────────┐
-  │  GitHub    │ ──────────────────────────▶│  AWS    │
-  │  Secrets   │     (long-lived, risky!)   │         │
-  └────────────┘                            └─────────┘
-
-  ✅ NEW WAY: OIDC Federation (no stored secrets!)
-  ┌────────────┐     1. JWT Token            ┌─────────┐
-  │  GitHub    │ ──────────────────────────▶ │ AWS STS │
-  │  Actions   │                             │         │
-  │            │     2. Temp Credentials     │ IAM Role│
-  │            │ ◀────────────────────────── │ (15 min)│
-  │            │                             └─────────┘
-  │            │     3. Use AWS APIs
-  │            │ ──────────────────────────▶ ECR, ECS...
-  └────────────┘
+```d2 title="GitHub Actions — OIDC Federation"
+direction: right
+old: "Cũ — Long-lived Keys" {
+ secrets: GitHub Secrets
+ aws: AWS
+ secrets -> aws: Access Key / Secret — long-lived
+}
+new: "Mới — OIDC" {
+ actions: GitHub Actions
+ sts: AWS STS / IAM Role
+ apis: ECR / ECS / AWS APIs
+ actions -> sts: 1. JWT Token
+ sts -> actions: 2. Temporary credentials
+ actions -> apis: 3. Use AWS APIs
+}
 ```
 
-```hcl
+Thời hạn temporary credentials phụ thuộc session configuration và giới hạn của STS/role; không luôn cố định 15 phút.
+
+```hcl source="snippets/7-1-oidc-authentication-khong-can-access-keys.tf"
 # Terraform — IAM Role cho GitHub Actions OIDC
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
@@ -885,9 +871,11 @@ resource "aws_iam_role" "github_actions" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F7-1-oidc-authentication-khong-can-access-keys.tf)
+
 ### 7.2. CI/CD Pipeline hoàn chỉnh cho ECS
 
-```yaml
+```yaml source="snippets/7-2-ci-cd-pipeline-hoan-chinh-cho-ecs.yaml"
 # .github/workflows/deploy.yml — Complete CI/CD pipeline
 name: Deploy to ECS
 
@@ -1012,9 +1000,11 @@ jobs:
           codedeploy-deployment-group: order-service-prod
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F7-2-ci-cd-pipeline-hoan-chinh-cho-ecs.yaml)
+
 ### 7.3. Matrix Build cho Multi-Service Monorepo
 
-```yaml
+```yaml source="snippets/7-3-matrix-build-cho-multi-service-monorepo.yaml"
 # .github/workflows/ci.yml — Matrix build for monorepo
 name: CI — Multi-Service
 
@@ -1056,6 +1046,8 @@ jobs:
           cd services/${{ matrix.service }}
           docker run --rm ${{ matrix.service }}:${{ github.sha }} npm test
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F7-3-matrix-build-cho-multi-service-monorepo.yaml)
 
 ---
 
@@ -1112,7 +1104,7 @@ ARGOCD TRÊN EKS — ARCHITECTURE
 
 **Install ArgoCD trên EKS:**
 
-```bash
+```bash source="snippets/8-1-argocd-tren-eks-setup.sh"
 # 1. Install ArgoCD
 kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
@@ -1125,11 +1117,13 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F8-1-argocd-tren-eks-setup.sh)
+
 ### 8.2. ApplicationSet — Multi-Service GitOps
 
 **ApplicationSet** tự động tạo ArgoCD Application cho từng service — không cần config thủ công mỗi service.
 
-```yaml
+```yaml source="snippets/8-2-applicationset-multi-service-gitops.yaml"
 # ApplicationSet — Tự động tạo Application cho mọi service trong git
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
@@ -1170,6 +1164,8 @@ spec:
             maxDuration: 3m0s
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F8-2-applicationset-multi-service-gitops.yaml)
+
 > 💡 Thêm thư mục mới `services/notification-service/` → ArgoCD **tự động** tạo Application và deploy — không cần chỉnh config gì!
 
 ### 8.3. Image Updater — Auto-deploy on new image
@@ -1209,7 +1205,7 @@ CI/CD FLOW VỚI IMAGE UPDATER
   └─────────────────────────────────────────┘
 ```
 
-```yaml
+```yaml source="snippets/8-3-image-updater-auto-deploy-on-new-image.yaml"
 # ArgoCD Application with Image Updater annotations
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -1231,6 +1227,8 @@ spec:
     server: https://kubernetes.default.svc
     namespace: production
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F8-3-image-updater-auto-deploy-on-new-image.yaml)
 
 ### 8.4. GitOps vs Push-based trên AWS
 
@@ -1321,7 +1319,7 @@ IMAGE SCANNING PIPELINE
   └────────────────────────────────────────────────┘
 ```
 
-```yaml
+```yaml source="snippets/9-2-image-scanning-ecr-trivy.yaml"
 # GitHub Actions — Trivy scan step
 - name: Trivy vulnerability scan
   uses: aquasecurity/trivy-action@master
@@ -1339,11 +1337,13 @@ IMAGE SCANNING PIPELINE
     sarif_file: 'trivy-results.sarif'
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F9-2-image-scanning-ecr-trivy.yaml)
+
 ### 9.3. Policy as Code — OPA / Kyverno
 
 **Policy as Code** đảm bảo deployments tuân thủ security policies trước khi được apply lên cluster.
 
-```yaml
+```yaml source="snippets/9-3-policy-as-code-opa-kyverno.yaml"
 # Kyverno Policy — Block privileged containers trên EKS
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
@@ -1391,6 +1391,8 @@ spec:
                 memory: "?*"
                 cpu: "?*"
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F9-3-policy-as-code-opa-kyverno.yaml)
 
 ### 9.4. Secrets trong Pipeline
 
@@ -1481,7 +1483,7 @@ CI/CD COST CHO 10 MICROSERVICES — TYPICAL
 | **Right-size CodeBuild** — small thay vì medium | $10-15/mo | Thấp |
 | **Rolling thay vì Blue-Green** cho non-critical | $30-50/mo (no 2× tasks) | Thấp |
 
-```hcl
+```hcl source="snippets/10-2-chien-luoc-giam-chi-phi.tf"
 # ECR Lifecycle Policy — Giữ tối đa 20 images per service
 resource "aws_ecr_lifecycle_policy" "cleanup" {
   repository = aws_ecr_repository.order_service.name
@@ -1504,6 +1506,8 @@ resource "aws_ecr_lifecycle_policy" "cleanup" {
   })
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F10-2-chien-luoc-giam-chi-phi.tf)
 
 ---
 

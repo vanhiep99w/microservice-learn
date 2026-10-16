@@ -34,6 +34,9 @@
 - [9. Design Patterns tổng hợp](#9-design-patterns-tổng-hợp)
 - [10. Triển khai Microservice trên AWS](#10-triển-khai-microservice-trên-aws)
 - [11. Case Study — Thiết kế kiến trúc Microservice từ đầu](#11-case-study--thiết-kế-kiến-trúc-microservice-từ-đầu)
+- [Website docs và quy ước D2 / SourceExplorer](#website-docs-và-quy-ước-d2--sourceexplorer)
+  - [D2 — sơ đồ dạng text, render lúc build](#d2--sơ-đồ-dạng-text-render-lúc-build)
+  - [SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài](#sourceexplorer--đối-chiếu-nhiều-đoạn-code-trong-cùng-bài)
 - [Tham khảo](#-tham-khảo)
 
 ---
@@ -197,11 +200,64 @@
 
 Mỗi tài liệu đều có:
 - 📋 **Mục lục** với anchor links tới từng phần
-- 📊 **Diagrams** (Mermaid / ASCII art / Tables)
+- 📊 **Diagrams** (D2 cho kiến trúc/flow; Mermaid cho sơ đồ chuyên biệt; text cho cây thư mục/log; tables cho so sánh)
 - 💡 **Ví dụ thực tế** và use cases
 - 🔗 **Liên kết** tới các tài liệu liên quan
 
 ---
+
+## Website docs và quy ước D2 / SourceExplorer
+
+Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit). Yêu cầu **Node.js 22+**.
+
+```bash
+npm ci
+npm run dev
+# Kiểm tra trước khi deploy:
+npm test
+npm run check-diagrams
+npm run build
+```
+
+**Chỉnh tài liệu gốc** ở thư mục gốc hoặc `17-*/`, không chỉnh `content/docs/`. `prepare-content` tự sinh frontmatter, routes, sidebar và assets cho SourceExplorer; được chạy trước `dev`/`build`.
+
+### D2 — sơ đồ dạng text, render lúc build
+
+````markdown
+```d2 title="Luồng đặt hàng"
+direction: right
+client: Client
+order: Order Service
+db: Order DB {shape: cylinder}
+client -> order -> db
+```
+````
+
+- Ưu tiên D2 cho kiến trúc, dependency graph, flowchart và sequence đơn giản. SVG light/dark được render lúc build; browser không phải tải D2/WASM.
+- Giữ Mermaid khi cần các semantics chuyên biệt như activation, parallel/alternative fragments, state machine, ER hoặc Gantt. Giữ text cho cây thư mục, logs, payloads, công thức và ví dụ phụ thuộc căn cột; sơ đồ đầu README giữ ASCII để đọc trực tiếp trên GitHub.
+- D2 fenced blocks được render trên website; GitHub chỉ hiển thị source D2. Dùng nhãn ngắn, tách sơ đồ lớn thành các phần. Escape ký tự `$` thành `\$` trong nhãn D2 để không bị hiểu là substitution.
+- `npm run check-diagrams` render và kiểm tra tất cả D2 trong tài liệu gốc, kể cả các bài tổng hợp không publish riêng. Cache dùng `.next/cache/docs-kit/d2`, không commit vào Git.
+
+### SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài
+
+Đánh dấu code fence bằng đường dẫn artifact ổn định. Artifact là **trích đoạn minh họa**, không phải một project có thể chạy độc lập:
+
+````markdown
+```yaml source="snippets/order-deployment.yaml"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+```
+
+[Đối chiếu source](?source=13-orchestration&snapshot=article&file=snippets%2Forder-deployment.yaml)
+````
+
+- `source` trong query là tên file tài liệu, bỏ `.md`; `snapshot=article`. `file` phải trùng đường dẫn `source="..."` của code fence. Tên artifact trong ví dụ cần được thêm vào bài tương ứng trước khi reference.
+- Có thể thêm `&lines=1-4` để highlight một vùng. Hiện pipeline sinh trích đoạn nguyên bản, chưa khai báo named regions.
+- Markdown link được remark plugin chuyển thành component **`SourceRef`** của docs-kit. Provider dùng chung mở drawer, file tree, copy, deep link và Back/Forward; đổi pathname sẽ reset drawer.
+- `prepare-content` sinh manifest và JSON highlight light/dark tại `public/source-examples/`, rồi kiểm tra project/snapshot/file/line references. Reference sai làm build thất bại. Assets được tái tạo, không commit; **không đưa secrets thật hoặc HTML không tin cậy vào source**.
+- Giữ code quan trọng inline để bài vẫn đọc được trên GitHub. SourceExplorer bổ sung khả năng đọc chéo, không thay thế giải thích trong bài.
 
 ## 📚 Tham khảo
 

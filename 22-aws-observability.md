@@ -91,40 +91,26 @@ Doc này trả lời câu hỏi: **Distributed Tracing triển khai với X-Ray 
 
 **AWS X-Ray** là managed distributed tracing service — thu thập data từ các service, tạo **Service Map** trực quan và cho phép phân tích latency, error rates theo từng request path.
 
+```d2 title="AWS X-Ray — SDK và Collector"
+direction: down
+a: Service A {
+ app: Application Code
+ sdk: X-Ray SDK / OTel SDK
+ daemon: X-Ray Daemon — Sidecar
+ app -> sdk -> daemon
+}
+b: Service B {
+ app: Application Code
+ sdk: X-Ray SDK / OTel SDK
+ collector: ADOT Collector — Sidecar
+ app -> sdk -> collector
+}
+xray: "X-Ray Service\nTraces • Service Map • Analytics"
+a.daemon -> xray
+b.collector -> xray
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                  AWS X-RAY ARCHITECTURE                          │
-│                                                                  │
-│  ┌─── Service A ──────┐   ┌─── Service B ──────┐                 │
-│  │  Application Code  │   │  Application Code  │                 │
-│  │       │            │   │       │            │                 │
-│  │  ┌────▼──────────┐ │   │  ┌────▼──────────┐ │                 │
-│  │  │ X-Ray SDK /   │ │   │  │ X-Ray SDK /   │ │                 │
-│  │  │ OTel SDK      │ │   │  │ OTel SDK      │ │                 │
-│  │  └────┬──────────┘ │   │  └────┬──────────┘ │                 │
-│  │       │            │   │       │            │                 │
-│  │  ┌────▼──────────┐ │   │  ┌────▼──────────┐ │                 │
-│  │  │ X-Ray Daemon  │ │   │  │ ADOT Collector│ │                 │
-│  │  │ (sidecar)     │ │   │  │ (sidecar)     │ │                 │
-│  │  └────┬──────────┘ │   │  └────┬──────────┘ │                 │
-│  └───────┼────────────┘   └───────┼────────────┘                 │
-│          │                        │                              │
-│          └──────────┬─────────────┘                              │
-│                     ▼                                            │
-│          ┌──────────────────┐                                    │
-│          │   X-Ray Service  │                                    │
-│          │   ┌────────────┐ │                                    │
-│          │   │ Traces     │ │                                    │
-│          │   │ Service Map│ │                                    │
-│          │   │ Analytics  │ │                                    │
-│          │   └────────────┘ │                                    │
-│          └──────────────────┘                                    │
-│                                                                  │
-│  Trace Context propagation:                                      │
-│  HTTP Header: X-Amzn-Trace-Id                                    │
-│  Format: Root=1-xxx;Parent=yyy;Sampled=1                         │
-└──────────────────────────────────────────────────────────────────┘
-```
+
+Ví dụ header context X-Ray: `X-Amzn-Trace-Id: Root=1-xxx;Parent=yyy;Sampled=1`. Chọn exporter/protocol tương thích: X-Ray SDK thường gửi tới Daemon; OTel SDK thường dùng OTLP tới ADOT Collector.
 
 #### Các khái niệm cốt lõi
 
@@ -141,7 +127,7 @@ Doc này trả lời câu hỏi: **Distributed Tracing triển khai với X-Ray 
 
 #### X-Ray cho ECS (Sidecar Pattern)
 
-```hcl
+```hcl source="snippets/x-ray-cho-ecs-sidecar-pattern.tf"
 # ECS Task Definition với X-Ray Daemon sidecar
 resource "aws_ecs_task_definition" "order_service" {
   family                   = "order-service"
@@ -203,9 +189,11 @@ resource "aws_iam_role_policy_attachment" "xray" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Fx-ray-cho-ecs-sidecar-pattern.tf)
+
 #### X-Ray cho EKS (ADOT Collector DaemonSet)
 
-```yaml
+```yaml source="snippets/x-ray-cho-eks-adot-collector-daemonset.yaml"
 # ADOT (AWS Distro for OpenTelemetry) Collector — DaemonSet
 apiVersion: opentelemetry.io/v1alpha1
 kind: OpenTelemetryCollector
@@ -254,9 +242,11 @@ spec:
           exporters: [awsemf]
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Fx-ray-cho-eks-adot-collector-daemonset.yaml)
+
 #### X-Ray cho Lambda (Built-in)
 
-```hcl
+```hcl source="snippets/x-ray-cho-lambda-built-in.tf"
 # Lambda — X-Ray tracing tích hợp sẵn
 resource "aws_lambda_function" "payment_processor" {
   function_name = "payment-processor"
@@ -269,6 +259,8 @@ resource "aws_lambda_function" "payment_processor" {
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Fx-ray-cho-lambda-built-in.tf)
 
 | Platform | Cách tích hợp X-Ray | Effort | Tự động trace |
 |----------|---------------------|--------|:-------------:|
@@ -313,7 +305,7 @@ X-Ray Service Map hiển thị **biểu đồ trực quan** toàn bộ hệ th�
 
 X-Ray charge theo số traces recorded. **Sampling** giảm chi phí bằng cách chỉ record một phần requests.
 
-```hcl
+```hcl source="snippets/2-4-sampling-rules-kiem-soat-chi-phi.tf"
 # X-Ray Sampling Rule — Terraform
 resource "aws_xray_sampling_rule" "payment_service" {
   rule_name      = "payment-service"
@@ -362,6 +354,8 @@ resource "aws_xray_sampling_rule" "errors" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F2-4-sampling-rules-kiem-soat-chi-phi.tf)
+
 #### Chiến lược Sampling
 
 | Chiến lược | Fixed Rate | Reservoir | Use case |
@@ -409,46 +403,41 @@ resource "aws_xray_sampling_rule" "errors" {
 
 ### 3.1. Kiến trúc Logging trên AWS
 
+```d2 title="AWS — Centralized Logging Architecture"
+direction: down
+ecs: ECS Tasks
+eks: EKS Pods
+lambda: Lambda
+api: API Gateway
+alb: ALB
+rds: RDS / Aurora
+vpc: VPC Flow Logs
+logs: CloudWatch Logs — Log Groups
+insights: Logs Insights — Query
+filter: Subscription Filter
+targets: Lambda / OpenSearch / Kinesis
+s3: S3 Archive {shape: cylinder}
+athena: Athena — Ad-hoc query
+ecs -> logs: awslogs driver
+eks -> logs: Fluent Bit DaemonSet
+lambda -> logs: Built-in
+api -> logs: Access logs
+alb -> s3: Access logs — native destination
+rds -> logs: Audit / Slow query theo cấu hình
+vpc -> logs
+logs -> insights
+logs -> filter -> targets
+logs -> s3: Export
+s3 -> athena
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│                  CENTRALIZED LOGGING ARCHITECTURE                     │
-│                                                                       │
-│  ┌──── Log Sources ──────────────────────────────────────────────┐    │
-│  │                                                               │    │
-│  │  ECS Tasks ──── awslogs driver ──────┐                        │    │
-│  │  EKS Pods ───── Fluent Bit DaemonSet ┤                        │    │
-│  │  Lambda ─────── built-in ────────────┤                        │    │
-│  │  API Gateway ── access logs ─────────┤                        │    │
-│  │  ALB ────────── access logs ─────────┤                        │    │
-│  │  RDS/Aurora ─── audit/slow query ────┤                        │    │
-│  │  VPC Flow Logs ──────────────────────┤                        │    │
-│  └──────────────────────────────────────┼────────────────────────┘    │
-│                                         ▼                             │
-│                              ┌───────────────────┐                    │
-│                              │  CloudWatch Logs  │                    │
-│                              │  (Log Groups)     │                    │
-│                              └────┬────┬────┬────┘                    │
-│                                   │    │    │                         │
-│                    ┌──────────────┘    │    └──────────────┐          │
-│                    ▼                   ▼                   ▼          │
-│           ┌──────────────┐  ┌──────────────┐  ┌───────────────┐       │
-│           │ Logs Insights│  │ Subscription │  │ S3 Export     │       │
-│           │ (query)      │  │ Filter       │  │ (archive)     │       │
-│           └──────────────┘  └──────┬───────┘  └──────┬────────┘       │
-│                                    │                 │                │
-│                          ┌─────────▼──────┐   ┌──────▼────────┐       │
-│                          │ Lambda /       │   │ Athena        │       │
-│                          │ OpenSearch /   │   │ (ad-hoc query │       │
-│                          │ Kinesis        │   │  on S3 logs)  │       │
-│                          └────────────────┘   └───────────────┘       │
-└───────────────────────────────────────────────────────────────────────┘
-```
+
+ALB access logs mặc định được publish vào S3, không trực tiếp vào CloudWatch Logs; cần pipeline bổ sung nếu muốn hợp nhất tại CloudWatch.
 
 ### 3.2. CloudWatch Logs — Cấu hình cho ECS / EKS / Lambda
 
 #### ECS — awslogs driver (mặc định)
 
-```hcl
+```hcl source="snippets/ecs-awslogs-driver-mac-dinh.tf"
 # ECS Task Definition — log configuration
 container_definitions = jsonencode([{
   name  = "order-service"
@@ -478,9 +467,11 @@ resource "aws_cloudwatch_log_group" "order_service" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Fecs-awslogs-driver-mac-dinh.tf)
+
 #### EKS — Fluent Bit DaemonSet
 
-```yaml
+```yaml source="snippets/eks-fluent-bit-daemonset.yaml"
 # Fluent Bit ConfigMap cho EKS
 apiVersion: v1
 kind: ConfigMap
@@ -525,9 +516,11 @@ data:
         log_retention_days  30
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Feks-fluent-bit-daemonset.yaml)
+
 #### Lambda — Built-in Logging
 
-```hcl
+```hcl source="snippets/lambda-built-in-logging.tf"
 # Lambda tự động ghi log vào CloudWatch
 # Log Group: /aws/lambda/<function-name>
 # Chỉ cần cấu hình retention
@@ -538,11 +531,13 @@ resource "aws_cloudwatch_log_group" "payment_lambda" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Flambda-built-in-logging.tf)
+
 ### 3.3. Structured Logging & Log Insights
 
 #### Structured Logging Format (JSON)
 
-```json
+```json source="snippets/structured-logging-format-json.json"
 {
   "timestamp": "2025-02-27T10:30:45.123Z",
   "level": "INFO",
@@ -562,9 +557,11 @@ resource "aws_cloudwatch_log_group" "payment_lambda" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Fstructured-logging-format-json.json)
+
 #### CloudWatch Logs Insights — Query Examples
 
-```sql
+```sql source="snippets/cloudwatch-logs-insights-query-examples.sql"
 -- Top 10 slowest requests trong 1 giờ
 fields @timestamp, service, message, duration_ms, traceId
 | filter duration_ms > 0
@@ -606,37 +603,30 @@ fields @timestamp, @duration, @billedDuration, @initDuration
     by bin(1h)
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Fcloudwatch-logs-insights-query-examples.sql)
+
 ### 3.4. Cross-Account & Cross-Region Logging
 
 Với hệ thống multi-account (theo AWS best practice), logs cần tập trung về **central logging account**.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              CROSS-ACCOUNT LOGGING                              │
-│                                                                 │
-│  ┌─── Account: Production ────┐  ┌─── Account: Staging ───────┐ │
-│  │  CloudWatch Logs           │  │  CloudWatch Logs           │ │
-│  │  /ecs/order-service        │  │  /ecs/order-service        │ │
-│  │  /ecs/payment-service      │  │  /ecs/payment-service      │ │
-│  └──────────┬─────────────────┘  └───────────┬────────────────┘ │
-│             │ Subscription Filter            │                  │
-│             ▼                                ▼                  │
-│  ┌──────────────────── Account: Central Logging ──────────────┐ │
-│  │                                                            │ │
-│  │  ┌──────────────┐     ┌──────────────┐    ┌─────────────┐  │ │
-│  │  │ Kinesis Data │────▶│ OpenSearch   │    │ S3 Bucket   │  │ │
-│  │  │ Firehose     │     │ (Kibana)     │    │ (Archive)   │  │ │
-│  │  └──────────────┘     └──────────────┘    └──────┬──────┘  │ │
-│  │                                                  │         │ │
-│  │                                            ┌─────▼──────┐  │ │
-│  │                                            │ Athena     │  │ │
-│  │                                            │ (ad-hoc)   │  │ │
-│  │                                            └────────────┘  │ │
-│  └────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+```d2 title="Cross-account Logging"
+direction: down
+prod: "Production — CloudWatch Logs\n/ecs/order-service\n/ecs/payment-service"
+staging: "Staging — CloudWatch Logs\n/ecs/order-service\n/ecs/payment-service"
+central: Central Logging Account {
+ firehose: Kinesis Data Firehose
+ search: OpenSearch — Dashboards
+ s3: S3 Archive {shape: cylinder}
+ athena: Athena — ad-hoc
+ firehose -> search
+ firehose -> s3: Archive / backup theo cấu hình
+ s3 -> athena
+}
+prod -> central.firehose: Subscription Filter
+staging -> central.firehose: Subscription Filter
 ```
 
-```hcl
+```hcl source="snippets/3-4-cross-account-cross-region-logging.tf"
 # Subscription Filter — gửi logs sang central account
 resource "aws_cloudwatch_log_subscription_filter" "central" {
   name            = "central-logging"
@@ -654,6 +644,8 @@ resource "aws_cloudwatch_log_group" "order_service" {
   # Logs > 30 ngày → export sang S3 (qua Lambda scheduled task)
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F3-4-cross-account-cross-region-logging.tf)
 
 ### 3.5. Lựa chọn thay thế — OpenSearch (ELK trên AWS)
 
@@ -696,7 +688,7 @@ AWS services tự động gửi metrics về CloudWatch — gọi là **built-in
 
 **Container Insights** cung cấp metrics chi tiết cho **ECS và EKS** — bao gồm cluster, service, task/pod level metrics.
 
-```hcl
+```hcl source="snippets/4-2-cloudwatch-container-insights.tf"
 # Bật Container Insights cho ECS Cluster
 resource "aws_ecs_cluster" "main" {
   name = "production"
@@ -708,7 +700,9 @@ resource "aws_ecs_cluster" "main" {
 }
 ```
 
-```yaml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F4-2-cloudwatch-container-insights.tf)
+
+```yaml source="snippets/4-2-cloudwatch-container-insights-2.yaml"
 # Bật Container Insights cho EKS — ADOT addon
 apiVersion: eks.amazonaws.com/v1alpha1
 kind: Addon
@@ -718,6 +712,8 @@ spec:
   addonName: amazon-cloudwatch-observability
   clusterName: production
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F4-2-cloudwatch-container-insights-2.yaml)
 
 #### Metrics từ Container Insights
 
@@ -754,7 +750,7 @@ spec:
 
 **EMF** (Embedded Metric Format) cho phép gửi custom metrics **qua structured logs** — không cần gọi `PutMetricData` API riêng (giảm latency, giảm cost).
 
-```json
+```json source="snippets/4-3-custom-metrics-embedded-metric-format-emf.json"
 // EMF Log Line — ghi ra stdout, CloudWatch tự extract metrics
 {
   "_aws": {
@@ -781,7 +777,9 @@ spec:
 }
 ```
 
-```typescript
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F4-3-custom-metrics-embedded-metric-format-emf.json)
+
+```typescript source="snippets/4-3-custom-metrics-embedded-metric-format-emf-2.ts"
 // Node.js — sử dụng aws-embedded-metrics library
 import { createMetricsLogger, Unit } from "aws-embedded-metrics";
 
@@ -810,6 +808,8 @@ async function processOrder(order: Order) {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F4-3-custom-metrics-embedded-metric-format-emf-2.ts)
+
 #### PutMetricData vs EMF
 
 | Tiêu chí | PutMetricData API | Embedded Metric Format (EMF) |
@@ -823,7 +823,7 @@ async function processOrder(order: Order) {
 
 ### 4.4. CloudWatch Alarms & Composite Alarms
 
-```hcl
+```hcl source="snippets/4-4-cloudwatch-alarms-composite-alarms.tf"
 # Alarm — High Error Rate
 resource "aws_cloudwatch_metric_alarm" "order_error_rate" {
   alarm_name          = "order-service-high-error-rate"
@@ -920,9 +920,11 @@ resource "aws_cloudwatch_composite_alarm" "order_critical" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F4-4-cloudwatch-alarms-composite-alarms.tf)
+
 ### 4.5. CloudWatch Dashboards
 
-```hcl
+```hcl source="snippets/4-5-cloudwatch-dashboards.tf"
 # CloudWatch Dashboard — Order Service
 resource "aws_cloudwatch_dashboard" "order_service" {
   dashboard_name = "Order-Service-Production"
@@ -1013,6 +1015,8 @@ resource "aws_cloudwatch_dashboard" "order_service" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F4-5-cloudwatch-dashboards.tf)
+
 ---
 
 ## 5. Managed Prometheus & Grafana trên AWS
@@ -1059,7 +1063,7 @@ resource "aws_cloudwatch_dashboard" "order_service" {
 
 #### Cấu hình AMP (Terraform)
 
-```hcl
+```hcl source="snippets/cau-hinh-amp-terraform.tf"
 # Amazon Managed Prometheus Workspace
 resource "aws_prometheus_workspace" "main" {
   alias = "production-microservices"
@@ -1107,9 +1111,11 @@ resource "aws_prometheus_rule_group_namespace" "order_alerts" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Fcau-hinh-amp-terraform.tf)
+
 ### 5.2. Amazon Managed Grafana (AMG)
 
-```hcl
+```hcl source="snippets/5-2-amazon-managed-grafana-amg.tf"
 # Amazon Managed Grafana
 resource "aws_grafana_workspace" "main" {
   name                     = "production-dashboards"
@@ -1131,6 +1137,8 @@ resource "aws_grafana_workspace" "main" {
   })
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F5-2-amazon-managed-grafana-amg.tf)
 
 ### 5.3. Khi nào CloudWatch vs Prometheus + Grafana?
 
@@ -1195,7 +1203,7 @@ resource "aws_grafana_workspace" "main" {
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-```hcl
+```hcl source="snippets/6-1-alerting-pipeline-tren-aws.tf"
 # SNS Topics — phân loại severity
 resource "aws_sns_topic" "critical" {
   name = "alerts-critical"
@@ -1223,6 +1231,8 @@ resource "aws_chatbot_slack_channel_configuration" "alerts" {
   logging_level = "ERROR"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F6-1-alerting-pipeline-tren-aws.tf)
 
 ### 6.2. Thiết kế Alert hiệu quả — Tránh Alert Fatigue
 
@@ -1263,7 +1273,7 @@ resource "aws_chatbot_slack_channel_configuration" "alerts" {
 
 ### 6.3. Runbook Automation với Systems Manager
 
-```hcl
+```hcl source="snippets/6-3-runbook-automation-voi-systems-manager.tf"
 # SSM Automation Runbook — Auto remediate high error rate
 resource "aws_ssm_document" "restart_ecs_service" {
   name            = "RestartECSService"
@@ -1331,6 +1341,8 @@ resource "aws_cloudwatch_event_target" "ssm_automation" {
   })
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2F6-3-runbook-automation-voi-systems-manager.tf)
 
 ---
 

@@ -142,32 +142,29 @@ Luồng điển hình gồm các bước sau:
 6. Worker ghi kết quả vào Result Store, rồi chuyển job sang `completed`; nếu không thể xử lý, chuyển sang `failed` cùng lý do.
 7. Client Poll status URL hoặc nhận kết quả qua cơ chế push đã thống nhất.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant API as Report API
-    participant J as Job Store
-    participant Q as Queue
-    participant W as Report Worker
-    participant R as Result Store
-
-    C->>API: POST /reports + Idempotency-Key
-    API->>J: Tạo job và state = pending
-    API->>Q: Enqueue GenerateReport(job_id)
-    API-->>C: 202 + Location + Retry-After
-
-    Q->>W: Deliver job
-    W->>J: state = processing, progress = 0
-    Note over W: Xử lý báo cáo trong nền
-    W->>J: Cập nhật progress = 40
-    W->>R: Lưu file báo cáo
-    R-->>W: result reference
-    W->>J: state = completed + downloadUrl
-
-    C->>API: GET /reports/{job_id}/status
-    API->>J: Đọc trạng thái
-    J-->>API: completed + downloadUrl
-    API-->>C: 200 status và kết quả
+```d2 title="Luồng request và trạng thái job"
+shape: sequence_diagram
+"C": "Client"
+"API": "Report API"
+"J": "Job Store"
+"Q": "Queue"
+"W": "Report Worker"
+"R": "Result Store"
+"C" -> "API": "POST /reports + Idempotency-Key"
+"API" -> "J": "Tạo job và state = pending"
+"API" -> "Q": "Enqueue GenerateReport(job_id)"
+"API" -> "C": "202 + Location + Retry-After" { style.stroke-dash: 5 }
+"Q" -> "W": "Deliver job"
+"W" -> "J": "state = processing, progress = 0"
+"W".note1: "Xử lý báo cáo trong nền"
+"W" -> "J": "Cập nhật progress = 40"
+"W" -> "R": "Lưu file báo cáo"
+"R" -> "W": "result reference" { style.stroke-dash: 5 }
+"W" -> "J": "state = completed + downloadUrl"
+"C" -> "API": "GET /reports/{job_id}/status"
+"API" -> "J": "Đọc trạng thái"
+"J" -> "API": "completed + downloadUrl" { style.stroke-dash: 5 }
+"API" -> "C": "200 status và kết quả" { style.stroke-dash: 5 }
 ```
 
 Trạng thái là một phần của API contract. Một vòng đời thường dùng là:
@@ -256,7 +253,7 @@ Thời điểm **ACK** (acknowledgment — xác nhận đã nhận message) cũn
 
 Request tạo job nên chứa dữ liệu nghiệp vụ, `Idempotency-Key` và Correlation ID nếu client đã có workflow cần nối:
 
-```http
+```http source="snippets/tao-job-bang-post.http"
 POST /api/reports HTTP/1.1
 Authorization: Bearer <access-token>
 Idempotency-Key: monthly-sales-2025-09-user-123
@@ -269,9 +266,11 @@ Content-Type: application/json
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=async-request-reply&snapshot=article&file=snippets%2Ftao-job-bang-post.http)
+
 Khi API đã chấp nhận việc cần làm:
 
-```http
+```http source="snippets/tao-job-bang-post-2.http"
 HTTP/1.1 202 Accepted
 Location: /api/reports/9f3c/status
 Retry-After: 30
@@ -284,6 +283,8 @@ Content-Type: application/json
   "statusUrl": "/api/reports/9f3c/status"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=async-request-reply&snapshot=article&file=snippets%2Ftao-job-bang-post-2.http)
 
 Các header và field có thể thay đổi theo API contract, nhưng response cần cho client biết ít nhất:
 
@@ -327,7 +328,7 @@ Khi Worker đang xử lý:
 
 Khi job lỗi, status nên cho biết lỗi có thể thử lại hay không mà không làm lộ stack trace hoặc secret:
 
-```json
+```json source="snippets/tra-cuu-trang-thai.json"
 {
   "jobId": "9f3c",
   "state": "failed",
@@ -338,6 +339,8 @@ Khi job lỗi, status nên cho biết lỗi có thể thử lại hay không mà
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=async-request-reply&snapshot=article&file=snippets%2Ftra-cuu-trang-thai.json)
 
 HTTP `200` của status endpoint chỉ nói request tra cứu thành công. Client vẫn phải đọc `state` để biết job đã hoàn tất hay chưa. Ngược lại, API không nên trả `completed` trước khi kết quả thực sự sẵn sàng theo contract.
 
@@ -379,7 +382,7 @@ Nếu Worker gặp lỗi tạm thời khi đọc nguồn dữ liệu, retry có 
 
 Client gửi request một lần với key ổn định:
 
-```http
+```http source="snippets/vi-du-request-va-response.http"
 POST /api/reports HTTP/1.1
 Authorization: Bearer <access-token>
 Idempotency-Key: report-monthly-sales-2025-09-account-123
@@ -392,9 +395,11 @@ Content-Type: application/json
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=async-request-reply&snapshot=article&file=snippets%2Fvi-du-request-va-response.http)
+
 API trả lời ngay:
 
-```http
+```http source="snippets/vi-du-request-va-response-2.http"
 HTTP/1.1 202 Accepted
 Location: /api/reports/9f3c/status
 Retry-After: 30
@@ -404,6 +409,8 @@ Retry-After: 30
   "state": "pending"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=async-request-reply&snapshot=article&file=snippets%2Fvi-du-request-va-response-2.http)
 
 Client tra cứu sau khoảng thời gian được gợi ý:
 
@@ -465,7 +472,7 @@ API nên trả `Retry-After` để gợi ý thời điểm tra cứu lại. Clie
 
 Với **Webhook**, client đăng ký một callback URL. Khi job `completed` hoặc `failed`, server gửi event kết quả đến URL đó:
 
-```http
+```http source="snippets/webhook.http"
 POST https://partner.example.com/hooks/report HTTP/1.1
 X-Correlation-ID: req-91ab
 X-Signature: sha256=...
@@ -477,6 +484,8 @@ Content-Type: application/json
   "downloadUrl": "/api/reports/9f3c/file"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=async-request-reply&snapshot=article&file=snippets%2Fwebhook.http)
 
 Webhook phù hợp khi client là partner hoặc third-party có endpoint công khai. Endpoint nhận callback cần:
 

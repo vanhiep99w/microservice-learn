@@ -65,15 +65,23 @@ Tên gọi này mô tả topology có một trung tâm với rất nhiều đư�
 
 Một **dependency graph** là đồ thị thể hiện service nào phụ thuộc service nào. Trong graph, đường đi nối tiếp là phần caller phải chờ; các dependency tùy chọn có thể được đưa ra ngoài critical path.
 
-```mermaid
-flowchart LR
-    C["Client"] --> G["API Gateway"]
-    G --> O["Order Service"]
-    O --> P["Payment Service"]
-    P --> F["Fraud Service"]
-    F --> B["Bank API"]
-    O -.->|OrderCreated| N["Notification"]
-    O -.->|OrderCreated| A["Analytics"]
+```d2 title="Dependency graph và critical path"
+direction: right
+n1: "Client"
+n2: "API Gateway"
+n3: "Order Service"
+n4: "Payment Service"
+n5: "Fraud Service"
+n6: "Bank API"
+n7: "Notification"
+n8: "Analytics"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n3 -> n7: "OrderCreated" { style.stroke-dash: 5 }
+n3 -> n8: "OrderCreated" { style.stroke-dash: 5 }
 ```
 
 Trong ví dụ trên, `Client → Gateway → Order → Payment → Fraud → Bank` là một synchronous chain. `Notification` và `Analytics` nhận `OrderCreated` theo hướng bất đồng bộ nên không nhất thiết nằm trên critical path của response checkout.
@@ -187,25 +195,24 @@ Sync Chain cũng khác **Chatty Services**. Chatty tập trung vào số round-t
 
 Giả sử client gửi yêu cầu checkout. Gateway gọi Order Service. Order gọi Payment, Payment gọi Fraud, rồi Fraud gọi Bank API. Caller chờ kết quả từng bước:
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant G as API Gateway
-    participant O as Order Service
-    participant P as Payment Service
-    participant F as Fraud Service
-    participant B as Bank API
-
-    C->>G: Checkout
-    G->>O: Tạo hoặc xác nhận order
-    O->>P: Authorize payment
-    P->>F: Kiểm tra fraud
-    F->>B: Gọi Bank API
-    B-->>F: Kết quả hoặc timeout
-    F-->>P: Kết quả kiểm tra
-    P-->>O: Kết quả payment
-    O-->>G: Kết quả checkout
-    G-->>C: Response
+```d2 title="Luồng đồng bộ"
+shape: sequence_diagram
+"C": "Client"
+"G": "API Gateway"
+"O": "Order Service"
+"P": "Payment Service"
+"F": "Fraud Service"
+"B": "Bank API"
+"C" -> "G": "Checkout"
+"G" -> "O": "Tạo hoặc xác nhận order"
+"O" -> "P": "Authorize payment"
+"P" -> "F": "Kiểm tra fraud"
+"F" -> "B": "Gọi Bank API"
+"B" -> "F": "Kết quả hoặc timeout" { style.stroke-dash: 5 }
+"F" -> "P": "Kết quả kiểm tra" { style.stroke-dash: 5 }
+"P" -> "O": "Kết quả payment" { style.stroke-dash: 5 }
+"O" -> "G": "Kết quả checkout" { style.stroke-dash: 5 }
+"G" -> "C": "Response" { style.stroke-dash: 5 }
 ```
 
 Trong topology này, request ngoài cùng phụ thuộc vào availability và latency của cả Payment, Fraud và Bank API. Nếu mỗi bước có thêm retry, tổng thời gian còn tăng trước khi Gateway trả response.
@@ -260,12 +267,17 @@ Ghi rõ service nào là owner của business decision, API, event và dữ li�
 
 Các side effect như gửi notification, ghi analytics, cập nhật index hoặc hậu xử lý thường không cần nằm trong response checkout. Order Service có thể publish `OrderCreated` vào broker; các consumer tự subscribe và xử lý theo khả năng của mình.
 
-```mermaid
-flowchart LR
-    O["Order Service"] -->|publish OrderCreated| B["Message Broker"]
-    B --> N["Notification Service"]
-    B --> A["Analytics Service"]
-    B --> I["Indexing hoặc hậu xử lý"]
+```d2 title="Chuyển side effect sang async hoặc event"
+direction: right
+n1: "Order Service"
+n2: "Message Broker"
+n3: "Notification Service"
+n4: "Analytics Service"
+n5: "Indexing hoặc hậu xử lý"
+n1 -> n2: "publish OrderCreated"
+n2 -> n3
+n2 -> n4
+n2 -> n5
 ```
 
 Event fan-out giảm **temporal coupling** và giúp thêm consumer mà không cần producer gọi tuần tự consumer mới. Đổi lại, producer và consumer vẫn coupling qua event schema, broker và delivery semantics. Consumer có thể xử lý trễ, nhận duplicate hoặc gặp lỗi; vì vậy cần retry có giới hạn, idempotency và Dead Letter Queue khi phù hợp.
@@ -276,12 +288,17 @@ Nếu producer vừa ghi business state vừa publish event, cần xử lý dual
 
 Khi client cần dữ liệu từ nhiều service để dựng một màn hình, **API Aggregation** cho phép client gọi một endpoint. Gateway hoặc BFF gọi các dependency độc lập, thường là song song, rồi gộp response.
 
-```mermaid
-flowchart TB
-    C["Client"] --> X["Gateway hoặc BFF"]
-    X --> U["User Service"]
-    X --> K["Cart Service"]
-    X --> R["Recommendation Service"]
+```d2 title="Dùng aggregation cho read path"
+direction: down
+n1: "Client"
+n2: "Gateway hoặc BFF"
+n3: "User Service"
+n4: "Cart Service"
+n5: "Recommendation Service"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n2 -> n5
 ```
 
 Aggregation giảm số round-trip giữa client và hệ thống, nhưng không xóa các upstream call. Lớp aggregation vẫn cần timeout riêng cho từng dependency, giới hạn fan-out và metrics cho latency của từng nhánh.

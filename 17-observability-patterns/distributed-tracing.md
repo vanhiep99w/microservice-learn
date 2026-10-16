@@ -146,20 +146,28 @@ Pipeline tracing có hai luồng khác nhau:
 - **Request path**: trace context đi cùng HTTP, gRPC hoặc message để nối các span.
 - **Telemetry path**: các span được SDK export tới Collector, sau đó tới trace backend để lưu và truy vấn.
 
-```mermaid
-flowchart LR
-    client[Client] --> gateway[API Gateway<br/>instrumentation]
-    gateway --> service[Service<br/>OTel SDK]
-    service -->|HTTP gRPC<br/>traceparent| downstream[Downstream Service<br/>OTel SDK]
-    service -->|message headers<br/>traceparent| broker[Message Broker]
-    broker --> consumer[Consumer<br/>OTel SDK]
-
-    gateway -->|OTLP spans| collector[OpenTelemetry Collector<br/>receive process batch sample export]
-    service -->|OTLP spans| collector
-    downstream -->|OTLP spans| collector
-    consumer -->|OTLP spans| collector
-    collector --> backend[Trace Backend<br/>Jaeger Tempo AWS X-Ray]
-    backend --> ui[Trace UI<br/>waterfall dependency map]
+```d2 title="Kiến trúc và pipeline tracing"
+direction: right
+n1: "Client"
+n2: "API Gateway\ninstrumentation"
+n3: "Service\nOTel SDK"
+n4: "Downstream Service\nOTel SDK"
+n5: "Message Broker"
+n6: "Consumer\nOTel SDK"
+n7: "OpenTelemetry Collector\nreceive process batch sample export"
+n8: "Trace Backend\nJaeger Tempo AWS X-Ray"
+n9: "Trace UI\nwaterfall dependency map"
+n1 -> n2
+n2 -> n3
+n3 -> n4: "HTTP gRPC\ntraceparent"
+n3 -> n5: "message headers\ntraceparent"
+n5 -> n6
+n2 -> n7: "OTLP spans"
+n3 -> n7: "OTLP spans"
+n4 -> n7: "OTLP spans"
+n6 -> n7: "OTLP spans"
+n7 -> n8
+n8 -> n9
 ```
 
 Context propagation không thay thế việc export span. Một service có thể truyền `traceparent` thành công nhưng vẫn mất trace nếu SDK, Collector hoặc backend không nhận được span. Vì vậy cần kiểm tra cả request path và telemetry path.
@@ -288,27 +296,26 @@ Có thể bắt đầu bằng head sampling vì cách triển khai đơn giản.
 
 Giả sử người dùng gọi `POST /orders`. Gateway tạo trace nếu request chưa có `traceparent`, sau đó context được truyền qua Order Service, Inventory Service và Payment Service:
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant G as API Gateway
-    participant O as Order Service
-    participant I as Inventory Service
-    participant P as Payment Service
-    participant B as Bank API
-
-    C->>G: POST /orders
-    Note over G: Tạo Trace ID và span Gateway
-    G->>O: Forward + traceparent
-    Note over O: Extract context, tạo span Order
-    O->>I: Reserve stock + traceparent
-    I-->>O: Stock reserved
-    O->>P: Charge payment + traceparent
-    P->>B: POST /charges + traceparent
-    B-->>P: 200 OK
-    P-->>O: Payment completed
-    O-->>G: 201 Created
-    G-->>C: 201 Created
+```d2 title="Request đặt hàng"
+shape: sequence_diagram
+"C": "Client"
+"G": "API Gateway"
+"O": "Order Service"
+"I": "Inventory Service"
+"P": "Payment Service"
+"B": "Bank API"
+"C" -> "G": "POST /orders"
+"G".note1: "Tạo Trace ID và span Gateway"
+"G" -> "O": "Forward + traceparent"
+"O".note2: "Extract context, tạo span Order"
+"O" -> "I": "Reserve stock + traceparent"
+"I" -> "O": "Stock reserved" { style.stroke-dash: 5 }
+"O" -> "P": "Charge payment + traceparent"
+"P" -> "B": "POST /charges + traceparent"
+"B" -> "P": "200 OK" { style.stroke-dash: 5 }
+"P" -> "O": "Payment completed" { style.stroke-dash: 5 }
+"O" -> "G": "201 Created" { style.stroke-dash: 5 }
+"G" -> "C": "201 Created" { style.stroke-dash: 5 }
 ```
 
 Waterfall minh họa của cùng request:

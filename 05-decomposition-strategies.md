@@ -125,15 +125,29 @@ Không có quy tắc cứng, nhưng có **heuristics** (quy tắc ngón tay cái
 | **Autonomous Function** | Service hoàn thành 1 chức năng mà không cần gọi nhiều service khác | Nếu Service A luôn phải gọi B, C, D → có thể nên gộp |
 | **Data Ownership** | Service own 1 tập dữ liệu rõ ràng | User Service own bảng users, profiles |
 
-```mermaid
-flowchart TD
-    A[Đang cân nhắc tách service] --> B{Service hiện tại có<br/>nhiều hơn 1 lý do<br/>để thay đổi?}
-    B -->|Không| C["✅ Giữ nguyên<br/>Chưa cần tách"]
-    B -->|Có| D{Các phần có thể<br/>deploy & scale<br/>độc lập?}
-    D -->|Không| E["⚠️ Refactor nội bộ trước<br/>Chưa tách service"]
-    D -->|Có| F{Team có đủ<br/>bandwidth vận hành<br/>thêm service?}
-    F -->|Không| G["⚠️ Chưa tách<br/>Tập trung ổn định trước"]
-    F -->|Có| H["✅ Tách service<br/>Áp dụng strategy phù hợp"]
+```d2 title="2.2. Service Granularity — Kích thước phù hợp"
+direction: down
+n1: "Đang cân nhắc tách service"
+n2: "Service hiện tại có\nnhiều hơn 1 lý do\nđể thay đổi?" {
+  shape: diamond
+}
+n3: "✅ Giữ nguyên\nChưa cần tách"
+n4: "Các phần có thể\ndeploy & scale\nđộc lập?" {
+  shape: diamond
+}
+n5: "⚠️ Refactor nội bộ trước\nChưa tách service"
+n6: "Team có đủ\nbandwidth vận hành\nthêm service?" {
+  shape: diamond
+}
+n7: "⚠️ Chưa tách\nTập trung ổn định trước"
+n8: "✅ Tách service\nÁp dụng strategy phù hợp"
+n1 -> n2
+n2 -> n3: "Không"
+n2 -> n4: "Có"
+n4 -> n5: "Không"
+n4 -> n6: "Có"
+n6 -> n7: "Không"
+n6 -> n8: "Có"
 ```
 
 ---
@@ -282,33 +296,26 @@ Domain (toàn bộ hệ thống)
 | **Supporting** | Cần thiết nhưng không tạo lợi thế cạnh tranh | Tự build hoặc **customize** giải pháp có sẵn | Inventory, Shipping, Customer Support |
 | **Generic** | Bài toán phổ biến, mọi công ty đều giống nhau | **Mua SaaS** hoặc dùng open-source | Auth (Auth0), Email (SendGrid), Payment gateway (Stripe) |
 
-```mermaid
-graph TB
-    subgraph Core ["🏆 Core Subdomain — Đầu tư NHIỀU"]
-        C1[Recommendation Engine]
-        C2[Dynamic Pricing]
-        C3[Order Fulfillment]
-    end
-
-    subgraph Supporting ["⚙️ Supporting Subdomain — Vừa phải"]
-        S1[Inventory]
-        S2[Shipping]
-        S3[Customer Support]
-    end
-
-    subgraph Generic ["📦 Generic Subdomain — Mua/dùng sẵn"]
-        G1["Auth (Auth0)"]
-        G2["Email (SendGrid)"]
-        G3["Payment (Stripe)"]
-    end
-
-    Core ---|build in-house| Team1[Best engineers]
-    Supporting ---|build or buy| Team2[Standard team]
-    Generic ---|buy SaaS| Team3[Integrate only]
-
-    style Core fill:#1a237e,color:#fff,stroke:#fff
-    style Supporting fill:#4a148c,color:#fff,stroke:#fff
-    style Generic fill:#004d40,color:#fff,stroke:#fff
+```d2 title="4.2. Core / Supporting / Generic Subdomain"
+direction: down
+n3: "📦 Generic Subdomain — Mua/dùng sẵn" {}
+n2: "⚙️ Supporting Subdomain — Vừa phải" {}
+n1: "🏆 Core Subdomain — Đầu tư NHIỀU" {}
+n1.n4: "Recommendation Engine"
+n1.n5: "Dynamic Pricing"
+n1.n6: "Order Fulfillment"
+n2.n7: "Inventory"
+n2.n8: "Shipping"
+n2.n9: "Customer Support"
+n3.n10: "Auth (Auth0)"
+n3.n11: "Email (SendGrid)"
+n3.n12: "Payment (Stripe)"
+n13: "Best engineers"
+n14: "Standard team"
+n15: "Integrate only"
+n1 -- n13: "build in-house"
+n2 -- n14: "build or buy"
+n3 -- n15: "buy SaaS"
 ```
 
 ### 4.3. Ví dụ thực tế — Online Banking
@@ -404,15 +411,24 @@ Monolith sống         Microservice bắt      Monolith chết
 
 ### 5.2. Các bước thực hiện
 
-```mermaid
-graph TB
-    A["1. Xác định module<br/>cần tách trước"] --> B["2. Đặt Proxy/Facade<br/>trước monolith"]
-    B --> C["3. Build microservice<br/>cho module đó"]
-    C --> D["4. Chuyển traffic<br/>sang microservice"]
-    D --> E["5. Xóa code cũ<br/>trong monolith"]
-    E --> F{Còn module<br/>cần tách?}
-    F -->|Có| A
-    F -->|Không| G["✅ Migration hoàn tất<br/>Tắt monolith"]
+```d2 title="5.2. Các bước thực hiện"
+direction: down
+n1: "1. Xác định module\ncần tách trước"
+n2: "2. Đặt Proxy/Facade\ntrước monolith"
+n3: "3. Build microservice\ncho module đó"
+n4: "4. Chuyển traffic\nsang microservice"
+n5: "5. Xóa code cũ\ntrong monolith"
+n6: "Còn module\ncần tách?" {
+  shape: diamond
+}
+n7: "✅ Migration hoàn tất\nTắt monolith"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n1: "Có"
+n6 -> n7: "Không"
 ```
 
 **Chi tiết từng bước:**
@@ -642,24 +658,17 @@ Tách các phần **thay đổi thường xuyên** ra khỏi phần **ổn đị
 
 Tách service theo **cấu trúc team** (áp dụng Conway's Law — xem [doc 04, section 6](04-autonomy-independence.md)):
 
-```
-Team Structure:                    Service Structure:
-──────────────                     ──────────────────
-
-┌─────────────┐                    ┌──────────────┐
-│  Team Alpha │ ──── owns ────▶    │  Catalog +   │
-│  (5 devs)   │                    │  Search Svc  │
-└─────────────┘                    └──────────────┘
-
-┌─────────────┐                    ┌──────────────┐
-│  Team Beta  │ ──── owns ────▶    │  Order +     │
-│  (4 devs)   │                    │  Payment Svc │
-└─────────────┘                    └──────────────┘
-
-┌─────────────┐                    ┌──────────────┐
-│ Team Gamma  │ ──── owns ────▶    │  User +      │
-│  (3 devs)   │                    │  Notif. Svc  │
-└─────────────┘                    └──────────────┘
+```d2 title="Team Ownership và service boundary"
+direction: right
+alpha: "Team Alpha\n5 developers"
+beta: "Team Beta\n4 developers"
+gamma: "Team Gamma\n3 developers"
+catalog: Catalog + Search Service
+order: Order + Payment Service
+user: User + Notification Service
+alpha -> catalog: Owns
+beta -> order: Owns
+gamma -> user: Owns
 ```
 
 **Khi nào dùng**: Khi bạn đã có team structure ổn định và muốn giảm cross-team dependency.
@@ -672,14 +681,20 @@ Team Structure:                    Service Structure:
 
 ### 7.1. Framework 6 bước
 
-```mermaid
-graph TB
-    S1["1️⃣ Identify Domain<br/>Xác định domain<br/>& subdomains"] --> S2["2️⃣ Map Capabilities<br/>Liệt kê business<br/>capabilities"]
-    S2 --> S3["3️⃣ Define Boundaries<br/>Vẽ ranh giới<br/>Bounded Context"]
-    S3 --> S4["4️⃣ Evaluate Dependencies<br/>Xác định coupling<br/>giữa các boundaries"]
-    S4 --> S5["5️⃣ Design Communication<br/>Chọn sync/async<br/>cho mỗi interaction"]
-    S5 --> S6["6️⃣ Validate & Iterate<br/>Review với team<br/>Điều chỉnh ranh giới"]
-    S6 -.->|Không ổn| S3
+```d2 title="7.1. Framework 6 bước"
+direction: down
+n1: "1️⃣ Identify Domain\nXác định domain\n& subdomains"
+n2: "2️⃣ Map Capabilities\nLiệt kê business\ncapabilities"
+n3: "3️⃣ Define Boundaries\nVẽ ranh giới\nBounded Context"
+n4: "4️⃣ Evaluate Dependencies\nXác định coupling\ngiữa các boundaries"
+n5: "5️⃣ Design Communication\nChọn sync/async\ncho mỗi interaction"
+n6: "6️⃣ Validate & Iterate\nReview với team\nĐiều chỉnh ranh giới"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n3: "Không ổn" { style.stroke-dash: 5 }
 ```
 
 ```
@@ -800,36 +815,22 @@ Chi tiết:
 | **Nano-services** | Tách quá nhỏ, mỗi function 1 service | Latency cao, debug khó, overhead vận hành lớn | Gộp lại theo business capability |
 | **Tech-Driven Split** | Tách theo layer kỹ thuật (UI service, Logic service, Data service) | Cross-service call cho mọi request, latency cao | Tách theo vertical slice (business capability), không horizontal layer |
 
+```d2 title="Horizontal Split và Vertical Slice"
+direction: down
+horizontal: "Tech-Driven Split — sai" {
+ ui: UI Layer Service
+ business: Business Logic Service
+ data: Data Access Service
+ ui -> business -> data
+}
+vertical: "Business-Driven Split — đúng" {
+ order: "Order\nUI + Logic + Data"
+ payment: "Payment\nUI + Logic + Data"
+ catalog: "Catalog\nUI + Logic + Data"
+}
 ```
-❌ Tech-Driven Split (Horizontal):
 
-  ┌───────────┐
-  │  UI Layer │ Service
-  └─────┬─────┘
-        │ (mọi request đều phải đi qua 3 services)
-  ┌─────▼─────┐
-  │  Business │ Service
-  │  Logic    │
-  └─────┬─────┘
-        │
-  ┌─────▼─────┐
-  │  Data     │ Service
-  │  Access   │
-  └───────────┘
-
-✅ Business-Driven Split (Vertical):
-
-  ┌────────┐  ┌────────┐  ┌────────┐
-  │ Order  │  │Payment │  │Catalog │
-  │        │  │        │  │        │
-  │ UI     │  │ UI     │  │ UI     │
-  │ Logic  │  │ Logic  │  │ Logic  │
-  │ Data   │  │ Data   │  │ Data   │
-  └────────┘  └────────┘  └────────┘
-  
-  Mỗi service là vertical slice: tự chứa UI logic + 
-  business logic + data access
-```
+Horizontal split buộc request đi qua ba services. Vertical slice tự chứa UI logic, business logic và data access.
 
 ---
 

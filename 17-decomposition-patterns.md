@@ -159,41 +159,58 @@ Ba pattern này **không loại trừ nhau** — một chương trình migration
 
 Tên pattern do **Martin Fowler** đặt (bài viết *Strangler Application*, 2004), lấy từ loại **cây strangler fig** (một loại cây leo nhiệt đới): hạt cây đa nảy mầm trên cành cây chủ, rễ khí mọc dần bao quanh thân cây chủ, dần dần thay thế hoàn toàn cây chủ — trong khi **suốt quá trình đó, cây chủ vẫn sống**.
 
-```mermaid
-graph LR
-    subgraph "Phase 1 — Đặt facade"
-        C1[Client] --> GW1[Proxy / Facade]
-        GW1 -->|100% traffic| M1[Monolith<br/>toàn bộ tính năng]
-    end
-
-    subgraph "Phase 2 — Thay thế dần"
-        C2[Client] --> GW2[Proxy / Facade]
-        GW2 -->|/orders| S1[Order Service ✨]
-        GW2 -->|còn lại| M2[Monolith<br/>nhỏ dần]
-    end
-
-    subgraph "Phase 3 — Bóp nghẹt xong"
-        C3[Client] --> GW3[Proxy / Facade]
-        GW3 --> S2[Order Service]
-        GW3 --> S3[Product Service]
-        GW3 --> S4[User Service]
-    end
+```d2 title="2.1. Ý tưởng"
+direction: right
+n3: "Phase 3 — Bóp nghẹt xong" {}
+n2: "Phase 2 — Thay thế dần" {}
+n1: "Phase 1 — Đặt facade" {}
+n1.n4: "Client"
+n1.n5: "Proxy / Facade"
+n1.n6: "Monolith\ntoàn bộ tính năng"
+n2.n7: "Client"
+n2.n8: "Proxy / Facade"
+n2.n9: "Order Service ✨"
+n2.n10: "Monolith\nnhỏ dần"
+n3.n11: "Client"
+n3.n12: "Proxy / Facade"
+n3.n13: "Order Service"
+n3.n14: "Product Service"
+n3.n15: "User Service"
+n1.n4 -> n1.n5
+n1.n5 -> n1.n6: "100% traffic"
+n2.n7 -> n2.n8
+n2.n8 -> n2.n9: "/orders"
+n2.n8 -> n2.n10: "còn lại"
+n3.n11 -> n3.n12
+n3.n12 -> n3.n13
+n3.n12 -> n3.n14
+n3.n12 -> n3.n15
 ```
 
 Nguyên tắc sống còn: **hệ cũ và hệ mới cùng chạy production trong suốt quá trình chuyển đổi**, mỗi thay đổi đều nhỏ, đo lường được và rollback được.
 
 ### 2.2. Cách hoạt động từng bước
 
-```mermaid
-graph TB
-    A["1. Chọn module tách trước<br/>(change frequency cao, coupling thấp)"] --> B["2. Đặt proxy/API Gateway<br/>trước monolith"]
-    B --> C["3. Build microservice<br/>cho module đã chọn"]
-    C --> D["4. Migrate/sync dữ liệu"]
-    D --> E["5. Chuyển traffic dần<br/>(canary, dark launch)"]
-    E --> F["6. Xóa code cũ<br/>trong monolith"]
-    F --> G{"Còn module<br/>nào cần tách?"}
-    G -->|Có| A
-    G -->|Không| H["7. Tắt monolith 🎉"]
+```d2 title="2.2. Cách hoạt động từng bước"
+direction: down
+n1: "1. Chọn module tách trước\n(change frequency cao, coupling thấp)"
+n2: "2. Đặt proxy/API Gateway\ntrước monolith"
+n3: "3. Build microservice\ncho module đã chọn"
+n4: "4. Migrate/sync dữ liệu"
+n5: "5. Chuyển traffic dần\n(canary, dark launch)"
+n6: "6. Xóa code cũ\ntrong monolith"
+n7: "Còn module\nnào cần tách?" {
+  shape: diamond
+}
+n8: "7. Tắt monolith 🎉"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n1: "Có"
+n7 -> n8: "Không"
 ```
 
 Chi tiết từng bước:
@@ -601,22 +618,40 @@ Một hệ thống quản lý khách sạn có module Billing viết trên nền
 
 ### 5.3. Decision flow
 
-```mermaid
-graph TB
-    Q1{"Hệ thống còn nhỏ,<br/>rewrite rẻ hơn?"}
-    Q1 -->|Có| R1["Rewrite cục bộ hoặc giữ nguyên<br/>không cần decomposition pattern"]
-    Q1 -->|Không| Q2{"Phần cần thay thế có<br/>endpoint riêng ở HTTP edge?"}
-    Q2 -->|"Có"| Q3{"Code cũ còn sửa được<br/>an toàn?"}
-    Q2 -->|Không — gọi nội bộ sâu| Q4{"Code cũ còn sửa được<br/>an toàn?"}
-    Q3 -->|Có| R2["Strangler Fig<br/>route qua proxy"]
-    Q3 -->|Không| Q5{"Scope nhỏ và<br/>requirements rõ?"}
-    Q4 -->|Có| R3["Branch by Abstraction<br/>+ service mới sau interface"]
-    Q4 -->|Không| Q5
-    Q5 -->|Có| R4["Vine Pattern<br/>+ bắt buộc parallel run"]
-    Q5 -->|Không| R5["Refactor tạo seam trước<br/>(Branch by Abstraction cho ranh giới)<br/>rồi mới chọn lại chiến lược"]
-
-    R2 -.->|"module nằm sâu phía sau"| R3
-    R4 -.->|"cutover vẫn qua"| R2
+```d2 title="5.3. Decision flow"
+direction: down
+n1: "Hệ thống còn nhỏ,\nrewrite rẻ hơn?" {
+  shape: diamond
+}
+n2: "Rewrite cục bộ hoặc giữ nguyên\nkhông cần decomposition pattern"
+n3: "Phần cần thay thế có\nendpoint riêng ở HTTP edge?" {
+  shape: diamond
+}
+n4: "Code cũ còn sửa được\nan toàn?" {
+  shape: diamond
+}
+n5: "Code cũ còn sửa được\nan toàn?" {
+  shape: diamond
+}
+n6: "Strangler Fig\nroute qua proxy"
+n7: "Scope nhỏ và\nrequirements rõ?" {
+  shape: diamond
+}
+n8: "Branch by Abstraction\n+ service mới sau interface"
+n9: "Vine Pattern\n+ bắt buộc parallel run"
+n10: "Refactor tạo seam trước\n(Branch by Abstraction cho ranh giới)\nrồi mới chọn lại chiến lược"
+n1 -> n2: "Có"
+n1 -> n3: "Không"
+n3 -> n4: "Có"
+n3 -> n5: "Không — gọi nội bộ sâu"
+n4 -> n6: "Có"
+n4 -> n7: "Không"
+n5 -> n8: "Có"
+n5 -> n7: "Không"
+n7 -> n9: "Có"
+n7 -> n10: "Không"
+n6 -> n8: "module nằm sâu phía sau" { style.stroke-dash: 5 }
+n9 -> n6: "cutover vẫn qua" { style.stroke-dash: 5 }
 ```
 
 Ba lưu ý khi đọc flow:
@@ -683,21 +718,21 @@ Nguyên tắc bất di bất dịch: **ngăn service mới và monolith cùng gh
 
 Với Vine, parallel run **không phải tùy chọn** mà là cơ chế kiểm soát rủi ro cốt lõi:
 
-```mermaid
-sequenceDiagram
-    participant Src as Nguồn input thật
-    participant Old as Hệ cũ (frozen)
-    participant New as Service mới ✨
-    participant Cmp as Comparer / Diff report
-
-    Src->>Old: request thật
-    Old->>Cmp: kết quả A
-    Src->>New: mirror cùng request
-    New->>Cmp: kết quả B
-    Cmp->>Cmp: A so với B
-    Note over Cmp: Diff = 0 (trong ngưỡng)<br/>trong N ngày liên tiếp
-    Cmp-->>Team: đủ điều kiện cutover
-    Note over Team: Cutover qua proxy + canary<br/>hệ cũ standby đến khi decommission
+```d2 title="6.4. Vine kết hợp Parallel Run"
+shape: sequence_diagram
+"Src": "Nguồn input thật"
+"Old": "Hệ cũ (frozen)"
+"New": "Service mới ✨"
+"Cmp": "Comparer / Diff report"
+"Team": "Team"
+"Src" -> "Old": "request thật"
+"Old" -> "Cmp": "kết quả A"
+"Src" -> "New": "mirror cùng request"
+"New" -> "Cmp": "kết quả B"
+"Cmp" -> "Cmp": "A so với B"
+"Cmp".note1: "Diff = 0 (trong ngưỡng)\ntrong N ngày liên tiếp"
+"Cmp" -> "Team": "đủ điều kiện cutover" { style.stroke-dash: 5 }
+"Team".note2: "Cutover qua proxy + canary\nhệ cũ standby đến khi decommission"
 ```
 
 ### 6.5. Bảng tổng hợp các kết hợp

@@ -80,22 +80,28 @@ Nếu một thay đổi phục vụ Mobile làm thay đổi response của Web, 
 
 Mỗi BFF phục vụ một loại trải nghiệm client. Các BFF có thể dùng công nghệ khác nhau và vẫn gọi chung các domain service phía sau:
 
-```mermaid
-flowchart LR
-    W[Web App] --> WBFF[Web BFF]
-    M[Mobile App] --> MBFF[Mobile BFF]
-    I[IoT Device] --> IBFF[IoT BFF]
-
-    WBFF --> U[User Service]
-    WBFF --> O[Order Service]
-    WBFF --> P[Product Service]
-
-    MBFF --> U
-    MBFF --> O
-    MBFF --> P
-
-    IBFF --> U
-    IBFF --> P
+```d2 title="Mô hình BFF theo client"
+direction: right
+n1: "Web App"
+n2: "Web BFF"
+n3: "Mobile App"
+n4: "Mobile BFF"
+n5: "IoT Device"
+n6: "IoT BFF"
+n7: "User Service"
+n8: "Order Service"
+n9: "Product Service"
+n1 -> n2
+n3 -> n4
+n5 -> n6
+n2 -> n7
+n2 -> n8
+n2 -> n9
+n4 -> n7
+n4 -> n8
+n4 -> n9
+n6 -> n7
+n6 -> n9
 ```
 
 Web BFF có thể dùng GraphQL để Web tự chọn field. Mobile BFF có thể dùng REST với response compact. IoT BFF có thể dùng gRPC và Protobuf để giảm kích thước message. Đây là khác biệt ở lớp trình bày; các domain service vẫn sở hữu business rule và dữ liệu của domain mình.
@@ -222,7 +228,7 @@ Web BFF có thể trả nhiều vùng dữ liệu cho trang chủ như hero bann
 
 Ví dụ response của Web BFF:
 
-```json
+```json source="snippets/trang-chu-tren-web-va-mobile.json"
 {
   "hero": { "banners": ["banner-desktop-1", "banner-desktop-2"] },
   "categories": ["Điện thoại", "Laptop", "Phụ kiện"],
@@ -235,9 +241,11 @@ Ví dụ response của Web BFF:
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=backend-for-frontend&snapshot=article&file=snippets%2Ftrang-chu-tren-web-va-mobile.json)
+
 Response của Mobile BFF có thể giữ contract gọn hơn:
 
-```json
+```json source="snippets/trang-chu-tren-web-va-mobile-2.json"
 {
   "hero": { "banners": ["banner-mobile-1"] },
   "categories": ["Điện thoại", "Laptop", "Phụ kiện"],
@@ -248,6 +256,8 @@ Response của Mobile BFF có thể giữ contract gọn hơn:
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=backend-for-frontend&snapshot=article&file=snippets%2Ftrang-chu-tren-web-va-mobile-2.json)
+
 Cả hai BFF có thể gọi Product, Recommendation và Promotion Service. Sự khác nhau nằm ở số field, số item, cách định dạng và cách client sử dụng response. BFF không tự quyết định giá hay điều kiện khuyến mãi; nó lấy kết quả đã được domain service tính theo contract phù hợp.
 
 ### Chi tiết product trên ba client
@@ -256,7 +266,7 @@ Cùng product `456` có thể được expose qua ba contract:
 
 **Web BFF** dùng GraphQL để Web tự chọn field:
 
-```graphql
+```graphql source="snippets/chi-tiet-product-tren-ba-client.graphql"
 query ProductDetail {
   product(id: 456) {
     name
@@ -271,6 +281,8 @@ query ProductDetail {
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=backend-for-frontend&snapshot=article&file=snippets%2Fchi-tiet-product-tren-ba-client.graphql)
 
 **Mobile BFF** dùng REST với response compact và thumbnail:
 
@@ -344,18 +356,23 @@ Multiple Gateways không tự động trở thành BFF. Nếu một gateway ch�
 
 Trong thực tế, một public API Gateway có thể đứng trước các BFF:
 
-```mermaid
-flowchart LR
-    W[Web App] --> G[API Gateway<br/>Authentication • Rate Limiting • Routing]
-    M[Mobile App] --> G
-
-    G -->|/web/*| WBFF[Web BFF<br/>aggregation theo Web]
-    G -->|/mobile/*| MBFF[Mobile BFF<br/>response gọn cho Mobile]
-
-    WBFF --> U[User Service]
-    WBFF --> P[Product Service]
-    MBFF --> U
-    MBFF --> P
+```d2 title="Có thể kết hợp như thế nào"
+direction: right
+n1: "Web App"
+n2: "API Gateway\nAuthentication • Rate Limiting • Routing"
+n3: "Mobile App"
+n4: "Web BFF\naggregation theo Web"
+n5: "Mobile BFF\nresponse gọn cho Mobile"
+n6: "User Service"
+n7: "Product Service"
+n1 -> n2
+n3 -> n2
+n2 -> n4: "/web/*"
+n2 -> n5: "/mobile/*"
+n4 -> n6
+n4 -> n7
+n5 -> n6
+n5 -> n7
 ```
 
 Gateway chịu trách nhiệm policy edge dùng chung và route request đến đúng BFF. BFF chịu trách nhiệm dựng response của Web hoặc Mobile. Service-to-service call từ BFF đến domain service không nên vòng qua Gateway chỉ để dùng Gateway như một proxy chung.

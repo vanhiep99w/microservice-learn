@@ -88,61 +88,38 @@ Nếu client gọi trực tiếp từng service → phát sinh nhiều vấn đ�
 
 ### 2.2. API Gateway giải quyết gì?
 
+```d2 title="Client chỉ cần một API Gateway"
+direction: down
+mobile: Mobile App
+gateway: "API Gateway\nAuth • Rate limit • Route\nAggregate • Cache • Log/Trace"
+user: User Service
+order: Order Service
+product: Product Service
+mobile -> gateway: GET https://api.myapp.com/homepage
+gateway -> user
+gateway -> order
+gateway -> product
 ```
-✅ Có API Gateway:
-──────────────────
 
-  Mobile App
-      │
-      └── GET https://api.myapp.com/homepage
-                      │
-               ┌──────▼──────┐
-               │ API Gateway │
-               │             │
-               │ • Auth ✓    │
-               │ • Rate limit│
-               │ • Route     │
-               │ • Aggregate │
-               │ • Cache     │
-               │ • Log/Trace │
-               └──────┬──────┘
-                      │
-         ┌────────────┼────────────┐
-         ▼            ▼            ▼
-    ┌─────────┐ ┌─────────┐ ┌─────────┐
-    │  User   │ │  Order  │ │ Product │
-    │ Service │ │ Service │ │ Service │
-    └─────────┘ └─────────┘ └─────────┘
-
-  Client chỉ biết 1 URL: api.myapp.com
-  Gateway lo tất cả: auth, routing, aggregation, rate limit
-```
+Client chỉ biết `api.myapp.com`; Gateway lo auth, routing, aggregation và rate limiting.
 
 ### 2.3. Vị trí của API Gateway trong kiến trúc
 
+```d2 title="Gateway ở biên giới External và Internal"
+direction: right
+external: External { web: Web App; mobile: Mobile App; partner: Third Party }
+edge: "DMZ / Edge" { gateway: API Gateway }
+internal: Private Network { user: User Service; order: Order Service; product: Product Service; payment: Payment Service }
+external.web -> edge.gateway: HTTPS
+external.mobile -> edge.gateway: HTTPS
+external.partner -> edge.gateway: HTTPS
+edge.gateway -> internal.user
+edge.gateway -> internal.order
+edge.gateway -> internal.product
+edge.gateway -> internal.payment
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    KIẾN TRÚC TỔNG QUAN                          │
-│                                                                 │
-│        External                    Internal                     │
-│    ┌──────────────┐           ┌──────────────────────────┐      │
-│    │              │           │                          │      │
-│    │  Web App     │           │  ┌────────┐ ┌────────┐   │      │
-│    │  Mobile App  │──HTTPS───▶│  │ User   │ │ Order  │   │      │
-│    │  3rd Party   │           │  │ Service│ │ Service│   │      │
-│    │              │    ┌──────┤  └────────┘ └────────┘   │      │
-│    └──────────────┘    │      │  ┌────────┐ ┌────────┐   │      │
-│                        │  API │  │Product │ │Payment │   │      │
-│    DMZ / Edge          │  GW  │  │Service │ │Service │   │      │
-│                        │      │  └────────┘ └────────┘   │      │
-│                        └──────┤                          │      │
-│                               │  Private Network         │      │
-│                               └──────────────────────────┘      │
-│                                                                 │
-│  API Gateway nằm ở BIÊN GIỚI giữa external và internal          │
-│  Client KHÔNG BAO GIỜ truy cập trực tiếp vào internal services  │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Client không truy cập trực tiếp các internal services.
 
 ---
 
@@ -485,22 +462,33 @@ Transformation ví dụ:
 
 ### 3.8. Tổng hợp chức năng
 
-```mermaid
-graph TD
-    C[Client] --> GW[API Gateway]
-    
-    GW --> R[🔀 Routing]
-    GW --> A[🔐 Auth]
-    GW --> RL[⏱️ Rate Limiting]
-    GW --> LB[⚖️ Load Balancing]
-    GW --> CA[💾 Caching]
-    GW --> AG[📦 Aggregation]
-    GW --> TR[🔄 Transformation]
-    GW --> LOG[📊 Logging & Tracing]
-    
-    R --> S1[Service A]
-    R --> S2[Service B]
-    R --> S3[Service C]
+```d2 title="3.8. Tổng hợp chức năng"
+direction: down
+n1: "Client"
+n2: "API Gateway"
+n3: "🔀 Routing"
+n4: "🔐 Auth"
+n5: "⏱️ Rate Limiting"
+n6: "⚖️ Load Balancing"
+n7: "💾 Caching"
+n8: "📦 Aggregation"
+n9: "🔄 Transformation"
+n10: "📊 Logging & Tracing"
+n11: "Service A"
+n12: "Service B"
+n13: "Service C"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n2 -> n5
+n2 -> n6
+n2 -> n7
+n2 -> n8
+n2 -> n9
+n2 -> n10
+n3 -> n11
+n3 -> n12
+n3 -> n13
 ```
 
 | Chức năng | Mô tả | Ai hưởng lợi |
@@ -547,37 +535,30 @@ graph TD
 
 **Backend for Frontend** (BFF) — mỗi loại client có **gateway riêng**, tối ưu cho nhu cầu của client đó.
 
+```d2 title="Backend for Frontend — mỗi client một contract"
+direction: down
+web: Web App
+mobile: Mobile App
+partner: Third Party
+wbff: "Web BFF\nFull response • GraphQL • SSR"
+mbff: "Mobile BFF\nCompact response • REST • Optimized"
+public: "Public API\nRaw data • REST • Versioned"
+backend: Backend Services { user: User Service; order: Order Service; product: Product Service }
+web -> wbff
+mobile -> mbff
+partner -> public
+wbff -> backend.user
+wbff -> backend.order
+wbff -> backend.product
+mbff -> backend.user
+mbff -> backend.order
+mbff -> backend.product
+public -> backend.user
+public -> backend.order
+public -> backend.product
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    BFF PATTERN                                  │
-│                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐                       │
-│  │  Web App │  │Mobile App│  │ 3rd Party│                       │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘                       │
-│       │             │             │                             │
-│       ▼             ▼             ▼                             │
-│  ┌─────────┐   ┌──────────┐   ┌──────────┐                      │
-│  │ Web BFF │   │Mobile    │   │Public    │                      │
-│  │         │   │  BFF     │   │  API     │                      │
-│  │ Full    │   │ Compact  │   │ Raw      │                      │
-│  │ response│   │ response │   │ data     │                      │
-│  │ GraphQL │   │ REST     │   │ REST     │                      │
-│  │ SSR     │   │ Optimized│   │ Versioned│                      │
-│  └────┬────┘   └────┬─────┘   └────┬─────┘                      │
-│       │             │              │                            │
-│       └─────────────┼──────────────┘                            │
-│                     │                                           │
-│         ┌───────────┼────────────┐                              │
-│         ▼           ▼            ▼                              │
-│    ┌─────────┐ ┌─────────┐ ┌─────────┐                          │
-│    │  User   │ │  Order  │ │ Product │                          │
-│    │ Service │ │ Service │ │ Service │                          │
-│    └─────────┘ └─────────┘ └─────────┘                          │
-│                                                                 │
-│  Mỗi BFF do team frontend tương ứng phát triển                  │
-│  Web team own Web BFF, Mobile team own Mobile BFF               │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Web team sở hữu Web BFF; Mobile team sở hữu Mobile BFF.
 
 ### 4.3. Ví dụ thực tế — E-Commerce
 
@@ -1383,21 +1364,29 @@ Hai thứ này **KHÁC NHAU** và **bổ sung cho nhau** — không thay thế n
 
 ### 8.3. Chức năng của Edge Service
 
-```mermaid
-graph TD
-    U[User Request] --> E[Edge Service]
-    
-    E --> C["💾 Edge Caching<br/>Static + API response"]
-    E --> W["🛡️ WAF<br/>Web Application Firewall"]
-    E --> G["🌍 Geo-routing<br/>Route theo vị trí user"]
-    E --> AB["🔬 A/B Testing<br/>Split traffic"]
-    E --> BOT["🤖 Bot Detection<br/>Block bad bots"]
-    E --> T["🔄 Transform<br/>Header injection, rewrite"]
-    E --> AUTH["🔐 Edge Auth<br/>JWT validate tại edge"]
-    
-    C -->|cache miss| GW[API Gateway]
-    W -->|clean traffic| GW
-    G -->|routed| GW
+```d2 title="8.3. Chức năng của Edge Service"
+direction: down
+n1: "User Request"
+n2: "Edge Service"
+n3: "💾 Edge Caching\nStatic + API response"
+n4: "🛡️ WAF\nWeb Application Firewall"
+n5: "🌍 Geo-routing\nRoute theo vị trí user"
+n6: "🔬 A/B Testing\nSplit traffic"
+n7: "🤖 Bot Detection\nBlock bad bots"
+n8: "🔄 Transform\nHeader injection, rewrite"
+n9: "🔐 Edge Auth\nJWT validate tại edge"
+n10: "API Gateway"
+n1 -> n2
+n2 -> n3
+n2 -> n4
+n2 -> n5
+n2 -> n6
+n2 -> n7
+n2 -> n8
+n2 -> n9
+n3 -> n10: "cache miss"
+n4 -> n10: "clean traffic"
+n5 -> n10: "routed"
 ```
 
 **Chi tiết từng chức năng:**

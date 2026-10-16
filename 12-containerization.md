@@ -475,48 +475,22 @@ CHỌN NHANH:
 
 ### 3.1. Docker Architecture
 
+```d2 title="Docker Architecture — CLI tới Container Process"
+direction: right
+cli: "Docker CLI\nrun • build • pull • ps"
+host: Docker Host {
+ daemon: "Docker Daemon (dockerd)\nBuild images • Run containers\nManage networks & volumes"
+ containerd: containerd — container lifecycle
+ runc: runc — OCI runtime
+ process: Container Process
+ daemon -> containerd -> runc -> process
+}
+registry: "Container Registry\nDocker Hub / ECR / GCR / ACR"
+cli -> host.daemon: API
+host.daemon -> registry: Pull nếu image chưa có local
 ```
-DOCKER ARCHITECTURE:
-────────────────────
 
-  ┌─────────────┐        ┌──────────────────────────────────────────┐
-  │  Docker CLI │        │  Docker Host                             │
-  │             │        │                                          │
-  │ docker run  │──API──▶│  ┌──────────────┐                        │
-  │ docker build│        │  │ Docker Daemon│  (dockerd)             │
-  │ docker pull │        │  │              │                        │
-  │ docker ps   │        │  │  • Build images                       │
-  │             │        │  │  • Run containers                     │
-  │             │        │  │  • Manage networks                    │
-  │             │        │  │  • Manage volumes                     │
-  │             │        │  └──────┬───────┘                        │
-  │             │        │         │                                │
-  │             │        │  ┌──────▼───────┐                        │
-  │             │        │  │  containerd  │                        │
-  │             │        │  │  (container  │                        │
-  │             │        │  │   lifecycle) │                        │
-  │             │        │  └──────┬───────┘                        │
-  │             │        │         │                                │
-  │             │        │  ┌──────▼───────┐  ┌──────────┐          │
-  │             │        │  │    runc      │  │ Container│          │
-  │             │        │  │ (OCI runtime)│─▶│ Process  │          │
-  │             │        │  └──────────────┘  └──────────┘          │
-  │             │        │                                          │
-  └─────────────┘        └──────────────────────────────────────────┘
-                                    │
-                         ┌──────────▼───────────┐
-                         │  Container Registry  │
-                         │  (Docker Hub, ECR,   │
-                         │   GCR, ACR)          │
-                         └──────────────────────┘
-
-  Flow: docker run nginx
-  1. CLI gửi request → Docker Daemon
-  2. Daemon check image local → không có → pull từ Registry
-  3. Daemon gọi containerd → tạo container
-  4. containerd gọi runc → tạo process với namespaces + cgroups
-  5. Container chạy!
-```
+`docker run nginx`: CLI gửi request; daemon kiểm tra image/pull nếu thiếu; containerd quản lý lifecycle; runc tạo process với namespaces và cgroups.
 
 ### 3.2. Docker Image
 
@@ -558,7 +532,7 @@ DOCKER IMAGE STRUCTURE:
 
 Dockerfile là file chỉ dẫn **cách build Docker image**.
 
-```dockerfile
+```dockerfile source="snippets/3-3-dockerfile.dockerfile"
 # ===== Dockerfile cho Java Spring Boot Service =====
 
 # 1. Base image — chọn image nhỏ nhất phù hợp
@@ -591,7 +565,9 @@ HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-```dockerfile
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-3-dockerfile.dockerfile)
+
+```dockerfile source="snippets/3-3-dockerfile-2.dockerfile"
 # ===== Dockerfile cho Node.js Service =====
 
 FROM node:20-alpine
@@ -617,7 +593,9 @@ HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
 CMD ["node", "src/index.js"]
 ```
 
-```dockerfile
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-3-dockerfile-2.dockerfile)
+
+```dockerfile source="snippets/3-3-dockerfile-3.dockerfile"
 # ===== Dockerfile cho Go Service =====
 
 FROM golang:1.22-alpine AS builder
@@ -637,6 +615,8 @@ EXPOSE 8084
 
 ENTRYPOINT ["/payment-service"]
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-3-dockerfile-3.dockerfile)
 
 ### 3.4. Image Layers & Caching
 
@@ -674,7 +654,7 @@ DOCKER BUILD CACHE:
 
 Multi-stage Build (xây dựng nhiều giai đoạn) dùng **nhiều FROM** trong 1 Dockerfile — tách phần build và phần chạy → image nhỏ hơn, an toàn hơn.
 
-```dockerfile
+```dockerfile source="snippets/3-5-multi-stage-build.dockerfile"
 # ===== Multi-stage Build — Java Spring Boot =====
 
 # ---- Stage 1: BUILD ----
@@ -705,6 +685,8 @@ EXPOSE 8081
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-5-multi-stage-build.dockerfile)
 
 ```
 TẠI SAO MULTI-STAGE?
@@ -737,7 +719,7 @@ TẠI SAO MULTI-STAGE?
   → Pull/deploy nhanh hơn
 ```
 
-```dockerfile
+```dockerfile source="snippets/3-5-multi-stage-build-2.dockerfile"
 # ===== Multi-stage Build — Node.js =====
 
 # ---- Stage 1: Install dependencies ----
@@ -775,7 +757,9 @@ EXPOSE 3000
 CMD ["node", "dist/index.js"]
 ```
 
-```dockerfile
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-5-multi-stage-build-2.dockerfile)
+
+```dockerfile source="snippets/3-5-multi-stage-build-3.dockerfile"
 # ===== Multi-stage Build — Go (extreme small) =====
 
 # ---- Stage 1: BUILD ----
@@ -804,6 +788,8 @@ ENTRYPOINT ["/server"]
 
 # Final image: ~10-15 MB (chỉ có 1 binary Go) 🚀
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-5-multi-stage-build-3.dockerfile)
 
 ### 3.6. Docker Networking
 
@@ -947,7 +933,7 @@ CÓ COMPOSE:
 
 ### 4.2. Cấu trúc docker-compose.yml
 
-```yaml
+```yaml source="snippets/4-2-cau-truc-docker-compose-yml.yaml"
 # docker-compose.yml — Cấu trúc cơ bản
 
 services:
@@ -1013,6 +999,8 @@ networks:
     driver: bridge
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F4-2-cau-truc-docker-compose-yml.yaml)
+
 ### 4.3. Networking trong Compose
 
 ```
@@ -1059,7 +1047,7 @@ COMPOSE NETWORKING:
 
 ### 4.4. Ví dụ — E-Commerce stack
 
-```yaml
+```yaml source="snippets/4-4-vi-du-e-commerce-stack.yaml"
 # docker-compose.yml — E-Commerce Development Stack
 
 services:
@@ -1197,6 +1185,8 @@ networks:
   backend:
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F4-4-vi-du-e-commerce-stack.yaml)
+
 ```
 COMPOSE COMMANDS:
 ─────────────────
@@ -1231,29 +1221,18 @@ COMPOSE COMMANDS:
 
 Container Registry là nơi **lưu trữ và phân phối Docker images** — giống như npm registry cho Node.js packages, Maven Central cho Java artifacts.
 
+```d2 title="Registry Workflow — Build, Push và Pull"
+direction: down
+dev: Developer — docker build
+ci: CI/CD — docker push
+prod: Production — docker pull
+registry: "Container Registry\nuser-service:1.0.0 • 1.1.0 • latest\norder-service:2.0.0 • 2.0.0-rc1" {shape: cylinder}
+dev -> registry: Image
+ci -> registry: Push
+registry -> prod: Pull
 ```
-REGISTRY WORKFLOW:
-──────────────────
 
-  Developer                 CI/CD                    Production
-  ┌──────────┐         ┌──────────┐              ┌──────────┐
-  │ docker   │         │ docker   │              │ docker   │
-  │ build    │         │ push     │              │ pull     │
-  │          │         │          │              │          │
-  └────┬─────┘         └────┬─────┘              └────┬─────┘
-       │                    │                         │
-       │    ┌───────────────▼─────────────────────────▼────┐
-       │    │         Container Registry                   │
-       │    │                                              │
-       └───▶│  user-service:1.0.0                          │
-            │  user-service:1.1.0                          │
-            │  user-service:latest                         │
-            │  order-service:2.0.0                         │
-            │  order-service:2.0.0-rc1                     │
-            │                                              │
-            │  Lưu trữ images theo repository + tag        │
-            └──────────────────────────────────────────────┘
-```
+Registry lưu images theo repository và tag. Production nên pin version/digest thay vì dựa vào tag `latest` thay đổi được.
 
 ### 5.2. So sánh các Registry phổ biến
 
@@ -1756,14 +1735,21 @@ CONTAINERIZATION — TỔNG KẾT:
   └──────────────────────────────────────────────────────┘
 ```
 
-```mermaid
-graph LR
-    DEV[👨‍💻 Developer] -->|docker compose up| LOCAL[Local Dev]
-    DEV -->|git push| CI[CI/CD Pipeline]
-    CI -->|docker build| IMG[Docker Image]
-    IMG -->|docker push| REG[Container Registry]
-    REG -->|docker pull| K8S[Kubernetes]
-    K8S -->|run| PROD[Production Pods]
+```d2 title="10. Tổng kết"
+direction: right
+n1: "👨‍💻 Developer"
+n2: "Local Dev"
+n3: "CI/CD Pipeline"
+n4: "Docker Image"
+n5: "Container Registry"
+n6: "Kubernetes"
+n7: "Production Pods"
+n1 -> n2: "docker compose up"
+n1 -> n3: "git push"
+n3 -> n4: "docker build"
+n4 -> n5: "docker push"
+n5 -> n6: "docker pull"
+n6 -> n7: "run"
 ```
 
 ---

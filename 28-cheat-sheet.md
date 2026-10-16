@@ -48,16 +48,14 @@ Trước khi tách service, đi qua từng bước:
 - [ ] **⑥ Đảm bảo independent deployment** — Deploy service này không ảnh hưởng service kia?
 - [ ] **⑦ Kiểm tra team ownership** — Có 1 team chịu trách nhiệm toàn bộ service?
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    DECOMPOSITION FLOW                           │
-│                                                                 │
-│  Monolith ──▶ Identify ──▶ Define ──▶ Extract ──▶ Validate     │
-│              Domains     Boundaries   Services    Independence  │
-│                │              │           │            │         │
-│           Event Storming  Bounded     API +DB      Deploy &     │
-│           Domain Mapping  Context     per svc     Test riêng    │
-└─────────────────────────────────────────────────────────────────┘
+```d2 title="Decomposition Flow"
+direction: right
+monolith: Monolith
+identify: "Identify Domains\nEvent Storming / Domain Mapping"
+define: "Define Boundaries\nBounded Context"
+extract: "Extract Services\nAPI + DB per Service"
+validate: "Validate Independence\nDeploy & Test riêng"
+monolith -> identify -> define -> extract -> validate
 ```
 
 📖 Chi tiết: [02-single-responsibility-bounded-context.md](02-single-responsibility-bounded-context.md) | [05-decomposition-strategies.md](05-decomposition-strategies.md)
@@ -82,17 +80,34 @@ Trước khi tách service, đi qua từng bước:
 
 ### Flowchart chọn Communication Pattern
 
-```mermaid
-flowchart TD
-    A[Cần giao tiếp giữa services] --> B{Cần response ngay?}
-    B -->|Có| C{Ai là consumer?}
-    B -->|Không| D[🔔 Event-Driven<br/>SQS/SNS/Kafka]
-    C -->|External / Public| E{Frontend cần<br/>flexible query?}
-    C -->|Internal service| F{Cần hiệu năng<br/>cao / streaming?}
-    E -->|Có| G[📊 GraphQL]
-    E -->|Không| H[🌐 REST API]
-    F -->|Có| I[⚡ gRPC]
-    F -->|Không| H
+```d2 title="Flowchart chọn Communication Pattern"
+direction: down
+n1: "Cần giao tiếp giữa services"
+n2: "Cần response ngay?" {
+  shape: diamond
+}
+n3: "Ai là consumer?" {
+  shape: diamond
+}
+n4: "🔔 Event-Driven\nSQS/SNS/Kafka"
+n5: "Frontend cần\nflexible query?" {
+  shape: diamond
+}
+n6: "Cần hiệu năng\ncao / streaming?" {
+  shape: diamond
+}
+n7: "📊 GraphQL"
+n8: "🌐 REST API"
+n9: "⚡ gRPC"
+n1 -> n2
+n2 -> n3: "Có"
+n2 -> n4: "Không"
+n3 -> n5: "External / Public"
+n3 -> n6: "Internal service"
+n5 -> n7: "Có"
+n5 -> n8: "Không"
+n6 -> n9: "Có"
+n6 -> n8: "Không"
 ```
 
 📖 Chi tiết: [06-inter-service-communication.md](06-inter-service-communication.md) | [07-api-gateway.md](07-api-gateway.md)
@@ -111,15 +126,20 @@ flowchart TD
 
 ### Ví dụ thực tế — E-Commerce Order Flow
 
+```d2 title="Saga Choreography — chuỗi Order Events"
+direction: right
+place: Đặt hàng
+order: Order Service
+payment: Payment Service
+inventory: Inventory Service
+shipping: Shipping Service
+place -> order
+order -> payment: Event
+payment -> inventory: Event
+inventory -> shipping: Event
 ```
-Đặt hàng → Order Service ──(event)──▶ Payment Service
-                                          │
-                                     ──(event)──▶ Inventory Service
-                                                       │
-                                                  ──(event)──▶ Shipping Service
 
-Pattern: Saga Choreography — mỗi service lắng nghe event và tiếp tục flow
-```
+Mỗi service lắng nghe event và tiếp tục flow; không có orchestrator trung tâm.
 
 📖 Chi tiết: [09-data-management.md](09-data-management.md) | [20-aws-data-management.md](20-aws-data-management.md)
 
@@ -138,15 +158,23 @@ Pattern: Saga Choreography — mỗi service lắng nghe event và tiếp tục 
 
 ### Áp dụng kết hợp
 
-```mermaid
-flowchart LR
-    Client -->|Request| RL[🚦 Rate Limiter]
-    RL --> TO[⏱️ Timeout]
-    TO --> CB[🔌 Circuit Breaker]
-    CB --> RT[🔄 Retry]
-    RT --> BH[🧱 Bulkhead]
-    BH --> SVC[Service B]
-    CB -->|Open| FB[🔀 Fallback]
+```d2 title="Áp dụng kết hợp"
+direction: right
+n1: "Client"
+n2: "🚦 Rate Limiter"
+n3: "⏱️ Timeout"
+n4: "🔌 Circuit Breaker"
+n5: "🔄 Retry"
+n6: "🧱 Bulkhead"
+n7: "Service B"
+n8: "🔀 Fallback"
+n1 -> n2: "Request"
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n4 -> n8: "Open"
 ```
 
 > 💡 **Thứ tự áp dụng**: Rate Limiter → Timeout → Circuit Breaker → Retry → Bulkhead

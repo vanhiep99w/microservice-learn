@@ -96,25 +96,24 @@ Một triển khai Correlation ID có năm quy tắc liên kết với nhau:
 4. **Forward qua từng transport**: HTTP dùng header; message dùng headers, properties hoặc attributes của broker.
 5. **Trả lại cho client**: response echo ID để hỗ trợ tra cứu khi cần.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant G as API Gateway
-    participant O as Order Service
-    participant P as Payment Service
-    participant B as Message Broker
-    participant N as Notification Service
-
-    C->>G: POST /orders
-    Note over G: Validate hoặc generate correlation_id
-    G->>O: HTTP + X-Correlation-ID
-    O->>P: HTTP + cùng correlation_id
-    P-->>O: Kết quả thanh toán
-    O->>B: OrderCreated + message header
-    Note over B: Message có thể chờ trong queue
-    B->>N: Consume + cùng correlation_id
-    O-->>G: 201 + X-Correlation-ID
-    G-->>C: 201 + X-Correlation-ID
+```d2 title="Giải pháp và quy tắc thiết kế"
+shape: sequence_diagram
+"C": "Client"
+"G": "API Gateway"
+"O": "Order Service"
+"P": "Payment Service"
+"B": "Message Broker"
+"N": "Notification Service"
+"C" -> "G": "POST /orders"
+"G".note1: "Validate hoặc generate correlation_id"
+"G" -> "O": "HTTP + X-Correlation-ID"
+"O" -> "P": "HTTP + cùng correlation_id"
+"P" -> "O": "Kết quả thanh toán" { style.stroke-dash: 5 }
+"O" -> "B": "OrderCreated + message header"
+"B".note2: "Message có thể chờ trong queue"
+"B" -> "N": "Consume + cùng correlation_id"
+"O" -> "G": "201 + X-Correlation-ID" { style.stroke-dash: 5 }
+"G" -> "C": "201 + X-Correlation-ID" { style.stroke-dash: 5 }
 ```
 
 ID được giữ nguyên trong các hop của cùng luồng. Việc giữ ID không có nghĩa là mọi operation có cùng thời lượng hoặc cùng một span; đó là trách nhiệm của tracing.
@@ -159,21 +158,25 @@ Downstream service không nên sinh ID mới khi đã nhận được ID hợp l
 
 Với HTTP, Correlation ID nằm trong request header. Service nhận request đọc header trước khi thực hiện business logic, bind ID vào logging context, rồi forward nguyên giá trị khi gọi service kế tiếp.
 
-```http
+```http source="snippets/propagation-qua-http.http"
 POST /orders HTTP/1.1
 Host: api.example.test
 X-Correlation-ID: req-789
 Content-Type: application/json
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=correlation-id&snapshot=article&file=snippets%2Fpropagation-qua-http.http)
+
 Một outgoing call trong cùng flow giữ cùng ID:
 
-```http
+```http source="snippets/propagation-qua-http-2.http"
 POST /payments/charge HTTP/1.1
 Host: payment-service
 X-Correlation-ID: req-789
 Content-Type: application/json
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=correlation-id&snapshot=article&file=snippets%2Fpropagation-qua-http-2.http)
 
 Response nên echo ID để client hoặc hệ thống hỗ trợ lưu lại:
 
@@ -191,12 +194,14 @@ HTTP header không đi cùng message broker một cách tự nhiên. Producer ph
 
 Ví dụ metadata của một Kafka message có thể là:
 
-```json
+```json source="snippets/propagation-qua-message.json"
 {
   "X-Correlation-ID": "req-789",
   "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=correlation-id&snapshot=article&file=snippets%2Fpropagation-qua-message.json)
 
 `X-Correlation-ID` là phần của pattern này. `traceparent` là trace context tùy chọn, được thêm khi hệ thống có Distributed Tracing. Hai metadata có thể cùng đi trong message nhưng không thay thế vai trò của nhau.
 
@@ -210,7 +215,7 @@ Nếu message không có ID hợp lệ, consumer không thể khẳng định n�
 
 Một structured log entry có thể gồm cả Correlation ID và Trace ID:
 
-```json
+```json source="snippets/logging-context.json"
 {
   "timestamp": "2025-03-15T10:30:47.635Z",
   "level": "ERROR",
@@ -221,6 +226,8 @@ Một structured log entry có thể gồm cả Correlation ID và Trace ID:
   "order_id": "ORD-456"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=correlation-id&snapshot=article&file=snippets%2Flogging-context.json)
 
 Context phải được gắn trước log đầu tiên của request và được dọn khi request hoặc message handler kết thúc. Cách cài đặt phụ thuộc runtime, chẳng hạn request scope, thread-local hoặc async context. Không nên dùng một biến global dùng chung cho mọi request, vì các request đồng thời có thể ghi đè context của nhau.
 
@@ -301,7 +308,7 @@ Hai ID có thể cùng xuất hiện trong một log entry nhưng phục vụ ha
 
 Khuyến nghị thực tế là ghi cả hai field khi hệ thống có tracing:
 
-```json
+```json source="snippets/correlation-id-va-trace-id.json"
 {
   "correlation_id": "req-789",
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
@@ -310,6 +317,8 @@ Khuyến nghị thực tế là ghi cả hai field khi hệ thống có tracing:
   "message": "GatewayTimeout calling Bank API"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=correlation-id&snapshot=article&file=snippets%2Fcorrelation-id-va-trace-id.json)
 
 Engineer có thể bắt đầu từ mã trong ticket để tìm log theo `correlation_id`, sau đó dùng `trace_id` trong log để mở waterfall. Một số tổ chức dùng `trace_id` làm correlation key khi tracing đã đầy đủ. Cách này hợp lệ nếu được áp dụng nhất quán, được ghi vào log ở mọi hop cần thiết và có cơ chế trả mã về client.
 

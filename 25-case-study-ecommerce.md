@@ -218,33 +218,30 @@ Công ty **ShopVN** đang vận hành một **Monolith E-Commerce** được xâ
 | **Notification** | ⚪ Generic | Email, SMS, push — không tạo khác biệt cạnh tranh | SES, Firebase FCM, eSMS |
 | **User & Auth** | ⚪ Generic | Đăng nhập, OAuth, quản lý profile — bài toán đã có lời giải | Cognito / Keycloak + custom profile |
 
-```mermaid
-graph TB
-    subgraph "🔴 Core Domain"
-        ORD[Order Management]
-        PAY[Payment]
-        INV[Inventory]
-    end
-    subgraph "🟡 Supporting Domain"
-        CAT[Product Catalog]
-        SEA[Search & Discovery]
-        PRM[Promotion]
-        REV[Review & Rating]
-        REC[Recommendation]
-        CRT[Shopping Cart]
-        SHP[Shipping/Fulfillment]
-    end
-    subgraph "⚪ Generic Domain"
-        NTF[Notification]
-        USR[User & Auth]
-    end
-    ORD --> PAY
-    ORD --> INV
-    CAT --> SEA
-    CRT --> ORD
-    ORD --> SHP
-    ORD --> NTF
-    REC --> CAT
+```d2 title="1.1. Xác định Domain và Subdomain"
+direction: down
+n3: "⚪ Generic Domain" {}
+n2: "🟡 Supporting Domain" {}
+n1: "🔴 Core Domain" {}
+n1.n4: "Order Management"
+n1.n5: "Payment"
+n1.n6: "Inventory"
+n2.n7: "Product Catalog"
+n2.n8: "Search & Discovery"
+n2.n9: "Promotion"
+n2.n10: "Review & Rating"
+n2.n11: "Recommendation"
+n2.n12: "Shopping Cart"
+n2.n13: "Shipping/Fulfillment"
+n3.n14: "Notification"
+n3.n15: "User & Auth"
+n1.n4 -> n1.n5
+n1.n4 -> n1.n6
+n2.n7 -> n2.n8
+n2.n12 -> n1.n4
+n1.n4 -> n2.n13
+n1.n4 -> n3.n14
+n2.n11 -> n2.n7
 ```
 
 ### 1.2. Xác định Bounded Context
@@ -294,35 +291,36 @@ Mỗi **Bounded Context (BC)** đại diện cho một ranh giới ngữ nghĩa 
 
 ### 1.4. Context Mapping
 
-```mermaid
-graph TB
-    IAM[Identity & Access]
-    CAT[Catalog]
-    DIS[Discovery]
-    CRT[Cart]
-    ORD[Order]
-    PAY[Payment]
-    INV[Inventory]
-    PRM[Promotion]
-    FUL[Fulfillment]
-    ENG[Engagement]
-    TRU[Trust & UGC]
-    PER[Personalization]
-
-    CAT -->|"Published Language<br/>ProductUpdated event"| DIS
-    DIS -.->|"Conformist<br/>Consume Catalog data"| CAT
-    CRT -->|"Customer-Supplier"| ORD
-    ORD -->|"Customer-Supplier"| PAY
-    ORD -->|"Customer-Supplier<br/>Reserve stock"| INV
-    ORD -->|"Customer-Supplier"| PRM
-    ORD -->|"Customer-Supplier"| FUL
-    PAY -.->|"ACL<br/>Wrap MoMo/ZaloPay"| EXT_PAY[External Payment]
-    FUL -.->|"ACL<br/>Wrap GHN/GHTK"| EXT_SHIP[External Shipping]
-    ORD -->|"Published Language<br/>OrderPlaced event"| ENG
-    ORD -->|"Published Language"| PER
-    TRU -->|"Published Language<br/>ReviewApproved"| CAT
-    IAM -->|"Open Host Service<br/>JWT validation"| ORD
-    IAM -->|"Open Host Service"| CRT
+```d2 title="1.4. Context Mapping"
+direction: down
+n1: "Identity & Access"
+n2: "Catalog"
+n3: "Discovery"
+n4: "Cart"
+n5: "Order"
+n6: "Payment"
+n7: "Inventory"
+n8: "Promotion"
+n9: "Fulfillment"
+n10: "Engagement"
+n11: "Trust & UGC"
+n12: "Personalization"
+n13: "External Payment"
+n14: "External Shipping"
+n2 -> n3: "Published Language\nProductUpdated event"
+n3 -> n2: "Conformist\nConsume Catalog data" { style.stroke-dash: 5 }
+n4 -> n5: "Customer-Supplier"
+n5 -> n6: "Customer-Supplier"
+n5 -> n7: "Customer-Supplier\nReserve stock"
+n5 -> n8: "Customer-Supplier"
+n5 -> n9: "Customer-Supplier"
+n6 -> n13: "ACL\nWrap MoMo/ZaloPay" { style.stroke-dash: 5 }
+n9 -> n14: "ACL\nWrap GHN/GHTK" { style.stroke-dash: 5 }
+n5 -> n10: "Published Language\nOrderPlaced event"
+n5 -> n12: "Published Language"
+n11 -> n2: "Published Language\nReviewApproved"
+n1 -> n5: "Open Host Service\nJWT validation"
+n1 -> n4: "Open Host Service"
 ```
 
 **Chi tiết Context Mapping Patterns:**
@@ -446,31 +444,46 @@ graph TB
 
 ### 2.3. Service Dependency Graph
 
-```mermaid
-graph TD
-    GW[API Gateway]
-    GW --> AUTH[Auth Service]
-    GW --> USR[User Service]
-    GW --> CAT[Catalog Service]
-    GW --> SEA[Search Service]
-    GW --> CRT[Cart Service]
-    GW --> ORD[Order Service]
-
-    ORD --> INV[Inventory Service]
-    ORD --> PAY[Payment Service]
-    ORD --> PRM[Promotion Service]
-    ORD --> SHP[Shipping Service]
-
-    PAY --> EXT_PAY[MoMo/ZaloPay/VNPay]
-    SHP --> EXT_SHP[GHN/GHTK]
-
-    CAT -->|CDC events| SEA
-    CAT -->|events| REC[Recommendation]
-    ORD -->|events| NTF[Notification Service]
-    ORD -->|events| REV[Review Service]
-
-    style EXT_PAY fill:#f9f1,stroke:#333
-    style EXT_SHP fill:#f9f1,stroke:#333
+```d2 title="2.3. Service Dependency Graph"
+direction: down
+n1: "API Gateway"
+n2: "Auth Service"
+n3: "User Service"
+n4: "Catalog Service"
+n5: "Search Service"
+n6: "Cart Service"
+n7: "Order Service"
+n8: "Inventory Service"
+n9: "Payment Service"
+n10: "Promotion Service"
+n11: "Shipping Service"
+n12: "MoMo/ZaloPay/VNPay" {
+  style.fill: "#f9f"
+  style.stroke: "#333"
+}
+n13: "GHN/GHTK" {
+  style.fill: "#f9f"
+  style.stroke: "#333"
+}
+n14: "Recommendation"
+n15: "Notification Service"
+n16: "Review Service"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n1 -> n6
+n1 -> n7
+n7 -> n8
+n7 -> n9
+n7 -> n10
+n7 -> n11
+n9 -> n12
+n11 -> n13
+n4 -> n5: "CDC events"
+n4 -> n14: "events"
+n7 -> n15: "events"
+n7 -> n16: "events"
 ```
 
 **Quy tắc dependency:**
@@ -527,7 +540,7 @@ gantt
 
 **`POST /orders` (Order Service):**
 
-```json
+```json source="snippets/2-5-service-api-contracts-quan-trong.json"
 {
   "userId": "USR-9821",
   "items": [
@@ -539,6 +552,8 @@ gantt
   "paymentMethod": "vnpay"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=25-case-study-ecommerce&snapshot=article&file=snippets%2F2-5-service-api-contracts-quan-trong.json)
 
 **Response:**
 
@@ -1126,22 +1141,32 @@ sequenceDiagram
 
 **CQRS Flow cho Catalog/Search:**
 
-```mermaid
-flowchart LR
-    subgraph "Command Side (Write)"
-        M[Merchant Portal] --> CW[Catalog Write API]
-        CW --> PG[(PostgreSQL)]
-        PG --> DEB[Debezium CDC]
-    end
-    subgraph "Event Bus"
-        DEB --> K[Kafka]
-    end
-    subgraph "Query Side (Read)"
-        K --> SC[Search Consumer]
-        SC --> OS[(OpenSearch Index)]
-        U[User App] --> SRA[Search API]
-        SRA --> OS
-    end
+```d2 title="4.3. CQRS — Áp dụng ở đâu?"
+direction: right
+n3: "Query Side (Read)" {}
+n2: "Event Bus" {}
+n1: "Command Side (Write)" {}
+n1.n4: "Merchant Portal"
+n1.n5: "Catalog Write API"
+n1.n6: "PostgreSQL" {
+  shape: cylinder
+}
+n1.n7: "Debezium CDC"
+n2.n8: "Kafka"
+n3.n9: "Search Consumer"
+n3.n10: "OpenSearch Index" {
+  shape: cylinder
+}
+n3.n11: "User App"
+n3.n12: "Search API"
+n1.n4 -> n1.n5
+n1.n5 -> n1.n6
+n1.n6 -> n1.n7
+n1.n7 -> n2.n8
+n2.n8 -> n3.n9
+n3.n9 -> n3.n10
+n3.n11 -> n3.n12
+n3.n12 -> n3.n10
 ```
 
 ### 4.4. Event Sourcing — Decision
@@ -1160,13 +1185,19 @@ flowchart LR
 
 Giải quyết **Dual Write** problem (ghi DB + publish event phải atomic):
 
-```mermaid
-flowchart LR
-    A["Service<br/>DB Transaction"] --> B["Business Tables"]
-    A --> C["Outbox Table"]
-    D["Outbox Relay<br/>(Polling/CDC)"] --> C
-    D --> E["Kafka"]
-    E --> F["Consumers"]
+```d2 title="4.5. Transactional Outbox Pattern"
+direction: right
+n1: "Service\nDB Transaction"
+n2: "Business Tables"
+n3: "Outbox Table"
+n4: "Outbox Relay\n(Polling/CDC)"
+n5: "Kafka"
+n6: "Consumers"
+n1 -> n2
+n1 -> n3
+n4 -> n3
+n4 -> n5
+n5 -> n6
 ```
 
 **Service nào cần Outbox?**
@@ -1183,7 +1214,7 @@ flowchart LR
 
 **Outbox table schema:**
 
-```sql
+```sql source="snippets/4-5-transactional-outbox-pattern.sql"
 CREATE TABLE outbox_events (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     aggregate_type VARCHAR(100) NOT NULL,  -- 'Order', 'Payment'
@@ -1194,6 +1225,8 @@ CREATE TABLE outbox_events (
     published_at   TIMESTAMP NULL          -- NULL = chưa publish
 );
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=25-case-study-ecommerce&snapshot=article&file=snippets%2F4-5-transactional-outbox-pattern.sql)
 
 ### 4.6. Data Consistency Rules
 
@@ -1211,7 +1244,7 @@ CREATE TABLE outbox_events (
 
 **Order tables:**
 
-```sql
+```sql source="snippets/4-7-schema-chi-tiet-cho-order-inventory-thuc-chien.sql"
 CREATE TABLE orders (
   order_id            VARCHAR(40) PRIMARY KEY,
   user_id             VARCHAR(40) NOT NULL,
@@ -1237,9 +1270,11 @@ CREATE TABLE order_items (
 );
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=25-case-study-ecommerce&snapshot=article&file=snippets%2F4-7-schema-chi-tiet-cho-order-inventory-thuc-chien.sql)
+
 **Inventory tables:**
 
-```sql
+```sql source="snippets/4-7-schema-chi-tiet-cho-order-inventory-thuc-chien-2.sql"
 CREATE TABLE stocks (
   sku_id              VARCHAR(40) PRIMARY KEY,
   available_qty       INT NOT NULL,
@@ -1259,6 +1294,8 @@ CREATE TABLE stock_reservations (
 );
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=25-case-study-ecommerce&snapshot=article&file=snippets%2F4-7-schema-chi-tiet-cho-order-inventory-thuc-chien-2.sql)
+
 ### 4.8. Concurrency Control & Reconciliation Jobs
 
 | Bài toán | Cách xử lý |
@@ -1274,7 +1311,7 @@ CREATE TABLE stock_reservations (
 
 Scenario: Flash sale, 1000 user cùng mua 1 SKU chỉ còn 5 sản phẩm.
 
-```sql
+```sql source="snippets/4-8-concurrency-control-reconciliation-jobs.sql"
 -- ❌ Cách sai — đọc rồi ghi riêng lẻ → oversell
 SELECT available_qty FROM stocks WHERE sku_id = 'SKU-001';  -- 5
 -- 100 request cùng đọc = 5 → đều nghĩ còn hàng
@@ -1289,6 +1326,8 @@ WHERE sku_id = :sku_id
   AND available_qty >= :qty;
 -- Nếu affected_rows = 0 → hết hàng, trả lỗi ngay. Không có cửa oversell.
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=25-case-study-ecommerce&snapshot=article&file=snippets%2F4-8-concurrency-control-reconciliation-jobs.sql)
 
 Với Redis (dùng cho pre-check trước khi vào DB):
 
@@ -1433,24 +1472,13 @@ Bank API của MoMo bị chậm (timeout 10s mỗi request)
 
 **Giải pháp: Tách thread pool riêng cho từng downstream**
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│               ORDER SERVICE — BULKHEAD ISOLATION             │
-│                                                              │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  │
-│  │ Payment Pool    │  │ Inventory Pool  │  │ Other Pool   │  │
-│  │ Max: 20 threads │  │ Max: 30 threads │  │ Max: 50      │  │
-│  │ Queue: 10       │  │ Queue: 20       │  │ Queue: 30    │  │
-│  │                 │  │                 │  │              │  │
-│  │ Bank API chậm   │  │ DB lock wait    │  │ Promo, Ship  │  │
-│  │ → chỉ 20 thread │  │ → không ảnh     │  │ → hoạt động  │  │
-│  │   bị block      │  │   hưởng Payment │  │   bình thường│  │
-│  └─────────────────┘  └─────────────────┘  └──────────────┘  │
-│                                                              │
-│  ✅ Payment chậm → chỉ 20 thread Payment pool bị kẹt         │
-│  ✅ Inventory vẫn có 30 thread riêng → reserve stock bình thường│
-│  ✅ Promotion, Shipping vẫn có 50 thread → không bị ảnh hưởng │
-└──────────────────────────────────────────────────────────────┘
+```d2 title="ShopVN — Bulkhead Isolation"
+direction: right
+order: Order Service {
+ payment: "Payment Pool\nMax 20 threads • Queue 10\nBank API chậm chỉ block pool này"
+ inventory: "Inventory Pool\nMax 30 threads • Queue 20\nDB lock wait không chiếm Payment pool"
+ other: "Other Pool\nMax 50 threads • Queue 30\nPromotion / Shipping vẫn chạy"
+}
 ```
 
 ### 5.5. Rate Limiting
@@ -1482,17 +1510,31 @@ Khi một downstream service bị lỗi hoặc phản hồi quá chậm, thay v�
 
 **Mối quan hệ Circuit Breaker → Fallback:**
 
-```mermaid
-graph LR
-    A[Service Call] --> B{Response?}
-    B -->|Success| C[Return result]
-    B -->|Timeout / Error| D{Circuit Breaker state?}
-    D -->|CLOSED: lỗi chưa vượt threshold| E[Retry nếu còn quota]
-    D -->|OPEN: quá nhiều lỗi liên tiếp| F[Bỏ qua call, vào Fallback ngay]
-    D -->|HALF-OPEN: thử 1 request| G{Thành công?}
-    G -->|Yes| C
-    G -->|No| F
-    F --> H[Trả kết quả thay thế cho user]
+```d2 title="5.7. Fallback Strategies"
+direction: right
+n1: "Service Call"
+n2: "Response?" {
+  shape: diamond
+}
+n3: "Return result"
+n4: "Circuit Breaker state?" {
+  shape: diamond
+}
+n5: "Retry nếu còn quota"
+n6: "Bỏ qua call, vào Fallback ngay"
+n7: "Thành công?" {
+  shape: diamond
+}
+n8: "Trả kết quả thay thế cho user"
+n1 -> n2
+n2 -> n3: "Success"
+n2 -> n4: "Timeout / Error"
+n4 -> n5: "CLOSED: lỗi chưa vượt threshold"
+n4 -> n6: "OPEN: quá nhiều lỗi liên tiếp"
+n4 -> n7: "HALF-OPEN: thử 1 request"
+n7 -> n3: "Yes"
+n7 -> n6: "No"
+n6 -> n8
 ```
 
 Fallback chỉ được kích hoạt trong 2 trường hợp:
@@ -1925,43 +1967,33 @@ Observability trả lời 3 câu hỏi quan trọng:
 
 ### 6.2. Kiến trúc Telemetry tổng thể
 
-```mermaid
-flowchart LR
-    subgraph APP["Application Layer"]
-        SVC["Services: Gateway, Order, Payment, Inventory, Catalog, Search"]
-    end
-
-    subgraph COLLECT["Collection Layer"]
-        FB["Fluent Bit (logs)"]
-        PROM["Prometheus Scraper (metrics)"]
-        OTEL["OpenTelemetry Collector (traces)"]
-    end
-
-    subgraph STORE["Storage/Backend Layer"]
-        CW["CloudWatch Logs"]
-        AMP["Amazon Managed Prometheus"]
-        XRAY["AWS X-Ray / Jaeger"]
-    end
-
-    subgraph VIS["Visualization & Alerting"]
-        GRAF["Grafana Dashboards"]
-        AM["Alertmanager / Managed Alerting"]
-        PD["PagerDuty / Slack / Email"]
-    end
-
-    SVC -->|"stdout/stderr JSON logs"| FB
-    SVC -->|"/metrics"| PROM
-    SVC -->|"OTLP spans"| OTEL
-
-    FB --> CW
-    PROM --> AMP
-    OTEL --> XRAY
-
-    CW --> GRAF
-    AMP --> GRAF
-    XRAY --> GRAF
-    AMP --> AM
-    AM --> PD
+```d2 title="6.2. Kiến trúc Telemetry tổng thể"
+direction: right
+n4: "Visualization & Alerting" {}
+n3: "Storage/Backend Layer" {}
+n2: "Collection Layer" {}
+n1: "Application Layer" {}
+n1.n5: "Services: Gateway, Order, Payment, Inventory, Catalog, Search"
+n2.n6: "Fluent Bit (logs)"
+n2.n7: "Prometheus Scraper (metrics)"
+n2.n8: "OpenTelemetry Collector (traces)"
+n3.n9: "CloudWatch Logs"
+n3.n10: "Amazon Managed Prometheus"
+n3.n11: "AWS X-Ray / Jaeger"
+n4.n12: "Grafana Dashboards"
+n4.n13: "Alertmanager / Managed Alerting"
+n4.n14: "PagerDuty / Slack / Email"
+n1.n5 -> n2.n6: "stdout/stderr JSON logs"
+n1.n5 -> n2.n7: "/metrics"
+n1.n5 -> n2.n8: "OTLP spans"
+n2.n6 -> n3.n9
+n2.n7 -> n3.n10
+n2.n8 -> n3.n11
+n3.n9 -> n4.n12
+n3.n10 -> n4.n12
+n3.n11 -> n4.n12
+n3.n10 -> n4.n13
+n4.n13 -> n4.n14
 ```
 
 **Luồng đúng theo tín hiệu:**
@@ -1996,7 +2028,7 @@ flowchart LR
 
 **Ví dụ log thực tế (checkout timeout):**
 
-```json
+```json source="snippets/6-3-logging-strategy.json"
 {
   "timestamp": "2026-02-27T10:12:45.123Z",
   "service": "order-service",
@@ -2011,6 +2043,8 @@ flowchart LR
   "message": "Payment service timeout after 10s"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=25-case-study-ecommerce&snapshot=article&file=snippets%2F6-3-logging-strategy.json)
 
 ### 6.4. Metrics Framework (RED + USE)
 
@@ -2047,25 +2081,24 @@ ShopVN áp dụng kết hợp:
 
 ### 6.6. Distributed Tracing
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant G as API Gateway
-    participant O as Order
-    participant I as Inventory
-    participant P as Payment
-    participant K as Kafka
-    participant N as Notification
-
-    U->>G: POST /checkout
-    G->>O: Forward (traceparent)
-    O->>I: reserveStock (child span)
-    I-->>O: reserved
-    O->>P: initiatePayment (child span)
-    P-->>O: payment_pending
-    O->>K: publish order.created
-    K->>N: consume event
-    N-->>U: email/sms confirmation
+```d2 title="6.6. Distributed Tracing"
+shape: sequence_diagram
+"U": "User"
+"G": "API Gateway"
+"O": "Order"
+"I": "Inventory"
+"P": "Payment"
+"K": "Kafka"
+"N": "Notification"
+"U" -> "G": "POST /checkout"
+"G" -> "O": "Forward (traceparent)"
+"O" -> "I": "reserveStock (child span)"
+"I" -> "O": "reserved" { style.stroke-dash: 5 }
+"O" -> "P": "initiatePayment (child span)"
+"P" -> "O": "payment_pending" { style.stroke-dash: 5 }
+"O" -> "K": "publish order.created"
+"K" -> "N": "consume event"
+"N" -> "U": "email/sms confirmation" { style.stroke-dash: 5 }
 ```
 
 **Trace tags bắt buộc:**
@@ -2144,16 +2177,23 @@ sequenceDiagram
 
 ### 7.2. AuthN/AuthZ cho người dùng cuối
 
-```mermaid
-flowchart LR
-    U[User App] --> G[API Gateway]
-    G --> IAM[Identity Service / IdP]
-    IAM --> JWT[JWT Access Token]
-    JWT --> G
-    G --> O[Order Service]
-    G --> C[Cart Service]
-    O --> PDP[Policy Engine]
-    C --> PDP
+```d2 title="7.2. AuthN/AuthZ cho người dùng cuối"
+direction: right
+n1: "User App"
+n2: "API Gateway"
+n3: "Identity Service / IdP"
+n4: "JWT Access Token"
+n5: "Order Service"
+n6: "Cart Service"
+n7: "Policy Engine"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n2
+n2 -> n5
+n2 -> n6
+n5 -> n7
+n6 -> n7
 ```
 
 **Luồng chuẩn:**
@@ -2424,14 +2464,23 @@ T+48 giờ   │ POST-MORTEM:
 
 ### 8.4. Network & Edge Architecture
 
-```mermaid
-flowchart LR
-    U[Users] --> CDN[CloudFront]
-    CDN --> WAF[AWS WAF]
-    WAF --> APIGW[API Gateway / ALB]
-    APIGW --> SVC[Microservices in Private Subnets]
-    SVC --> DB[(RDS / DynamoDB)]
-    SVC --> MQ[Kafka / SQS]
+```d2 title="8.4. Network & Edge Architecture"
+direction: right
+n1: "Users"
+n2: "CloudFront"
+n3: "AWS WAF"
+n4: "API Gateway / ALB"
+n5: "Microservices in Private Subnets"
+n6: "RDS / DynamoDB" {
+  shape: cylinder
+}
+n7: "Kafka / SQS"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n5 -> n7
 ```
 
 **Thiết kế mạng:**
@@ -2464,16 +2513,25 @@ flowchart LR
 
 ### 8.7. CI/CD Pipeline chi tiết
 
-```mermaid
-flowchart LR
-    A[Git Push] --> B[CI: test + lint + scan]
-    B --> C[Build image]
-    C --> D[Push ECR]
-    D --> E[Deploy Staging]
-    E --> F[Integration + contract test]
-    F --> G[Approval Gate]
-    G --> H[Canary/Blue-Green Prod]
-    H --> I[Post-deploy verification]
+```d2 title="8.7. CI/CD Pipeline chi tiết"
+direction: right
+n1: "Git Push"
+n2: "CI: test + lint + scan"
+n3: "Build image"
+n4: "Push ECR"
+n5: "Deploy Staging"
+n6: "Integration + contract test"
+n7: "Approval Gate"
+n8: "Canary/Blue-Green Prod"
+n9: "Post-deploy verification"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n6 -> n7
+n7 -> n8
+n8 -> n9
 ```
 
 **Gate bắt buộc trước production:**

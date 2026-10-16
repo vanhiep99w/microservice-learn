@@ -68,8 +68,13 @@ orders
 
 Khi thanh toán xong, service cập nhật dòng đó thành `PAID`. Khi giao xong, cập nhật thành `DELIVERED`.
 
-```text
-CREATED  →  PAID  →  SHIPPED  →  DELIVERED
+```d2 title="Order Lifecycle — trạng thái hiện tại"
+direction: right
+created: CREATED
+paid: PAID
+shipped: SHIPPED
+delivered: DELIVERED
+created -> paid -> shipped -> delivered
 ```
 
 Đây là cách lưu **current state** (trạng thái hiện tại). Nó hoàn toàn bình thường và phù hợp với rất nhiều hệ thống CRUD.
@@ -92,12 +97,17 @@ EDA là cách Order Service **thông báo** cho service khác sau khi một fact
 
 Khi tạo đơn, Order Service phát một event tên `OrderCreated`. Event đi qua **message broker** (hệ thống trung chuyển message) như Kafka, RabbitMQ hoặc SNS/SQS. Các service quan tâm tự nhận event đó.
 
-```mermaid
-flowchart LR
-    O[Order Service] -->|OrderCreated| B[Message Broker]
-    B --> P[Payment Service]
-    B --> I[Inventory Service]
-    B --> N[Notification Service]
+```d2 title="Event-Driven Architecture làm gì?"
+direction: right
+n1: "Order Service"
+n2: "Message Broker"
+n3: "Payment Service"
+n4: "Inventory Service"
+n5: "Notification Service"
+n1 -> n2: "OrderCreated"
+n2 -> n3
+n2 -> n4
+n2 -> n5
 ```
 
 Order Service không cần gọi trực tiếp từng service và không cần biết có bao nhiêu service đang nghe.
@@ -133,21 +143,20 @@ Sau khi khách tạo đơn, flow đơn giản có thể là:
 4. Inventory Service nhận event và reserve (giữ) hàng.
 5. Notification Service nhận event và gửi email.
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant B as Broker
-    participant P as Payment
-    participant I as Inventory
-    participant N as Notification
-
-    O->>B: OrderCreated
-    B->>P: OrderCreated
-    B->>I: OrderCreated
-    B->>N: OrderCreated
-    P->>P: Charge tiền
-    I->>I: Reserve hàng
-    N->>N: Gửi email
+```d2 title="Luồng OrderCreated"
+shape: sequence_diagram
+"O": "Order Service"
+"B": "Broker"
+"P": "Payment"
+"I": "Inventory"
+"N": "Notification"
+"O" -> "B": "OrderCreated"
+"B" -> "P": "OrderCreated"
+"B" -> "I": "OrderCreated"
+"B" -> "N": "OrderCreated"
+"P" -> "P": "Charge tiền"
+"I" -> "I": "Reserve hàng"
+"N" -> "N": "Gửi email"
 ```
 
 Điểm mạnh là ngày mai có thêm **Analytics Service**, team chỉ cần cho Analytics subscribe `OrderCreated`. Không phải sửa Order Service để nó gọi Analytics.
@@ -192,12 +201,21 @@ thì order đã tồn tại nhưng Payment/Inventory không biết. Đây là **
 
 Outbox ghi order và “ý định gửi event” trong cùng một database transaction. Worker/relay sẽ gửi event sau.
 
-```mermaid
-flowchart LR
-    T[1 local transaction] --> D[(orders table)]
-    T --> X[(outbox table)]
-    X --> R[Relay]
-    R --> B[Broker]
+```d2 title="2. Transactional Outbox: không mất event khi broker lỗi"
+direction: right
+n1: "1 local transaction"
+n2: "orders table" {
+  shape: cylinder
+}
+n3: "outbox table" {
+  shape: cylinder
+}
+n4: "Relay"
+n5: "Broker"
+n1 -> n2
+n1 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Nếu broker đang down, row trong `outbox` còn đó để relay thử lại. Xem thêm: [Transactional Outbox Pattern](17-data-patterns/transactional-outbox.md).
@@ -267,10 +285,15 @@ OrderDelivered     → status = DELIVERED
 
 Quá trình đọc lại này gọi là **replay** hoặc **rehydrate**.
 
-```mermaid
-flowchart LR
-    ES[(Event Store)] -->|đọc event stream| A[Order Aggregate]
-    A -->|apply từng event| S[State hiện tại: DELIVERED]
+```d2 title="Cách dựng lại trạng thái"
+direction: right
+n1: "Event Store" {
+  shape: cylinder
+}
+n2: "Order Aggregate"
+n3: "State hiện tại: DELIVERED"
+n1 -> n2: "đọc event stream"
+n2 -> n3: "apply từng event"
 ```
 
 Khi nhận command mới, aggregate phải dựng lại state trước, kiểm tra rule, sau đó mới append event mới.
@@ -344,12 +367,23 @@ UI thường cần query như “100 đơn gần nhất”, “đơn đang giao�
 
 Projector đọc event và cập nhật các bảng phục vụ từng query:
 
-```mermaid
-flowchart LR
-    E[(Order Event Store)] --> P1[Projector danh sách đơn]
-    E --> P2[Projector doanh thu]
-    P1 --> R1[(order_list_view)]
-    P2 --> R2[(revenue_by_day)]
+```d2 title="2. Projection: event store không phải màn hình UI"
+direction: right
+n1: "Order Event Store" {
+  shape: cylinder
+}
+n2: "Projector danh sách đơn"
+n3: "Projector doanh thu"
+n4: "order_list_view" {
+  shape: cylinder
+}
+n5: "revenue_by_day" {
+  shape: cylinder
+}
+n1 -> n2
+n1 -> n3
+n2 -> n4
+n3 -> n5
 ```
 
 Các bảng `order_list_view` và `revenue_by_day` gọi là **projection** hoặc **read model**. Chúng có thể xóa và dựng lại từ event stream.
@@ -382,12 +416,12 @@ Order aggregate / event stream       order_detail_view
                                      - display_status
 ```
 
-```text
-OrderShipped event
-        ↓
-projector cập nhật order_detail_view
-        ↓
-GET /orders/123 chỉ đọc thẳng order_detail_view
+```d2 title="Projection — cập nhật Read Model"
+direction: right
+event: OrderShipped event
+projector: Projector cập nhật order_detail_view
+read: GET /orders/123 đọc order_detail_view
+event -> projector -> read
 ```
 
 Đây là lý do CQRS thường đi cùng Event Sourcing: event đã được ghi ở write side là input tự nhiên để projector cập nhật read model. Nhưng hai pattern vẫn độc lập:
@@ -447,39 +481,66 @@ Event Sourcing: Service A  ── lưu lịch sử ──► Event Store
 
 ### 1. Chỉ dùng database CRUD — không EDA, không Event Sourcing
 
-```text
-Client → Order Service → orders table
+```d2 title="Bắt đầu đơn giản — CRUD"
+direction: right
+client: Client
+order: Order Service
+table: orders table {shape: cylinder}
+client -> order -> table
 ```
 
 Phù hợp với application đơn giản. Đây là điểm bắt đầu tốt, không phải thất bại kiến trúc.
 
 ### 2. Dùng EDA, không dùng Event Sourcing
 
-```text
-Order Service → orders table + outbox → Broker → Notification/Analytics
+```d2 title="Thêm EDA bằng Transactional Outbox"
+direction: right
+order: Order Service
+db: "Local transaction\norders + outbox" {shape: cylinder}
+broker: Broker
+notification: Notification
+analytics: Analytics
+order -> db -> broker
+broker -> notification
+broker -> analytics
 ```
 
 `orders` table vẫn là source of truth. Event được dùng để các service khác biết order thay đổi. Đây là lựa chọn rất phổ biến.
 
 ### 3. Dùng Event Sourcing, không dùng EDA
 
-```text
-Order module → Event Store → Internal projection → UI
+```d2 title="Event Sourcing nội bộ — không bắt buộc EDA"
+direction: right
+order: Order Module
+events: Event Store {shape: cylinder}
+projection: Internal Projection
+ui: UI
+order -> events -> projection -> ui
 ```
 
 Phù hợp với monolith/modular monolith cần audit và history. Không có service khác cần được thông báo, nên chưa cần broker.
 
 ### 4. Dùng cả EDA và Event Sourcing
 
-```mermaid
-flowchart LR
-    C[Command] --> A[Order Aggregate]
-    A --> E[(Order Event Store)]
-    E --> P[Read Model Projector]
-    E --> M[Integration Event Mapper]
-    M --> B[Broker]
-    B --> N[Notification]
-    B --> X[Analytics]
+```d2 title="4. Dùng cả EDA và Event Sourcing"
+direction: right
+n1: "Command"
+n2: "Order Aggregate"
+n3: "Order Event Store" {
+  shape: cylinder
+}
+n4: "Read Model Projector"
+n5: "Integration Event Mapper"
+n6: "Broker"
+n7: "Notification"
+n8: "Analytics"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n3 -> n5
+n5 -> n6
+n6 -> n7
+n6 -> n8
 ```
 
 Order Service lưu lịch sử nội bộ bằng Event Sourcing, sau đó chỉ publish **integration event** cần thiết ra broker. Đây là mạnh nhất nhưng cũng phức tạp nhất.

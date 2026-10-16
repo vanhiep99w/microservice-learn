@@ -60,14 +60,24 @@ Strangler Fig không phải là một lần rewrite toàn bộ. Mỗi phase cầ
 
 Routing facade che giấu quá trình chuyển đổi với client. Trong giai đoạn chuyển tiếp, nó phân biệt request nào đi vào service mới và request nào vẫn đi vào Monolith.
 
-```mermaid
-flowchart LR
-    C[Client] --> F[Routing facade<br/>Proxy hoặc API Gateway]
-    F -->|Route đã chuyển| S[Service mới]
-    F -->|Phần còn lại| M[Monolith]
-    S --> DS[(Data store của service)]
-    M --> DM[(Data store của Monolith)]
-    M -. Đồng bộ qua event hoặc API .-> S
+```d2 title="Routing và topology"
+direction: right
+n1: "Client"
+n2: "Routing facade\nProxy hoặc API Gateway"
+n3: "Service mới"
+n4: "Monolith"
+n5: "Data store của service" {
+  shape: cylinder
+}
+n6: "Data store của Monolith" {
+  shape: cylinder
+}
+n1 -> n2
+n2 -> n3: "Route đã chuyển"
+n2 -> n4: "Phần còn lại"
+n3 -> n5
+n4 -> n6
+n4 -> n3: "Đồng bộ qua event hoặc API" { style.stroke-dash: 5 }
 ```
 
 ### Topology ban đầu

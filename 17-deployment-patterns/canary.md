@@ -53,20 +53,27 @@ Canary kiểm soát đường đi của request, không tự giải quyết comp
 
 **Traffic splitting** là cơ chế tại Load Balancer, Ingress, Service Mesh hoặc một router khác để phân request giữa stable và canary. Ở bước đầu, router có thể gửi `95%` traffic tới stable v1 và `5%` tới canary v2.
 
-```mermaid
-flowchart LR
-    R["Client request"] --> G["Load Balancer / Ingress / Service Mesh"]
-    G -->|"95%"| S["Stable v1"]
-    G -->|"5%"| C["Canary v2"]
-    S --> D[("Shared state")]
-    C --> D
+```d2 title="Stable và canary"
+direction: right
+n1: "Client request"
+n2: "Load Balancer / Ingress / Service Mesh"
+n3: "Stable v1"
+n4: "Canary v2"
+n5: "Shared state" {
+  shape: cylinder
+}
+n1 -> n2
+n2 -> n3: "95%"
+n2 -> n4: "5%"
+n3 -> n5
+n4 -> n5
 ```
 
 Tỷ lệ trong sơ đồ là quyết định routing của hạ tầng. Team cần kiểm tra metrics routing để xác nhận traffic thực tế đã đến đúng subset. Stable và canary cũng phải có định danh rõ ràng trong service discovery hoặc routing rule; nếu không, metrics và rollback sẽ khó xác định đúng version.
 
 Với Istio, `VirtualService` có thể đặt `weight` cho hai subset. `DestinationRule` bên dưới chỉ là phần minh họa để gắn subset với label version; tên label thực tế phải khớp manifest của service:
 
-```yaml
+```yaml source="snippets/stable-va-canary.yaml"
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
@@ -101,6 +108,8 @@ spec:
         version: v2
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=canary&snapshot=article&file=snippets%2Fstable-va-canary.yaml)
+
 Traffic splitting không bắt buộc phải dùng Istio. Load Balancer hoặc API Gateway cũng có thể cung cấp weighted routing hay routing theo header, cookie và nhóm user. Chi tiết cấu hình Kubernetes, Istio và Flagger nằm trong [14 — CI/CD & Deployment](../14-cicd-deployment.md).
 
 ### Cohort và tính ổn định của routing
@@ -121,17 +130,30 @@ Nếu session hoặc workflow dài không chịu được việc một user đ�
 
 Một canary rollout cần có điểm bắt đầu, các cổng quyết định và lối thoát. Flow dưới đây mô tả một lộ trình điển hình:
 
-```mermaid
-flowchart TD
-    A["Deploy v2 cạnh stable v1<br/>0% traffic"] --> B["Mở canary nhỏ<br/>5% traffic"]
-    B --> C["Quan sát stable và canary<br/>trong cửa sổ đã định nghĩa"]
-    C --> D{"Metrics và chỉ số business<br/>đạt ngưỡng?"}
-    D -->|"Đạt"| E{"Còn bước rollout?"}
-    E -->|"Còn"| F["Tăng weight<br/>25% → 50% → ..."]
-    F --> C
-    E -->|"Hết"| G["Promote v2<br/>100% traffic"]
-    D -->|"Không đạt"| H["Abort canary<br/>weight về 0%"]
-    H --> I["Điều tra và fix forward"]
+```d2 title="Quy trình progressive rollout"
+direction: down
+n1: "Deploy v2 cạnh stable v1\n0% traffic"
+n2: "Mở canary nhỏ\n5% traffic"
+n3: "Quan sát stable và canary\ntrong cửa sổ đã định nghĩa"
+n4: "Metrics và chỉ số business\nđạt ngưỡng?" {
+  shape: diamond
+}
+n5: "Còn bước rollout?" {
+  shape: diamond
+}
+n6: "Tăng weight\n25% → 50% → ..."
+n7: "Promote v2\n100% traffic"
+n8: "Abort canary\nweight về 0%"
+n9: "Điều tra và fix forward"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5: "Đạt"
+n5 -> n6: "Còn"
+n6 -> n3
+n5 -> n7: "Hết"
+n4 -> n8: "Không đạt"
+n8 -> n9
 ```
 
 ### Chuẩn bị version mới
@@ -276,7 +298,7 @@ Alert cũng phải nêu rõ bước rollout và lý do, chẳng hạn: `canary o
 
 Công cụ như Flagger có thể chạy vòng phân tích theo `interval`, tăng `stepWeight` khi metrics đạt và abort khi số lần kiểm tra thất bại vượt `threshold`. Một phần cấu hình minh họa:
 
-```yaml
+```yaml source="snippets/auto-promote-va-auto-abort.yaml"
 analysis:
   interval: 1m
   threshold: 5
@@ -292,6 +314,8 @@ analysis:
         max: 500
       interval: 1m
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=canary&snapshot=article&file=snippets%2Fauto-promote-va-auto-abort.yaml)
 
 Trong ví dụ này, công cụ kiểm tra mỗi phút, tăng traffic theo từng bước, và ngừng rollout sau tối đa năm lần kiểm tra thất bại. Các con số chỉ là cấu hình minh họa; chúng phải được điều chỉnh theo SLO và đặc tính traffic của service.
 
@@ -313,7 +337,7 @@ Trong canary, rollback traffic thường bắt đầu bằng việc **abort** ro
 
 Ví dụ phần route sau khi abort có thể biểu diễn như sau:
 
-```yaml
+```yaml source="snippets/ua-weight-ve-0.yaml"
 route:
   - destination:
       host: order-service
@@ -324,6 +348,8 @@ route:
       subset: canary
     weight: 0
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=canary&snapshot=article&file=snippets%2Fua-weight-ve-0.yaml)
 
 Tên trường và cách cập nhật phụ thuộc controller hoặc platform đang dùng. Điều cần bảo đảm là traffic mới không tiếp tục đi vào canary và stable vẫn healthy.
 

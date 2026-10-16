@@ -20,6 +20,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join, posix as pathPosix } from 'node:path';
+import { buildSourceExamples } from './source-examples.mjs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const docsBase = join(ROOT, 'content', 'docs');
@@ -523,6 +524,11 @@ writeJson(join(patternRootDir, 'meta.json'), {
 
 mkdirSync(docsBase, { recursive: true });
 writeJson(join(docsBase, 'meta.json'), { pages: SECTION_ORDER });
+
+await buildSourceExamples({
+  docsDir: docsBase,
+  outputDir: join(ROOT, 'public', 'source-examples'),
+});
 
 console.log(
   `\nDone! Wrote ${generatedEntries.size} pages, including ${patternEntryCount} nested pattern pages, to content/docs/`

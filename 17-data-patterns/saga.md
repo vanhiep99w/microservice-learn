@@ -72,13 +72,19 @@ Ví dụ với nghiệp vụ đặt hàng:
 
 Trên happy path, các local transaction lần lượt hoàn tất. Khi một bước thất bại, compensation thường chạy theo thứ tự ngược với những bước đã commit:
 
-```mermaid
-flowchart LR
-    T1["T1: Create order<br/>Order DB"] --> T2["T2: Charge payment<br/>Payment DB"]
-    T2 --> T3["T3: Reserve stock<br/>Inventory DB"]
-    T3 --> T4["T4: Confirm order<br/>Order DB"]
-    T3 -.->|fail| C2["C2: Refund payment"]
-    C2 --> C1["C1: Cancel order"]
+```d2 title="Luồng thành công và thất bại"
+direction: right
+n1: "T1: Create order\nOrder DB"
+n2: "T2: Charge payment\nPayment DB"
+n3: "T3: Reserve stock\nInventory DB"
+n4: "T4: Confirm order\nOrder DB"
+n5: "C2: Refund payment"
+n6: "C1: Cancel order"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n3 -> n5: "fail" { style.stroke-dash: 5 }
+n5 -> n6
 ```
 
 Nếu `T3` thất bại, `T1` và `T2` vẫn đã commit. Saga không xóa lịch sử của hai transaction đó. Nó thực hiện `C2` để refund payment rồi `C1` để chuyển order sang `CANCELLED`, nếu đó là quy tắc của nghiệp vụ.
@@ -132,21 +138,20 @@ Nếu nghiệp vụ không chấp nhận các giới hạn này, không nên đ�
 
 Event diễn tả một fact đã xảy ra, chẳng hạn `OrderCreated` hoặc `PaymentCompleted`. Service nhận event tự quyết định có phản ứng hay không dựa trên contract của nó.
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Payment Service
-    participant I as Inventory Service
-
-    O->>O: T1: Tạo order PENDING
-    O-->>P: OrderCreated
-    P->>P: T2: Charge payment
-    P-->>I: PaymentCompleted
-    I->>I: T3: Reserve stock
-    I-->>P: StockReservationFailed
-    P->>P: C2: Refund payment
-    P-->>O: PaymentRefunded
-    O->>O: C1: Cancel order
+```d2 title="Luồng qua events"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Payment Service"
+"I": "Inventory Service"
+"O" -> "O": "T1: Tạo order PENDING"
+"O" -> "P": "OrderCreated" { style.stroke-dash: 5 }
+"P" -> "P": "T2: Charge payment"
+"P" -> "I": "PaymentCompleted" { style.stroke-dash: 5 }
+"I" -> "I": "T3: Reserve stock"
+"I" -> "P": "StockReservationFailed" { style.stroke-dash: 5 }
+"P" -> "P": "C2: Refund payment"
+"P" -> "O": "PaymentRefunded" { style.stroke-dash: 5 }
+"O" -> "O": "C1: Cancel order"
 ```
 
 Producer không cần biết toàn bộ consumer. Tuy nhiên, logic của một Saga bị phân tán giữa các event handler. Muốn hiểu vì sao order bị hủy, người vận hành phải nối được các event và local transaction theo cùng một Saga.
@@ -170,26 +175,25 @@ Choreography thường dễ bắt đầu với Saga khoảng 3–4 bước và �
 
 Command mang ý nghĩa "hãy thực hiện việc này" và hướng tới một service cụ thể. Cách phối hợp này là command-driven, dù command có thể được truyền qua HTTP, RPC hoặc message broker.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant S as Saga Orchestrator
-    participant O as Order Service
-    participant P as Payment Service
-    participant I as Inventory Service
-
-    C->>S: Start PlaceOrder
-    S->>O: CreateOrder command
-    O-->>S: OK, order_id
-    S->>P: ChargePayment command
-    P-->>S: OK, payment_id
-    S->>I: ReserveStock command
-    I-->>S: Rejected, out of stock
-    S->>P: RefundPayment command
-    P-->>S: OK, refund_id
-    S->>O: CancelOrder command
-    O-->>S: OK
-    S->>S: Mark saga COMPENSATED
+```d2 title="Luồng qua commands"
+shape: sequence_diagram
+"C": "Client"
+"S": "Saga Orchestrator"
+"O": "Order Service"
+"P": "Payment Service"
+"I": "Inventory Service"
+"C" -> "S": "Start PlaceOrder"
+"S" -> "O": "CreateOrder command"
+"O" -> "S": "OK, order_id" { style.stroke-dash: 5 }
+"S" -> "P": "ChargePayment command"
+"P" -> "S": "OK, payment_id" { style.stroke-dash: 5 }
+"S" -> "I": "ReserveStock command"
+"I" -> "S": "Rejected, out of stock" { style.stroke-dash: 5 }
+"S" -> "P": "RefundPayment command"
+"P" -> "S": "OK, refund_id" { style.stroke-dash: 5 }
+"S" -> "O": "CancelOrder command"
+"O" -> "S": "OK" { style.stroke-dash: 5 }
+"S" -> "S": "Mark saga COMPENSATED"
 ```
 
 Orchestrator nhìn thấy flow ở một chỗ và có thể mô tả rõ các nhánh thành công, timeout và compensation. Đổi lại, nó phải biết participant nào nhận command và contract của từng participant.

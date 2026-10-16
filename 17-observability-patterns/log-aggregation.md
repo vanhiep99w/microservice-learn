@@ -51,12 +51,17 @@ Khi có sự cố, việc SSH vào từng máy rồi chạy `grep` không mở r
 
 Một pipeline Log Aggregation thường đi từ application tới collector, qua lớp lưu trữ, rồi tới giao diện truy vấn:
 
-```mermaid
-flowchart LR
-    A[Services<br/>structured log ra stdout] --> B[Collector / Shipper<br/>parse + gắn metadata]
-    B --> C[Buffer / Queue<br/>tùy chọn]
-    C --> D[Log Store<br/>lưu trữ + index]
-    D --> E[Search / Dashboard<br/>Kibana hoặc Grafana]
+```d2 title="Kiến trúc và pipeline"
+direction: right
+n1: "Services\nstructured log ra stdout"
+n2: "Collector / Shipper\nparse + gắn metadata"
+n3: "Buffer / Queue\ntùy chọn"
+n4: "Log Store\nlưu trữ + index"
+n5: "Search / Dashboard\nKibana hoặc Grafana"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 `Buffer / Queue` là lớp tùy chọn. Nó có thể giúp pipeline chịu được lúc backend tạm thời quá tải hoặc gián đoạn, nhưng cần cấu hình dung lượng, retry và chính sách khi đầy; không nên xem nó là bảo đảm mất log bằng không.
@@ -96,7 +101,7 @@ Ví dụ, hai thông điệp sau chứa cùng ý nghĩa nhưng khả năng truy 
 ERROR Charge failed for order ORD-456 after 2503ms
 ```
 
-```json
+```json source="snippets/structured-logging.json"
 {
   "level": "ERROR",
   "service": "payment-service",
@@ -106,6 +111,8 @@ ERROR Charge failed for order ORD-456 after 2503ms
   "message": "Charge failed"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=log-aggregation&snapshot=article&file=snippets%2Fstructured-logging.json)
 
 Ở dạng có cấu trúc, backend có thể lọc theo `service`, `level`, `order_id` hoặc `error_type` mà không phải đoán vị trí của từng giá trị trong câu text. Application nên giữ `message` dễ đọc cho con người, đồng thời đưa dữ liệu dùng để lọc và phân tích vào field riêng.
 
@@ -130,7 +137,7 @@ Các field theo nghiệp vụ như `order_id`, `error_type` và `duration_ms` ch
 
 Ví dụ dưới đây mô tả một lỗi thanh toán. Các giá trị chỉ mang tính minh họa:
 
-```json
+```json source="snippets/vi-du-mot-log-entry.json"
 {
   "timestamp": "2025-03-15T10:30:45.123Z",
   "level": "ERROR",
@@ -146,6 +153,8 @@ Ví dụ dưới đây mô tả một lỗi thanh toán. Các giá trị chỉ m
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=log-aggregation&snapshot=article&file=snippets%2Fvi-du-mot-log-entry.json)
+
 Một query tương ứng có thể là:
 
 ```text
@@ -160,7 +169,7 @@ Cú pháp query thực tế phụ thuộc Log Store. Ý chính là các tiêu ch
 
 `correlation_id` thường phục vụ việc tìm tất cả log thuộc một request. `trace_id` phục vụ việc mở trace và xem quan hệ, thời lượng giữa các span. Hai field có mục đích khác nhau nhưng có thể cùng xuất hiện trong mọi log entry.
 
-```json
+```json source="snippets/lien-ket-voi-correlation-id-va-trace-id.json"
 {
   "correlation_id": "req-789",
   "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
@@ -169,6 +178,8 @@ Cú pháp query thực tế phụ thuộc Log Store. Ý chính là các tiêu ch
   "message": "GatewayTimeout calling Bank API"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=log-aggregation&snapshot=article&file=snippets%2Flien-ket-voi-correlation-id-va-trace-id.json)
 
 Nhờ đó, mã `req-789` từ ticket hỗ trợ có thể dẫn tới log; từ `trace_id` trong log, engineer có thể chuyển sang giao diện tracing để xem waterfall. Chi tiết thiết kế Correlation ID nằm trong [Correlation ID Pattern](../17-observability-patterns.md#5-correlation-id-pattern), còn Distributed Tracing được mô tả trong [Distributed Tracing Pattern](../17-observability-patterns.md#4-distributed-tracing-pattern).
 
@@ -272,7 +283,7 @@ PII (Personally Identifiable Information — thông tin định danh cá nhân) 
 
 Ví dụ masking và redaction:
 
-```json
+```json source="snippets/bao-ve-du-lieu-nhay-cam.json"
 {
   "message": "payment request",
   "card_number": "[REDACTED]",
@@ -280,6 +291,8 @@ Ví dụ masking và redaction:
   "user_email": "nguyen.van.a@***.com"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=log-aggregation&snapshot=article&file=snippets%2Fbao-ve-du-lieu-nhay-cam.json)
 
 Nên dùng ba lớp phòng thủ:
 

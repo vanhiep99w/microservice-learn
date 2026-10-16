@@ -274,15 +274,24 @@ kubectl patch service order-service \
 
 Đây là biểu hiện của **Progressive Delivery** — triển khai tiến dần: mở rộng rủi ro theo từng bước, mỗi bước được chốt bằng **dữ liệu thực tế trên production** thay vì bằng niềm tin vào test suite.
 
-```mermaid
-flowchart LR
-    A["Deploy v2 cạnh v1<br/>0% traffic"] --> B["Canary 5%"]
-    B --> C{"Phân tích metrics<br/>tách theo version"}
-    C -->|"Đạt ngưỡng"| D["Tăng dần<br/>25% → 50% → 100%"]
-    C -->|"Vượt ngưỡng lỗi"| E["Đưa weight về 0%<br/>phần lớn user không bị ảnh hưởng"]
-    D --> C
-    D -->|"Đã đạt 100%"| F["Xóa v1<br/>rollout hoàn tất"]
-    E --> G["Điều tra nguyên nhân<br/>fix forward"]
+```d2 title="5.1. Cách hoạt động"
+direction: right
+n1: "Deploy v2 cạnh v1\n0% traffic"
+n2: "Canary 5%"
+n3: "Phân tích metrics\ntách theo version" {
+  shape: diamond
+}
+n4: "Tăng dần\n25% → 50% → 100%"
+n5: "Đưa weight về 0%\nphần lớn user không bị ảnh hưởng"
+n6: "Xóa v1\nrollout hoàn tất"
+n7: "Điều tra nguyên nhân\nfix forward"
+n1 -> n2
+n2 -> n3
+n3 -> n4: "Đạt ngưỡng"
+n3 -> n5: "Vượt ngưỡng lỗi"
+n4 -> n3
+n4 -> n6: "Đã đạt 100%"
+n5 -> n7
 ```
 
 Khác biệt then chốt so với Rolling Update: Rolling Update tăng tỉ lệ v2 theo **tốc độ thay pod** (thường vài phút, gần như tự động chạy hết), còn Canary tăng theo **cổng metrics** — mỗi bậc % chỉ mở khi bậc trước chứng minh an toàn. Thời gian rollout vì vậy dài hơn (có thể hàng giờ), đổi lấy blast radius nhỏ nhất và quyết định dựa trên dữ liệu.
@@ -437,16 +446,33 @@ Ba điểm cần nhấn mạnh khi đọc bảng:
 
 ### 7.2. Cây quyết định
 
-```mermaid
-flowchart TD
-    Q1{"Chấp nhận downtime?"} -->|"Có — dev/staging"| R["Recreate"]
-    Q1 -->|"Không"| Q2{"Cần rollback tức thời<br/>trong vài giây?"}
-    Q2 -->|"Có"| BG["Blue-Green"]
-    Q2 -->|"Không"| Q3{"Traffic đủ lớn và đã có<br/>metrics theo version?"}
-    Q3 -->|"Có"| Q4{"Muốn mở rộng theo<br/>nhóm nào?"}
-    Q4 -->|"Theo % traffic"| CA["Canary"]
-    Q4 -->|"Theo nhóm user cụ thể"| FT["Feature Toggle"]
-    Q3 -->|"Không"| RU["Rolling Update<br/>+ Feature Toggle để giảm rủi ro"]
+```d2 title="7.2. Cây quyết định"
+direction: down
+n1: "Chấp nhận downtime?" {
+  shape: diamond
+}
+n2: "Recreate"
+n3: "Cần rollback tức thời\ntrong vài giây?" {
+  shape: diamond
+}
+n4: "Blue-Green"
+n5: "Traffic đủ lớn và đã có\nmetrics theo version?" {
+  shape: diamond
+}
+n6: "Muốn mở rộng theo\nnhóm nào?" {
+  shape: diamond
+}
+n7: "Canary"
+n8: "Feature Toggle"
+n9: "Rolling Update\n+ Feature Toggle để giảm rủi ro"
+n1 -> n2: "Có — dev/staging"
+n1 -> n3: "Không"
+n3 -> n4: "Có"
+n3 -> n5: "Không"
+n5 -> n6: "Có"
+n6 -> n7: "Theo % traffic"
+n6 -> n8: "Theo nhóm user cụ thể"
+n5 -> n9: "Không"
 ```
 
 Ba câu hỏi phụ thực tế trước khi chốt:
@@ -664,20 +690,36 @@ Một tổ hợp khác đáng nhắc: **Strangler Fig** ([05 — Decomposition S
 
 Kết hợp tất cả, một release "chuẩn" cho thay đổi rủi ro cao thường trông như sau:
 
-```mermaid
-flowchart TD
-    S1["Expand schema<br/>(thêm, chưa xóa gì)"] --> S2["Deploy v2 — Rolling Update<br/>release toggle OFF"]
-    S2 --> S3["Smoke test trên production<br/>(flag OFF — dark launch)"]
-    S3 --> S4["Bật flag cho internal users"]
-    S4 --> S5{"Technical + business metrics OK?"}
-    S5 -->|"Không"| S6["Tắt flag<br/>không cần redeploy"]
-    S5 -->|"Có"| S7["Canary 5% → 25% → 50% → 100%<br/>mỗi bậc chốt bằng metrics"]
-    S7 --> S8{"Vẫn ổn định?"}
-    S8 -->|"Không"| S9["Abort canary — weight về 0<br/>hoặc tắt flag"]
-    S8 -->|"Có"| S10["Giữ rollback window<br/>quan sát thêm"]
-    S10 --> S11["Contract: DROP cột cũ,<br/>xóa flag + code path cũ"]
-    S6 --> S12["Fix forward — deploy bản sửa"]
-    S9 --> S12
+```d2 title="11.4. Trình tự một release an toàn"
+direction: down
+n1: "Expand schema\n(thêm, chưa xóa gì)"
+n2: "Deploy v2 — Rolling Update\nrelease toggle OFF"
+n3: "Smoke test trên production\n(flag OFF — dark launch)"
+n4: "Bật flag cho internal users"
+n5: "Technical + business metrics OK?" {
+  shape: diamond
+}
+n6: "Tắt flag\nkhông cần redeploy"
+n7: "Canary 5% → 25% → 50% → 100%\nmỗi bậc chốt bằng metrics"
+n8: "Vẫn ổn định?" {
+  shape: diamond
+}
+n9: "Abort canary — weight về 0\nhoặc tắt flag"
+n10: "Giữ rollback window\nquan sát thêm"
+n11: "Contract: DROP cột cũ,\nxóa flag + code path cũ"
+n12: "Fix forward — deploy bản sửa"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6: "Không"
+n5 -> n7: "Có"
+n7 -> n8
+n8 -> n9: "Không"
+n8 -> n10: "Có"
+n10 -> n11
+n6 -> n12
+n9 -> n12
 ```
 
 Đọc theo trục rủi ro: mỗi bước chỉ mở rộng rủi ro **sau khi** bước trước chứng minh an toàn, và mỗi bước đều có lối thoát (tắt flag / hạ weight / rollback image) đã được định nghĩa trước.

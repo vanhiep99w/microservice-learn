@@ -110,34 +110,44 @@ Trong kiến trúc Microservice, mỗi service nên **độc lập** và **tự 
 | **Data Format** | Date/time utils, currency formatting, locale | Tránh inconsistency khi trao đổi dữ liệu |
 | **Testing** | Test fixtures factory, mock helpers, contract test base | Giảm effort setup test |
 
-```mermaid
-graph TB
-    subgraph "✅ NÊN Share — Cross-cutting"
-        A[Logging / Tracing]
-        B[Auth / Security Utils]
-        C[HTTP Client / gRPC Utils]
-        D[Health Check / Config]
-        E[Error Handling Format]
-    end
-
-    subgraph "Services"
-        S1[Order Service]
-        S2[Payment Service]
-        S3[User Service]
-    end
-
-    A --> S1
-    A --> S2
-    A --> S3
-    B --> S1
-    B --> S2
-    B --> S3
-
-    style A fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style B fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style C fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style D fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style E fill:#2d5a3d,stroke:#4ade80,color:#fff
+```d2 title="2.1. Nên share — Cross-cutting Concerns"
+direction: down
+n2: "Services" {}
+n1: "✅ NÊN Share — Cross-cutting" {}
+n1.n3: "Logging / Tracing" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n1.n4: "Auth / Security Utils" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n1.n5: "HTTP Client / gRPC Utils" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n1.n6: "Health Check / Config" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n1.n7: "Error Handling Format" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n2.n8: "Order Service"
+n2.n9: "Payment Service"
+n2.n10: "User Service"
+n1.n3 -> n2.n8
+n1.n3 -> n2.n9
+n1.n3 -> n2.n10
+n1.n4 -> n2.n8
+n1.n4 -> n2.n9
+n1.n4 -> n2.n10
 ```
 
 ### 2.2. Không nên share — Domain/Business Logic
@@ -180,29 +190,53 @@ graph TB
 
 Khi phân vân có nên share một đoạn code hay không, trả lời các câu hỏi sau:
 
-```mermaid
-flowchart TD
-    Q1{"Code này có thuộc về<br/>business logic / domain<br/>của 1 service cụ thể?"}
-    Q1 -->|Có| NO1["❌ KHÔNG share<br/>Duplicate & customize"]
-    Q1 -->|Không| Q2
-
-    Q2{"Code này có thay đổi<br/>cùng lúc ở tất cả<br/>services khi update?"}
-    Q2 -->|Có| Q3
-    Q2 -->|Không| NO2["❌ KHÔNG share<br/>Copy & let diverge"]
-
-    Q3{"Nếu share, có buộc<br/>tất cả services phải<br/>deploy cùng lúc?"}
-    Q3 -->|Có| NO3["⚠️ Cân nhắc lại<br/>Refactor để tách coupling"]
-    Q3 -->|Không| Q4
-
-    Q4{"Code đủ stable?<br/>API ít thay đổi?"}
-    Q4 -->|Có| YES["✅ NÊN share<br/>Tạo shared library"]
-    Q4 -->|Không| MAYBE["🟡 Share với<br/>strict versioning"]
-
-    style YES fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style NO1 fill:#5a2d2d,stroke:#f87171,color:#fff
-    style NO2 fill:#5a2d2d,stroke:#f87171,color:#fff
-    style NO3 fill:#5a4a2d,stroke:#fbbf24,color:#fff
-    style MAYBE fill:#5a4a2d,stroke:#fbbf24,color:#fff
+```d2 title="2.3. Decision Framework — Checklist xác định nhanh"
+direction: down
+n1: "Code này có thuộc về\nbusiness logic / domain\ncủa 1 service cụ thể?" {
+  shape: diamond
+}
+n2: "❌ KHÔNG share\nDuplicate & customize" {
+  style.fill: "#5a2d2d"
+  style.stroke: "#f87171"
+  style.font-color: "#fff"
+}
+n3: "Code này có thay đổi\ncùng lúc ở tất cả\nservices khi update?" {
+  shape: diamond
+}
+n4: "Nếu share, có buộc\ntất cả services phải\ndeploy cùng lúc?" {
+  shape: diamond
+}
+n5: "❌ KHÔNG share\nCopy & let diverge" {
+  style.fill: "#5a2d2d"
+  style.stroke: "#f87171"
+  style.font-color: "#fff"
+}
+n6: "⚠️ Cân nhắc lại\nRefactor để tách coupling" {
+  style.fill: "#5a4a2d"
+  style.stroke: "#fbbf24"
+  style.font-color: "#fff"
+}
+n7: "Code đủ stable?\nAPI ít thay đổi?" {
+  shape: diamond
+}
+n8: "✅ NÊN share\nTạo shared library" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n9: "🟡 Share với\nstrict versioning" {
+  style.fill: "#5a4a2d"
+  style.stroke: "#fbbf24"
+  style.font-color: "#fff"
+}
+n1 -> n2: "Có"
+n1 -> n3: "Không"
+n3 -> n4: "Có"
+n3 -> n5: "Không"
+n4 -> n6: "Có"
+n4 -> n7: "Không"
+n7 -> n8: "Có"
+n7 -> n9: "Không"
 ```
 
 **Quick Rules of Thumb:**
@@ -247,7 +281,7 @@ flowchart TD
 
 **Ví dụ thực tế (Java / Spring Boot — Maven):**
 
-```xml
+```xml source="snippets/3-1-shared-library-package-module.xml"
 <!-- pom.xml của Order Service -->
 <dependencies>
     <dependency>
@@ -268,7 +302,9 @@ flowchart TD
 </dependencies>
 ```
 
-```xml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2F3-1-shared-library-package-module.xml)
+
+```xml source="snippets/3-1-shared-library-package-module-2.xml"
 <!-- pom.xml của Payment Service -->
 <dependencies>
     <dependency>
@@ -288,6 +324,8 @@ flowchart TD
     </dependency>
 </dependencies>
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2F3-1-shared-library-package-module-2.xml)
 
 **Ưu điểm:**
 - DRY — Không duplicate code
@@ -337,7 +375,7 @@ Thay vì share code trực tiếp, share **schema/contract** rồi **generate co
 
 **Ví dụ — Protobuf schema:**
 
-```protobuf
+```protobuf source="snippets/3-2-code-generation-schema-first.proto"
 // shared-schemas/events/order_events.proto
 syntax = "proto3";
 package events;
@@ -357,6 +395,8 @@ message OrderItem {
   int64 unit_price_cents = 3;
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2F3-2-code-generation-schema-first.proto)
 
 Từ schema này, generate:
 - **Java** → classes cho Payment Service
@@ -653,7 +693,7 @@ Trong Microservice, các service giao tiếp qua **API** (REST, gRPC) hoặc **e
 
 Schema đặt trong **repo riêng** hoặc **thư mục shared** trong mono-repo. File `.proto` chỉ mô tả **cấu trúc dữ liệu**, không có logic.
 
-```protobuf
+```protobuf source="snippets/buoc-1-viet-schema-file-proto.proto"
 // repo: contract-schemas/proto/order/order_events.proto
 syntax = "proto3";
 package com.mycompany.order.events;
@@ -682,11 +722,13 @@ message Money {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-1-viet-schema-file-proto.proto)
+
 #### Bước 2: Cấu hình Maven plugin để generate code
 
 Mỗi service cần dùng event này sẽ **kéo file `.proto`** về và **generate Java class** lúc build.
 
-```xml
+```xml source="snippets/buoc-2-cau-hinh-maven-plugin-de-generate-code.xml"
 <!-- pom.xml của Payment Service -->
 <build>
     <plugins>
@@ -712,6 +754,8 @@ Mỗi service cần dùng event này sẽ **kéo file `.proto`** về và **gene
     </plugins>
 </build>
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-2-cau-hinh-maven-plugin-de-generate-code.xml)
 
 #### Bước 3: Maven build → Auto generate Java classes
 
@@ -744,7 +788,7 @@ Khi chạy `mvn compile`, plugin sẽ đọc file `.proto` và **tự động ge
 
 #### Bước 4: Service sử dụng generated class như bình thường
 
-```java
+```java source="snippets/buoc-4-service-su-dung-generated-class-nhu-binh-thuong.java"
 // Payment Service — consume event từ Kafka
 @KafkaListener(topics = "order-events")
 public void handleOrderCreated(OrderCreatedEvent event) {
@@ -761,7 +805,9 @@ public void handleOrderCreated(OrderCreatedEvent event) {
 }
 ```
 
-```java
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-4-service-su-dung-generated-class-nhu-binh-thuong.java)
+
+```java source="snippets/buoc-4-service-su-dung-generated-class-nhu-binh-thuong-2.java"
 // Order Service — publish event lên Kafka
 public void createOrder(CreateOrderRequest request) {
     Order order = orderRepository.save(/* ... */);
@@ -781,20 +827,41 @@ public void createOrder(CreateOrderRequest request) {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-4-service-su-dung-generated-class-nhu-binh-thuong-2.java)
+
 #### Tổng kết flow:
 
-```mermaid
-flowchart LR
-    A["1. Dev viết<br/>.proto file"] --> B["2. Commit vào<br/>contract repo"]
-    B --> C["3. Mỗi service<br/>kéo .proto về"]
-    C --> D["4. mvn compile<br/>→ protoc generate<br/>Java classes"]
-    D --> E["5. Service dùng<br/>generated class<br/>bình thường"]
-
-    style A fill:#2d3a5a,stroke:#60a5fa,color:#fff
-    style B fill:#2d3a5a,stroke:#60a5fa,color:#fff
-    style C fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style D fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style E fill:#2d5a3d,stroke:#4ade80,color:#fff
+```d2 title="Tổng kết flow:"
+direction: right
+n1: "1. Dev viết\n.proto file" {
+  style.fill: "#2d3a5a"
+  style.stroke: "#60a5fa"
+  style.font-color: "#fff"
+}
+n2: "2. Commit vào\ncontract repo" {
+  style.fill: "#2d3a5a"
+  style.stroke: "#60a5fa"
+  style.font-color: "#fff"
+}
+n3: "3. Mỗi service\nkéo .proto về" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n4: "4. mvn compile\n→ protoc generate\nJava classes" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n5: "5. Service dùng\ngenerated class\nbình thường" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 **Quy tắc quan trọng:**
@@ -810,7 +877,7 @@ Phù hợp cho **REST API**. Ý tưởng tương tự Protobuf: viết spec → 
 
 #### Bước 1: Service owner viết OpenAPI spec
 
-```yaml
+```yaml source="snippets/buoc-1-service-owner-viet-openapi-spec.yaml"
 # contract-schemas/openapi/order-service.yaml
 openapi: 3.0.3
 info:
@@ -872,9 +939,11 @@ components:
           format: int64
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-1-service-owner-viet-openapi-spec.yaml)
+
 #### Bước 2: Service khác generate client code từ spec
 
-```xml
+```xml source="snippets/buoc-2-service-khac-generate-client-code-tu-spec.xml"
 <!-- pom.xml của Payment Service — cần gọi Order Service API -->
 <plugin>
     <groupId>org.openapitools</groupId>
@@ -902,6 +971,8 @@ components:
     </executions>
 </plugin>
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-2-service-khac-generate-client-code-tu-spec.xml)
 
 #### Bước 3: Kết quả generate
 
@@ -1006,7 +1077,7 @@ Phù hợp cho **event-driven architecture** — define schema cho messages trê
 
 #### Bước 1: Viết Avro schema
 
-```json
+```json source="snippets/buoc-1-viet-avro-schema.json"
 // contract-schemas/avro/com/mycompany/events/OrderCreatedEvent.avsc
 {
   "type": "record",
@@ -1022,9 +1093,11 @@ Phù hợp cho **event-driven architecture** — define schema cho messages trê
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-1-viet-avro-schema.json)
+
 #### Bước 2: Maven plugin generate Java class từ Avro schema
 
-```xml
+```xml source="snippets/buoc-2-maven-plugin-generate-java-class-tu-avro-schema.xml"
 <!-- pom.xml -->
 <plugin>
     <groupId>org.apache.avro</groupId>
@@ -1049,9 +1122,11 @@ Phù hợp cho **event-driven architecture** — define schema cho messages trê
 </plugin>
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-2-maven-plugin-generate-java-class-tu-avro-schema.xml)
+
 #### Bước 3: Cấu hình Kafka Serializer/Deserializer sử dụng Schema Registry
 
-```yaml
+```yaml source="snippets/buoc-3-cau-hinh-kafka-serializer-deserializer-su-dung-schema-registry.yaml"
 # application.yml của Order Service (Producer)
 spring:
   kafka:
@@ -1064,7 +1139,9 @@ spring:
       auto.register.schemas: true
 ```
 
-```yaml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-3-cau-hinh-kafka-serializer-deserializer-su-dung-schema-registry.yaml)
+
+```yaml source="snippets/buoc-3-cau-hinh-kafka-serializer-deserializer-su-dung-schema-registry-2.yaml"
 # application.yml của Payment Service (Consumer)
 spring:
   kafka:
@@ -1076,9 +1153,11 @@ spring:
       specific.avro.reader: true
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-3-cau-hinh-kafka-serializer-deserializer-su-dung-schema-registry-2.yaml)
+
 #### Bước 4: Service dùng generated class như bình thường
 
-```java
+```java source="snippets/buoc-4-service-dung-generated-class-nhu-binh-thuong.java"
 // Order Service — Producer
 @Service
 public class OrderEventPublisher {
@@ -1104,7 +1183,9 @@ public class OrderEventPublisher {
 }
 ```
 
-```java
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-4-service-dung-generated-class-nhu-binh-thuong.java)
+
+```java source="snippets/buoc-4-service-dung-generated-class-nhu-binh-thuong-2.java"
 // Payment Service — Consumer
 @Service
 public class OrderEventConsumer {
@@ -1125,6 +1206,8 @@ public class OrderEventConsumer {
     }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-4-service-dung-generated-class-nhu-binh-thuong-2.java)
 
 #### Schema Registry — Compatibility Rules
 
@@ -1206,7 +1289,7 @@ sequenceDiagram
 
 #### Bước 1: Consumer viết contract
 
-```groovy
+```groovy source="snippets/buoc-1-consumer-viet-contract.groovy"
 // Order Service repo: src/test/resources/contracts/payment/shouldReturnPaymentStatus.groovy
 Contract.make {
     description "Order Service cần lấy payment status"
@@ -1233,11 +1316,13 @@ Contract.make {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-1-consumer-viet-contract.groovy)
+
 #### Bước 2: Provider verify — test được auto-generate
 
 Khi Payment Service build, Spring Cloud Contract **tự động generate** JUnit test:
 
-```java
+```java source="snippets/buoc-2-provider-verify-test-duoc-auto-generate.java"
 // AUTO-GENERATED test trong Payment Service
 // (developer KHÔNG viết file này — plugin generate)
 public class PaymentContractTest extends PaymentBaseTestClass {
@@ -1263,11 +1348,13 @@ public class PaymentContractTest extends PaymentBaseTestClass {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-2-provider-verify-test-duoc-auto-generate.java)
+
 Payment team chạy `mvn test` → nếu controller trả về đúng format → PASS. Nếu đổi `amount` thành `totalAmount` → **FAIL ngay lập tức** → biết mình đang break consumer.
 
 #### Bước 3: Consumer test với WireMock stub (không cần provider chạy thật)
 
-```java
+```java source="snippets/buoc-3-consumer-test-voi-wiremock-stub-khong-can-provider-chay-that.java"
 // Order Service — Integration test
 @SpringBootTest
 @AutoConfigureStubRunner(
@@ -1293,6 +1380,8 @@ class OrderServiceIntegrationTest {
     }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2Fbuoc-3-consumer-test-voi-wiremock-stub-khong-can-provider-chay-that.java)
 
 #### Tóm tắt lợi ích:
 
@@ -1549,20 +1638,35 @@ Lý do nên **tách riêng**:
 
 #### Tổng kết — Cấu trúc repo thực tế theo quy mô
 
-```mermaid
-flowchart TB
-    Q1{"Bao nhiêu<br/>services?"}
-    Q1 -->|"< 5"| S1["1 mono-repo chứa tất cả<br/>libs + contracts + services"]
-    Q1 -->|"5 – 20"| S2["3 repos:<br/>① shared-libraries<br/>② contract-schemas<br/>③–N service repos"]
-    Q1 -->|"> 20"| S3["N repos:<br/>Mỗi service repo chứa<br/>contracts của chính nó<br/>+ shared-libraries repo riêng"]
-
-    S1 --> N1["Ví dụ: Startup MVP<br/>3 devs, 3 services"]
-    S2 --> N2["Ví dụ: Scale-up<br/>3–5 teams, 10 services"]
-    S3 --> N3["Ví dụ: Enterprise<br/>10+ teams, mỗi team<br/>own 2–3 services"]
-
-    style S1 fill:#2d3a5a,stroke:#60a5fa,color:#fff
-    style S2 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style S3 fill:#5a4a2d,stroke:#fbbf24,color:#fff
+```d2 title="Tổng kết — Cấu trúc repo thực tế theo quy mô"
+direction: down
+n1: "Bao nhiêu\nservices?" {
+  shape: diamond
+}
+n2: "1 mono-repo chứa tất cả\nlibs + contracts + services" {
+  style.fill: "#2d3a5a"
+  style.stroke: "#60a5fa"
+  style.font-color: "#fff"
+}
+n3: "3 repos:\n① shared-libraries\n② contract-schemas\n③–N service repos" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n4: "N repos:\nMỗi service repo chứa\ncontracts của chính nó\n+ shared-libraries repo riêng" {
+  style.fill: "#5a4a2d"
+  style.stroke: "#fbbf24"
+  style.font-color: "#fff"
+}
+n5: "Ví dụ: Startup MVP\n3 devs, 3 services"
+n6: "Ví dụ: Scale-up\n3–5 teams, 10 services"
+n7: "Ví dụ: Enterprise\n10+ teams, mỗi team\nown 2–3 services"
+n1 -> n2: "< 5"
+n1 -> n3: "5 – 20"
+n1 -> n4: "> 20"
+n2 -> n5
+n3 -> n6
+n4 -> n7
 ```
 
 **Ví dụ cụ thể — team 10 services, 3 teams:**
@@ -1746,38 +1850,64 @@ Shared code không chỉ ảnh hưởng tới **thiết kế** mà còn ảnh h�
 
 Shared library **PHẢI** có CI/CD pipeline riêng, tách biệt khỏi pipeline của services.
 
-```mermaid
-flowchart TB
-    subgraph LIB_PIPELINE["Pipeline của common-auth (library)"]
-        L1["Developer<br/>push code"] --> L2["CI: Compile<br/>+ Unit Test"]
-        L2 --> L3["CI: Integration Test"]
-        L3 --> L4{"Tất cả test<br/>PASS?"}
-        L4 -->|Có| L5["Publish lên<br/>Nexus/Artifactory<br/>version 1.5.1"]
-        L4 -->|Không| L6["❌ FAIL<br/>Không publish"]
-        L5 --> L7["Tạo changelog<br/>+ thông báo teams"]
-    end
-
-    subgraph SVC_PIPELINE["Pipeline của Order Service (service)"]
-        S1["Developer<br/>push code<br/>(hoặc PR upgrade lib)"] --> S2["CI: Compile<br/>+ Unit Test"]
-        S2 --> S3["CI: Integration Test<br/>+ Contract Test"]
-        S3 --> S4{"PASS?"}
-        S4 -->|Có| S5["Build Docker Image<br/>+ Push Registry"]
-        S5 --> S6["Deploy to Staging"]
-        S6 --> S7["Deploy to Production"]
-        S4 -->|Không| S8["❌ FAIL<br/>Không deploy"]
-    end
-
-    L7 -.->|"Team tự tạo PR<br/>upgrade version<br/>(KHÔNG auto trigger)"| S1
-
-    style L5 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style L6 fill:#5a2d2d,stroke:#f87171,color:#fff
-    style S7 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style S8 fill:#5a2d2d,stroke:#f87171,color:#fff
+```d2 title="7.2. Pipeline cho Shared Library — Phải tách riêng"
+direction: down
+n2: "Pipeline của Order Service (service)" {}
+n1: "Pipeline của common-auth (library)" {}
+n1.n3: "Developer\npush code"
+n1.n4: "CI: Compile\n+ Unit Test"
+n1.n5: "CI: Integration Test"
+n1.n6: "Tất cả test\nPASS?" {
+  shape: diamond
+}
+n1.n7: "Publish lên\nNexus/Artifactory\nversion 1.5.1" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n1.n8: "❌ FAIL\nKhông publish" {
+  style.fill: "#5a2d2d"
+  style.stroke: "#f87171"
+  style.font-color: "#fff"
+}
+n1.n9: "Tạo changelog\n+ thông báo teams"
+n2.n10: "Developer\npush code\n(hoặc PR upgrade lib)"
+n2.n11: "CI: Compile\n+ Unit Test"
+n2.n12: "CI: Integration Test\n+ Contract Test"
+n2.n13: "PASS?" {
+  shape: diamond
+}
+n2.n14: "Build Docker Image\n+ Push Registry"
+n2.n15: "Deploy to Staging"
+n2.n16: "Deploy to Production" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n2.n17: "❌ FAIL\nKhông deploy" {
+  style.fill: "#5a2d2d"
+  style.stroke: "#f87171"
+  style.font-color: "#fff"
+}
+n1.n3 -> n1.n4
+n1.n4 -> n1.n5
+n1.n5 -> n1.n6
+n1.n6 -> n1.n7: "Có"
+n1.n6 -> n1.n8: "Không"
+n1.n7 -> n1.n9
+n2.n10 -> n2.n11
+n2.n11 -> n2.n12
+n2.n12 -> n2.n13
+n2.n13 -> n2.n14: "Có"
+n2.n14 -> n2.n15
+n2.n15 -> n2.n16
+n2.n13 -> n2.n17: "Không"
+n1.n9 -> n2.n10: "Team tự tạo PR\nupgrade version\n(KHÔNG auto trigger)" { style.stroke-dash: 5 }
 ```
 
 **Ví dụ GitHub Actions — Pipeline cho shared library:**
 
-```yaml
+```yaml source="snippets/7-2-pipeline-cho-shared-library-phai-tach-rieng.yaml"
 # .github/workflows/common-auth-ci.yml
 name: common-auth CI/CD
 
@@ -1822,9 +1952,11 @@ jobs:
           echo "common-auth $VERSION published to Nexus"
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2F7-2-pipeline-cho-shared-library-phai-tach-rieng.yaml)
+
 **Ví dụ GitHub Actions — Pipeline cho service (tách biệt):**
 
-```yaml
+```yaml source="snippets/7-2-pipeline-cho-shared-library-phai-tach-rieng-2.yaml"
 # .github/workflows/order-service-ci.yml
 name: Order Service CI/CD
 
@@ -1866,6 +1998,8 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: ./deploy.sh order-service ${{ github.sha }}
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2F7-2-pipeline-cho-shared-library-phai-tach-rieng-2.yaml)
 
 > **Key insight**: Library pipeline kết thúc ở bước **publish lên Nexus**. Service pipeline **KHÔNG tự động trigger** khi library publish version mới. Team service tự quyết định khi nào upgrade.
 
@@ -1909,7 +2043,7 @@ Khi library publish version mới, services **KHÔNG nên tự động upgrade**
 
 Để không quên upgrade, dùng tool tự động tạo PR khi library có version mới:
 
-```yaml
+```yaml source="snippets/7-4-tu-dong-hoa-dependabot-renovate-cho-shared-library.yaml"
 # .github/dependabot.yml (trong repo của Order Service)
 version: 2
 updates:
@@ -1924,6 +2058,8 @@ updates:
     # MAJOR: require manual review
     open-pull-requests-limit: 5
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2F7-4-tu-dong-hoa-dependabot-renovate-cho-shared-library.yaml)
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
@@ -1956,26 +2092,48 @@ updates:
 
 Khi file `.proto` / `.avsc` / OpenAPI spec thay đổi, cần flow riêng:
 
-```mermaid
-flowchart TB
-    A["Dev sửa<br/>order_events.proto"] --> B["CI: Compile proto<br/>+ backward compat check"]
-    B --> C{"Backward<br/>compatible?"}
-    C -->|Không| D["❌ CI FAIL<br/>Phải sửa lại schema"]
-    C -->|Có| E["Publish schema<br/>lên Schema Registry<br/>hoặc contract repo"]
-    E --> F["Trigger re-generate<br/>code cho các service<br/>(hoặc Renovate PR)"]
-    F --> G["Mỗi service CI:<br/>mvn compile<br/>(re-generate classes)<br/>+ chạy test"]
-    G --> H{"Test PASS?"}
-    H -->|Có| I["✅ Deploy service<br/>theo schedule riêng"]
-    H -->|Không| J["⚠️ Service team<br/>sửa code tương thích"]
-
-    style D fill:#5a2d2d,stroke:#f87171,color:#fff
-    style I fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style J fill:#5a4a2d,stroke:#fbbf24,color:#fff
+```d2 title="7.5. Contract Schema thay đổi → Ảnh hưởng pipeline thế nào?"
+direction: down
+n1: "Dev sửa\norder_events.proto"
+n2: "CI: Compile proto\n+ backward compat check"
+n3: "Backward\ncompatible?" {
+  shape: diamond
+}
+n4: "❌ CI FAIL\nPhải sửa lại schema" {
+  style.fill: "#5a2d2d"
+  style.stroke: "#f87171"
+  style.font-color: "#fff"
+}
+n5: "Publish schema\nlên Schema Registry\nhoặc contract repo"
+n6: "Trigger re-generate\ncode cho các service\n(hoặc Renovate PR)"
+n7: "Mỗi service CI:\nmvn compile\n(re-generate classes)\n+ chạy test"
+n8: "Test PASS?" {
+  shape: diamond
+}
+n9: "✅ Deploy service\ntheo schedule riêng" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n10: "⚠️ Service team\nsửa code tương thích" {
+  style.fill: "#5a4a2d"
+  style.stroke: "#fbbf24"
+  style.font-color: "#fff"
+}
+n1 -> n2
+n2 -> n3
+n3 -> n4: "Không"
+n3 -> n5: "Có"
+n5 -> n6
+n6 -> n7
+n7 -> n8
+n8 -> n9: "Có"
+n8 -> n10: "Không"
 ```
 
 **Ví dụ — CI check backward compatibility cho Protobuf:**
 
-```yaml
+```yaml source="snippets/7-5-contract-schema-thay-doi-anh-huong-pipeline-the-nao.yaml"
 # .github/workflows/contract-schema-ci.yml
 name: Contract Schema CI
 
@@ -2011,6 +2169,8 @@ jobs:
             http://schema-registry:8081/compatibility/subjects/order-events-value/versions/latest
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2F7-5-contract-schema-thay-doi-anh-huong-pipeline-the-nao.yaml)
+
 ### 7.6. Mono-repo vs Multi-repo — CI/CD khác nhau thế nào?
 
 | Aspect | Mono-repo | Multi-repo |
@@ -2036,26 +2196,40 @@ on:
 
 **Multi-repo — Mỗi repo pipeline riêng:**
 
-```mermaid
-flowchart TB
-    subgraph REPO_LIB["Repo: common-auth"]
-        A1["Dev push code"] --> A2["CI: Test"] --> A3["Publish v1.5.1<br/>lên Nexus"]
-    end
-
-    subgraph REPO_ORDER["Repo: order-service"]
-        B1["Dependabot tạo PR:<br/>bump v1.5.1"] --> B2["CI: Build + Test"] --> B3["Deploy"]
-    end
-
-    subgraph REPO_PAYMENT["Repo: payment-service (timeline riêng)"]
-        C1["Dependabot tạo PR:<br/>bump v1.5.1"] --> C2["CI: Build + Test"] --> C3["Deploy"]
-    end
-
-    A3 -.->|"Dependabot phát hiện<br/>version mới trên Nexus"| B1
-    A3 -.->|"Dependabot phát hiện<br/>version mới trên Nexus"| C1
-
-    style A3 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style B3 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style C3 fill:#2d5a3d,stroke:#4ade80,color:#fff
+```d2 title="Trong mono-repo: chỉ build service bị ảnh hưởng"
+direction: down
+n3: "Repo: payment-service (timeline riêng)" {}
+n2: "Repo: order-service" {}
+n1: "Repo: common-auth" {}
+n1.n4: "Dev push code"
+n1.n5: "CI: Test"
+n1.n6: "Publish v1.5.1\nlên Nexus" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n2.n7: "Dependabot tạo PR:\nbump v1.5.1"
+n2.n8: "CI: Build + Test"
+n2.n9: "Deploy" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n3.n10: "Dependabot tạo PR:\nbump v1.5.1"
+n3.n11: "CI: Build + Test"
+n3.n12: "Deploy" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n1.n4 -> n1.n5
+n1.n5 -> n1.n6
+n2.n7 -> n2.n8
+n2.n8 -> n2.n9
+n3.n10 -> n3.n11
+n3.n11 -> n3.n12
+n1.n6 -> n2.n7: "Dependabot phát hiện\nversion mới trên Nexus" { style.stroke-dash: 5 }
+n1.n6 -> n3.n10: "Dependabot phát hiện\nversion mới trên Nexus" { style.stroke-dash: 5 }
 ```
 
 ### 7.7. Tổng kết — Checklist CI/CD cho Shared Code
@@ -2149,30 +2323,46 @@ flowchart TB
 
 **Quá trình tách:**
 
-```mermaid
-flowchart LR
-    subgraph Before["❌ TRƯỚC — Mega Library"]
-        MEGA["shared-utils<br/>200+ classes<br/>80 deps"]
-    end
-
-    subgraph After["✅ SAU — Maven Modules"]
-        L1["common-logging<br/>5 classes, 2 deps"]
-        L2["common-auth<br/>8 classes, 3 deps"]
-        L3["common-web<br/>6 classes, 4 deps"]
-        L4["common-config<br/>3 classes, 1 dep"]
-        L5["common-crypto<br/>4 classes, 2 deps"]
-        L6["common-test<br/>10 classes, 5 deps"]
-    end
-
-    MEGA -->|"Phân tích import<br/>trong mỗi service"| After
-
-    style MEGA fill:#5a2d2d,stroke:#f87171,color:#fff
-    style L1 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style L2 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style L3 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style L4 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style L5 fill:#2d5a3d,stroke:#4ade80,color:#fff
-    style L6 fill:#2d5a3d,stroke:#4ade80,color:#fff
+```d2 title="8.2. Từ Mega Library → Micro Libraries"
+direction: right
+n2: "✅ SAU — Maven Modules" {}
+n1: "❌ TRƯỚC — Mega Library" {}
+n1.n3: "shared-utils\n200+ classes\n80 deps" {
+  style.fill: "#5a2d2d"
+  style.stroke: "#f87171"
+  style.font-color: "#fff"
+}
+n2.n4: "common-logging\n5 classes, 2 deps" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n2.n5: "common-auth\n8 classes, 3 deps" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n2.n6: "common-web\n6 classes, 4 deps" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n2.n7: "common-config\n3 classes, 1 dep" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n2.n8: "common-crypto\n4 classes, 2 deps" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n2.n9: "common-test\n10 classes, 5 deps" {
+  style.fill: "#2d5a3d"
+  style.stroke: "#4ade80"
+  style.font-color: "#fff"
+}
+n1.n3 -> n2: "Phân tích import\ntrong mỗi service"
 ```
 
 **Bước thực hiện:**

@@ -70,16 +70,27 @@ Một abstraction tốt giúp caller không biết implementation nằm trong Mo
 
 Abstraction layer nằm giữa caller và các implementation. Nó định nghĩa contract ở cấp domain, còn adapter chịu trách nhiệm chuyển contract đó sang API của code cũ hoặc service mới.
 
-```mermaid
-flowchart LR
-    A[Caller A] --> P[PaymentProcessor<br/>abstraction layer]
-    B[Caller B] --> P
-    C[Caller C] --> P
-    P --> R{Feature flag<br/>hoặc router}
-    R -->|old| L[LegacyPaymentAdapter]
-    R -->|new| N[PaymentServiceClient]
-    L --> G[Legacy module<br/>hoặc SDK cũ]
-    N --> S[Payment Service]
+```d2 title="Abstraction layer đứng ở đâu"
+direction: right
+n1: "Caller A"
+n2: "PaymentProcessor\nabstraction layer"
+n3: "Caller B"
+n4: "Caller C"
+n5: "Feature flag\nhoặc router" {
+  shape: diamond
+}
+n6: "LegacyPaymentAdapter"
+n7: "PaymentServiceClient"
+n8: "Legacy module\nhoặc SDK cũ"
+n9: "Payment Service"
+n1 -> n2
+n3 -> n2
+n4 -> n2
+n2 -> n5
+n5 -> n6: "old"
+n5 -> n7: "new"
+n6 -> n8
+n7 -> n9
 ```
 
 Trong sơ đồ này, `PaymentProcessor` không nói caller phải dùng SDK nào. `LegacyPaymentAdapter` giữ hành vi cũ trong giai đoạn đầu. `PaymentServiceClient` chuyển cùng capability đó sang Payment Service khi flag được bật.

@@ -72,20 +72,31 @@ Nếu **Bounded Context** ([xem doc 02](02-single-responsibility-bounded-context
 
 **Loose Coupling** là đặc tính của hệ thống mà trong đó các thành phần (service) có **mức phụ thuộc tối thiểu** vào nhau. Khi một service thay đổi, các service khác **không cần phải thay đổi theo** hoặc chỉ cần thay đổi rất ít.
 
-```mermaid
-graph LR
-    subgraph "Tight Coupling ❌"
-        A1[Order Service] -->|gọi trực tiếp<br/>biết internal logic| B1[Inventory Service]
-        A1 -->|chia sẻ DB| C1[(Shared DB)]
-        B1 -->|chia sẻ DB| C1
-    end
-
-    subgraph "Loose Coupling ✅"
-        A2[Order Service] -->|event: OrderCreated| MQ[Message Queue]
-        MQ -->|consume event| B2[Inventory Service]
-        A2 -->|own DB| D1[(Order DB)]
-        B2 -->|own DB| D2[(Inventory DB)]
-    end
+```d2 title="2.1. Loose Coupling là gì?"
+direction: right
+n2: "Loose Coupling ✅" {}
+n1: "Tight Coupling ❌" {}
+n1.n3: "Order Service"
+n1.n4: "Inventory Service"
+n1.n5: "Shared DB" {
+  shape: cylinder
+}
+n2.n6: "Order Service"
+n2.n7: "Message Queue"
+n2.n8: "Inventory Service"
+n2.n9: "Order DB" {
+  shape: cylinder
+}
+n2.n10: "Inventory DB" {
+  shape: cylinder
+}
+n1.n3 -> n1.n4: "gọi trực tiếp\nbiết internal logic"
+n1.n3 -> n1.n5: "chia sẻ DB"
+n1.n4 -> n1.n5: "chia sẻ DB"
+n2.n6 -> n2.n7: "event: OrderCreated"
+n2.n7 -> n2.n8: "consume event"
+n2.n6 -> n2.n9: "own DB"
+n2.n8 -> n2.n10: "own DB"
 ```
 
 **Định nghĩa chính thức**: Hai service A và B là loosely coupled nếu:
@@ -190,20 +201,26 @@ Service A phụ thuộc vào **API contract** (interface) của Service B, khôn
 
 Sử dụng **message broker** (Kafka, RabbitMQ, NATS) thay vì gọi HTTP trực tiếp.
 
-```mermaid
-graph TD
-    subgraph "Synchronous ❌"
-        A[Order] -->|HTTP POST| B[Payment]
-        B -->|HTTP PUT| C[Inventory]
-        C -->|HTTP POST| D[Notification]
-    end
-
-    subgraph "Asynchronous ✅"
-        A2[Order] -->|Publish: OrderCreated| E[Event Bus]
-        E -->|Subscribe| B2[Payment]
-        E -->|Subscribe| C2[Inventory]
-        E -->|Subscribe| D2[Notification]
-    end
+```d2 title="2.4.1. Asynchronous Communication (Giao tiếp bất đồng bộ)"
+direction: down
+n2: "Asynchronous ✅" {}
+n1: "Synchronous ❌" {}
+n1.n3: "Order"
+n1.n4: "Payment"
+n1.n5: "Inventory"
+n1.n6: "Notification"
+n2.n7: "Order"
+n2.n8: "Event Bus"
+n2.n9: "Payment"
+n2.n10: "Inventory"
+n2.n11: "Notification"
+n1.n3 -> n1.n4: "HTTP POST"
+n1.n4 -> n1.n5: "HTTP PUT"
+n1.n5 -> n1.n6: "HTTP POST"
+n2.n7 -> n2.n8: "Publish: OrderCreated"
+n2.n8 -> n2.n9: "Subscribe"
+n2.n8 -> n2.n10: "Subscribe"
+n2.n8 -> n2.n11: "Subscribe"
 ```
 
 **Ưu điểm**:
@@ -259,18 +276,17 @@ Email Service tự lắng nghe và quyết định: "OK, tôi sẽ gửi email x
 
 Mỗi service sở hữu **riêng** database của mình. Không service nào được đọc/ghi trực tiếp vào database của service khác.
 
-```
-┌──────────────┐    ┌───────────────┐    ┌──────────────┐
-│ Order Service│    │Product Service│    │ User Service │
-└──────┬───────┘    └──────┬────────┘    └──────┬───────┘
-       │                   │                    │
-  ┌────▼─────┐         ┌───▼─────┐         ┌────▼─────┐
-  │Order DB  │         │Product  │         │ User DB  │
-  │(Postgres)│         │DB(Mongo)│         │(Postgres)│
-  └─────────┘          └─────────┘         └──────────┘
-       ✅                  ✅                  ✅
-  Mỗi service            Mỗi service         Mỗi service
-  own riêng DB          own riêng DB         own riêng DB
+```d2 title="Mỗi service sở hữu database riêng"
+direction: down
+order: Order Service
+product: Product Service
+user: User Service
+od: "Order DB\nPostgreSQL" {shape: cylinder}
+pd: "Product DB\nMongoDB" {shape: cylinder}
+ud: "User DB\nPostgreSQL" {shape: cylinder}
+order -> od: Own
+product -> pd: Own
+user -> ud: Own
 ```
 
 > 📖 Chi tiết về Database per Service → [09-data-management.md](09-data-management.md)
@@ -279,23 +295,34 @@ Mỗi service sở hữu **riêng** database của mình. Không service nào đ
 
 Mỗi consumer chỉ nên biết về **phần API mà nó cần**, không phải toàn bộ API của provider.
 
-```mermaid
-graph TD
-    subgraph "Fat Interface ❌"
-        P1[Product Service<br/>getAllProducts<br/>getProduct<br/>updateStock<br/>setPricing<br/>getReviews<br/>addImage] 
-        O1[Order Service] -->|biết tất cả API| P1
-        C1[Catalog Service] -->|biết tất cả API| P1
-    end
-
-    subgraph "Segregated Interface ✅"
-        P2[Product Service]
-        P2 -->|Pricing API| I1[/pricing-api/]
-        P2 -->|Inventory API| I2[/inventory-api/]
-        P2 -->|Catalog API| I3[/catalog-api/]
-        O2[Order Service] -->|chỉ dùng| I1
-        C2[Catalog Service] -->|chỉ dùng| I3
-        INV[Inventory Service] -->|chỉ dùng| I2
-    end
+```d2 title="2.4.5. Interface Segregation (Tách biệt giao diện)"
+direction: down
+n2: "Segregated Interface ✅" {}
+n1: "Fat Interface ❌" {}
+n1.n3: "Product Service\ngetAllProducts\ngetProduct\nupdateStock\nsetPricing\ngetReviews\naddImage"
+n1.n4: "Order Service"
+n1.n5: "Catalog Service"
+n2.n6: "Product Service"
+n2.n7: "pricing-api" {
+  shape: parallelogram
+}
+n2.n8: "inventory-api" {
+  shape: parallelogram
+}
+n2.n9: "catalog-api" {
+  shape: parallelogram
+}
+n2.n10: "Order Service"
+n2.n11: "Catalog Service"
+n2.n12: "Inventory Service"
+n1.n4 -> n1.n3: "biết tất cả API"
+n1.n5 -> n1.n3: "biết tất cả API"
+n2.n6 -> n2.n7: "Pricing API"
+n2.n6 -> n2.n8: "Inventory API"
+n2.n6 -> n2.n9: "Catalog API"
+n2.n10 -> n2.n7: "chỉ dùng"
+n2.n11 -> n2.n9: "chỉ dùng"
+n2.n12 -> n2.n8: "chỉ dùng"
 ```
 
 ### 2.5. Ví dụ thực tế — Tight vs Loose Coupling
@@ -420,19 +447,15 @@ Từ **tốt nhất** → **tệ nhất**:
 
 Mỗi service tương ứng với **1 Bounded Context** trong domain model.
 
-```mermaid
-graph TD
-    subgraph "E-Commerce Domain"
-        subgraph BC1 ["Bounded Context: Catalog"]
-            S1[Catalog Service<br/>─────────────<br/>listProducts<br/>searchProducts<br/>getProductDetail<br/>manageCategories]
-        end
-        subgraph BC2 ["Bounded Context: Ordering"]
-            S2[Order Service<br/>─────────────<br/>createOrder<br/>cancelOrder<br/>trackOrder<br/>getOrderHistory]
-        end
-        subgraph BC3 ["Bounded Context: Payment"]
-            S3[Payment Service<br/>─────────────<br/>processPayment<br/>refundPayment<br/>getPaymentStatus<br/>manageBilling]
-        end
-    end
+```d2 title="3.3.1. Thiết kế theo Domain (DDD Alignment)"
+direction: down
+n4: "E-Commerce Domain" {}
+n4.n3: "Bounded Context: Payment" {}
+n4.n2: "Bounded Context: Ordering" {}
+n4.n1: "Bounded Context: Catalog" {}
+n4.n1.n5: "Catalog Service\n─────────────\nlistProducts\nsearchProducts\ngetProductDetail\nmanageCategories"
+n4.n2.n6: "Order Service\n─────────────\ncreateOrder\ncancelOrder\ntrackOrder\ngetOrderHistory"
+n4.n3.n7: "Payment Service\n─────────────\nprocessPayment\nrefundPayment\ngetPaymentStatus\nmanageBilling"
 ```
 
 #### 3.3.2. Single Responsibility Principle (SRP)
@@ -608,19 +631,30 @@ Coupling và Cohesion có **mối quan hệ nghịch đảo** tự nhiên: khi b
 
 **Không có giải pháp hoàn hảo** — luôn có trade-off:
 
-```mermaid
-graph TD
-    A[Tách nhỏ service hơn] --> B[✅ High Cohesion hơn]
-    A --> C[⚠️ Nhiều service hơn]
-    C --> D[⚠️ Inter-service communication tăng]
-    D --> E[⚠️ Coupling có thể tăng]
-    E --> F[⚠️ Latency tăng]
-    
-    G[Gom lớn service hơn] --> H[✅ Ít communication]
-    G --> I[✅ Đơn giản hơn]
-    G --> J[⚠️ Cohesion giảm]
-    J --> K[⚠️ Khó scale riêng]
-    K --> L[⚠️ Deploy rủi ro hơn]
+```d2 title="4.2. Trade-off trong thực tế"
+direction: down
+n1: "Tách nhỏ service hơn"
+n2: "✅ High Cohesion hơn"
+n3: "⚠️ Nhiều service hơn"
+n4: "⚠️ Inter-service communication tăng"
+n5: "⚠️ Coupling có thể tăng"
+n6: "⚠️ Latency tăng"
+n7: "Gom lớn service hơn"
+n8: "✅ Ít communication"
+n9: "✅ Đơn giản hơn"
+n10: "⚠️ Cohesion giảm"
+n11: "⚠️ Khó scale riêng"
+n12: "⚠️ Deploy rủi ro hơn"
+n1 -> n2
+n1 -> n3
+n3 -> n4
+n4 -> n5
+n5 -> n6
+n7 -> n8
+n7 -> n9
+n7 -> n10
+n10 -> n11
+n11 -> n12
 ```
 
 **Nguyên tắc thực tế**:
@@ -637,27 +671,19 @@ graph TD
 
 **Đặc điểm**: Tách thành nhiều service nhưng vẫn phải **deploy cùng nhau**, **share database**, và **gọi đồng bộ chéo** liên tục.
 
+```d2 title="Distributed Monolith — coupling qua call và schema"
+direction: right
+a: Service A
+b: Service B
+c: Service C
+db: Shared Database { a: Table A; b: Table B; c: Table C }
+a <-> b <-> c
+a -> db
+b -> db
+c -> db
 ```
-❌ Distributed Monolith:
-┌────────┐    ┌────────┐    ┌────────┐
-│Service │───▶│Service │───▶│Service │
-│   A    │◀───│   B    │◀───│   C    │
-└───┬────┘    └───┬────┘    └───┬────┘
-    │             │             │
-    ▼             ▼             ▼
-┌─────────────────────────────────────┐
-│          SHARED DATABASE            │
-│  ┌────────┐ ┌────────┐ ┌────────┐   │
-│  │Table A │ │Table B │ │Table C │   │
-│  └────────┘ └────────┘ └────────┘   │
-└─────────────────────────────────────┘
 
-Triệu chứng:
-• Deploy 1 service → phải deploy 2 service khác
-• Thay đổi 1 table → 3 service bị ảnh hưởng
-• 1 service chậm → cả chain chậm
-• Lock release → coordination meeting trước mỗi deploy
-```
+Triệu chứng: deploy một service phải deploy service khác; đổi một table ảnh hưởng cả ba; một service chậm kéo chậm cả chain; mỗi release phải họp coordination.
 
 **Cách fix**: 
 - Tách database cho từng service
@@ -888,31 +914,35 @@ Event Flow:
 
 **Bài toán**: Hệ thống ngân hàng — yêu cầu cao về **consistency** và **security**.
 
-```mermaid
-graph TB
-    subgraph "Banking Microservices"
-        ACC[Account Service<br/>─────────────<br/>createAccount<br/>getBalance<br/>freezeAccount<br/>updateKYC]
-        
-        TXN[Transaction Service<br/>─────────────<br/>transfer<br/>deposit<br/>withdraw<br/>getHistory]
-        
-        LOAN[Loan Service<br/>─────────────<br/>applyLoan<br/>calculateEMI<br/>processRepayment<br/>checkEligibility]
-        
-        NOTIF[Notification Service<br/>─────────────<br/>sendSMS<br/>sendEmail<br/>sendPush<br/>managePreferences]
-        
-        FRAUD[Fraud Detection<br/>─────────────<br/>analyzeTransaction<br/>scoreRisk<br/>blockSuspicious<br/>reportFraud]
-    end
-
-    TXN -->|event: TransferInitiated| EB[Event Bus]
-    EB -->|subscribe| FRAUD
-    EB -->|subscribe| NOTIF
-    TXN -->|sync call: validate balance| ACC
-    LOAN -->|sync call: check account| ACC
-    
-    style ACC fill:#4CAF50,color:#fff
-    style TXN fill:#2196F3,color:#fff
-    style LOAN fill:#FF9800,color:#fff
-    style NOTIF fill:#9C27B0,color:#fff
-    style FRAUD fill:#f44336,color:#fff
+```d2 title="7.2. Banking System"
+direction: down
+n1: "Banking Microservices" {}
+n1.n2: "Account Service\n─────────────\ncreateAccount\ngetBalance\nfreezeAccount\nupdateKYC" {
+  style.fill: "#4CAF50"
+  style.font-color: "#fff"
+}
+n1.n3: "Transaction Service\n─────────────\ntransfer\ndeposit\nwithdraw\ngetHistory" {
+  style.fill: "#2196F3"
+  style.font-color: "#fff"
+}
+n1.n4: "Loan Service\n─────────────\napplyLoan\ncalculateEMI\nprocessRepayment\ncheckEligibility" {
+  style.fill: "#FF9800"
+  style.font-color: "#fff"
+}
+n1.n5: "Notification Service\n─────────────\nsendSMS\nsendEmail\nsendPush\nmanagePreferences" {
+  style.fill: "#9C27B0"
+  style.font-color: "#fff"
+}
+n1.n6: "Fraud Detection\n─────────────\nanalyzeTransaction\nscoreRisk\nblockSuspicious\nreportFraud" {
+  style.fill: "#f44336"
+  style.font-color: "#fff"
+}
+n7: "Event Bus"
+n1.n3 -> n7: "event: TransferInitiated"
+n7 -> n1.n6: "subscribe"
+n7 -> n1.n5: "subscribe"
+n1.n3 -> n1.n2: "sync call: validate balance"
+n1.n4 -> n1.n2: "sync call: check account"
 ```
 
 **Lưu ý đặc biệt cho Banking**:

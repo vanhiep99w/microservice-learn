@@ -305,18 +305,29 @@ TWELVE-FACTOR: CONFIG TEST
 
 ### 3.3. Các cách truyền Config vào Service
 
-```mermaid
-flowchart TD
-    A[Cần truyền config vào service] --> B{Loại config?}
-    B -->|Không nhạy cảm, ít thay đổi| C[Environment Variables]
-    B -->|Cần quản lý tập trung, dynamic| D[Config Server]
-    B -->|Kubernetes workload| E[ConfigMap / Secret]
-    B -->|Secrets, cần mã hóa + rotate| F[Vault / Cloud Secret Manager]
-
-    C --> G[Đơn giản nhất]
-    D --> H[Spring Cloud Config / Consul / etcd]
-    E --> I[K8s native]
-    F --> J[An toàn nhất]
+```d2 title="3.3. Các cách truyền Config vào Service"
+direction: down
+n1: "Cần truyền config vào service"
+n2: "Loại config?" {
+  shape: diamond
+}
+n3: "Environment Variables"
+n4: "Config Server"
+n5: "ConfigMap / Secret"
+n6: "Vault / Cloud Secret Manager"
+n7: "Đơn giản nhất"
+n8: "Spring Cloud Config / Consul / etcd"
+n9: "K8s native"
+n10: "An toàn nhất"
+n1 -> n2
+n2 -> n3: "Không nhạy cảm, ít thay đổi"
+n2 -> n4: "Cần quản lý tập trung, dynamic"
+n2 -> n5: "Kubernetes workload"
+n2 -> n6: "Secrets, cần mã hóa + rotate"
+n3 -> n7
+n4 -> n8
+n5 -> n9
+n6 -> n10
 ```
 
 | Phương pháp | Ưu điểm | Nhược điểm | Phù hợp |
@@ -479,23 +490,18 @@ KHÔNG CÓ vs CÓ CONFIG SERVER
 
 **Spring Cloud Config** là config server phổ biến nhất trong hệ sinh thái Java/Spring, lưu config trong Git repo.
 
-```
-SPRING CLOUD CONFIG — KIẾN TRÚC
-─────────────────────────────────
-
-  ┌────────────────┐      ┌──────────────────┐      ┌──────────┐
-  │   Git Repo     │◄─────│  Config Server   │◄─────│ Service  │
-  │                │ pull │  (Spring Cloud)  │ pull │          │
-  │ config/        │      │                  │      │          │
-  │  ├ app-dev.yml │      │  GET /app/dev    │      │ @Value() │
-  │  ├ app-stg.yml │      │  → trả dev config│      │          │
-  │  └ app-prod.yml│      │                  │      │          │
-  └────────────────┘      └──────────────────┘      └──────────┘
+```d2 title="Spring Cloud Config — kiến trúc"
+direction: right
+git: "Git Repo\nconfig/app-dev.yml\nconfig/app-stg.yml\nconfig/app-prod.yml"
+server: "Spring Cloud Config Server\nGET /app/dev → dev config"
+service: "Service\n@Value()"
+service -> server: Pull
+server -> git: Pull
 ```
 
 **Config repo structure:**
 
-```yaml
+```yaml source="snippets/5-2-spring-cloud-config-server.yaml"
 # Git repo: config-repo/
 
 # order-service-dev.yml
@@ -521,9 +527,11 @@ logging:
     root: WARN
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F5-2-spring-cloud-config-server.yaml)
+
 **Service đọc config từ Config Server:**
 
-```yaml
+```yaml source="snippets/5-2-spring-cloud-config-server-2.yaml"
 # bootstrap.yml trong order-service
 spring:
   application:
@@ -536,6 +544,8 @@ spring:
         max-attempts: 5        # Retry 5 lần
         initial-interval: 1000 # Chờ 1s giữa mỗi retry
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F5-2-spring-cloud-config-server-2.yaml)
 
 ### 5.3. Consul KV Store
 
@@ -658,7 +668,7 @@ APPCONFIG — DEPLOY CONFIG AN TOÀN (KHÔNG CÓ Ở CÁC TOOL KHÁC!)
 
 **Cách dùng AppConfig:**
 
-```python
+```python source="snippets/5-5-aws-appconfig.py"
 # Python — Đọc config từ AWS AppConfig
 
 # Cách 1: AppConfig Agent (chạy cạnh app, cache local, khuyến nghị)
@@ -702,9 +712,11 @@ config = json.loads(response["Configuration"].read())
 token = response["NextPollConfigurationToken"]  # dùng cho lần poll tiếp
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F5-5-aws-appconfig.py)
+
 **Feature Flags với AppConfig:**
 
-```json
+```json source="snippets/5-5-aws-appconfig-2.json"
 // AppConfig Feature Flag Profile
 {
   "version": "1",
@@ -739,7 +751,9 @@ token = response["NextPollConfigurationToken"]  # dùng cho lần poll tiếp
 }
 ```
 
-```python
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F5-5-aws-appconfig-2.json)
+
+```python source="snippets/5-5-aws-appconfig-3.py"
 # Sử dụng Feature Flag trong code
 config = get_config()
 
@@ -750,6 +764,8 @@ if config["flags"]["new_checkout"]["enabled"]:
     else:
         show_old_checkout()
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F5-5-aws-appconfig-3.py)
 
 ```
 APPCONFIG — KHI NÀO DÙNG?
@@ -847,7 +863,7 @@ CONFIGMAP — HIỂU ĐƠN GIẢN
 
 ### 6.2. Cách sử dụng ConfigMap
 
-```yaml
+```yaml source="snippets/6-2-cach-su-dung-configmap.yaml"
 # 1. Tạo ConfigMap
 apiVersion: v1
 kind: ConfigMap
@@ -873,7 +889,9 @@ data:
         root: INFO
 ```
 
-```yaml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F6-2-cach-su-dung-configmap.yaml)
+
+```yaml source="snippets/6-2-cach-su-dung-configmap-2.yaml"
 # 2. Sử dụng trong Pod — Environment Variables
 apiVersion: apps/v1
 kind: Deployment
@@ -919,6 +937,8 @@ spec:
             path: application.yml
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F6-2-cach-su-dung-configmap-2.yaml)
+
 ### 6.3. Config Reload — Hot Reload không cần restart
 
 ```
@@ -946,7 +966,7 @@ CONFIG RELOAD STRATEGIES
 
 **Reloader — tự động restart khi ConfigMap đổi:**
 
-```yaml
+```yaml source="snippets/6-3-config-reload-hot-reload-khong-can-restart.yaml"
 # Dùng Reloader annotation
 apiVersion: apps/v1
 kind: Deployment
@@ -963,6 +983,8 @@ spec:
         - configMapRef:
             name: order-service-config
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F6-3-config-reload-hot-reload-khong-can-restart.yaml)
 
 ---
 
@@ -1037,16 +1059,29 @@ SECRETS NIGHTMARE — CÁC VẤN ĐỀ THỰC TẾ
 
 ### 7.3. Các giải pháp Secrets Management
 
-```mermaid
-flowchart TD
-    A[Cần quản lý Secrets] --> B{Môi trường?}
-    B -->|Self-hosted / Multi-cloud| C[HashiCorp Vault]
-    B -->|AWS| D[AWS Secrets Manager]
-    B -->|GCP| E[GCP Secret Manager]
-    B -->|Azure| F[Azure Key Vault]
-    B -->|Kubernetes + GitOps| G{Cần gì?}
-    G -->|Encrypt secrets trong Git| H[Sealed Secrets]
-    G -->|Sync từ external store| I[External Secrets Operator]
+```d2 title="7.3. Các giải pháp Secrets Management"
+direction: down
+n1: "Cần quản lý Secrets"
+n2: "Môi trường?" {
+  shape: diamond
+}
+n3: "HashiCorp Vault"
+n4: "AWS Secrets Manager"
+n5: "GCP Secret Manager"
+n6: "Azure Key Vault"
+n7: "Cần gì?" {
+  shape: diamond
+}
+n8: "Sealed Secrets"
+n9: "External Secrets Operator"
+n1 -> n2
+n2 -> n3: "Self-hosted / Multi-cloud"
+n2 -> n4: "AWS"
+n2 -> n5: "GCP"
+n2 -> n6: "Azure"
+n2 -> n7: "Kubernetes + GitOps"
+n7 -> n8: "Encrypt secrets trong Git"
+n7 -> n9: "Sync từ external store"
 ```
 
 | Giải pháp | Loại | Dynamic Secrets | Auto Rotation | Phù hợp |
@@ -1257,7 +1292,7 @@ DYNAMIC SECRETS FLOW — TỪNG BƯỚC
 
 ### 8.6. Vault với Kubernetes
 
-```yaml
+```yaml source="snippets/8-6-vault-voi-kubernetes.yaml"
 # Cách 1: Vault Agent Sidecar Injector
 # → Vault Agent chạy cạnh app, tự động inject secrets vào file
 apiVersion: apps/v1
@@ -1294,7 +1329,9 @@ spec:
         command: ["sh", "-c", "source /vault/secrets/db && source /vault/secrets/api && ./app"]
 ```
 
-```yaml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F8-6-vault-voi-kubernetes.yaml)
+
+```yaml source="snippets/8-6-vault-voi-kubernetes-2.yaml"
 # Cách 2: Vault CSI Provider
 # → Mount secrets làm volume, giống ConfigMap
 apiVersion: secrets-store.csi.x-k8s.io/v1
@@ -1314,6 +1351,8 @@ spec:
         secretPath: "secret/data/order-service/api"
         secretKey: "stripe_key"
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F8-6-vault-voi-kubernetes-2.yaml)
 
 ---
 
@@ -1337,7 +1376,7 @@ AWS SECRETS MANAGER — CÁCH HOẠT ĐỘNG
   └──────────┘                    └───────────────────┘
 ```
 
-```python
+```python source="snippets/9-1-aws-secrets-manager.py"
 # Python — Đọc secret từ AWS Secrets Manager
 import boto3
 import json
@@ -1356,6 +1395,8 @@ db_creds = get_secret("prod/order-service/db")
 #   "port": 5432
 # }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F9-1-aws-secrets-manager.py)
 
 **Auto-rotation với RDS:**
 
@@ -1404,7 +1445,7 @@ PARAMETER STORE — CẤU TRÚC
       └── db_password = "encrypted..."             (SecureString)
 ```
 
-```python
+```python source="snippets/9-2-aws-systems-manager-parameter-store.py"
 # Python — Đọc parameters
 import boto3
 
@@ -1426,6 +1467,8 @@ response = ssm.get_parameters_by_path(
 for param in response["Parameters"]:
     print(f"{param['Name']} = {param['Value']}")
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F9-2-aws-systems-manager-parameter-store.py)
 
 ### 9.3. So sánh Secrets Manager vs Parameter Store
 
@@ -1477,33 +1520,18 @@ VẤN ĐỀ VỚI KUBERNETES SECRETS + GITOPS
 
 **Sealed Secrets** (Bitnami) encrypt K8s Secret thành **SealedSecret** — chỉ controller trên cluster mới decrypt được.
 
-```
-SEALED SECRETS FLOW
-────────────────────
-
-  Developer                    Git Repo              K8s Cluster
-      │                          │                       │
-      │ 1. Tạo Secret bình thường│                       │
-      │    (local, KHÔNG commit) │                       │
-      │                          │                       │
-      │ 2. kubeseal encrypt      │                       │
-      │    Secret → SealedSecret │                       │
-      │    (dùng public key      │                       │
-      │     của cluster)         │                       │
-      │                          │                       │
-      │ 3. Commit SealedSecret ─▶│                       │
-      │    (encrypted, an toàn!) │                       │
-      │                          │ 4. ArgoCD sync        │
-      │                          │────────────────────▶  │
-      │                          │                       │
-      │                          │    SealedSecret       │
-      │                          │    Controller         │
-      │                          │    decrypt            │
-      │                          │    → K8s Secret       │
-      │                          │    (trong cluster)    │
+```d2 title="Sealed Secrets — không commit plaintext"
+direction: right
+local: "1. Developer tạo Secret local\nKHÔNG commit plaintext"
+encrypt: "2. kubeseal encrypt\nDùng public key của cluster"
+git: "3. Git Repo\nCommit SealedSecret đã encrypt"
+sync: 4. ArgoCD sync
+controller: SealedSecret Controller decrypt
+secret: K8s Secret — trong cluster
+local -> encrypt -> git -> sync -> controller -> secret
 ```
 
-```yaml
+```yaml source="snippets/10-2-sealed-secrets.yaml"
 # SealedSecret — AN TOÀN để commit vào Git
 apiVersion: bitnami.com/v1alpha1
 kind: SealedSecret
@@ -1517,32 +1545,26 @@ spec:
     password: AgCtr8OJSWK+YtSi7KxPHnHalks9djfh...
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F10-2-sealed-secrets.yaml)
+
 ### 10.3. External Secrets Operator (ESO)
 
 **ESO** sync secrets từ external store (Vault, AWS, GCP) vào K8s Secrets — Git chỉ lưu **reference**, không lưu secret value.
 
-```
-EXTERNAL SECRETS OPERATOR — FLOW
-──────────────────────────────────
-
-  Git Repo                 K8s Cluster              External Store
-      │                       │                          │
-      │  ExternalSecret       │                          │
-      │  (chỉ lưu reference)  │                          │
-      │  "lấy secret 'db'     │                          │
-      │   từ AWS Secrets Mgr" │                          │
-      │──────────────────────▶│                          │
-      │                       │ ESO Controller           │
-      │                       │──── fetch secret ──────▶ │
-      │                       │                          │
-      │                       │◄── password: s3cret ──── │
-      │                       │                          │
-      │                       │ Tạo K8s Secret           │
-      │                       │ (trong cluster,          │
-      │                       │  KHÔNG trong Git)        │
+```d2 title="External Secrets Operator — Git chỉ lưu reference"
+direction: right
+git: "Git Repo\nExternalSecret reference tới db"
+cluster: K8s Cluster { eso: ESO Controller; secret: K8s Secret }
+store: AWS Secrets Manager / External Store
+git -> cluster.eso: Sync reference
+cluster.eso -> store: Fetch secret
+store -> cluster.eso: Secret value
+cluster.eso -> cluster.secret: Tạo / cập nhật
 ```
 
-```yaml
+Giá trị secret ở trong cluster, không nằm trong Git.
+
+```yaml source="snippets/10-3-external-secrets-operator-eso.yaml"
 # SecretStore — kết nối tới external store
 apiVersion: external-secrets.io/v1beta1
 kind: SecretStore
@@ -1585,6 +1607,8 @@ spec:
       key: prod/order-service/db
       property: password
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F10-3-external-secrets-operator-eso.yaml)
 
 ---
 
@@ -1717,7 +1741,7 @@ FEATURE FLAG SYSTEM — KIẾN TRÚC
 
 **Ví dụ với Unleash (open-source Feature Flag):**
 
-```python
+```python source="snippets/11-2-feature-flags.py"
 # Python — SDK Unleash
 from UnleashClient import UnleashClient
 
@@ -1737,6 +1761,8 @@ context = {"userId": "user-123", "properties": {"plan": "premium"}}
 if client.is_enabled("beta_search", context):
     show_beta_search()
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F11-2-feature-flags.py)
 
 ```
 USE CASES CỤ THỂ

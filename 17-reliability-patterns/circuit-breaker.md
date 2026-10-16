@@ -45,14 +45,22 @@
 
 Khi mạch mở, request bị **fail fast** (thất bại nhanh) thay vì tiếp tục chờ một dependency đang không phục vụ được. Caller có thể trả lỗi theo contract, chuyển sang **fallback** (phương án dự phòng), hoặc đưa công việc vào queue để xử lý sau.
 
-```mermaid
-flowchart LR
-    R[Request] --> CB{Circuit Breaker}
-    CB -->|CLOSED| D[Dependency]
-    CB -->|OPEN| F[Fallback hoặc lỗi nhanh]
-    D -->|Success| S[Trả kết quả]
-    D -->|Failure hoặc slow call| C[CB ghi nhận kết quả]
-    C --> CB
+```d2 title="Circuit Breaker là gì"
+direction: right
+n1: "Request"
+n2: "Circuit Breaker" {
+  shape: diamond
+}
+n3: "Dependency"
+n4: "Fallback hoặc lỗi nhanh"
+n5: "Trả kết quả"
+n6: "CB ghi nhận kết quả"
+n1 -> n2
+n2 -> n3: "CLOSED"
+n2 -> n4: "OPEN"
+n3 -> n5: "Success"
+n3 -> n6: "Failure hoặc slow call"
+n6 -> n2
 ```
 
 Circuit Breaker không sửa được dependency và cũng không hoàn tác side effect đã xảy ra. Mục tiêu của nó là giới hạn việc caller tiếp tục tiêu tài nguyên cho một dependency đang lỗi, từ đó giảm nguy cơ **Cascading Failure** (lỗi lan truyền dây chuyền).
@@ -251,32 +259,29 @@ Các con số này chỉ nhằm minh họa state transition. Production cần d�
 
 ### Luồng khi Bank API lỗi kéo dài
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Payment Service
-    participant CB as Circuit Breaker
-    participant B as Bank API
-    participant Q as Payment Queue
-
-    O->>P: Thanh toán order-456
-    P->>CB: Execute payment operation
-    CB->>B: Charge với timeout
-    B-->>CB: Timeout hoặc 5xx
-    CB-->>P: Ghi nhận failure
-    P-->>O: Kết quả lỗi hoặc pending theo policy
-
-    Note over CB: Failure rate vượt threshold
-    O->>P: Payment request mới
-    P->>CB: Kiểm tra state
-    CB-->>P: OPEN — reject ngay
-    P->>Q: Đưa payment vào queue
-    P-->>O: PENDING_PAYMENT
-
-    Note over CB: Hết wait duration
-    CB->>B: HALF-OPEN probe
-    B-->>CB: Success
-    CB-->>P: CLOSED sau policy kiểm tra
+```d2 title="Luồng khi Bank API lỗi kéo dài"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Payment Service"
+"CB": "Circuit Breaker"
+"B": "Bank API"
+"Q": "Payment Queue"
+"O" -> "P": "Thanh toán order-456"
+"P" -> "CB": "Execute payment operation"
+"CB" -> "B": "Charge với timeout"
+"B" -> "CB": "Timeout hoặc 5xx" { style.stroke-dash: 5 }
+"CB" -> "P": "Ghi nhận failure" { style.stroke-dash: 5 }
+"P" -> "O": "Kết quả lỗi hoặc pending theo policy" { style.stroke-dash: 5 }
+"CB".note1: "Failure rate vượt threshold"
+"O" -> "P": "Payment request mới"
+"P" -> "CB": "Kiểm tra state"
+"CB" -> "P": "OPEN — reject ngay" { style.stroke-dash: 5 }
+"P" -> "Q": "Đưa payment vào queue"
+"P" -> "O": "PENDING_PAYMENT" { style.stroke-dash: 5 }
+"CB".note2: "Hết wait duration"
+"CB" -> "B": "HALF-OPEN probe"
+"B" -> "CB": "Success" { style.stroke-dash: 5 }
+"CB" -> "P": "CLOSED sau policy kiểm tra" { style.stroke-dash: 5 }
 ```
 
 Một timeline cụ thể theo ví dụ trong tài liệu nguồn:

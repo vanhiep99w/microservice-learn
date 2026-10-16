@@ -41,17 +41,29 @@ Rolling Update thường là lựa chọn nền cho một service thông thườ
 
 Controller bắt đầu bằng việc tạo instance v2, chờ instance đó sẵn sàng, rồi mới giảm số instance v1. Quy trình lặp lại cho tới khi không còn instance v1.
 
-```mermaid
-flowchart TD
-    A["Bắt đầu: các pod v1"] --> B["Tạo một pod v2"]
-    B --> C{"v2 đạt readiness?"}
-    C -->|"Chưa"| D["Giữ v1 phục vụ<br/>Theo dõi v2"]
-    D --> B
-    C -->|"Đạt"| E["Đưa v2 vào pool\nnhận traffic"]
-    E --> F["Giảm một pod v1"]
-    F --> G{"Còn pod v1?"}
-    G -->|"Còn"| B
-    G -->|"Hết"| H["Hoàn tất: toàn bộ là v2"]
+```d2 title="Cơ chế rollout"
+direction: down
+n1: "Bắt đầu: các pod v1"
+n2: "Tạo một pod v2"
+n3: "v2 đạt readiness?" {
+  shape: diamond
+}
+n4: "Giữ v1 phục vụ\nTheo dõi v2"
+n5: "Đưa v2 vào pool\\nnhận traffic"
+n6: "Giảm một pod v1"
+n7: "Còn pod v1?" {
+  shape: diamond
+}
+n8: "Hoàn tất: toàn bộ là v2"
+n1 -> n2
+n2 -> n3
+n3 -> n4: "Chưa"
+n4 -> n2
+n3 -> n5: "Đạt"
+n5 -> n6
+n6 -> n7
+n7 -> n2: "Còn"
+n7 -> n8: "Hết"
 ```
 
 ### Trình tự thay thế instance

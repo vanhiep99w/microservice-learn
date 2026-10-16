@@ -100,12 +100,17 @@ Các thay đổi thường có nguy cơ breaking:
 - Đổi business logic hoặc trạng thái xử lý khiến consumer cũ tạo ra data sai.
 - Đổi data model đến mức contract cũ không còn ánh xạ đúng.
 
-```mermaid
-flowchart LR
-    C[Consumer cũ] -->|Gọi contract cũ| P[Provider]
-    P -->|Xóa fullName| R[Response mới]
-    R --> E[Deserialize lỗi hoặc sai logic]
-    E --> I[Incident liên team]
+```d2 title="Breaking change và hậu quả"
+direction: right
+n1: "Consumer cũ"
+n2: "Provider"
+n3: "Response mới"
+n4: "Deserialize lỗi hoặc sai logic"
+n5: "Incident liên team"
+n1 -> n2: "Gọi contract cũ"
+n2 -> n3: "Xóa fullName"
+n3 -> n4
+n4 -> n5
 ```
 
 Hậu quả chính gồm:
@@ -142,22 +147,26 @@ Giả sử User Provider đang công bố response:
 GET /api/users/123
 ```
 
-```json
+```json source="snippets/cach-thay-doi-lam-consumer-bi-pha-vo.json"
 {
   "id": 123,
   "fullName": "Nguyen Van A"
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=no-api-versioning&snapshot=article&file=snippets%2Fcach-thay-doi-lam-consumer-bi-pha-vo.json)
+
 Order Consumer chỉ đọc `id` và `fullName`. Provider muốn chuẩn hóa dữ liệu thành `firstName` và `lastName`, rồi deploy thay đổi trực tiếp:
 
-```json
+```json source="snippets/cach-thay-doi-lam-consumer-bi-pha-vo-2.json"
 {
   "id": 123,
   "firstName": "Nguyen",
   "lastName": "Van A"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=no-api-versioning&snapshot=article&file=snippets%2Fcach-thay-doi-lam-consumer-bi-pha-vo-2.json)
 
 Consumer cũ có thể fail khi deserialize nếu schema strict. Nếu serializer cho phép thiếu field, logic phía sau vẫn có thể nhận `fullName` rỗng và xử lý sai. Vấn đề không nằm ở tên field mới, mà ở việc provider xóa field cũ khi consumer chưa migrate.
 
@@ -178,24 +187,28 @@ Nếu ý nghĩa nghiệp vụ của contract cũ vẫn còn đúng, provider có
 GET /api/v1/users/123
 ```
 
-```json
+```json source="snippets/cach-giu-contract-cu-bang-adapter.json"
 {
   "id": 123,
   "fullName": "Nguyen Van A"
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=no-api-versioning&snapshot=article&file=snippets%2Fcach-giu-contract-cu-bang-adapter.json)
+
 ```http
 GET /api/v2/users/123
 ```
 
-```json
+```json source="snippets/cach-giu-contract-cu-bang-adapter-2.json"
 {
   "id": 123,
   "firstName": "Nguyen",
   "lastName": "Van A"
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=no-api-versioning&snapshot=article&file=snippets%2Fcach-giu-contract-cu-bang-adapter-2.json)
 
 Trong giai đoạn chuyển tiếp, v1 vẫn trả contract cũ và v2 trả contract mới. Consumer được migrate từng phần. Chỉ sau khi usage của v1 đã được kiểm tra và deprecation đã công bố thì provider mới xem xét gỡ v1.
 
@@ -226,7 +239,7 @@ Versioning không thay thế compatibility. Trước khi tạo v2, hãy hỏi li
 
 Provider thêm `phone` vào response:
 
-```json
+```json source="snippets/tolerant-reader.json"
 {
   "id": 123,
   "name": "John",
@@ -235,18 +248,25 @@ Provider thêm `phone` vào response:
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=no-api-versioning&snapshot=article&file=snippets%2Ftolerant-reader.json)
+
 Consumer cũ chỉ đọc `id`, `name` và `email`. Nó có thể tiếp tục hoạt động nếu serializer và contract cho phép bỏ qua field chưa biết. Tolerant Reader không cứu được việc rename, xóa field hoặc đổi ý nghĩa của field đang được đọc.
 
 ### Consumer Driven Contract Testing
 
 **Consumer-driven contract test** để mỗi consumer mô tả chính xác phần contract mình cần. Provider chạy các contract đó trong CI trước khi deploy.
 
-```mermaid
-flowchart LR
-    O[Order Consumer] -->|Contract: id và name| R[Contract Registry]
-    S[Search Consumer] -->|Contract: id và category| R
-    R --> T[Provider CI]
-    T -->|Pass hoặc fail| P[User Provider]
+```d2 title="Consumer Driven Contract Testing"
+direction: right
+n1: "Order Consumer"
+n2: "Contract Registry"
+n3: "Search Consumer"
+n4: "Provider CI"
+n5: "User Provider"
+n1 -> n2: "Contract: id và name"
+n3 -> n2: "Contract: id và category"
+n2 -> n4
+n4 -> n5: "Pass hoặc fail"
 ```
 
 Một contract nên làm rõ ít nhất:
@@ -453,13 +473,19 @@ Không nên đưa toàn bộ business logic hoặc workflow migration vào Gatew
 
 **Backend for Frontend (BFF)** là một consumer thực sự của domain API. Web BFF và Mobile BFF có thể expose response shape khác nhau, nhưng mỗi BFF vẫn phải theo contract của service phía sau.
 
-```mermaid
-flowchart LR
-    W[Web App] --> WBFF[Web BFF]
-    M[Mobile App] --> MBFF[Mobile BFF]
-    WBFF --> P[Product API]
-    MBFF --> P
-    P --> V[Contract có lifecycle]
+```d2 title="Khi BFF là consumer của API"
+direction: right
+n1: "Web App"
+n2: "Web BFF"
+n3: "Mobile App"
+n4: "Mobile BFF"
+n5: "Product API"
+n6: "Contract có lifecycle"
+n1 -> n2
+n3 -> n4
+n2 -> n5
+n4 -> n5
+n5 -> n6
 ```
 
 BFF có thể version public contract theo UX của client mà không buộc domain service dùng cùng hình dạng response. Tuy nhiên, BFF không xóa nhu cầu compatibility: nếu Product API rename field, cả Web BFF và Mobile BFF đều là consumer cần được kiểm tra hoặc migrate.

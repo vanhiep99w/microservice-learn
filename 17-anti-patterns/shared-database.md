@@ -79,23 +79,28 @@ Mô hình `Private tables` với convention đặt tên như `order_orders` và 
 
 Mục tiêu của **Database per Service** không nhất thiết là mỗi service phải có một máy chủ vật lý riêng. Mục tiêu trước hết là mỗi nhóm dữ liệu có một service sở hữu, chỉ owner được ghi và truy cập chéo đi qua API hoặc events. Cấp độ server có thể tăng dần theo nhu cầu isolation.
 
-```text
-❌ Shared schema/table: implementation bị dùng chung
-
-  Order Service ───────┐
-                       ├──> public.orders
-  Shipping Service ────┘       └── shipping_status
-
-  Shipping Service có thể UPDATE cột nội bộ của Order Service.
-
-✅ Data ownership: cùng server vẫn có boundary
-
-  Order Service ───> order_schema.orders ───> Order DB server
-  Shipping Service ─> shipping_schema.shipments ─> Order DB server
-
-  Mỗi service chỉ có quyền trên schema của mình.
-  Nhu cầu liên service đi qua API, event hoặc read model.
+```d2 title="Shared Schema khác Shared Server"
+direction: right
+bad: "Sai — Shared schema/table" {
+ order: Order Service
+ shipping: Shipping Service
+ table: "public.orders\nshipping_status" {shape: cylinder}
+ order -> table
+ shipping -> table: UPDATE cột nội bộ Order
+}
+good: "Đúng — Data ownership trên cùng server" {
+ order: Order Service
+ shipping: Shipping Service
+ server: DB Server {
+  orders: order_schema.orders {shape: cylinder}
+  shipments: shipping_schema.shipments {shape: cylinder}
+ }
+ order -> server.orders
+ shipping -> server.shipments
+}
 ```
+
+Mỗi service chỉ có quyền trên schema của mình. Nhu cầu liên service đi qua API, event hoặc read model; không bắt buộc mỗi service có một physical database server.
 
 Dùng chung server và dùng chung implementation là hai chuyện khác nhau. Điều cần kiểm tra là schema/permission có ngăn được truy cập sai hay chỉ dựa vào convention của team.
 
@@ -148,17 +153,13 @@ Shared Database có thể làm một thao tác ban đầu trông đơn giản h�
 
 Giả sử Order Service và Shipping Service đã có codebase riêng nhưng cùng truy cập một schema. Shipping Service cập nhật trực tiếp trạng thái giao hàng trong table của order để màn hình tracking đọc được dữ liệu nhanh.
 
-```text
-❌ Cùng dùng một table
-
-  Order Service ────────────────┐
-       │                        │
-       │ reads/writes orders    ▼
-       └──────────────────> orders table
-                                ▲
-       ┌────────────────────────┘
-       │ UPDATE orders.shipping_status
-  Shipping Service
+```d2 title="Shared Table — Implementation Coupling"
+direction: right
+order: Order Service
+shipping: Shipping Service
+table: orders table {shape: cylinder}
+order -> table: Reads / Writes
+shipping -> table: UPDATE orders.shipping_status
 ```
 
 Đoạn ghi dưới đây minh họa việc Shipping Service phụ thuộc trực tiếp vào table của Order Service:
@@ -188,17 +189,18 @@ Sau đó Order Service đổi cách biểu diễn status. Shipping Service và c
 
 Nếu trạng thái shipment thuộc Shipping capability, Shipping Service nên sở hữu dữ liệu shipment của mình. Order Service chỉ cập nhật trạng thái order hoặc một projection local dựa trên contract đã thống nhất.
 
-```text
-✅ Tách ownership, không tách nghĩa vụ phối hợp
-
-  Shipping Service ──> Shipping DB
-        │
-        └── ShipmentStatusChanged event hoặc API response
-                                      │
-                                      ▼
-                           Order Service ──> Order DB
-                           (cập nhật dữ liệu local nếu use case cần)
+```d2 title="Tách Data Ownership — cập nhật Local Model"
+direction: right
+shipping: Shipping Service
+sd: Shipping DB {shape: cylinder}
+order: Order Service
+od: Order DB {shape: cylinder}
+shipping -> sd
+shipping -> order: ShipmentStatusChanged event / API response
+order -> od: Cập nhật local nếu use case cần
 ```
+
+Tách ownership không xóa bỏ nghĩa vụ phối hợp giữa các service.
 
 Có hai cách thường dùng khi Order cần hiển thị thông tin từ Shipping:
 
@@ -300,14 +302,23 @@ Nếu business chấp nhận trạng thái trung gian và **eventual consistency
 
 Ví dụ đặt hàng:
 
-```text
-Happy path:
-  Order tạo PENDING ──> Payment charge ──> Inventory reserve ──> CONFIRMED
-
-Inventory thất bại:
-  Order PENDING ──> Payment đã charge ──> Inventory FAIL
-                                  │
-                                  └──> Refund payment ──> Cancel order
+```d2 title="Saga — Shared Database không phải điều kiện bắt buộc"
+direction: right
+happy: Happy Path {
+ order: Order PENDING
+ payment: Payment Charge
+ inventory: Inventory Reserve
+ confirmed: CONFIRMED
+ order -> payment -> inventory -> confirmed
+}
+fail: Inventory Failure {
+ order: Order PENDING
+ payment: Payment đã charge
+ inventory: Inventory FAIL
+ refund: Refund Payment
+ cancel: Cancel Order
+ order -> payment -> inventory -> refund -> cancel
+}
 ```
 
 Mỗi participant cần có state và identity ổn định để xử lý retry. Các bước charge, refund hoặc reserve phải có **idempotency** (xử lý lặp lại không tạo thêm side effect sai). Nếu workflow không chấp nhận eventual consistency hoặc compensation, cần xem xét lại boundary nghiệp vụ thay vì quay lại cho nhiều service ghi chung table.

@@ -86,13 +86,19 @@ Một service gọi service khác không tự động tạo ra Distributed Monol
 
 **Synchronous chain** là chuỗi gọi đồng bộ `A → B → C`, trong đó mỗi caller phải chờ callee trước khi tiếp tục. Thời gian chờ của các bước nối tiếp cộng dồn. Nếu một downstream chậm hoặc unavailable, upstream có thể giữ connection và tài nguyên cho tới khi timeout.
 
-```mermaid
-flowchart LR
-    C[Client] --> G[API Gateway]
-    G --> O[Order Service]
-    O -->|sync và chờ| P[Payment Service]
-    P -->|sync và chờ| I[Inventory Service]
-    O -.->|event cho việc không cần kết quả ngay| N[Notification]
+```d2 title="Coupling và synchronous chain"
+direction: right
+n1: "Client"
+n2: "API Gateway"
+n3: "Order Service"
+n4: "Payment Service"
+n5: "Inventory Service"
+n6: "Notification"
+n1 -> n2
+n2 -> n3
+n3 -> n4: "sync và chờ"
+n4 -> n5: "sync và chờ"
+n3 -> n6: "event cho việc không cần kết quả ngay" { style.stroke-dash: 5 }
 ```
 
 Synchronous call vẫn phù hợp khi caller cần quyết định tức thời, chẳng hạn cần biết kết quả của một bước bắt buộc trước khi trả response. Anti-pattern nằm ở việc dùng sync làm mặc định cho mọi bước và tạo một chuỗi chờ dài, trong khi notification, analytics hoặc hậu xử lý không cần kết quả ngay.

@@ -471,17 +471,34 @@ Tools: Apache Kafka, Amazon Kinesis, Redpanda, Apache Pulsar
 
 ### 4.1. Decision Framework
 
-```mermaid
-flowchart TD
-    A[Service A cần giao tiếp<br/>với Service B] --> B{Caller CẦN response<br/>ngay lập tức?}
-    B -->|Có| C{Response cần<br/>trong bao lâu?}
-    C -->|"< 500ms"| D["Sync: REST hoặc gRPC"]
-    C -->|"> 500ms"| E["Async + Webhook/Polling<br/>hoặc WebSocket"]
-    B -->|Không| F{Cần đảm bảo<br/>message được xử lý?}
-    F -->|Có| G["Async: Message Queue<br/>(RabbitMQ, SQS)"]
-    F -->|Không nhất thiết| H{Có nhiều consumers<br/>cần nhận event?}
-    H -->|Có| I["Async: Pub/Sub hoặc<br/>Event Streaming (Kafka)"]
-    H -->|Không| G
+```d2 title="4.1. Decision Framework"
+direction: down
+n1: "Service A cần giao tiếp\nvới Service B"
+n2: "Caller CẦN response\nngay lập tức?" {
+  shape: diamond
+}
+n3: "Response cần\ntrong bao lâu?" {
+  shape: diamond
+}
+n4: "Sync: REST hoặc gRPC"
+n5: "Async + Webhook/Polling\nhoặc WebSocket"
+n6: "Cần đảm bảo\nmessage được xử lý?" {
+  shape: diamond
+}
+n7: "Async: Message Queue\n(RabbitMQ, SQS)"
+n8: "Có nhiều consumers\ncần nhận event?" {
+  shape: diamond
+}
+n9: "Async: Pub/Sub hoặc\nEvent Streaming (Kafka)"
+n1 -> n2
+n2 -> n3: "Có"
+n3 -> n4: "< 500ms"
+n3 -> n5: "> 500ms"
+n2 -> n6: "Không"
+n6 -> n7: "Có"
+n6 -> n8: "Không nhất thiết"
+n8 -> n9: "Có"
+n8 -> n7: "Không"
 ```
 
 | Scenario | Chọn | Lý do |
@@ -496,57 +513,28 @@ flowchart TD
 
 ### 4.2. Ví dụ thực tế — E-Commerce Order Flow
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│         E-COMMERCE ORDER FLOW — MIXED COMMUNICATION             │
-│                                                                 │
-│  User click "Đặt hàng"                                          │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌─────────────┐                                                │
-│  │ API Gateway │                                                │
-│  └──────┬──────┘                                                │
-│         │ REST (sync)                                           │
-│         ▼                                                       │
-│  ┌─────────────┐    gRPC (sync)     ┌─────────────┐             │
-│  │   Order     │───────────────────▶│  Product    │             │
-│  │   Service   │  "Lấy giá, check   │  Service    │             │
-│  │             │   còn hàng không?" │             │             │
-│  │             │◀────────────────── │             │             │
-│  │             │                    └─────────────┘             │
-│  │             │                                                │
-│  │             │    REST (sync)     ┌─────────────┐             │
-│  │             │───────────────────▶│  Payment    │             │
-│  │             │  "Charge $100"     │  Service    │             │
-│  │             │◀──── OK ────────── │             │             │
-│  │             │                    └─────────────┘             │
-│  │             │                                                │
-│  │             │─── Publish Event ─────────────────────┐        │
-│  │             │    "OrderCreated"                     │        │
-│  └─────────────┘                                       │        │
-│         │                                              │        │
-│    Response to user:                                   ▼        │
-│    "Đơn hàng #456                            ┌──────────┐     │
-│     đã được tạo"                               │  Kafka   │     │
-│                                                │  Topic:  │     │
-│                                                │  orders  │     │
-│                                                └────┬─────┘     │
-│                                                     │           │
-│                              ┌───────────────┬──────┴────┐      │
-│                              ▼               ▼           ▼      │
-│                        ┌──────────┐   ┌──────────┐ ┌──────────┐ │
-│                        │Inventory │   │  Notif.  │ │Analytics │ │
-│                        │ Service  │   │ Service  │ │ Service  │ │
-│                        │          │   │          │ │          │ │
-│                        │Reserve   │   │Gửi email │ │Track     │ │
-│                        │stock     │   │xác nhận  │ │conversion│ │
-│                        └──────────┘   └──────────┘ └──────────┘ │
-│                                                                 │
-│  Sync:  Order → Product (cần giá ngay)                          │
-│         Order → Payment (cần kết quả charge ngay)               │
-│  Async: Order → Inventory, Notification, Analytics              │
-│         (không cần chờ, xử lý background)                       │
-└─────────────────────────────────────────────────────────────────┘
+```d2 title="Order Flow — kết hợp Sync và Async"
+direction: down
+user: "User — đặt hàng"
+gateway: API Gateway
+order: Order Service
+product: Product Service
+payment: Payment Service
+kafka: "Kafka\nTopic orders"
+inventory: "Inventory Service\nReserve stock"
+notification: "Notification Service\nGửi email xác nhận"
+analytics: "Analytics Service\nTrack conversion"
+user -> gateway
+gateway -> order: REST sync
+order -> product: "gRPC sync — giá, tồn kho"
+product -> order: Kết quả
+order -> payment: "REST sync — Charge \$100"
+payment -> order: OK
+order -> kafka: Publish OrderCreated
+order -> user: Đơn hàng 456 đã được tạo
+kafka -> inventory: Async
+kafka -> notification: Async
+kafka -> analytics: Async
 ```
 
 ---
@@ -692,19 +680,24 @@ Event-Driven cốt lõi:                Orchestration vi phạm:
    cần sửa producer                  orchestrator
 ```
 
-```mermaid
-graph LR
-    subgraph "Choreography — Event-Driven ✅"
-        A1[Order] -->|"OrderCreated<br/>(event)"| B1[Payment]
-        B1 -->|"PaymentCompleted<br/>(event)"| C1[Inventory]
-        C1 -->|"StockReserved<br/>(event)"| D1[Shipping]
-    end
-
-    subgraph "Orchestration — Command-Driven ❌"
-        O["Orchestrator<br/>(God service)"] -->|"ChargePayment<br/>(command)"| B2[Payment]
-        O -->|"ReserveStock<br/>(command)"| C2[Inventory]
-        O -->|"CreateShipment<br/>(command)"| D2[Shipping]
-    end
+```d2 title="5.3. Choreography vs Orchestration — Phân biệt rõ ràng"
+direction: right
+n2: "Orchestration — Command-Driven ❌" {}
+n1: "Choreography — Event-Driven ✅" {}
+n1.n3: "Order"
+n1.n4: "Payment"
+n1.n5: "Inventory"
+n1.n6: "Shipping"
+n2.n7: "Orchestrator\n(God service)"
+n2.n8: "Payment"
+n2.n9: "Inventory"
+n2.n10: "Shipping"
+n1.n3 -> n1.n4: "OrderCreated\n(event)"
+n1.n4 -> n1.n5: "PaymentCompleted\n(event)"
+n1.n5 -> n1.n6: "StockReserved\n(event)"
+n2.n7 -> n2.n8: "ChargePayment\n(command)"
+n2.n7 -> n2.n9: "ReserveStock\n(command)"
+n2.n7 -> n2.n10: "CreateShipment\n(command)"
 ```
 
 **Vậy Orchestration có xấu không? Khi nào vẫn nên dùng?**
@@ -845,60 +838,21 @@ Failure (step 3 fails):
 
 **Vấn đề**: Khi service cần **cập nhật DB** VÀ **publish event** — làm sao đảm bảo cả hai đều xảy ra (hoặc đều không)?
 
+```d2 title="Transactional Outbox — tránh Dual Write"
+direction: right
+service: Order Service {
+ tx: "Một local DB transaction" {
+  orders: "orders\nid 456 • status CREATED" {shape: cylinder}
+  outbox: "outbox\nid 1 • type OrderCreated\npayload {id:456}\npublished false" {shape: cylinder}
+ }
+ publisher: "Outbox Publisher\nPoll → Publish → Mark published"
+ tx.outbox -> publisher
+}
+kafka: Kafka Broker
+service.publisher -> kafka
 ```
-❌ Vấn đề — Dual Write:
-──────────────────────
 
-  Order Service:
-    1. Save order to DB         ✅ Thành công
-    2. Publish OrderCreated     ❌ Broker down → event bị mất!
-    
-  → DB có order nhưng không ai biết → data inconsistency
-
-✅ Outbox Pattern — Giải pháp:
-──────────────────────────────
-
-  Order Service:
-    1. BEGIN TRANSACTION
-       - INSERT INTO orders (...) 
-       - INSERT INTO outbox (event_type, payload)   ← cùng transaction
-    2. COMMIT TRANSACTION
-    
-  Outbox Publisher (background worker):
-    - Poll bảng outbox
-    - Publish event lên broker
-    - Mark as published
-
-  ┌──────────────────────────────────────────────────┐
-  │              Order Service                       │
-  │                                                  │
-  │  ┌────────────┐     ┌────────────┐               │
-  │  │  orders    │     │   outbox   │               │
-  │  │  table     │     │   table    │               │
-  │  │            │     │            │               │
-  │  │ id: 456    │     │ id: 1      │               │
-  │  │ status:    │     │ type:      │               │
-  │  │  CREATED   │     │ OrderCrtd  │               │
-  │  └────────────┘     │ payload:   │               │
-  │                     │  {id:456}  │               │
-  │   Cùng 1 DB         │ published: │               │
-  │   transaction!      │  false     │               │
-  │                     └─────┬──────┘               │
-  │                           │                      │
-  │                  Outbox Publisher                │
-  │                  (poll + publish)                │
-  │                           │                      │
-  └───────────────────────────┼──────────────────────┘
-                              │
-                              ▼
-                       ┌──────────┐
-                       │  Kafka   │
-                       │  Broker  │
-                       └──────────┘
-
-  → Đảm bảo: DB write + event publish LUÔN consistent
-  → Tradeoff: At-least-once delivery (consumer cần idempotent)
-```
+**Dual Write không an toàn:** save order thành công nhưng broker down có thể làm mất event. Outbox ghi `orders` và `outbox` trong cùng transaction; worker publish sau. Đây là **at-least-once delivery**, consumer vẫn phải idempotent; không phải một distributed transaction atomic với broker.
 
 ### 6.4. Dead Letter Queue
 

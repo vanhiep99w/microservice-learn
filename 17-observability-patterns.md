@@ -186,12 +186,17 @@ Khi có sự cố, việc phải SSH từng máy chạy `grep` là không khả 
 
 **Log Aggregation** (tổng hợp log) đưa toàn bộ log về **một nền tảng tập trung** với pipeline chuẩn:
 
-```mermaid
-graph LR
-    A[Services<br/>log JSON ra stdout] --> B[Collector<br/>Fluent Bit / Filebeat]
-    B --> C[Buffer / Queue<br/>tùy chọn - Kafka]
-    C --> D[Log Store + Index<br/>Elasticsearch / Loki]
-    D --> E[Search và Dashboard<br/>Kibana / Grafana]
+```d2 title="3.2. Giải pháp"
+direction: right
+n1: "Services\nlog JSON ra stdout"
+n2: "Collector\nFluent Bit / Filebeat"
+n3: "Buffer / Queue\ntùy chọn - Kafka"
+n4: "Log Store + Index\nElasticsearch / Loki"
+n5: "Search và Dashboard\nKibana / Grafana"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n4 -> n5
 ```
 
 Các thành phần của pattern:
@@ -321,22 +326,21 @@ Câu hỏi pattern này trả lời: *"Request này đã đi qua đâu, từng b
 
 **Luồng của pattern:**
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant GW as API Gateway
-    participant O as Order Service
-    participant P as Payment Service
-
-    C->>GW: POST /orders (chưa có traceparent)
-    Note over GW: Bắt đầu trace mới<br/>traceparent: 00-{traceId}-{spanGW}-01
-    GW->>O: Forward + traceparent
-    Note over O: Parse traceparent (giữ Trace ID)<br/>tạo span mới cho Order Service
-    O->>P: POST /charge + traceparent
-    Note over P: Tạo span con cho Payment
-    P-->>O: 200 OK (span Payment đóng, ghi duration)
-    O-->>GW: 201 Created (span Order đóng)
-    Note over GW: Span Gateway đóng → trace hoàn chỉnh<br/>export spans qua OTel Collector
+```d2 title="4.2. Giải pháp"
+shape: sequence_diagram
+"C": "Client"
+"GW": "API Gateway"
+"O": "Order Service"
+"P": "Payment Service"
+"C" -> "GW": "POST /orders (chưa có traceparent)"
+"GW".note1: "Bắt đầu trace mới\ntraceparent: 00-{traceId}-{spanGW}-01"
+"GW" -> "O": "Forward + traceparent"
+"O".note2: "Parse traceparent (giữ Trace ID)\ntạo span mới cho Order Service"
+"O" -> "P": "POST /charge + traceparent"
+"P".note3: "Tạo span con cho Payment"
+"P" -> "O": "200 OK (span Payment đóng, ghi duration)" { style.stroke-dash: 5 }
+"O" -> "GW": "201 Created (span Order đóng)" { style.stroke-dash: 5 }
+"GW".note4: "Span Gateway đóng → trace hoàn chỉnh\nexport spans qua OTel Collector"
 ```
 
 **Các thành phần của pattern:**
@@ -569,16 +573,28 @@ Con người không thể theo dõi hàng trăm pod này — orchestrator (Kuber
 
 **Luồng quyết định của orchestrator:**
 
-```mermaid
-flowchart TD
-    A[Orchestrator poll /health định kỳ] --> B{Loại probe}
-    B -->|Liveness fail| C[Restart container]
-    B -->|Readiness fail| D[Gỡ pod khỏi LB endpoints<br/>Pod vẫn chạy - chờ phục hồi]
-    B -->|Startup chưa xong| E[Chờ - chưa kích hoạt probe khác]
-    B -->|Tất cả pass| F[Bình thường - giữ traffic]
-    D --> G{Readiness phục hồi?}
-    G -->|Có| F
-    G -->|Không sau threshold| H[Alert cho on-call]
+```d2 title="6.2. Giải pháp"
+direction: down
+n1: "Orchestrator poll /health định kỳ"
+n2: "Loại probe" {
+  shape: diamond
+}
+n3: "Restart container"
+n4: "Gỡ pod khỏi LB endpoints\nPod vẫn chạy - chờ phục hồi"
+n5: "Chờ - chưa kích hoạt probe khác"
+n6: "Bình thường - giữ traffic"
+n7: "Readiness phục hồi?" {
+  shape: diamond
+}
+n8: "Alert cho on-call"
+n1 -> n2
+n2 -> n3: "Liveness fail"
+n2 -> n4: "Readiness fail"
+n2 -> n5: "Startup chưa xong"
+n2 -> n6: "Tất cả pass"
+n4 -> n7
+n7 -> n6: "Có"
+n7 -> n8: "Không sau threshold"
 ```
 
 **Ví dụ response deep check** (health endpoint trả chi tiết trạng thái dependencies):
@@ -689,11 +705,15 @@ Giống Correlation ID, đây là pattern nên có **từ service đầu tiên**
 
 Giá trị lớn nhất không nằm ở từng pattern riêng lẻ mà ở **khả năng nhảy từ tín hiệu này sang tín hiệu khác** khi điều tra:
 
-```mermaid
-graph LR
-    A[Metrics báo động<br/>error rate tăng] --> B[Traces thu hẹp phạm vi<br/>request nào, span nào]
-    B --> C[Logs cho chi tiết<br/>chuyện gì xảy ra trong span]
-    C --> D[Root cause + fix<br/>và verify bằng metrics]
+```d2 title="7.1. Ba trụ cột bổ trợ nhau"
+direction: right
+n1: "Metrics báo động\nerror rate tăng"
+n2: "Traces thu hẹp phạm vi\nrequest nào, span nào"
+n3: "Logs cho chi tiết\nchuyện gì xảy ra trong span"
+n4: "Root cause + fix\nvà verify bằng metrics"
+n1 -> n2
+n2 -> n3
+n3 -> n4
 ```
 
 **Các "cầu nối" tạo bởi patterns:**
@@ -709,35 +729,29 @@ graph LR
 
 ### 7.2. Bản đồ tương tác giữa các pattern
 
-```mermaid
-graph TB
-    subgraph "Điểm vào"
-        GW[API Gateway]
-    end
-
-    subgraph "Patterns trong mỗi service"
-        CID[Correlation ID<br/>sinh tại edge - forward mọi hop]
-        TRC[Distributed Tracing<br/>traceparent + spans]
-        LOG[Structured Logging<br/>log chứa cid + trace_id]
-        HLT[Health Check API<br/>live / ready / startup]
-    end
-
-    subgraph "Nền tảng"
-        LA[Log Aggregation<br/>search theo correlation_id]
-        TB2[Trace Backend<br/>waterfall theo trace_id]
-        MON[Metrics + Alerting]
-        ORC[Orchestrator / LB]
-    end
-
-    GW --> CID
-    CID --> LOG
-    TRC --> LOG
-    LOG --> LA
-    TRC --> TB2
-    HLT --> ORC
-    HLT --> MON
-    LA -. trace_id bridge .-> TB2
-    MON -. exemplar và time range .-> TB2
+```d2 title="7.2. Bản đồ tương tác giữa các pattern"
+direction: down
+n3: "Nền tảng" {}
+n2: "Patterns trong mỗi service" {}
+n1: "Điểm vào" {}
+n1.n4: "API Gateway"
+n2.n5: "Correlation ID\nsinh tại edge - forward mọi hop"
+n2.n6: "Distributed Tracing\ntraceparent + spans"
+n2.n7: "Structured Logging\nlog chứa cid + trace_id"
+n2.n8: "Health Check API\nlive / ready / startup"
+n3.n9: "Log Aggregation\nsearch theo correlation_id"
+n3.n10: "Trace Backend\nwaterfall theo trace_id"
+n3.n11: "Metrics + Alerting"
+n3.n12: "Orchestrator / LB"
+n1.n4 -> n2.n5
+n2.n5 -> n2.n7
+n2.n6 -> n2.n7
+n2.n7 -> n3.n9
+n2.n6 -> n3.n10
+n2.n8 -> n3.n12
+n2.n8 -> n3.n11
+n3.n9 -> n3.n10: "trace_id bridge" { style.stroke-dash: 5 }
+n3.n11 -> n3.n10: "exemplar và time range" { style.stroke-dash: 5 }
 ```
 
 Đọc bản đồ này thành ba câu kết luận thiết kế:
@@ -773,20 +787,19 @@ BƯỚC 4 — HÀNH ĐỘNG + VERIFY
    Sau deploy, p99 về ~150ms. Alert ngừng. Viết postmortem kèm trace minh chứng.
 ```
 
-```mermaid
-sequenceDiagram
-    participant M as Metrics/Alert
-    participant T as Trace Backend
-    participant L as Log Store
-    participant E as On-call Engineer
-
-    M->>E: Alert p99 POST /orders > 800ms
-    E->>T: Lọc trace chậm 13:55-14:02
-    T-->>E: Span Bank API 740ms trong Payment
-    E->>L: Query log theo trace_id của span
-    L-->>E: retry_count=2, pool_wait=310ms
-    Note over E: Root cause: pool cạn do Bank API chậm
-    E->>M: Fix + verify p99 giảm
+```d2 title="7.3. Ví dụ: quy trình debug một sự cố"
+shape: sequence_diagram
+"M": "Metrics/Alert"
+"T": "Trace Backend"
+"L": "Log Store"
+"E": "On-call Engineer"
+"M" -> "E": "Alert p99 POST /orders > 800ms"
+"E" -> "T": "Lọc trace chậm 13:55-14:02"
+"T" -> "E": "Span Bank API 740ms trong Payment" { style.stroke-dash: 5 }
+"E" -> "L": "Query log theo trace_id của span"
+"L" -> "E": "retry_count=2, pool_wait=310ms" { style.stroke-dash: 5 }
+"E".note1: "Root cause: pool cạn do Bank API chậm"
+"E" -> "M": "Fix + verify p99 giảm"
 ```
 
 > 💡 Không có pattern nào trong bốn pattern là thừa trong luồng trên: metrics **phát hiện**, tracing **định vị**, logs **chứng minh**, và health check giữ hệ thống sống trong lúc sự cố chưa được sửa.
@@ -1000,25 +1013,24 @@ Telemetry sao chép dữ liệu khắp nơi: từ service → collector → back
 
 **Một request đặt hàng đi qua hệ thống này:**
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant GW as API Gateway
-    participant O as Order Svc
-    participant P as Payment Svc
-    participant N as Notification Svc
-
-    C->>GW: POST /orders
-    Note over GW: Sinh cid=req-789 + trace bắt đầu<br/>Log: [req-789] request in
-    GW->>O: forward (cid + traceparent)
-    Note over O: span Order.create mở<br/>Log: [req-789] order ORD-456 created
-    O->>P: POST /charge (cid + traceparent)
-    Note over P: span Payment.charge mở<br/>Log: [req-789] charging - status UP theo /health/ready
-    P-->>O: 200 OK
-    O->>N: publish OrderCreated (cid + traceparent trong Kafka headers)
-    Note over N: span consumer nối tiếp trace qua async<br/>Log: [req-789] email queued
-    O-->>GW: 201 Created (header echo X-Correlation-ID: req-789)
-    GW-->>C: 201 + mã req-789 hiển thị ở UI khi lỗi
+```d2 title="10. Ví dụ tổng hợp — Observability cho E-Commerce"
+shape: sequence_diagram
+"C": "Client"
+"GW": "API Gateway"
+"O": "Order Svc"
+"P": "Payment Svc"
+"N": "Notification Svc"
+"C" -> "GW": "POST /orders"
+"GW".note1: "Sinh cid=req-789 + trace bắt đầu\nLog: [req-789] request in"
+"GW" -> "O": "forward (cid + traceparent)"
+"O".note2: "span Order.create mở\nLog: [req-789] order ORD-456 created"
+"O" -> "P": "POST /charge (cid + traceparent)"
+"P".note3: "span Payment.charge mở\nLog: [req-789] charging - status UP theo /health/ready"
+"P" -> "O": "200 OK" { style.stroke-dash: 5 }
+"O" -> "N": "publish OrderCreated (cid + traceparent trong Kafka headers)"
+"N".note4: "span consumer nối tiếp trace qua async\nLog: [req-789] email queued"
+"O" -> "GW": "201 Created (header echo X-Correlation-ID: req-789)" { style.stroke-dash: 5 }
+"GW" -> "C": "201 + mã req-789 hiển thị ở UI khi lỗi" { style.stroke-dash: 5 }
 ```
 
 **Kết quả vận hành** — mọi sự cố đều có đường điều tra ngắn:

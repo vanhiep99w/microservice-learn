@@ -85,21 +85,20 @@ Sidecar chủ yếu nói về deployment boundary; Ambassador nói về network 
 
 ### 2.1. Vị trí của ba pattern
 
-```mermaid
-flowchart LR
-    C[Checkout Service\nbusiness logic] -->|PaymentPort\ncontract nội bộ| A[Payment Adapter\ncontract boundary]
-    A -->|localhost:15001| M[Ambassador\nlocal outbound proxy]
-    M -->|mTLS, route, retry policy| P[Payment Provider]
-
-    subgraph POD[Pod checkout-service]
-        C
-        A
-        M
-        L[Log Sidecar\ncollect / enrich / ship]
-        C -->|stdout hoặc shared volume| L
-    end
-
-    L --> O[Observability backend]
+```d2 title="2.1. Vị trí của ba pattern"
+direction: right
+n1: "Pod checkout-service" {}
+n1.n2: "Checkout Service\\nbusiness logic"
+n1.n3: "Payment Adapter\\ncontract boundary"
+n1.n4: "Ambassador\\nlocal outbound proxy"
+n5: "Payment Provider"
+n1.n6: "Log Sidecar\\ncollect / enrich / ship"
+n7: "Observability backend"
+n1.n2 -> n1.n3: "PaymentPort\\ncontract nội bộ"
+n1.n3 -> n1.n4: "localhost:15001"
+n1.n4 -> n5: "mTLS, route, retry policy"
+n1.n2 -> n1.n6: "stdout hoặc shared volume"
+n1.n6 -> n7
 ```
 
 Trong sơ đồ này, Log Sidecar là Sidecar thuần túy. Ambassador được triển khai *dưới dạng* sidecar. Payment Adapter có thể nằm trong code Checkout Service, trong một process riêng, hoặc trong sidecar; việc nó là Adapter đến từ nhiệm vụ chuyển đổi contract, không phải vị trí chạy.
@@ -412,15 +411,21 @@ class BankSoapPaymentAdapter implements PaymentPort {
 
 ### 6.1. Topology, proxy và contract
 
-```mermaid
-flowchart TB
-    S[Sidecar] -->|mô tả| T[Topology: process cạnh workload]
-    AM[Ambassador] -->|mô tả| N[Network role: local outbound proxy]
-    AD[Adapter] -->|mô tả| C[Contract role: chuyển đổi interface/semantics]
-    AM -.thường triển khai bằng.-> S
-    AD -.có thể triển khai bằng.-> S
-    S -.không tự động là.-> AM
-    S -.không tự động là.-> AD
+```d2 title="6.1. Topology, proxy và contract"
+direction: down
+n1: "Sidecar"
+n2: "Topology: process cạnh workload"
+n3: "Ambassador"
+n4: "Network role: local outbound proxy"
+n5: "Adapter"
+n6: "Contract role: chuyển đổi interface/semantics"
+n1 -> n2: "mô tả"
+n3 -> n4: "mô tả"
+n5 -> n6: "mô tả"
+n3 -> n1: "thường triển khai bằng" { style.stroke-dash: 5 }
+n5 -> n1: "có thể triển khai bằng" { style.stroke-dash: 5 }
+n1 -> n3: "không tự động là" { style.stroke-dash: 5 }
+n1 -> n5: "không tự động là" { style.stroke-dash: 5 }
 ```
 
 Kết luận ngắn:
@@ -456,17 +461,33 @@ Kết luận ngắn:
 
 ### 7.1. Decision tree
 
-```mermaid
-flowchart TD
-    A[Có concern ngoài business logic?] -->|Không| Z[Không thêm pattern]
-    A -->|Có| B{Cần chạy sát từng app instance?}
-    B -->|Có| C[Đánh giá Sidecar]
-    B -->|Không| D{Cần chuyển contract hoặc semantics?}
-    C --> E{Concern là outbound network policy?}
-    E -->|Có| F[Sidecar Ambassador]
-    E -->|Không| G[Sidecar log/config/telemetry]
-    D -->|Có| H[Adapter: chọn module, service hoặc sidecar]
-    D -->|Không| I[Agent node-level, SDK hoặc platform service]
+```d2 title="7.1. Decision tree"
+direction: down
+n1: "Có concern ngoài business logic?"
+n2: "Không thêm pattern"
+n3: "Cần chạy sát từng app instance?" {
+  shape: diamond
+}
+n4: "Đánh giá Sidecar"
+n5: "Cần chuyển contract hoặc semantics?" {
+  shape: diamond
+}
+n6: "Concern là outbound network policy?" {
+  shape: diamond
+}
+n7: "Sidecar Ambassador"
+n8: "Sidecar log/config/telemetry"
+n9: "Adapter: chọn module, service hoặc sidecar"
+n10: "Agent node-level, SDK hoặc platform service"
+n1 -> n2: "Không"
+n1 -> n3: "Có"
+n3 -> n4: "Có"
+n3 -> n5: "Không"
+n4 -> n6
+n6 -> n7: "Có"
+n6 -> n8: "Không"
+n5 -> n9: "Có"
+n5 -> n10: "Không"
 ```
 
 ### 7.2. Ma trận chọn lựa

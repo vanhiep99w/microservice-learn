@@ -159,7 +159,7 @@ IAM ROLES CHO TỪNG COMPUTE PLATFORM
 | **Scope** | Khác nhau theo từng service | Có thể share giữa nhiều services |
 | **Ví dụ permission** | `s3:GetObject`, `dynamodb:Query` | `ecr:GetAuthorizationToken`, `secretsmanager:GetSecretValue` |
 
-```json
+```json source="snippets/2-1-iam-roles-cho-ecs-tasks-eks-pods-lambda.json"
 // Task Role — Order Service chỉ được đọc/ghi DynamoDB table "orders"
 {
   "Version": "2012-10-17",
@@ -183,7 +183,9 @@ IAM ROLES CHO TỪNG COMPUTE PLATFORM
 }
 ```
 
-```json
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F2-1-iam-roles-cho-ecs-tasks-eks-pods-lambda.json)
+
+```json source="snippets/2-1-iam-roles-cho-ecs-tasks-eks-pods-lambda-2.json"
 // Task Execution Role — Chung cho nhiều services
 {
   "Version": "2012-10-17",
@@ -215,11 +217,13 @@ IAM ROLES CHO TỪNG COMPUTE PLATFORM
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F2-1-iam-roles-cho-ecs-tasks-eks-pods-lambda-2.json)
+
 **EKS — IRSA (IAM Roles for Service Accounts):**
 
 IRSA là cơ chế cho phép **từng Pod** trong EKS cluster có IAM Role riêng, thay vì dùng chung Node Role (anti-pattern).
 
-```yaml
+```yaml source="snippets/2-1-iam-roles-cho-ecs-tasks-eks-pods-lambda-3.yaml"
 # 1. Tạo Kubernetes ServiceAccount liên kết với IAM Role
 apiVersion: v1
 kind: ServiceAccount
@@ -246,6 +250,8 @@ spec:
         image: 123456789.dkr.ecr.ap-southeast-1.amazonaws.com/order-service:latest
         # AWS SDK tự động dùng IRSA credentials — KHÔNG cần config gì thêm
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F2-1-iam-roles-cho-ecs-tasks-eks-pods-lambda-3.yaml)
 
 > ⚠️ **Anti-pattern**: Dùng EC2 Instance Role (Node Role) cho tất cả Pods — mọi Pod đều có cùng quyền. IRSA cho phép **Pod-level isolation**, đúng tinh thần Least Privilege.
 
@@ -309,7 +315,7 @@ IAM ACCESS ANALYZER WORKFLOW
 
 **Permission Boundaries — Giới hạn quyền tối đa:**
 
-```json
+```json source="snippets/2-2-least-privilege-cach-viet-iam-policy-dung.json"
 // Permission Boundary — Giới hạn tối đa cho mọi service role
 {
   "Version": "2012-10-17",
@@ -337,6 +343,8 @@ IAM ACCESS ANALYZER WORKFLOW
   ]
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F2-2-least-privilege-cach-viet-iam-policy-dung.json)
 
 > 💡 **Permission Boundary** = "trần nhà" — dù Role có policy rộng đến mấy, cũng không vượt qua boundary. Kết hợp Identity Policy ∩ Permission Boundary = quyền thực tế.
 
@@ -368,7 +376,7 @@ CROSS-ACCOUNT ACCESS — AssumeRole
   └─────────────────────┘          └─────────────────────────┘
 ```
 
-```json
+```json source="snippets/2-3-cross-account-access.json"
 // Role B — Trust Policy (cho phép Account A assume)
 {
   "Version": "2012-10-17",
@@ -388,6 +396,8 @@ CROSS-ACCOUNT ACCESS — AssumeRole
   ]
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F2-3-cross-account-access.json)
 
 ---
 
@@ -423,7 +433,7 @@ COGNITO USER POOL — AUTHENTICATION FLOW
 
 **Cấu hình Cognito User Pool (Terraform):**
 
-```hcl
+```hcl source="snippets/3-1-cognito-user-pools-authentication.tf"
 resource "aws_cognito_user_pool" "main" {
   name = "ecommerce-user-pool"
 
@@ -488,6 +498,8 @@ resource "aws_cognito_user_pool_client" "web" {
   generate_secret = false
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F3-1-cognito-user-pools-authentication.tf)
 
 ### 3.2. Cognito Identity Pools — Federated Identity
 
@@ -612,7 +624,7 @@ OPTION 2: LAMBDA AUTHORIZER (Custom logic)
 
 **Lambda Authorizer — Ví dụ multi-tenant:**
 
-```python
+```python source="snippets/3-4-cognito-api-gateway-integration.py"
 # Lambda Authorizer cho multi-tenant SaaS
 import jwt
 import json
@@ -651,6 +663,8 @@ def handler(event, context):
     except Exception as e:
         raise Exception('Unauthorized')
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F3-4-cognito-api-gateway-integration.py)
 
 ### 3.5. So sánh Cognito vs Keycloak vs Auth0 trên AWS
 
@@ -715,7 +729,7 @@ APP MESH mTLS ARCHITECTURE
 
 ### 4.2. Mẫu cấu hình mTLS (tham khảo)
 
-```json
+```json source="snippets/4-2-mau-cau-hinh-mtls-tham-khao.json"
 // Virtual Node — Bật mTLS cho Order Service
 {
   "meshName": "ecommerce-mesh",
@@ -755,6 +769,8 @@ APP MESH mTLS ARCHITECTURE
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F4-2-mau-cau-hinh-mtls-tham-khao.json)
+
 **TLS Mode options:**
 
 | Mode | Mô tả | Use case |
@@ -767,7 +783,7 @@ APP MESH mTLS ARCHITECTURE
 
 Service mesh có thể kiểm soát service nào được gọi service nào thông qua policy/backends:
 
-```json
+```json source="snippets/4-3-authorization-policy-giua-services.json"
 // Order Service chỉ được gọi Payment Service và Inventory Service
 {
   "virtualNodeName": "order-service-vn",
@@ -789,6 +805,8 @@ Service mesh có thể kiểm soát service nào được gọi service nào th�
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F4-3-authorization-policy-giua-services.json)
 
 ### 4.4. Service Connect vs Istio vs App Mesh (legacy)
 
@@ -841,7 +859,7 @@ SECRETS MANAGER — AUTOMATIC ROTATION
 
 **Tạo secret + auto rotation (Terraform):**
 
-```hcl
+```hcl source="snippets/5-1-aws-secrets-manager.tf"
 resource "aws_secretsmanager_secret" "db_password" {
   name = "prod/db/orders"
   
@@ -871,6 +889,8 @@ resource "aws_secretsmanager_secret_rotation" "db_password" {
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F5-1-aws-secrets-manager.tf)
 
 ### 5.2. AWS Systems Manager Parameter Store
 
@@ -906,7 +926,7 @@ CHỌN GÌ? DECISION TREE
 
 **ECS — Inject secrets vào container:**
 
-```json
+```json source="snippets/5-3-tich-hop-secrets-vao-ecs-eks-lambda.json"
 // ECS Task Definition — secrets từ Secrets Manager + Parameter Store
 {
   "containerDefinitions": [
@@ -938,11 +958,13 @@ CHỌN GÌ? DECISION TREE
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F5-3-tich-hop-secrets-vao-ecs-eks-lambda.json)
+
 > ⚠️ `secrets` vs `environment`: Dùng `secrets` cho sensitive values (inject lúc runtime từ Secrets Manager / Parameter Store). Dùng `environment` cho non-sensitive config. **Không bao giờ** đặt password trong `environment` — nó visible trong Task Definition!
 
 **EKS — External Secrets Operator:**
 
-```yaml
+```yaml source="snippets/5-3-tich-hop-secrets-vao-ecs-eks-lambda-2.yaml"
 # ExternalSecret — Sync từ AWS Secrets Manager vào K8s Secret
 apiVersion: external-secrets.io/v1beta1
 kind: ExternalSecret
@@ -983,9 +1005,11 @@ spec:
             name: order-service-secrets
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F5-3-tich-hop-secrets-vao-ecs-eks-lambda-2.yaml)
+
 **Lambda — Environment variables với KMS:**
 
-```hcl
+```hcl source="snippets/5-3-tich-hop-secrets-vao-ecs-eks-lambda-3.tf"
 resource "aws_lambda_function" "order_processor" {
   function_name = "order-processor"
   runtime       = "nodejs18.x"
@@ -1007,6 +1031,8 @@ resource "aws_lambda_function" "order_processor" {
 # Lambda code lấy secret lúc runtime (không qua env var)
 # const secret = await secretsManager.getSecretValue({ SecretId: 'prod/db/orders' });
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F5-3-tich-hop-secrets-vao-ecs-eks-lambda-3.tf)
 
 ### 5.4. KMS — Encryption at Rest & in Transit
 
@@ -1098,43 +1124,27 @@ VPC DESIGN CHO MICROSERVICE — MULTI-AZ
 
 **Security Groups** hoạt động ở **instance/ENI level** — là tường lửa stateful cho từng resource.
 
-```
-SECURITY GROUPS CHO MICROSERVICE — CHAIN PATTERN
-──────────────────────────────────────────────────
-
-  ┌── SG: alb-sg ─────────┐
-  │ Inbound:              │
-  │  443 from 0.0.0.0/0   │    ← Internet HTTPS only
-  │ Outbound:             │
-  │  8080 to svc-sg       │    ← Chỉ tới services
-  └──────────┬────────────┘
-             │
-  ┌──────────▼────────────┐
-  │ SG: svc-sg            │
-  │ Inbound:              │
-  │  8080 from alb-sg     │    ← Chỉ từ ALB
-  │  8080 from svc-sg     │    ← Service-to-service
-  │ Outbound:             │
-  │  3306 to db-sg        │    ← Tới database
-  │  6379 to cache-sg     │    ← Tới cache
-  │  443 to 0.0.0.0/0     │    ← External APIs (HTTPS)
-  └──────────┬────────────┘
-             │
-  ┌──────────▼────────────┐
-  │ SG: db-sg             │
-  │ Inbound:              │
-  │  3306 from svc-sg     │    ← CHỈ từ services
-  │ Outbound:             │
-  │  (none needed -       │    ← Stateful: response tự động
-  │   stateful)           │
-  └───────────────────────┘
+```d2 title="Security Groups — Chain Pattern"
+direction: down
+internet: Internet
+alb: "alb-sg\nInbound 443 from 0.0.0.0/0\nOutbound 8080 to svc-sg"
+svc: "svc-sg\nInbound 8080 from alb-sg / svc-sg\nOutbound 3306 db-sg\n6379 cache-sg • 443 external APIs"
+db: "db-sg\nInbound 3306 from svc-sg\nResponse stateful — không cần outbound rule riêng"
+cache: cache-sg
+external: External HTTPS APIs
+internet -> alb: 443
+alb -> svc: 8080
+svc -> svc: 8080
+svc -> db: 3306
+svc -> cache: 6379
+svc -> external: 443
 ```
 
 > ⚠️ **Key insight**: Security Groups reference **nhau** (không dùng IP) — khi service scale up/down, rules vẫn đúng. Rule `8080 from sg-abc123` = "cho phép mọi ENI thuộc SG sg-abc123".
 
 **Terraform example:**
 
-```hcl
+```hcl source="snippets/6-2-security-groups-stateful-firewall.tf"
 # ALB Security Group
 resource "aws_security_group" "alb" {
   name_prefix = "alb-"
@@ -1192,6 +1202,8 @@ resource "aws_security_group" "database" {
 }
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F6-2-security-groups-stateful-firewall.tf)
+
 ### 6.3. NACLs — Network Access Control Lists
 
 | Tiêu chí | Security Groups | NACLs |
@@ -1241,35 +1253,21 @@ KHÔNG CÓ VPC ENDPOINT vs CÓ VPC ENDPOINT
 
 **AWS WAF** bảo vệ API Gateway / ALB / CloudFront khỏi web attacks. **AWS Shield** bảo vệ khỏi DDoS.
 
-```
-WAF + SHIELD ARCHITECTURE
-──────────────────────────
-
-  Internet
-     │
-  ┌──▼────────────────────────────────┐
-  │  AWS Shield (Standard — Free)     │ ← Layer 3/4 DDoS protection
-  │  ┌───────────────────────────┐    │
-  │  │  CloudFront / ALB         │    │
-  │  │  ┌──────────────────────┐ │    │
-  │  │  │  AWS WAF             │ │    │ ← Layer 7 protection
-  │  │  │  • SQL injection     │ │    │
-  │  │  │  • XSS               │ │    │
-  │  │  │  • Rate-based rules  │ │    │
-  │  │  │  • IP blacklist      │ │    │
-  │  │  │  • Geo blocking      │ │    │
-  │  │  │  • Bot control       │ │    │
-  │  │  └──────────────────────┘ │    │
-  │  └───────────────────────────┘    │
-  └───────────────────────────────────┘
-     │
-     ▼
-  API Gateway / Services
+```d2 title="AWS Shield và WAF — Defense in Depth"
+direction: down
+internet: Internet
+shield: "AWS Shield Standard\nLayer 3/4 DDoS protection" {
+ edge: "CloudFront / ALB" {
+  waf: "AWS WAF — Layer 7\nSQL injection • XSS\nRate-based rules • IP blacklist\nGeo blocking • Bot control"
+ }
+}
+services: API Gateway / Services
+internet -> shield.edge.waf -> services
 ```
 
 **WAF Rule Groups phổ biến:**
 
-```hcl
+```hcl source="snippets/6-5-aws-waf-shield.tf"
 resource "aws_wafv2_web_acl" "api" {
   name  = "api-protection"
   scope = "REGIONAL"  # REGIONAL cho ALB/API GW, CLOUDFRONT cho CF
@@ -1321,6 +1319,8 @@ resource "aws_wafv2_web_acl" "api" {
   }
 }
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F6-5-aws-waf-shield.tf)
 
 | Feature | Shield Standard | Shield Advanced |
 |---------|----------------|-----------------|
@@ -1388,37 +1388,42 @@ ZERO TRUST TRÊN AWS — DEFENSE IN DEPTH
 
 **Step-by-step migration sang Zero Trust:**
 
-```mermaid
-graph TB
-    subgraph "Phase 1 — Foundation (Week 1-2)"
-        A[IAM Role per service] --> B[VPC + Private Subnets]
-        B --> C[Security Groups chain]
-    end
-    
-    subgraph "Phase 2 — Identity (Week 3-4)"
-        D[Cognito User Pool] --> E[API GW Authorizer]
-        E --> F[JWT validation in services]
-    end
-    
-    subgraph "Phase 3 — Encryption (Week 5-6)"
-        G[KMS for data at rest] --> H[ACM for TLS in transit]
-        H --> I[Secrets Manager]
-    end
-    
-    subgraph "Phase 4 — Service Security (Week 7-8)"
-        J[Service mesh / Service Connect] --> K[mTLS between services]
-        K --> L[Service-level AuthZ]
-    end
-    
-    subgraph "Phase 5 — Monitoring (Week 9-10)"
-        M[CloudTrail everywhere] --> N[GuardDuty enabled]
-        N --> O[Security Hub + Config Rules]
-    end
-    
-    C --> D
-    F --> G
-    I --> J
-    L --> M
+```d2 title="7.2. Triển khai Zero Trust — Từng Layer"
+direction: down
+n5: "Phase 5 — Monitoring (Week 9-10)" {}
+n4: "Phase 4 — Service Security (Week 7-8)" {}
+n3: "Phase 3 — Encryption (Week 5-6)" {}
+n2: "Phase 2 — Identity (Week 3-4)" {}
+n1: "Phase 1 — Foundation (Week 1-2)" {}
+n1.n6: "IAM Role per service"
+n1.n7: "VPC + Private Subnets"
+n1.n8: "Security Groups chain"
+n2.n9: "Cognito User Pool"
+n2.n10: "API GW Authorizer"
+n2.n11: "JWT validation in services"
+n3.n12: "KMS for data at rest"
+n3.n13: "ACM for TLS in transit"
+n3.n14: "Secrets Manager"
+n4.n15: "Service mesh / Service Connect"
+n4.n16: "mTLS between services"
+n4.n17: "Service-level AuthZ"
+n5.n18: "CloudTrail everywhere"
+n5.n19: "GuardDuty enabled"
+n5.n20: "Security Hub + Config Rules"
+n1.n6 -> n1.n7
+n1.n7 -> n1.n8
+n2.n9 -> n2.n10
+n2.n10 -> n2.n11
+n3.n12 -> n3.n13
+n3.n13 -> n3.n14
+n4.n15 -> n4.n16
+n4.n16 -> n4.n17
+n5.n18 -> n5.n19
+n5.n19 -> n5.n20
+n1.n8 -> n2.n9
+n2.n11 -> n3.n12
+n3.n14 -> n4.n15
+n4.n17 -> n5.n18
 ```
 
 ### 7.3. AWS Verified Access
@@ -1586,25 +1591,17 @@ SECURITY HUB — SINGLE PANE OF GLASS
 | **Exfiltration** | Unusual S3 data transfer | High |
 | **PrivilegeEscalation** | IAM user tạo admin policy cho mình | Critical |
 
+```d2 title="GuardDuty — Auto-response qua EventBridge"
+direction: right
+guard: "GuardDuty Finding\nCryptomining trên EC2"
+event: "EventBridge Rule\nSeverity HIGH"
+lambda: "Lambda — Auto-isolate\nĐổi SG sang isolation SG\nSNS alert"
+pager: SNS → PagerDuty
+guard -> event -> lambda
+event -> pager
 ```
-GUARDDUTY → EVENTBRIDGE → AUTO-RESPONSE
-──────────────────────────────────────────
 
-  GuardDuty             EventBridge           Lambda
-  ┌──────────┐         ┌──────────────┐      ┌──────────────┐
-  │ Finding: │────────▶│ Rule:        │─────▶│ Auto-isolate │
-  │ Crypto-  │         │ severity =   │      │ instance:    │
-  │ mining   │         │ HIGH         │      │ • Remove SGs │
-  │ on EC2   │         │              │      │ • Add isolate│
-  └──────────┘         └──────────────┘      │   SG (deny   │
-                                             │  all traffic)│
-                            │                │ • SNS alert  │
-                            ▼                └──────────────┘
-                       ┌──────────┐
-                       │ SNS →    │
-                       │ PagerDuty│
-                       └──────────┘
-```
+Isolation SG hạn chế kết nối mới; Security Group là stateful nên không được giả định mọi established connection sẽ bị cắt ngay lập tức.
 
 ---
 

@@ -62,16 +62,16 @@ Application vẫn gọi theo contract của downstream. Proxy không biến mộ
 
 Request path và configuration path là hai luồng khác nhau. Control Plane hoặc cơ chế Service Discovery có thể phân phối endpoint, certificate và traffic policy cho Ambassador. Request thực tế vẫn đi từ application qua local proxy đến downstream.
 
-```mermaid
-flowchart LR
-    subgraph W["Workload của Checkout"]
-        C["Checkout Service<br/>business logic"]
-        A["Ambassador<br/>127.0.0.1:15001"]
-        C -->|"HTTP hoặc gRPC"| A
-    end
-
-    CP["Control Plane hoặc Service Discovery"] -->|"endpoint, certificate, policy"| A
-    A -->|"mTLS, route, load balancing"| P["Payment Service"]
+```d2 title="Luồng request outbound"
+direction: right
+n1: "Workload của Checkout" {}
+n1.n2: "Checkout Service\nbusiness logic"
+n1.n3: "Ambassador\n127.0.0.1:15001"
+n4: "Control Plane hoặc Service Discovery"
+n5: "Payment Service"
+n1.n2 -> n1.n3: "HTTP hoặc gRPC"
+n4 -> n1.n3: "endpoint, certificate, policy"
+n1.n3 -> n5: "mTLS, route, load balancing"
 ```
 
 Một request điển hình có thể diễn ra như sau:
@@ -305,10 +305,17 @@ Ba tên gọi thường xuất hiện cùng nhau nhưng trả lời ba câu hỏ
 | **Đơn vị scale** | Thường scale cùng application gọi ra ngoài | Thường scale cùng workload | Nhiều Gateway instance sau Load Balancer hoặc Ingress |
 | **Business logic** | Không nên chứa business rule | Thường không chứa business rule | Không nên trở thành nơi chứa workflow domain |
 
-```text
-Client ── North-South ──▶ API Gateway ──▶ Service A
-                                             │
-                       Service A ── East-West/outbound ──▶ Ambassador cục bộ ──▶ Service B
+```d2 title="Gateway và Ambassador — hai hướng Traffic"
+direction: right
+client: Client
+gateway: API Gateway
+a: Service A
+ambassador: Ambassador cục bộ
+b: Service B
+client -> gateway: North-South
+gateway -> a
+a -> ambassador: East-West / Outbound
+ambassador -> b
 ```
 
 Một Ambassador chạy trong cùng Pod với application thường đồng thời là một Sidecar. Nhưng một Log Sidecar không phải Ambassador vì nó không đại diện cho outbound call. Ngược lại, một local outbound proxy có thể được triển khai theo hình thức khác nếu topology không phải Sidecar.

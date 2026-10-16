@@ -163,63 +163,42 @@ Trong [doc 12](12-containerization.md), chúng ta đã đóng gói mỗi microse
 
 ### 3.1. Kubernetes Architecture
 
-```
-KUBERNETES CLUSTER ARCHITECTURE:
-────────────────────────────────
-
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  KUBERNETES CLUSTER                                             │
-  │                                                                 │
-  │  ┌───────────────────────────────────────┐                      │
-  │  │  CONTROL PLANE (Master)               │                      │
-  │  │                                       │                      │
-  │  │  ┌───────────┐  ┌──────────────────┐  │                      │
-  │  │  │ API Server│  │    Scheduler     │  │                      │
-  │  │  │ (kube-    │  │ (chọn node cho   │  │                      │
-  │  │  │ apiserver)│  │  pod mới)        │  │                      │
-  │  │  └─────┬─────┘  └──────────────────┘  │                      │
-  │  │        │                              │                      │
-  │  │  ┌─────▼─────┐  ┌──────────────────┐  │                      │
-  │  │  │   etcd    │  │ Controller       │  │                      │
-  │  │  │ (cluster  │  │ Manager          │  │                      │
-  │  │  │  state)   │  │ (desired state   │  │                      │
-  │  │  │           │  │  → actual state) │  │                      │
-  │  │  └───────────┘  └──────────────────┘  │                      │
-  │  │                                       │                      │
-  │  │  ┌──────────────────┐                 │                      │
-  │  │  │ Cloud Controller │ ← (optional)    │                      │
-  │  │  │ Manager          │   tích hợp      │                      │
-  │  │  │                  │   cloud provider│                      │
-  │  │  └──────────────────┘                 │                      │
-  │  └───────────────────────────────────────┘                      │
-  │                      │                                          │
-  │         kubectl ────▶│◀──── K8s Dashboard                       │
-  │                      │                                          │
-  │  ┌───────────────────┼───────────────────────────────────────┐  │
-  │  │                   │    WORKER NODES                       │  │
-  │  │                   │                                       │  │
-  │  │  ┌────────────────▼───────────┐  ┌──────────────────────┐ │  │
-  │  │  │  Node 1                    │  │  Node 2              │ │  │
-  │  │  │                            │  │                      │ │  │
-  │  │  │  ┌────────┐ ┌────────┐     │  │  ┌────────┐          │ │  │
-  │  │  │  │ Pod A  │ │ Pod B  │     │  │  │ Pod C  │          │ │  │
-  │  │  │  └────────┘ └────────┘     │  │  └────────┘          │ │  │
-  │  │  │                            │  │                      │ │  │
-  │  │  │  ┌──────────────────────┐  │  │  ┌────────────────┐  │ │  │
-  │  │  │  │ kubelet              │  │  │  │ kubelet        │  │ │  │
-  │  │  │  │ (agent quản lý pods) │  │  │  │                │  │ │  │
-  │  │  │  └──────────────────────┘  │  │  └────────────────┘  │ │  │
-  │  │  │  ┌──────────────────────┐  │  │  ┌────────────────┐  │ │  │
-  │  │  │  │ kube-proxy           │  │  │  │ kube-proxy     │  │ │  │
-  │  │  │  │ (network routing)    │  │  │  │                │  │ │  │
-  │  │  │  └──────────────────────┘  │  │  └────────────────┘  │ │  │
-  │  │  │  ┌──────────────────────┐  │  │  ┌────────────────┐  │ │  │
-  │  │  │  │ Container Runtime    │  │  │  │ Container      │  │ │  │
-  │  │  │  │ (containerd)         │  │  │  │ Runtime        │  │ │  │
-  │  │  │  └──────────────────────┘  │  │  └────────────────┘  │ │  │
-  │  │  └────────────────────────────┘  └──────────────────────┘ │  │
-  │  └───────────────────────────────────────────────────────────┘  │
-  └─────────────────────────────────────────────────────────────────┘
+```d2 title="Kubernetes Cluster — Control Plane và Workers"
+direction: down
+kubectl: kubectl
+dashboard: K8s Dashboard
+cluster: Kubernetes Cluster {
+ control: Control Plane {
+  api: kube-apiserver
+  etcd: etcd — Cluster state {shape: cylinder}
+  scheduler: Scheduler — chọn node cho Pod mới
+  controller: Controller Manager — desired → actual
+  cloud: Cloud Controller Manager — optional
+  api -> etcd
+  scheduler <-> api
+  controller <-> api
+  cloud <-> api: Cloud provider integration
+ }
+ workers: Worker Nodes {
+  n1: Node 1 {
+   a: Pod A
+   b: Pod B
+   kubelet: kubelet — quản lý Pods
+   proxy: kube-proxy — Network routing
+   runtime: Container Runtime — containerd
+  }
+  n2: Node 2 {
+   c: Pod C
+   kubelet: kubelet — quản lý Pods
+   proxy: kube-proxy — Network routing
+   runtime: Container Runtime — containerd
+  }
+ }
+ control.api <-> workers.n1.kubelet
+ control.api <-> workers.n2.kubelet
+}
+kubectl -> cluster.control.api
+dashboard -> cluster.control.api
 ```
 
 ### 3.2. Control Plane
@@ -246,50 +225,23 @@ Worker Node là **máy chạy containers** thực sự.
 
 ### 3.4. Luồng hoạt động khi deploy
 
+```d2 title="Kubernetes — Deploy Flow"
+direction: down
+dev: "Developer\nkubectl apply -f order-deployment.yaml\nDesired 3 pods order-service:2.0"
+api: "1. API Server\nValidate YAML → lưu etcd"
+controller: "2. Controller Manager\nDeployment → ReplicaSet → 3 Pod objects"
+scheduler: "3. Scheduler\nCPU / RAM / affinity\nPod 1,3 → Node 1; Pod 2 → Node 2"
+node1: "kubelet — Node 1\n4. Pull image\n5. Start container\n6. Health check"
+node2: "kubelet — Node 2\n4. Pull image\n5. Start container\n6. Health check"
+proxy: "7. kube-proxy cập nhật routing\n8. Pods sẵn sàng nhận traffic"
+dev -> api -> controller -> scheduler
+scheduler -> node1
+scheduler -> node2
+node1 -> proxy
+node2 -> proxy
 ```
-DEPLOY FLOW — kubectl apply -f deployment.yaml:
-────────────────────────────────────────────────
 
-  Developer
-      │
-      │  kubectl apply -f order-deployment.yaml
-      │  "Tôi muốn 3 pods order-service:2.0"
-      ▼
-  ┌──────────┐
-  │API Server│  1. Validate YAML → lưu vào etcd
-  └────┬─────┘
-       │
-       ▼
-  ┌──────────┐
-  │Controller│  2. Deployment Controller thấy: desired=3, actual=0
-  │ Manager  │     → Tạo ReplicaSet → ReplicaSet tạo 3 Pod objects
-  └────┬─────┘
-       │
-       ▼
-  ┌──────────┐
-  │Scheduler │  3. Cho mỗi Pod (chưa có node):
-  │          │     → Tìm node phù hợp (CPU/RAM/affinity)
-  │          │     → Assign: Pod 1→Node 1, Pod 2→Node 2, Pod 3→Node 1
-  └────┬─────┘
-       │
-       ├────────────────────┐
-       ▼                    ▼
-  ┌──────────┐         ┌──────────┐
-  │ kubelet  │         │ kubelet  │
-  │ (Node 1) │         │ (Node 2) │
-  │          │         │          │
-  │ 4. Pull  │         │ 4. Pull  │
-  │  image   │         │  image   │
-  │ 5. Start │         │ 5. Start │
-  │ container│         │ container│
-  │ 6. Health│         │ 6. Health│
-  │  check ✓ │         │  check ✓ │
-  └──────────┘         └──────────┘
-
-  7. kube-proxy cập nhật routing rules
-     → traffic đến order-service → load balance giữa 3 pods
-  8. Pods sẵn sàng nhận traffic ✅
-```
+Các controller, scheduler và kubelet quan sát/cập nhật trạng thái qua API Server; mũi tên mô tả thứ tự reconcile, không phải RPC trực tiếp giữa chúng.
 
 ---
 
@@ -344,7 +296,7 @@ POD:
   • Cùng lifecycle → start/stop cùng nhau
 ```
 
-```yaml
+```yaml source="snippets/4-1-pod.yaml"
 # pod.yaml — Ít khi tạo Pod trực tiếp, thường dùng Deployment
 apiVersion: v1
 kind: Pod
@@ -370,6 +322,8 @@ spec:
           cpu: "500m"
           memory: "512Mi"
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-1-pod.yaml)
 
 ### 4.2. ReplicaSet
 
@@ -422,7 +376,7 @@ REPLICASET:
 
 Deployment quản lý **ReplicaSets** và hỗ trợ **rolling updates**, **rollback**.
 
-```yaml
+```yaml source="snippets/4-3-deployment.yaml"
 # deployment.yaml — Object dùng NHIỀU NHẤT trong K8s
 apiVersion: apps/v1
 kind: Deployment
@@ -483,6 +437,8 @@ spec:
             initialDelaySeconds: 10
             periodSeconds: 5
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-3-deployment.yaml)
 
 ```
 ROLLING UPDATE — Zero Downtime Deploy:
@@ -559,7 +515,7 @@ KUBERNETES SERVICE:
   └──────────────────────────────────────────────────────┘
 ```
 
-```yaml
+```yaml source="snippets/4-4-service.yaml"
 # service.yaml
 apiVersion: v1
 kind: Service
@@ -575,6 +531,8 @@ spec:
       targetPort: 8082           # Container port
       protocol: TCP
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-4-service.yaml)
 
 ```
 SERVICE TYPES:
@@ -631,7 +589,7 @@ INGRESS:
   └──────────────────────────────────────────────────────┘
 ```
 
-```yaml
+```yaml source="snippets/4-5-ingress.yaml"
 # ingress.yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -674,6 +632,8 @@ spec:
                   number: 8083
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-5-ingress.yaml)
+
 ### 4.6. ConfigMap & Secret
 
 ```
@@ -685,7 +645,7 @@ CONFIGMAP — Lưu config không nhạy cảm:
   ConfigMap → đổi config không cần rebuild image
 ```
 
-```yaml
+```yaml source="snippets/4-6-configmap-secret.yaml"
 # configmap.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -700,6 +660,8 @@ data:
   cache-ttl: "300"
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-6-configmap-secret.yaml)
+
 ```
 SECRET — Lưu data nhạy cảm (passwords, tokens, keys):
 ──────────────────────────────────────────────────────
@@ -708,7 +670,7 @@ SECRET — Lưu data nhạy cảm (passwords, tokens, keys):
   → Cần kết hợp: Sealed Secrets, External Secrets, Vault
 ```
 
-```yaml
+```yaml source="snippets/4-6-configmap-secret-2.yaml"
 # secret.yaml
 apiVersion: v1
 kind: Secret
@@ -721,7 +683,9 @@ data:
   api-key: YWJjZGVmZzEyMzQ1        # base64 encoded
 ```
 
-```yaml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-6-configmap-secret-2.yaml)
+
+```yaml source="snippets/4-6-configmap-secret-3.yaml"
 # Sử dụng ConfigMap & Secret trong Deployment:
 spec:
   containers:
@@ -748,6 +712,8 @@ spec:
       configMap:
         name: order-config
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-6-configmap-secret-3.yaml)
 
 ### 4.7. Namespace
 
@@ -788,27 +754,33 @@ NAMESPACE:
 
 ### 4.8. Tổng hợp quan hệ giữa các Objects
 
-```mermaid
-graph TD
-    NS[Namespace] --> DEP[Deployment]
-    NS --> SVC[Service]
-    NS --> ING[Ingress]
-    NS --> CM[ConfigMap]
-    NS --> SEC[Secret]
-    
-    DEP --> RS[ReplicaSet]
-    RS --> POD1[Pod 1]
-    RS --> POD2[Pod 2]
-    RS --> POD3[Pod 3]
-    
-    SVC -->|selector: app=order| POD1
-    SVC -->|selector: app=order| POD2
-    SVC -->|selector: app=order| POD3
-    
-    ING -->|/orders| SVC
-    
-    CM -->|env vars| POD1
-    SEC -->|env vars| POD1
+```d2 title="4.8. Tổng hợp quan hệ giữa các Objects"
+direction: down
+n1: "Namespace"
+n2: "Deployment"
+n3: "Service"
+n4: "Ingress"
+n5: "ConfigMap"
+n6: "Secret"
+n7: "ReplicaSet"
+n8: "Pod 1"
+n9: "Pod 2"
+n10: "Pod 3"
+n1 -> n2
+n1 -> n3
+n1 -> n4
+n1 -> n5
+n1 -> n6
+n2 -> n7
+n7 -> n8
+n7 -> n9
+n7 -> n10
+n3 -> n8: "selector: app=order"
+n3 -> n9: "selector: app=order"
+n3 -> n10: "selector: app=order"
+n4 -> n3: "/orders"
+n5 -> n8: "env vars"
+n6 -> n8: "env vars"
 ```
 
 ---
@@ -830,7 +802,7 @@ kubectl edit deployment order-service
 
 HPA tự động **tăng/giảm số pods** dựa trên metrics (CPU, memory, custom).
 
-```yaml
+```yaml source="snippets/5-2-horizontal-pod-autoscaler-hpa.yaml"
 # hpa.yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -871,6 +843,8 @@ spec:
           value: 1                      # Giảm tối đa 1 pod mỗi lần
           periodSeconds: 60
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F5-2-horizontal-pod-autoscaler-hpa.yaml)
 
 ```
 HPA HOẠT ĐỘNG:
@@ -959,7 +933,7 @@ KEDA:
 
 **"Container còn sống không?"** — Nếu fail → K8s **restart** container.
 
-```yaml
+```yaml source="snippets/6-1-liveness-probe.yaml"
 livenessProbe:
   httpGet:
     path: /actuator/health/liveness
@@ -969,6 +943,8 @@ livenessProbe:
   timeoutSeconds: 3            # Timeout mỗi lần check
   failureThreshold: 3          # Fail 3 lần → restart
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F6-1-liveness-probe.yaml)
 
 ```
 Khi nào liveness probe cần?
@@ -1133,7 +1109,7 @@ QoS (Quality of Service) CLASSES:
 
 ### 7.3. LimitRange & ResourceQuota
 
-```yaml
+```yaml source="snippets/7-3-limitrange-resourcequota.yaml"
 # LimitRange — Set default và giới hạn cho MỖI pod/container trong namespace
 apiVersion: v1
 kind: LimitRange
@@ -1157,7 +1133,9 @@ spec:
         memory: "128Mi"
 ```
 
-```yaml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F7-3-limitrange-resourcequota.yaml)
+
+```yaml source="snippets/7-3-limitrange-resourcequota-2.yaml"
 # ResourceQuota — Giới hạn TỔNG resources cho namespace
 apiVersion: v1
 kind: ResourceQuota
@@ -1173,6 +1151,8 @@ spec:
     pods: "100"                 # Tối đa 100 pods
     services: "20"              # Tối đa 20 services
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F7-3-limitrange-resourcequota-2.yaml)
 
 ---
 
@@ -1229,7 +1209,7 @@ HELM CHART STRUCTURE:
 
 ### 8.3. Helm Commands
 
-```bash
+```bash source="snippets/8-3-helm-commands.sh"
 # Install chart
 helm install order-service ./order-service-chart \
   -f values-production.yaml \
@@ -1254,6 +1234,8 @@ helm list -n production
 helm template order-service ./order-service-chart -f values-production.yaml
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F8-3-helm-commands.sh)
+
 ### 8.4. Ví dụ — Helm Chart cho Microservice
 
 ```yaml
@@ -1265,7 +1247,7 @@ version: 1.0.0          # Chart version
 appVersion: "2.1.0"      # Application version
 ```
 
-```yaml
+```yaml source="snippets/8-4-vi-du-helm-chart-cho-microservice.yaml"
 # values.yaml — Default values
 replicaCount: 2
 
@@ -1306,7 +1288,9 @@ config:
 env: {}
 ```
 
-```yaml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F8-4-vi-du-helm-chart-cho-microservice.yaml)
+
+```yaml source="snippets/8-4-vi-du-helm-chart-cho-microservice-2.yaml"
 # values-production.yaml — Override cho production
 replicaCount: 3
 
@@ -1337,7 +1321,9 @@ config:
   logLevel: WARN
 ```
 
-```yaml
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F8-4-vi-du-helm-chart-cho-microservice-2.yaml)
+
+```yaml source="snippets/8-4-vi-du-helm-chart-cho-microservice-3.yaml"
 # templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -1390,6 +1376,8 @@ spec:
             periodSeconds: 5
 ```
 
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F8-4-vi-du-helm-chart-cho-microservice-3.yaml)
+
 ---
 
 ## 9. Service Mesh
@@ -1441,52 +1429,27 @@ VẤN ĐỀ: CROSS-CUTTING CONCERNS TRONG SERVICE-TO-SERVICE:
 
 ### 9.2. Service Mesh Architecture
 
+```d2 title="Service Mesh — Sidecar và Control Plane"
+direction: right
+cluster: Kubernetes Cluster {
+ order: Pod — Order Service {
+  app: "Order Service\nBusiness code • localhost:8082"
+  proxy: "Sidecar — Envoy / Linkerd\nmTLS • Retry • Circuit Breaker\nMetrics • Tracing"
+  app -> proxy
+ }
+ payment: Pod — Payment Service {
+  app: "Payment Service\nBusiness code • localhost:8084"
+  proxy: "Sidecar — Envoy / Linkerd\nmTLS • Retry • Circuit Breaker\nMetrics • Tracing"
+  proxy -> app
+ }
+ control: "Control Plane — Istiod / Linkerd\nConfig • Certificate rotation\nTelemetry theo deployment • Traffic policies"
+ control -> order.proxy: Push config
+ control -> payment.proxy: Push config
+ order.proxy <-> payment.proxy: Service traffic
+}
 ```
-SERVICE MESH — SIDECAR PROXY PATTERN:
-──────────────────────────────────────
 
-  Service Mesh giải quyết bằng cách inject SIDECAR PROXY
-  vào mỗi pod. Proxy xử lý TẤT CẢ networking concerns.
-  Service code KHÔNG CẦN thay đổi.
-
-  ┌──────────────────────────────────────────────────────────┐
-  │  Kubernetes Cluster                                      │
-  │                                                          │
-  │  ┌────────────────────────┐  ┌────────────────────────┐  │
-  │  │  Pod: Order Service    │  │  Pod: Payment Service  │  │
-  │  │                        │  │                        │  │
-  │  │  ┌──────────────────┐  │  │  ┌──────────────────┐  │  │
-  │  │  │  Order Service   │  │  │  │ Payment Service  │  │  │
-  │  │  │  (business code) │  │  │  │ (business code)  │  │  │
-  │  │  │  localhost:8082  │  │  │  │ localhost:8084   │  │  │
-  │  │  └────────┬─────────┘  │  │  └────────┬─────────┘  │  │
-  │  │           │            │  │           │            │  │
-  │  │  ┌────────▼─────────┐  │  │  ┌────────▼─────────┐  │  │
-  │  │  │  Sidecar Proxy   │  │  │  │  Sidecar Proxy   │  │  │
-  │  │  │  (Envoy/Linkerd) │◄─┼──┼─▶│  (Envoy/Linkerd) │  │  │
-  │  │  │                  │  │  │  │                  │  │  │
-  │  │  │  • mTLS          │  │  │  │  • mTLS          │  │  │
-  │  │  │  • Retry         │  │  │  │  • Retry         │  │  │
-  │  │  │  • Circuit Break │  │  │  │  • Circuit Break │  │  │
-  │  │  │  • Metrics       │  │  │  │  • Metrics       │  │  │
-  │  │  │  • Tracing       │  │  │  │  • Tracing       │  │  │
-  │  │  └──────────────────┘  │  │  └──────────────────┘  │  │
-  │  └────────────────────────┘  └────────────────────────┘  │
-  │                                                          │
-  │  ┌────────────────────────────────────────────────────┐  │
-  │  │  Control Plane (Istiod / Linkerd control plane)    │  │
-  │  │                                                    │  │
-  │  │  • Push config đến proxies                         │  │
-  │  │  • Manage certificates (mTLS auto-rotation)        │  │
-  │  │  • Collect metrics/traces                          │  │
-  │  │  • Traffic policies                                │  │
-  │  └────────────────────────────────────────────────────┘  │
-  └──────────────────────────────────────────────────────────┘
-
-  App code GIỮ NGUYÊN — chỉ cần gọi http://payment-service:8084
-  Sidecar proxy tự động: encrypt (mTLS), retry, circuit break,
-  collect metrics, add tracing headers
-```
+App vẫn gọi `http://payment-service:8084`. Các tính năng retry/circuit breaking phụ thuộc proxy và policy đã cấu hình; không phải mọi Service Mesh đều cung cấp chúng giống nhau.
 
 ### 9.3. Istio
 
@@ -1519,7 +1482,7 @@ ISTIO:
   └────────────────────────────────────────────────────────┘
 ```
 
-```yaml
+```yaml source="snippets/9-3-istio.yaml"
 # Istio VirtualService — Canary deployment 90/10
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
@@ -1562,6 +1525,8 @@ spec:
       interval: 30s
       baseEjectionTime: 30s
 ```
+
+[Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F9-3-istio.yaml)
 
 ### 9.4. Linkerd
 
@@ -1842,17 +1807,26 @@ ORCHESTRATION — TỔNG KẾT:
                                    → Cần full → Istio
 ```
 
-```mermaid
-graph LR
-    DEV[Developer] -->|git push| CI[CI/CD]
-    CI -->|docker build| IMG[Docker Image]
-    IMG -->|push| ECR[Container Registry]
-    CI -->|helm upgrade| K8S[Kubernetes Cluster]
-    K8S -->|pull image| ECR
-    K8S --> PODS[Running Pods]
-    PODS --> HPA[Auto-Scale]
-    PODS --> HEAL[Self-Heal]
-    PODS --> ROLL[Rolling Update]
+```d2 title="14. Tổng kết"
+direction: right
+n1: "Developer"
+n2: "CI/CD"
+n3: "Docker Image"
+n4: "Container Registry"
+n5: "Kubernetes Cluster"
+n6: "Running Pods"
+n7: "Auto-Scale"
+n8: "Self-Heal"
+n9: "Rolling Update"
+n1 -> n2: "git push"
+n2 -> n3: "docker build"
+n3 -> n4: "push"
+n2 -> n5: "helm upgrade"
+n5 -> n4: "pull image"
+n5 -> n6
+n6 -> n7
+n6 -> n8
+n6 -> n9
 ```
 
 ---

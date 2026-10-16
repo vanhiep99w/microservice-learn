@@ -95,17 +95,31 @@ Phụ thuộc giữa các Data Patterns (học theo thứ tự này):
 
 Thuật ngữ then chốt: **data ownership** (quyền sở hữu dữ liệu) — dữ liệu thuộc về service duy nhất chịu trách nhiệm vòng đời của nó. Order data thuộc Order Service, product data thuộc Product Service.
 
-```mermaid
-graph TB
-    OS[Order Service] --> ODB[(Order DB<br/>PostgreSQL)]
-    PS[Product Service] --> PDB[(Product DB<br/>MongoDB)]
-    PAY[Payment Service] --> PAYDB[(Payment DB<br/>PostgreSQL)]
-    OS -.->|Chỉ qua API / Event| PS
-    OS -.->|Chỉ qua API / Event| PAY
-
-    style OS fill:#b3cde3
-    style PS fill:#ccebc5
-    style PAY fill:#decbe4
+```d2 title="2.1. Khái niệm và nguyên tắc sở hữu dữ liệu"
+direction: down
+n1: "Order Service" {
+  style.fill: "#b3cde3"
+}
+n2: "Order DB\nPostgreSQL" {
+  shape: cylinder
+}
+n3: "Product Service" {
+  style.fill: "#ccebc5"
+}
+n4: "Product DB\nMongoDB" {
+  shape: cylinder
+}
+n5: "Payment Service" {
+  style.fill: "#decbe4"
+}
+n6: "Payment DB\nPostgreSQL" {
+  shape: cylinder
+}
+n1 -> n2
+n3 -> n4
+n5 -> n6
+n1 -> n3: "Chỉ qua API / Event" { style.stroke-dash: 5 }
+n1 -> n5: "Chỉ qua API / Event" { style.stroke-dash: 5 }
 ```
 
 Hai quy tắc bất di bất dịch:
@@ -338,24 +352,23 @@ sequenceDiagram
 
 Một **Saga Orchestrator** (điều phối viên) nắm state machine của saga: gửi command tới từng service, nhận reply, quyết định bước tiếp hoặc kích hoạt compensation. Orchestrator phải **persist saga log** để sống sót qua crash.
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant OR as Saga Orchestrator<br/>(persist saga log)
-    participant O as Order Service
-    participant P as Payment Service
-    participant I as Inventory Service
-
-    C->>OR: Start saga "PlaceOrder"
-    OR->>O: CreateOrder (command)
-    O-->>OR: OK
-    OR->>P: ChargePayment (command)
-    P-->>OR: OK
-    OR->>I: ReserveStock (command)
-    I-->>OR: ❌ FAIL
-    OR->>P: RefundPayment (compensate)
-    OR->>O: CancelOrder (compensate)
-    OR->>OR: Saga log: COMPENSATED
+```d2 title="4.3. Orchestration Saga — điều phối tập trung"
+shape: sequence_diagram
+"C": "Client"
+"OR": "Saga Orchestrator\n(persist saga log)"
+"O": "Order Service"
+"P": "Payment Service"
+"I": "Inventory Service"
+"C" -> "OR": "Start saga \"PlaceOrder\""
+"OR" -> "O": "CreateOrder (command)"
+"O" -> "OR": "OK" { style.stroke-dash: 5 }
+"OR" -> "P": "ChargePayment (command)"
+"P" -> "OR": "OK" { style.stroke-dash: 5 }
+"OR" -> "I": "ReserveStock (command)"
+"I" -> "OR": "❌ FAIL" { style.stroke-dash: 5 }
+"OR" -> "P": "RefundPayment (compensate)"
+"OR" -> "O": "CancelOrder (compensate)"
+"OR" -> "OR": "Saga log: COMPENSATED"
 ```
 
 > 📖 Chi tiết Saga Execution Coordinator (SEC) và saga log: [09 — Data Management, mục 6.6](09-data-management.md#66-saga-execution-coordinator-sec). Phân biệt event vs command (command hướng tới một người nhận cụ thể, event là fact đã xảy ra): [06 — Inter-Service Communication](06-inter-service-communication.md).
@@ -588,16 +601,21 @@ Trong thực tế, các patterns này **không đứng một mình** — sức m
 
 Saga dựa trên events/commands để chuyển bước. Nếu một bước ghi DB thành công nhưng event không đến được bước tiếp theo — saga **đứng hình vĩnh viễn** (order PENDING, tiền chưa refund, không ai biết). Mọi bước saga "ghi DB + phát event" vì vậy phải qua Outbox:
 
-```mermaid
-graph LR
-    subgraph "Payment Service — một bước saga"
-        A[Charge thẻ<br/>local tx] --> B[(payment + outbox<br/>cùng transaction)]
-        B --> C[Relay / CDC]
-        C --> D[Kafka]
-    end
-    D --> E[Order Service<br/>bước tiếp theo<br/>hoặc compensation]
-
-    style B fill:#fbd38d
+```d2 title="7.2. Saga + Outbox — cặp bắt buộc"
+direction: right
+n1: "Payment Service — một bước saga" {}
+n1.n2: "Charge thẻ\nlocal tx"
+n1.n3: "payment + outbox\ncùng transaction" {
+  shape: cylinder
+  style.fill: "#fbd38d"
+}
+n1.n4: "Relay / CDC"
+n1.n5: "Kafka"
+n6: "Order Service\nbước tiếp theo\nhoặc compensation"
+n1.n2 -> n1.n3
+n1.n3 -> n1.n4
+n1.n4 -> n1.n5
+n1.n5 -> n6
 ```
 
 Checklist cho mỗi bước saga:
@@ -611,18 +629,32 @@ Checklist cho mỗi bước saga:
 
 Event store tối ưu cho **append và replay**, không phải cho query ("tìm mọi đơn DELIVERED trong tuần" trên event store là bài toán sai). Vì vậy ES trong thực tế **luôn đi kèm CQRS**: projector consume events, dựng read models tối ưu từng use case.
 
-```mermaid
-graph LR
-    CMD[Command] --> AGG[Aggregate<br/>validate + append]
-    AGG --> ES[(Event Store<br/>append-only)]
-    ES --> P1[Projector 1<br/>Order history view]
-    ES --> P2[Projector 2<br/>Dashboard thống kê]
-    ES --> P3[Integration Publisher<br/>→ Kafka cho services khác]
-    P1 --> R1[(Read DB 1)]
-    P2 --> R2[(Read DB 2)]
-    P3 --> OTHER[Services khác]
-
-    style ES fill:#fbd38d
+```d2 title="7.3. Event Sourcing + CQRS — cặp kinh điển"
+direction: right
+n1: "Command"
+n2: "Aggregate\nvalidate + append"
+n3: "Event Store\nappend-only" {
+  shape: cylinder
+  style.fill: "#fbd38d"
+}
+n4: "Projector 1\nOrder history view"
+n5: "Projector 2\nDashboard thống kê"
+n6: "Integration Publisher\n→ Kafka cho services khác"
+n7: "Read DB 1" {
+  shape: cylinder
+}
+n8: "Read DB 2" {
+  shape: cylinder
+}
+n9: "Services khác"
+n1 -> n2
+n2 -> n3
+n3 -> n4
+n3 -> n5
+n3 -> n6
+n4 -> n7
+n5 -> n8
+n6 -> n9
 ```
 
 Đáng chú ý projector thứ ba: event store **thay thế outbox** trong service dùng ES — event đã được persist atomic ngay khi aggregate ghi (chỉ một phép ghi, không dual write), integration publisher chỉ việc đọc stream và publish ra Kafka cho services khác. Đây là lý do bảng chọn Outbox ở mục 3.5 ghi "ES thuần → không cần outbox".
@@ -693,23 +725,48 @@ Sơ đồ dưới đây ghép cả năm patterns vào một hệ đặt hàng đ
 
 Các câu hỏi dưới đây độc lập — trả lời lần lượt và cộng dồn tổ hợp patterns cần dùng:
 
-```mermaid
-flowchart TD
-    S([Service cần quản lý dữ liệu]) --> Q1{Ghi DB và publish event<br/>trong cùng nghiệp vụ?}
-    Q1 -->|Có| O[Transactional Outbox]
-    Q1 -->|Không| Q2
-    O --> Q2{Nghiệp vụ xuyên<br/>nhiều services?}
-    Q2 -->|Có| Q3{Flow nhiều bước,<br/>rẽ nhánh, cần visibility?}
-    Q3 -->|Không — tuyến tính, ít bước| SA[Saga Choreography]
-    Q3 -->|Có| SO[Saga Orchestration]
-    Q2 -->|Không| Q4
-    SA --> Q4{Query nặng / read-write<br/>chênh lệch lớn / query đa service?}
-    SO --> Q4
-    Q4 -->|Có| C[CQRS]
-    Q4 -->|Không| F[CRUD + API là đủ]
-    C --> Q5{Cần audit trail đầy đủ,<br/>time-travel, replay state?}
-    Q5 -->|Có| E[Event Sourcing + CQRS]
-    Q5 -->|Không| K[Giữ CQRS thường]
+```d2 title="8.1. Decision flow"
+direction: down
+n1: "Service cần quản lý dữ liệu" {
+  shape: oval
+}
+n2: "Ghi DB và publish event\ntrong cùng nghiệp vụ?" {
+  shape: diamond
+}
+n3: "Transactional Outbox"
+n4: "Nghiệp vụ xuyên\nnhiều services?" {
+  shape: diamond
+}
+n5: "Flow nhiều bước,\nrẽ nhánh, cần visibility?" {
+  shape: diamond
+}
+n6: "Saga Choreography"
+n7: "Saga Orchestration"
+n8: "Query nặng / read-write\nchênh lệch lớn / query đa service?" {
+  shape: diamond
+}
+n9: "CQRS"
+n10: "CRUD + API là đủ"
+n11: "Cần audit trail đầy đủ,\ntime-travel, replay state?" {
+  shape: diamond
+}
+n12: "Event Sourcing + CQRS"
+n13: "Giữ CQRS thường"
+n1 -> n2
+n2 -> n3: "Có"
+n2 -> n4: "Không"
+n3 -> n4
+n4 -> n5: "Có"
+n5 -> n6: "Không — tuyến tính, ít bước"
+n5 -> n7: "Có"
+n4 -> n8: "Không"
+n6 -> n8
+n7 -> n8
+n8 -> n9: "Có"
+n8 -> n10: "Không"
+n9 -> n11
+n11 -> n12: "Có"
+n11 -> n13: "Không"
 ```
 
 ### 8.2. Bảng tình huống thực tế
