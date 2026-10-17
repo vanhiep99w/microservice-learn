@@ -67,28 +67,23 @@ Resilience (khả năng chịu lỗi) là khả năng hệ thống **tiếp tụ
 
 Trong monolith, khi ứng dụng lỗi → toàn bộ hệ thống dừng. Trong microservice, vấn đề **phức tạp hơn nhiều**:
 
-```
-┌─────────────────────────────────────────────────────────┐
-│              VẤN ĐỀ CASCADING FAILURE                   │
-│                                                         │
-│   User ──▶ API Gateway ──▶ Order Service ──▶ Payment    │
-│                              │                 ❌ DOWN  │
-│                              │                          │
-│                              ▼                          │
-│                         Order bị treo                   │
-│                              │                          │
-│                              ▼                          │
-│                    Thread pool cạn kiệt                 │
-│                              │                          │
-│                              ▼                          │
-│                    Order Service ❌ DOWN                │
-│                              │                          │
-│                              ▼                          │
-│                    API Gateway ❌ DOWN                  │
-│                              │                          │
-│                              ▼                          │
-│                    ❌ TOÀN BỘ HỆ THỐNG SẬP              │
-└─────────────────────────────────────────────────────────┘
+```d2 title="1.1. Tại sao Resilience quan trọng?"
+direction: down
+user: "User"
+gw: "API Gateway"
+order: "Order Service"
+payment: "Payment DOWN"
+wait: "Order call chờ / Thread pool cạn"
+orderdown: "Order DOWN"
+gwdown: "Gateway DOWN"
+outage: "Toàn bộ hệ thống gián đoạn"
+user -> gw
+gw -> order
+order -> payment
+payment -> wait
+wait -> orderdown
+orderdown -> gwdown
+gwdown -> outage
 ```
 
 Một **Payment Service** lỗi có thể kéo theo **toàn bộ hệ thống** sập — đây gọi là **Cascading Failure** (lỗi lan truyền dây chuyền).
@@ -155,26 +150,16 @@ n3.n8 -> n3.n9
 
 ### 1.3. Tổng quan các Resilience Patterns
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                    RESILIENCE PATTERNS                           │
-│                                                                  │
-│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│   │   Timeout   │  │    Retry    │  │  Circuit    │              │
-│   │             │  │             │  │  Breaker    │              │
-│   │ Giới hạn    │  │ Thử lại khi │  │             │              │
-│   │ thời gian   │  │ lỗi tạm     │  │ Ngắt mạch   │              │
-│   │ chờ         │  │ thời        │  │ khi lỗi     │              │
-│   └─────────────┘  └─────────────┘  │ liên tục    │              │
-│                                     └─────────────┘              │
-│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│   │  Bulkhead   │  │    Rate     │  │  Fallback   │              │
-│   │             │  │   Limiter   │  │             │              │
-│   │ Cô lập tài  │  │             │  │ Phương án   │              │
-│   │ nguyên      │  │ Giới hạn    │  │ dự phòng    │              │
-│   │             │  │ tần suất    │  │             │              │
-│   └─────────────┘  └─────────────┘  └─────────────┘              │
-└──────────────────────────────────────────────────────────────────┘
+```d2 title="1.3. Tổng quan các Resilience Patterns"
+direction: right
+patterns: Resilience Patterns {
+ timeout: "Timeout — Giới hạn chờ"
+ retry: "Retry — Lỗi tạm thời"
+ cb: "Circuit Breaker — Ngắt khi lỗi liên tục"
+ bulkhead: "Bulkhead — Cô lập tài nguyên"
+ limiter: "Rate Limiter — Giới hạn tần suất"
+ fallback: "Fallback — Phương án dự phòng"
+}
 ```
 
 ---
@@ -187,32 +172,27 @@ Timeout là pattern đơn giản nhất nhưng **quan trọng nhất** — nó l
 
 Không có Timeout, một request có thể **chờ vô hạn** khi service đích không phản hồi:
 
+```d2 title="2.1. Tại sao cần Timeout?"
+direction: down
+without: Không Timeout {
+ client: Client
+ a: Service A
+ b: Service B — treo
+ exhausted: Chờ 5–10 phút → giữ threads / connections → pool cạn
+ client -> a -> b
+ a -> exhausted
+}
+with: Timeout 3 giây {
+ client: Client
+ a: Service A
+ b: Service B — treo
+ fallback: Timeout → Lỗi / Fallback → giải phóng tài nguyên
+ client -> a -> b
+ a -> fallback: Sau 3 giây
+}
 ```
-Không có Timeout:
-──────────────────────────────────────────────────────
-Client ──▶ Service A ──▶ Service B (bị treo)
-                │
-                │  Chờ... chờ... chờ...
-                │  Thread bị giữ
-                │  Connection bị chiếm
-                │  5 phút... 10 phút...
-                │
-                ▼
-         Thread pool cạn kiệt
-         Service A cũng "chết"
 
-Có Timeout (3 giây):
-──────────────────────────────────────────────────────
-Client ──▶ Service A ──▶ Service B (bị treo)
-                │
-                │  Chờ 3 giây...
-                │  ⏰ TIMEOUT!
-                │
-                ▼
-         Trả về lỗi hoặc fallback
-         Thread được giải phóng
-         Service A vẫn hoạt động ✅
-```
+Timeout của caller không tự bảo đảm dependency dừng work; cần cancellation/deadline propagation nếu protocol hỗ trợ.
 
 ### 2.2. Các loại Timeout
 
@@ -223,23 +203,20 @@ Client ──▶ Service A ──▶ Service B (bị treo)
 | **Idle Timeout** | Thời gian tối đa kết nối không hoạt động trước khi bị đóng | 30-300 giây |
 | **Overall/Request Timeout** | Tổng thời gian tối đa cho toàn bộ request (bao gồm retry) | Tùy nghiệp vụ |
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant S as Server
-
-    Note over C,S: Connection Timeout (1-5s)
-    C->>S: SYN
-    S-->>C: SYN-ACK
-    C->>S: ACK
-
-    Note over C,S: Read Timeout (3-30s)
-    C->>S: HTTP Request
-    S-->>C: HTTP Response
-
-    Note over C,S: Idle Timeout (30-300s)
-    Note over C,S: Không có traffic...
-    C-xS: Connection đóng
+```d2 title="2.2. Các loại Timeout"
+shape: sequence_diagram
+"C": "Client"
+"S": "Server"
+"C".note1: "[Client — Server]\nConnection Timeout (1-5s)"
+"C" -> "S": "SYN"
+"S" -> "C": "SYN-ACK" { style.stroke-dash: 5 }
+"C" -> "S": "ACK"
+"C".note2: "[Client — Server]\nRead Timeout (3-30s)"
+"C" -> "S": "HTTP Request"
+"S" -> "C": "HTTP Response" { style.stroke-dash: 5 }
+"C".note3: "[Client — Server]\nIdle Timeout (30-300s)"
+"C".note4: "[Client — Server]\nKhông có traffic..."
+"C" -> "S": "Connection đóng" { target-arrowhead.shape: cross }
 ```
 
 ### 2.3. Cách chọn giá trị Timeout
@@ -320,12 +297,17 @@ Timeout = 1.5s × 1.5 + 0.1s
 
 **Lưu ý quan trọng — Timeout Propagation**:
 
-```
-Client (timeout=10s)
-  └──▶ API Gateway (timeout=8s)
-         └──▶ Order Service (timeout=5s)
-                └──▶ Payment Service (timeout=3s)
-                       └──▶ Bank API (timeout=2s)
+```d2 title="Công thức chọn Timeout"
+direction: right
+client: "Client timeout 10s"
+gateway: "API Gateway timeout 8s"
+order: "Order timeout 5s"
+payment: "Payment timeout 3s"
+bank: "Bank API timeout 2s"
+client -> gateway
+gateway -> order
+order -> payment
+payment -> bank
 ```
 
 Timeout phải **giảm dần** theo chuỗi gọi. Nếu Client timeout 10s nhưng Bank API timeout 15s → vô nghĩa vì Client đã timeout trước.
@@ -500,41 +482,35 @@ PATCH /accounts/balance   → Cộng tiền (retry → cộng 2 lần!)
 
 **Giải pháp**: Sử dụng **Idempotency Key**:
 
+```d2 title="3.4. Idempotency — Điều kiện tiên quyết"
+direction: right
+client: "Client tạo key pay_abc123"
+request: "POST /payments\nIdempotency-Key pay_abc123"
+server: "Server xử lý / persist key + result"
+timeout: "Response thất lạc — client timeout"
+retry: "Retry cùng POST + cùng key"
+saved: "Key đã có → trả kết quả cũ\nKhông charge lại"
+client -> request
+request -> server
+server -> timeout
+timeout -> retry
+retry -> saved
 ```
-┌──────────────────────────────────────────────────────┐
-│              IDEMPOTENCY KEY PATTERN                 │
-│                                                      │
-│   Client tạo unique key: "pay_abc123"                │
-│                                                      │
-│   Request 1: POST /payments                          │
-│              Idempotency-Key: pay_abc123             │
-│              → Server xử lý, lưu key + result        │
-│              → Timeout! Client không nhận response   │
-│                                                      │
-│   Retry:    POST /payments                           │
-│              Idempotency-Key: pay_abc123             │
-│              → Server thấy key đã tồn tại            │
-│              → Trả về kết quả cũ, KHÔNG xử lý lại    │
-└──────────────────────────────────────────────────────┘
-```
+
+Deduplication key/result phải được lưu atomic với business effect theo thiết kế; thời hạn key, payload mismatch và concurrent requests cần policy rõ.
 
 ### 3.5. Retry Storm — Khi Retry trở thành vấn đề
 
+```d2 title="3.5. Retry Storm — Khi Retry trở thành vấn đề"
+direction: right
+a: "Service A — 3 attempts"
+b: "Service B — 3 attempts"
+db: "DB — tối đa 9 calls / user request"
+a -> b: "Retry ở A"
+b -> db: "Retry ở B"
 ```
-                    RETRY STORM
-┌──────────────────────────────────────────────────┐
-│                                                  │
-│   Service A ──retry──▶ Service B ──retry──▶ DB   │
-│     3 lần               3 lần                    │
-│                                                  │
-│   1 request từ user = 3 × 3 = 9 requests tới DB! │
-│                                                  │
-│   Nếu 4 tầng, mỗi tầng retry 3 lần:              │
-│   3 × 3 × 3 × 3 = 81 requests!                   │
-│                                                  │
-│   1000 users cùng lúc = 81,000 requests tới DB!  │
-└──────────────────────────────────────────────────┘
-```
+
+Ví dụ nhân retry: 4 tầng × 3 attempts/tầng = 81 calls; 1.000 users → 81.000 calls. Số attempts phải phân biệt với số retries (3 retries thường thành 4 attempts).
 
 **Giải pháp**:
 
@@ -580,50 +556,48 @@ Payment Service bị chậm
 
 Circuit Breaker hoạt động như **proxy** giữa caller và callee, theo dõi tỷ lệ lỗi và tự động ngắt mạch khi vượt ngưỡng.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                  CIRCUIT BREAKER                         │
-│                                                          │
-│   Caller ──▶ ┌──────────────────┐ ──▶ Callee             │
-│              │  Circuit Breaker │     (Service đích)     │
-│              │                  │                        │
-│              │  • Đếm lỗi       │                        │
-│              │  • Theo dõi tỷ lệ│                        │
-│              │  • Quyết định    │                        │
-│              │    cho qua / chặn│                        │
-│              └──────────────────┘                        │
-│                                                          │
-│   Trạng thái:                                            │
-│   🟢 CLOSED  — Hoạt động bình thường, cho request qua    │
-│   🔴 OPEN    — Ngắt mạch, reject ngay lập tức            │
-│   🟡 HALF-OPEN — Thử nghiệm, cho 1 vài request qua       │
-└──────────────────────────────────────────────────────────┘
+```d2 title="4.2. Circuit Breaker là gì?"
+direction: right
+caller: "Caller"
+cb: "Circuit Breaker\nĐếm lỗi • Sliding window / Tỷ lệ\nCho qua hoặc chặn"
+callee: "Callee — Dependency"
+reject: "Reject / Fallback ngay"
+caller -> cb
+cb -> callee: "CLOSED / HALF-OPEN cho probe"
+cb -> reject: "OPEN"
 ```
 
 ### 4.3. Ba trạng thái của Circuit Breaker
 
-```mermaid
-stateDiagram-v2
-    [*] --> Closed
-    Closed --> Open: Tỷ lệ lỗi > ngưỡng
-    Open --> HalfOpen: Hết thời gian chờ
-    HalfOpen --> Closed: Request thử thành công
-    HalfOpen --> Open: Request thử thất bại
-
-    state Closed {
-        [*] --> Monitoring
-        Monitoring --> Monitoring: Đếm success/failure
-    }
-
-    state Open {
-        [*] --> Rejecting
-        Rejecting --> Rejecting: Reject tất cả request
-    }
-
-    state HalfOpen {
-        [*] --> Testing
-        Testing --> Testing: Cho 1-N request thử qua
-    }
+```d2 title="4.3. Ba trạng thái của Circuit Breaker"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+Closed: "Closed"
+initial1 -> Closed
+Open: "Open"
+Closed -> Open: "Tỷ lệ lỗi > ngưỡng"
+HalfOpen: "HalfOpen"
+Open -> HalfOpen: "Hết thời gian chờ"
+HalfOpen -> Closed: "Request thử thành công"
+HalfOpen -> Open: "Request thử thất bại"
+Closed: "Closed" {
+initial2: "Bắt đầu" {shape: circle; width: 40; height: 40}
+Monitoring: "Monitoring"
+initial2 -> Monitoring
+Monitoring -> Monitoring: "Đếm success/failure"
+}
+Open: "Open" {
+initial3: "Bắt đầu" {shape: circle; width: 40; height: 40}
+Rejecting: "Rejecting"
+initial3 -> Rejecting
+Rejecting -> Rejecting: "Reject tất cả request"
+}
+HalfOpen: "HalfOpen" {
+initial4: "Bắt đầu" {shape: circle; width: 40; height: 40}
+Testing: "Testing"
+initial4 -> Testing
+Testing -> Testing: "Cho 1-N request thử qua"
+}
 ```
 
 **Chi tiết từng trạng thái**:
@@ -753,44 +727,26 @@ n10 -> n3
 
 **Ví dụ cụ thể — 1 request đi qua cả 2 lớp**:
 
+```d2 title="4.6. Circuit Breaker + Retry — Kết hợp"
+direction: down
+request: "Thanh toán đơn 456"
+cb: "Outer Circuit Breaker\nFailure rate 30% < threshold 50% — CLOSED"
+one: "Inner Retry — Attempt 1 timeout 3s"
+two: "Backoff 500ms → Attempt 2 trả 500"
+three: "Backoff 1000ms → Attempt 3"
+success: "200ms OK → CB ghi 1 success"
+failure: "Hết attempts vẫn fail → CB ghi 1 failure"
+open: "Failure rate vượt 50% → OPEN"
+request -> cb
+cb -> one
+one -> two
+two -> three
+three -> success: "Success"
+three -> failure: "Failure"
+failure -> open: "Vượt threshold"
 ```
-Request: "Thanh toán đơn hàng #456"
 
-═══════════════════════════════════════════════════════════
-  LỚP NGOÀI: Circuit Breaker kiểm tra
-═══════════════════════════════════════════════════════════
-  │
-  │  Hỏi: "Mạch đang mở không?"
-  │  → Mạch đang 🟢 CLOSED (failure rate = 30% < 50%)
-  │  → OK, cho request đi qua ✅
-  │
-  │  ┌─────────────────────────────────────────────────┐
-  │  │  LỚP TRONG: Retry xử lý                         │
-  │  │                                                 │
-  │  │  Lần 1: Gọi Payment Service → ❌ timeout 3s     │
-  │  │  Chờ 500ms (backoff)                            │
-  │  │  Lần 2: Gọi Payment Service → ❌ 500 error      │
-  │  │  Chờ 1000ms (backoff)                           │
-  │  │  Lần 3: Gọi Payment Service → ✅ 200ms OK!      │
-  │  │                                                 │
-  │  │  → Trả kết quả thành công                       │
-  │  └─────────────────────────────────────────────────┘
-  │
-  │  Circuit Breaker ghi nhận: 1 success
-  │  (2 lần fail của retry KHÔNG được đếm riêng)
-  │
-═══════════════════════════════════════════════════════════
-
-  Nếu retry hết 3 lần vẫn fail:
-═══════════════════════════════════════════════════════════
-  │
-  │  Retry báo: "Thất bại sau 3 lần thử"
-  │  Circuit Breaker ghi nhận: 1 failure
-  │  → Tổng failure rate tăng lên
-  │  → Nếu vượt 50% → Circuit chuyển sang 🔴 OPEN
-  │
-═══════════════════════════════════════════════════════════
-```
+Wrapper order trong ví dụ là CB ngoài Retry nên CB thấy kết quả cuối của một logical operation, không đếm riêng hai attempts lỗi. Đảo thứ tự wrappers sẽ thay đổi cách ghi nhận failures và admission của từng attempt.
 
 **Tại sao KHÔNG đặt Retry bên ngoài Circuit Breaker?**
 
@@ -840,21 +796,15 @@ Request: "Thanh toán đơn hàng #456"
 
 Bulkhead (vách ngăn) trong đóng tàu chia thân tàu thành **các khoang riêng biệt**. Nếu một khoang bị thủng và ngập nước, các khoang khác **không bị ảnh hưởng** — tàu vẫn nổi.
 
-```
-Tàu KHÔNG có Bulkhead:
-┌──────────────────────────────────────────┐
-│ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~     │ ← Nước tràn khắp
-│ ~~~~ Toàn bộ tàu ngập ~~~~~~~~~~~~~~~~   │
-└──────────────────────────────────────────┘
-→ TÀU CHÌM ❌
-
-Tàu CÓ Bulkhead:
-┌─────────┬─────────┬─────────┬────────────┐
-│ ~~~~~~~~│         │         │            │
-│ ~ Ngập ~│  Khô ✅ │  Khô ✅ │   Khô ✅   │
-│ ~~~~~~~~│         │         │            │
-└─────────┴─────────┴─────────┴────────────┘
-→ TÀU VẪN NỔI ✅ (chỉ 1 khoang bị)
+```d2 title="5.1. Ý tưởng từ đóng tàu"
+direction: down
+without: "Không Bulkhead — tàu chìm" { hull: Toàn bộ khoang ngập }
+with: "Có Bulkhead — chỉ một khoang ngập, tàu vẫn nổi" {
+ one: Khoang 1 — NGẬP
+ two: Khoang 2 — KHÔ
+ three: Khoang 3 — KHÔ
+ four: Khoang 4 — KHÔ
+}
 ```
 
 ### 5.2. Bulkhead trong Microservice
@@ -873,53 +823,45 @@ Tàu CÓ Bulkhead:
 
 Dù cô lập loại tài nguyên nào, **ý tưởng đều giống nhau**:
 
+```d2 title="5.2. Bulkhead trong Microservice"
+direction: down
+shared: "Không Bulkhead — 200 threads chung" {
+ pool: Pool 200 threads
+ payment: Payment chậm 30s/request — chiếm hết 200
+ inventory: Inventory — không còn threads
+ notification: Notification — không còn threads
+ pool -> payment
+ pool -> inventory
+ pool -> notification
+}
+isolated: Order Service — Isolated Pools {
+ payment: Payment max50
+ inventory: Inventory max50
+ notification: Notification max20
+ other: Other max80
+}
 ```
-Không có Bulkhead — Dùng chung tài nguyên:
-──────────────────────────────────────────────────────
-Order Service: Thread Pool = 200 threads (dùng chung)
 
-  ├── Gọi Payment Service (bình thường: 10 threads)
-  ├── Gọi Inventory Service (bình thường: 10 threads)
-  └── Gọi Notification Service (bình thường: 5 threads)
-
-Payment Service bị chậm (30s/request):
-  → Payment chiếm 200 threads (tất cả đang chờ)
-  → Inventory, Notification: KHÔNG CÒN THREAD
-  → Order Service hoàn toàn tê liệt ❌
-
-Có Bulkhead — Cô lập tài nguyên:
-──────────────────────────────────────────────────────
-Order Service: Phân bổ thread riêng cho từng dependency
-
-  ├── Payment Pool:      50 threads (max)
-  ├── Inventory Pool:    50 threads (max)
-  ├── Notification Pool: 20 threads (max)
-  └── Other Pool:        80 threads (max)
-
-Payment Service bị chậm:
-  → Payment chiếm hết 50 threads → DỪNG (chỉ ảnh hưởng pool này)
-  → Inventory vẫn còn 50 threads → HOẠT ĐỘNG ✅
-  → Notification vẫn còn 20 threads → HOẠT ĐỘNG ✅
-```
+Bình thường Payment/Inventory/Notification dùng khoảng 10/10/5 threads trong ví dụ. Khi Payment chậm chỉ pool Payment bị chiếm; Inventory và Notification vẫn có capacity riêng, tránh một dependency làm tê liệt toàn Order.
 
 **Ví dụ Connection Pool Bulkhead** — không liên quan tới thread:
 
-```
-Order Service kết nối 3 databases (dùng chung 30 connections):
-──────────────────────────────────────────────────────
-
-Không Bulkhead:
-  Connection Pool = 30 connections (chung)
-  → Product DB chậm → 30 connections đều chờ Product DB
-  → Order DB, User DB không còn connection ❌
-
-Có Bulkhead:
-  ├── Order DB Pool:   max 15 connections
-  ├── Product DB Pool: max 10 connections  ← DB này chậm
-  └── User DB Pool:    max 5 connections
-
-  → Product DB chậm → chỉ chiếm 10 connections
-  → Order DB (15 conn) và User DB (5 conn) vẫn OK ✅
+```d2 title="5.2. Bulkhead trong Microservice"
+direction: down
+shared: "Chung 30 connections — Product DB chậm có thể chiếm hết" {
+ pool: Shared Pool — 30
+ product: Product DB
+ order: Order DB
+ user: User DB
+ pool -> product
+ pool -> order
+ pool -> user
+}
+separate: Separate Pools {
+ product: Product Pool max10 → Product DB chậm
+ order: Order Pool max15 → Order DB vẫn còn capacity
+ user: User Pool max5 → User DB vẫn còn capacity
+}
 ```
 
 **Ví dụ Kubernetes Resource Bulkhead** — cô lập ở tầng infrastructure:
@@ -945,20 +887,19 @@ Có Bulkhead (resource limits):
 
 Mỗi dependency có **thread pool riêng**:
 
-```
-┌──────────────────────────────────────────────────────┐
-│              ORDER SERVICE                           │
-│                                                      │
-│   ┌─────────────┐  ┌──────────────┐  ┌────────────┐  │
-│   │ Payment Pool│  │Inventory Pool│  │Notif Pool  │  │
-│   │ max=50      │  │ max=50       │  │ max=20     │  │
-│   │ ████████░░  │  │ ██░░░░░░░░   │  │ ██░░░░░░   │  │
-│   │ 40/50 used  │  │ 10/50 used   │  │ 8/20 used  │  │
-│   └──────┬──────┘  └──────┬───────┘  └─────┬──────┘  │
-│          │                │                │         │
-│          ▼                ▼                ▼         │
-│   Payment Service  Inventory Svc  Notification Svc   │
-└──────────────────────────────────────────────────────┘
+```d2 title="Thread Pool Isolation"
+direction: down
+order: Order Service {
+ pay: Payment Pool — used40 / max50
+ inv: Inventory Pool — used10 / max50
+ noti: Notification Pool — used8 / max20
+}
+payment: Payment Service
+inventory: Inventory Service
+notification: Notification Service
+order.pay -> payment
+order.inv -> inventory
+order.noti -> notification
 ```
 
 **Ưu điểm**: Cô lập hoàn toàn, thread bị block không ảnh hưởng pool khác
@@ -968,21 +909,16 @@ Mỗi dependency có **thread pool riêng**:
 
 Dùng **semaphore (counter)** giới hạn số lượng concurrent calls:
 
+```d2 title="Semaphore Isolation"
+direction: right
+order: Order Service — caller thread pool dùng chung {
+ pay: Payment Semaphore — current40 / max50
+ inv: Inventory Semaphore — current10 / max50
+ noti: Notification Semaphore — current8 / max20
+}
 ```
-┌──────────────────────────────────────────────────────┐
-│              ORDER SERVICE                           │
-│                                                      │
-│   ┌─────────────┐  ┌─────────────┐  ┌────────────┐   │
-│   │ Payment     │  │ Inventory   │  │ Notif      │   │
-│   │ Semaphore   │  │ Semaphore   │  │ Semaphore  │   │
-│   │ max=50      │  │ max=50      │  │ max=20     │   │
-│   │ current=40  │  │ current=10  │  │ current=8  │   │
-│   └─────────────┘  └─────────────┘  └────────────┘   │
-│                                                      │
-│   → Dùng chung thread pool của caller                │
-│   → Chỉ giới hạn concurrent requests                 │
-└──────────────────────────────────────────────────────┘
-```
+
+Semaphore isolation chỉ giới hạn concurrent calls, không tự cấp một thread pool độc lập cho mỗi dependency.
 
 **Ưu điểm**: Nhẹ, ít overhead
 **Nhược điểm**: Không cô lập hoàn toàn, nếu thread bị block → ảnh hưởng shared pool
@@ -996,38 +932,22 @@ Dùng **semaphore (counter)** giới hạn số lượng concurrent calls:
 
 ### 5.4. Ví dụ thực tế — E-Commerce Service
 
+```d2 title="5.4. Ví dụ thực tế — E-Commerce Service"
+direction: down
+request: "Incoming Requests — 1.000 req/s"
+handler: "Request Handler Pool — 200 threads"
+payment: "Payment Pool 50 — CRITICAL"
+inventory: "Inventory Pool 50 — CRITICAL"
+shipping: "Shipping Pool 30 — MEDIUM"
+rec: "Recommendation Pool 20 — LOW"
+request -> handler
+handler -> payment
+handler -> inventory
+handler -> shipping
+handler -> rec
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    E-COMMERCE ORDER SERVICE                  │
-│                                                              │
-│   Incoming Requests (1000 req/s)                             │
-│          │                                                   │
-│          ▼                                                   │
-│   ┌───────────────┐                                          │
-│   │  Request      │                                          │
-│   │  Handler      │                                          │
-│   │  Thread Pool  │                                          │
-│   │  (200 threads)│                                          │
-│   └──────┬────────┘                                          │
-│          │                                                   │
-│    ┌─────┼─────────────────┬────────────────┐                │
-│    ▼     ▼                 ▼                ▼                │
-│ ┌──────┐ ┌──────┐    ┌──────────┐    ┌──────────┐            │
-│ │Pay   │ │Inv   │    │Shipping  │    │Recommend │            │
-│ │Pool  │ │Pool  │    │Pool      │    │Pool      │            │
-│ │50 thd│ │50 thd│    │30 thd    │    │20 thd    │            │
-│ │      │ │      │    │          │    │          │            │
-│ │CRIT  │ │CRIT  │    │MEDIUM    │    │LOW       │            │
-│ └──┬───┘ └──┬───┘    └────┬─────┘    └────┬─────┘            │
-│    │        │             │               │                  │
-│    ▼        ▼             ▼               ▼                  │
-│ Payment  Inventory    Shipping       Recommendation          │
-│ Service  Service      Service        Service                 │
-│                                                              │
-│ Priority: CRITICAL > MEDIUM > LOW                            │
-│ Khi quá tải: Giảm/tắt LOW trước, giữ CRITICAL                │
-└──────────────────────────────────────────────────────────────┘
-```
+
+Mỗi pool gọi dependency tương ứng. Khi overload giảm/tắt LOW trước, giữ capacity CRITICAL.
 
 ### 5.5. Bulkhead + Circuit Breaker
 
@@ -1038,13 +958,19 @@ Bulkhead và Circuit Breaker **bổ sung cho nhau**:
 | **Bulkhead** | Giới hạn **số lượng** concurrent calls → cô lập tài nguyên |
 | **Circuit Breaker** | Giới hạn **tỷ lệ lỗi** → ngắt mạch khi quá nhiều lỗi |
 
-```
-Request ──▶ Bulkhead (còn slot?) ──▶ Circuit Breaker (mạch đóng?)
-               │                         │
-               │ Hết slot                │ OPEN
-               ▼                         ▼
-            Reject                    Fallback
-            (BulkheadFull)            (CircuitOpen)
+```d2 title="5.5. Bulkhead + Circuit Breaker"
+direction: right
+request: "Request"
+bulkhead: "Bulkhead — còn slot?"
+cb: "Circuit Breaker — mạch cho phép?"
+reject: "BulkheadFull — Reject"
+fallback: "CircuitOpen — Fallback"
+call: "Service Call"
+request -> bulkhead
+bulkhead -> reject: "Hết slot"
+bulkhead -> cb: "Có slot"
+cb -> fallback: "OPEN"
+cb -> call: "CLOSED / Probe"
 ```
 
 ---
@@ -1067,49 +993,39 @@ Rate Limiting giới hạn **số lượng request** mà client có thể gửi 
 
 #### Token Bucket
 
+```d2 title="Token Bucket"
+direction: right
+refill: "Refill 2 tokens/giây"
+bucket: "Token Bucket\nCapacity10 • Hiện có8"
+request: "Request đến"
+check: "Có token?"
+accept: "Lấy 1 token → Xử lý"
+reject: "429 Too Many Requests"
+refill -> bucket
+request -> check
+bucket -> check
+check -> accept: "Có"
+check -> reject: "Hết"
 ```
-┌──────────────────────────────────────────────────────┐
-│                TOKEN BUCKET                          │
-│                                                      │
-│   Bucket capacity: 10 tokens                         │
-│   Refill rate: 2 tokens/giây                         │
-│                                                      │
-│   ┌────────────────────────┐                         │
-│   │ 🪙🪙🪙🪙🪙🪙🪙🪙        │ ← 8 tokens hiện tại   │
-│   │                        │                         │
-│   │  capacity = 10         │ ← thêm 2 tokens/s       │
-│   └────────────────────────┘                         │
-│                                                      │
-│   Request đến:                                       │
-│   ├── Có token → Lấy 1 token, xử lý request ✅       │
-│   └── Hết token → Reject (429 Too Many Requests) ❌  │
-│                                                      │
-│   Đặc điểm: Cho phép burst (dùng hết token nhanh)    │
-└──────────────────────────────────────────────────────┘
-```
+
+Cho phép burst trong giới hạn số token tích lũy.
 
 #### Leaky Bucket
 
+```d2 title="Leaky Bucket"
+direction: right
+request: "Requests đến"
+check: "Bucket / Queue đầy?"
+queue: "Bounded Queue"
+reject: "Reject"
+process: "Processed — tốc độ cố định 5 req/s"
+request -> check
+check -> queue: "Chưa đầy"
+check -> reject: "Đầy"
+queue -> process
 ```
-┌──────────────────────────────────────────────────────┐
-│                LEAKY BUCKET                          │
-│                                                      │
-│   Request đổ vào bucket (queue)                      │
-│   Bucket xử lý ở tốc độ cố định                      │
-│                                                      │
-│   ┌────────────────────────┐                         │
-│   │ ▼▼▼▼ (requests vào)    │ ← Nếu đầy → reject      │
-│   │ ████████████████       │                         │
-│   │ ████████████████       │                         │
-│   │ ████████████████       │                         │
-│   └────────┬───────────────┘                         │
-│            │ (xử lý cố định 5 req/s)                 │
-│            ▼                                         │
-│        Processed                                     │
-│                                                      │
-│   Đặc điểm: Output rate ổn định, smooth traffic      │
-└──────────────────────────────────────────────────────┘
-```
+
+Leaky Bucket ở dạng queue làm output rate đều hơn, smooth input bursts.
 
 #### Fixed Window Counter
 
@@ -1189,26 +1105,17 @@ Kết hợp Fixed Window + trọng số:
 
 ### 6.3. Rate Limiting ở đâu?
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                 RATE LIMITING LAYERS                         │
-│                                                              │
-│   Client ──▶ CDN/LB ──▶ API Gateway ──▶ Service ──▶ DB       │
-│               │            │               │                 │
-│               ▼            ▼               ▼                 │
-│           IP-based    API Key-based   Per-dependency         │
-│           DDoS        Per-user        Connection pool        │
-│           protection  Per-tier        Query limit            │
-│                                                              │
-│   Tầng 1: Network (CDN, LB)                                  │
-│   → Chặn DDoS, IP-based limiting                             │
-│                                                              │
-│   Tầng 2: API Gateway                                        │
-│   → Per-user/API-key limiting, tiering                       │
-│                                                              │
-│   Tầng 3: Service                                            │
-│   → Per-dependency limiting, self-protection                 │
-└──────────────────────────────────────────────────────────────┘
+```d2 title="6.3. Rate Limiting ở đâu?"
+direction: right
+client: "Client"
+edge: "CDN / LB\nIP-based • DDoS protection"
+gw: "API Gateway\nAPI-key / Per-user / Per-tier"
+service: "Service\nPer-dependency • Self-protection\nConnection pool / Query limit"
+db: "Database"
+client -> edge
+edge -> gw
+gw -> service
+service -> db
 ```
 
 ### 6.4. Ví dụ thực tế — Public API
@@ -1266,22 +1173,25 @@ Dùng Lua script hoặc thao tác atomic phù hợp để việc tăng counter v
 
 Fallback cung cấp **phương án dự phòng** khi service chính không hoạt động. Thay vì trả lỗi cho user, hệ thống trả về **kết quả thay thế** (có thể không hoàn hảo nhưng vẫn hữu ích).
 
-```
-┌──────────────────────────────────────────────────────┐
-│              FALLBACK PATTERN                        │
-│                                                      │
-│   Request ──▶ Primary Service                        │
-│                    │                                 │
-│                    ├── Success → Return result ✅    │
-│                    │                                 │
-│                    └── Failure → Fallback            │
-│                         │                            │
-│                         ├── Cache data               │
-│                         ├── Default value            │
-│                         ├── Alternative service      │
-│                         ├── Simplified response      │
-│                         └── Queued for later         │
-└──────────────────────────────────────────────────────┘
+```d2 title="7.1. Fallback là gì?"
+direction: right
+request: "Request"
+primary: "Primary Service"
+result: "Return result"
+fallback: "Fallback theo business policy"
+cache: "Cache data"
+default: "Default value"
+alt: "Alternative service"
+simple: "Simplified response"
+queue: "Queue for later"
+request -> primary
+primary -> result: "Success"
+primary -> fallback: "Failure"
+fallback -> cache
+fallback -> default
+fallback -> alt
+fallback -> simple
+fallback -> queue
 ```
 
 ### 7.2. Các chiến lược Fallback
@@ -1381,20 +1291,20 @@ Health Check cho phép hệ thống **tự kiểm tra** trạng thái của mìn
 
 Trong chuỗi gọi dài, truyền **deadline** (thời điểm hết hạn) thay vì timeout:
 
+```d2 title="8.2. Deadlines / Distributed Timeout"
+direction: right
+client: "Client t=0 — deadline t+5s"
+a: "Service A nhận t+0.2s — còn 4.8s"
+b: "Service B nhận t+1s — còn 4s"
+c: "Service C nhận t+2s — còn 3s"
+db: "DB nhận t+3s — còn 2s"
+client -> a
+a -> b
+b -> c
+c -> db
 ```
-Client gửi request lúc t=0, deadline = t+5s
 
-Client (deadline: t+5s)
-  └──▶ Service A (nhận lúc t+0.2s, còn 4.8s)
-         └──▶ Service B (nhận lúc t+1s, còn 4s)
-                └──▶ Service C (nhận lúc t+2s, còn 3s)
-                       └──▶ DB (nhận lúc t+3s, còn 2s)
-
-Ưu điểm so với timeout từng tầng:
-- Tránh work vô ích (nếu hết deadline → dừng ngay)
-- Chính xác hơn (biết chính xác còn bao lâu)
-- gRPC hỗ trợ sẵn qua metadata
-```
+Propagate deadline để các tầng biết budget còn lại và dừng work khi hết; gRPC có metadata/deadline support, cần cancellation-aware handlers.
 
 ### 8.3. Load Shedding
 
@@ -1520,71 +1430,57 @@ n7 -> n9: "Success"
 n8 -> n9
 ```
 
+```d2 title="9.1. Thứ tự áp dụng"
+direction: down
+request: "Request"
+rate: "1. Rate Limiter — quá nhiều?"
+bulk: "2. Bulkhead — hết slot?"
+cb: "3. Circuit Breaker — OPEN?"
+retry: "4. Retry — lỗi transient / an toàn?"
+timeout: "5. Per-try Timeout"
+call: "6. Service Call"
+response: "Success → Response"
+reject: "Reject — 429 / BulkheadFull"
+fallback: "7. Fallback / Terminal failure"
+backoff: "Retry budget còn → Backoff"
+request -> rate
+rate -> reject: "Quá limit"
+rate -> bulk: "Cho qua"
+bulk -> reject: "Hết slot"
+bulk -> cb: "Có slot"
+cb -> fallback: "OPEN"
+cb -> retry: "Cho phép"
+retry -> timeout
+timeout -> call
+call -> response: "Success"
+call -> backoff: "Transient safe failure"
+backoff -> retry
+call -> fallback: "Terminal / Hết budget"
+timeout -> fallback: "Timeout / Deadline"
 ```
-Request
-  │
-  ├── 1. Rate Limiter: Quá nhiều request? → 429 Reject
-  │
-  ├── 2. Bulkhead: Hết slot cho dependency này? → Reject
-  │
-  ├── 3. Circuit Breaker: Mạch đang mở? → Fallback
-  │
-  ├── 4. Retry: Lỗi tạm thời? → Thử lại (với backoff)
-  │
-  ├── 5. Timeout: Chờ quá lâu? → Abort
-  │
-  ├── 6. Service Call → Success → Response
-  │
-  └── 7. Fallback: Tất cả thất bại → Phương án dự phòng
-```
+
+Đây là thứ tự wrapper minh họa, cần chọn theo admission/cancellation và cách tính CB statistics. Retry/backoff/per-try timeouts phải nằm trong overall deadline.
 
 ### 9.2. Ví dụ tổng hợp — Order Service
 
+```d2 title="9.2. Ví dụ tổng hợp — Order Service"
+direction: down
+user: "User đặt iPhone 15"
+rate: "Rate Limiter — 100 orders/phút/user"
+validate: "Order Service — Validate order"
+inventory: "Check Inventory\nBulkhead50 • CB50%\nRetry2 / Backoff500ms • Timeout3s\nFallback last-known-stock cache"
+payment: "Reserve Payment\nBulkhead50 • CB40%\nRetry1 với Idempotency-Key • Timeout5s\nFallback queue payment"
+noti: "Send Notification\nBulkhead20 • CB60%\nKhông retry inline • Timeout2s\nFallback queue for later"
+result: "Return order confirmation / pending theo contract"
+user -> rate
+rate -> validate
+validate -> inventory
+inventory -> payment
+payment -> noti
+noti -> result
 ```
-┌──────────────────────────────────────────────────────────────┐
-│              ORDER SERVICE — DEFENSE IN DEPTH                │
-│                                                              │
-│   User đặt hàng iPhone 15                                    │
-│   │                                                          │
-│   ▼                                                          │
-│   [Rate Limiter] 100 orders/phút/user                        │
-│   │                                                          │
-│   ▼                                                          │
-│   ┌─────────────────────────────────────────────────┐        │
-│   │ Order Service                                   │        │
-│   │                                                 │        │
-│   │  1. Validate order                              │        │
-│   │                                                 │        │
-│   │  2. Check Inventory ────────────────────────────│        │
-│   │     [Bulkhead: 50 threads]                      │        │
-│   │     [Circuit Breaker: threshold=50%]            │        │
-│   │     [Retry: 2 lần, backoff 500ms]               │        │
-│   │     [Timeout: 3s]                               │        │
-│   │     [Fallback: Cache last known stock]          │        │
-│   │                                                 │        │
-│   │  3. Reserve Payment ─────────────────────────── │        │
-│   │     [Bulkhead: 50 threads]                      │        │
-│   │     [Circuit Breaker: threshold=40%]            │        │
-│   │     [Retry: 1 lần (idempotency key)]            │        │
-│   │     [Timeout: 5s]                               │        │
-│   │     [Fallback: Queue payment for retry]         │        │
-│   │                                                 │        │
-│   │  4. Send Notification ────────────────────────  │        │
-│   │     [Bulkhead: 20 threads]                      │        │
-│   │     [Circuit Breaker: threshold=60%]            │        │
-│   │     [NO Retry — fire & forget]                  │        │
-│   │     [Timeout: 2s]                               │        │
-│   │     [Fallback: Queue for later]                 │        │
-│   │                                                 │        │
-│   │  5. Return order confirmation                   │        │
-│   └─────────────────────────────────────────────────┘        │
-│                                                              │
-│   Kết quả: Ngay cả khi Payment + Notification lỗi,           │
-│   user vẫn nhận được order confirmation.                     │
-│   Payment sẽ được retry từ queue.                            │
-│   Notification sẽ được gửi sau.                              │
-└──────────────────────────────────────────────────────────────┘
-```
+
+Payment/Notification lỗi có thể được retry từ queue. Không dùng cached stock như quyết định reserve có thẩm quyền, và không xác nhận thanh toán thành công khi chỉ mới enqueue: trả trạng thái pending/degraded đúng business contract.
 
 ---
 

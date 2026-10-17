@@ -108,47 +108,27 @@ Trong [doc 15](15-security.md), ta đã nói về **Service Identity** (SPIFFE) 
 
 ### 2.1. IAM Roles cho ECS Tasks / EKS Pods / Lambda
 
+```d2 title="2.1. IAM Roles cho ECS Tasks / EKS Pods / Lambda"
+direction: down
+ecs: ECS Task Definition {
+ app: App Container
+ agent: ECS Agent / Infrastructure
+ task: Task Role — Business AWS API permissions
+ execution: Task Execution Role — Pull image / Inject secrets / Logs
+ app -> task
+ agent -> execution
+}
+eks: EKS IRSA {
+ pod: Pod
+ sa: Kubernetes ServiceAccount
+ sts: OIDC Federation / STS
+ role: IAM Role + Policies
+ pod -> sa -> sts -> role
+}
+lambda: Lambda Function { code: Function Code; role: Execution Role — AWS APIs / Logs; code -> role }
 ```
-IAM ROLES CHO TỪNG COMPUTE PLATFORM
-─────────────────────────────────────
 
-  ┌─── ECS ──────────────────────────────────────────────┐
-  │                                                      │
-  │  Task Definition                                     │
-  │  ├── Task Role            ← Service dùng AWS APIs    │
-  │  │   (sts:AssumeRole)        (S3, DynamoDB, SQS...)  │
-  │  │                                                   │
-  │  └── Task Execution Role  ← ECS Agent dùng           │
-  │      (ecs:...)              (pull image, get secrets)│
-  │                                                      │
-  │  → 2 roles RIÊNG BIỆT, không nhầm lẫn!               │
-  └──────────────────────────────────────────────────────┘
-
-  ┌─── EKS ──────────────────────────────────────────────┐
-  │                                                      │
-  │  IRSA (IAM Roles for Service Accounts)               │
-  │  ┌──────────┐    OIDC     ┌──────────┐               │
-  │  │ K8s      │◄═══════════▶│ IAM Role │               │
-  │  │ Service  │  Federation │          │               │
-  │  │ Account  │             │ Policies │               │
-  │  └────┬─────┘             └──────────┘               │
-  │       │                                              │
-  │  ┌────▼─────┐                                        │
-  │  │   Pod    │ ← Chỉ Pod dùng SA này mới có quyền     │
-  │  └──────────┘                                        │
-  │                                                      │
-  │  → Pod-level granularity (không phải Node-level)     │
-  └──────────────────────────────────────────────────────┘
-
-  ┌─── Lambda ───────────────────────────────────────────┐
-  │                                                      │
-  │  Lambda Function                                     │
-  │  └── Execution Role       ← Function dùng AWS APIs   │
-  │      (lambda:...)            + business logic        │
-  │                                                      │
-  │  → Mỗi function có 1 role riêng                      │
-  └──────────────────────────────────────────────────────┘
-```
+Role permissions và trust policy khác nhau. IRSA role chỉ được assume khi token/trust conditions match SA/namespace/audience; EKS Pod Identity là một lựa chọn khác. Prefer least-privilege role theo workload, không dùng chung node role rộng cho mọi Pod.
 
 **ECS — Task Role vs Task Execution Role:**
 
@@ -295,23 +275,18 @@ LEAST PRIVILEGE EVOLUTION
 
 **IAM Access Analyzer — Tự động phát hiện quyền thừa:**
 
+```d2 title="2.2. Least Privilege — Cách viết IAM Policy đúng"
+direction: right
+trail: "CloudTrail — logs trong window ví dụ30–90ngày"
+analyzer: "IAM Access Analyzer — Analyze observed API usage"
+policy: "Generated / Recommended IAM Policy"
+review: "Review missing/rare paths / Test / Apply least privilege"
+trail -> analyzer
+analyzer -> policy
+policy -> review
 ```
-IAM ACCESS ANALYZER WORKFLOW
-─────────────────────────────
 
-  ┌──────────┐     ┌────────────────────┐     ┌──────────────┐
-  │CloudTrail│────▶│ IAM Access Analyzer│────▶│ Recommended  │
-  │ Logs     │     │                    │     │ Policy       │
-  │ (90 ngày)│     │ Phân tích API calls│     │ (tối thiểu   │
-  └──────────┘     │ thực tế của service│     │  cần thiết)  │
-                   └────────────────────┘     └──────────────┘
-
-  Workflow:
-  1. Deploy service với quyền rộng (giai đoạn dev)
-  2. Chạy 30-90 ngày → CloudTrail ghi lại mọi API call
-  3. IAM Access Analyzer phân tích → đề xuất policy tối thiểu
-  4. Apply policy mới → service chỉ còn quyền thực sự dùng
-```
+Observed calls không bao phủ mọi disaster/rare path. Không cần cố cấp admin quyền rộng30–90ngày để tạo logs; bắt đầu bằng permissions tối thiểu dự kiến và refine trong môi trường phù hợp.
 
 **Permission Boundaries — Giới hạn quyền tối đa:**
 
@@ -352,29 +327,19 @@ IAM ACCESS ANALYZER WORKFLOW
 
 Trong kiến trúc multi-account (xem [doc 18](18-aws-deployment-architecture.md)), services ở account khác nhau cần giao tiếp. AWS dùng **AssumeRole** pattern.
 
+```d2 title="2.3. Cross-Account Access"
+shape: sequence_diagram
+order: Account A — Order Task Role A
+sts: AWS STS
+role: Account B — Cross-account Role B
+s3: Account B — Shared S3 Bucket
+order -> sts: 1. AssumeRole Role B
+sts -> role: Evaluate trust + caller permissions
+sts -> order: 2. Temporary credentials scoped theo Role B {style.stroke-dash: 5}
+order -> s3: 3. Access S3 với temporary credentials
 ```
-CROSS-ACCOUNT ACCESS — AssumeRole
-───────────────────────────────────
 
-  Account A (Workload)              Account B (Shared Services)
-  ┌─────────────────────┐          ┌─────────────────────────┐
-  │                     │          │                         │
-  │  Order Service      │          │  Shared S3 Bucket       │
-  │  (Task Role A)      │          │                         │
-  │       │             │          │  ┌───────────────────┐  │
-  │       │ 1. AssumeRole          │  │ Cross-Account     │  │
-  │       │────────────────────────│─▶│ Role B            │  │
-  │       │             │          │  │                   │  │
-  │       │ 2. Temporary│          │  │ Trust: Account A  │  │
-  │       │◄── Creds ───│──────────│──│ Policy: s3:Get*   │  │
-  │       │             │          │  └───────────────────┘  │
-  │       │             │          │                         │
-  │       │ 3. Access S3│          │  ┌──────────┐           │
-  │       │─────────────│──────────│─▶│ S3 Bucket│           │
-  │       │             │          │  └──────────┘           │
-  │                     │          │                         │
-  └─────────────────────┘          └─────────────────────────┘
-```
+Role B trust phải chỉ định principal/conditions thích hợp; access có thể cần cả identity/resource/KMS policies, không chỉ một `s3:Get*` rộng.
 
 ```json source="snippets/2-3-cross-account-access.json"
 // Role B — Trust Policy (cho phép Account A assume)
@@ -409,27 +374,18 @@ Trong [doc 15](15-security.md), ta đã nói về **Centralized Authentication**
 
 **Cognito User Pool** là user directory — quản lý sign-up, sign-in, MFA, password policies.
 
+```d2 title="3.1. Cognito User Pools — Authentication"
+shape: sequence_diagram
+client: SPA / Mobile
+pool: Cognito User Pool
+client -> pool: Sign Up
+pool -> client: Confirmation / Verification challenge theo flow {style.stroke-dash: 5}
+client -> pool: Confirm / Sign In
+pool.note: Email/Phone verification • Password policy • MFA TOTP/SMS theo cấu hình
+pool -> client: ID / Access / Refresh tokens theo auth flow {style.stroke-dash: 5}
 ```
-COGNITO USER POOL — AUTHENTICATION FLOW
-─────────────────────────────────────────
 
-  ┌──────────┐                ┌─────────────────────┐
-  │  Client  │── Sign Up ────▶│  Cognito User Pool  │
-  │  (SPA/   │                │                     │
-  │  Mobile) │◄── Confirm ────│  • Email/Phone      │
-  │          │   (MFA code)   │    verification     │
-  │          │                │  • Password policy  │
-  │          │── Sign In ────▶│    (min 8 chars,    │
-  │          │   (user/pass)  │     uppercase, etc) │
-  │          │                │  • MFA (TOTP/SMS)   │
-  │          │◄── Tokens ─────│                     │
-  │          │   • ID Token   │  Social Login:      │
-  │          │   • Access Tok │  • Google           │
-  │          │   • Refresh Tok│  • Facebook         │
-  └──────────┘                │  • Apple            │
-                              │  • SAML/OIDC (SSO)  │
-                              └─────────────────────┘
-```
+User Pools có thể tích hợp Google/Facebook/Apple hoặc SAML/OIDC providers; signup verification và MFA là hai mục đích khác nhau, không gọi mọi confirmation code là MFA.
 
 **Cấu hình Cognito User Pool (Terraform):**
 
@@ -505,28 +461,20 @@ resource "aws_cognito_user_pool_client" "web" {
 
 **Cognito Identity Pool** khác với User Pool — nó cấp **AWS credentials tạm thời** cho authenticated/unauthenticated users, cho phép truy cập trực tiếp AWS services.
 
+```d2 title="3.2. Cognito Identity Pools — Federated Identity"
+shape: sequence_diagram
+client: Client
+user: Cognito User Pool — User Directory
+identity: Cognito Identity Pool — Credential Broker
+aws: AWS Services — S3 / DynamoDB
+client -> user: Sign in
+user -> client: JWT tokens {style.stroke-dash: 5}
+client -> identity: Present federated token
+identity -> client: Temporary AccessKeyId / SecretAccessKey / SessionToken qua IAM role mapping {style.stroke-dash: 5}
+client -> aws: Authorized AWS API calls bằng temporary credentials
 ```
-USER POOL vs IDENTITY POOL — KHÁC NHAU!
-─────────────────────────────────────────
 
-  User Pool                          Identity Pool
-  ─────────                          ─────────────
-  = User Directory                   = Credential Broker
-  = "Bạn là ai?" (AuthN)             = "Bạn được làm gì trên AWS?"
-  = Trả về JWT tokens                = Trả về AWS credentials
-                                        (AccessKeyId, SecretKey, SessionToken)
-
-  ┌──────────┐  sign in  ┌───────────────┐  JWT    ┌───────────────┐
-  │  Client  │──────────▶│  User Pool    │────────▶│ Identity Pool │
-  │          │◄── JWT ───│  (AuthN)      │         │               │
-  │          │           └───────────────┘         │ Map JWT →     │
-  │          │                                     │ IAM Role      │
-  │          │◄── AWS Credentials ─────────────────│               │
-  │          │   (temporary, scoped)               └───────────────┘
-  │          │
-  │          │── Direct access ──▶ S3, DynamoDB, etc.
-  └──────────┘   (dùng AWS creds)
-```
+User Pool cung cấp user authentication/tokens; Identity Pool map federated identity tới AWS credential permissions. IAM/resource policies quyết định thực sự được làm gì, không phải client tự chọn quyền.
 
 **Use case**: Mobile app cần upload ảnh trực tiếp lên S3 — thay vì đi qua backend API, client dùng Identity Pool credentials để upload trực tiếp, giảm latency.
 
@@ -540,78 +488,48 @@ Cognito trả về 3 loại token sau khi authenticate thành công:
 | **Access Token** | Authorize API calls | Scopes, groups, client_id | API Gateway, Backend services |
 | **Refresh Token** | Lấy token mới khi hết hạn | Opaque (không decode được) | Client → Cognito |
 
-```
-TOKEN LIFECYCLE
-────────────────
-
-  ┌──────────┐                     ┌─────────────────┐
-  │  Client  │── 1. Sign In ──────▶│  Cognito        │
-  │          │◄── ID + Access ─────│                 │
-  │          │    + Refresh Token  │                 │
-  │          │                     └─────────────────┘
-  │          │
-  │          │── 2. API Call ─────▶┌─────────────────┐
-  │          │   (Access Token     │  API Gateway    │
-  │          │    in header)       │  → Validate JWT │
-  │          │◄── Response ────────│  → Forward      │
-  │          │                     └─────────────────┘
-  │          │
-  │          │   ... 1 hour later (Access Token expired) ...
-  │          │
-  │          │── 3. Refresh ──────▶┌─────────────────┐
-  │          │   (Refresh Token)   │  Cognito        │
-  │          │◄── New ID + Access ─│  → Validate     │
-  │          │    Tokens           │    Refresh Token│
-  └──────────┘                     └─────────────────┘
+```d2 title="3.3. JWT & Token Management"
+shape: sequence_diagram
+client: Client
+cognito: Cognito
+gw: API Gateway
+client -> cognito: 1. Sign In
+cognito -> client: ID + Access + Refresh tokens {style.stroke-dash: 5}
+client -> gw: 2. API Call — Access Token trong Authorization header
+gw.note: Validate JWT / Claims / Scope rồi forward
+gw -> client: Response {style.stroke-dash: 5}
+client.note: Token hết hạn — ví dụ1giờ theo configuration
+client -> cognito: 3. Refresh bằng Refresh Token
+cognito -> client: New ID / Access tokens, Refresh rotation nếu bật {style.stroke-dash: 5}
 ```
 
 ### 3.4. Cognito + API Gateway Integration
 
 Có 2 cách tích hợp Cognito với API Gateway:
 
+```d2 title="3.4. Cognito + API Gateway Integration"
+direction: down
+managed: Managed Cognito / JWT Authorizer {
+ client: Client
+ gw: API Gateway
+ auth: Managed Authorizer — Signature / Expiry / Issuer / Audience / Scopes
+ backend: Backend — verified context
+ client -> gw: Access Token
+ gw -> auth
+ auth -> backend: Valid / Authorized
+}
+custom: Lambda Authorizer {
+ client: Client
+ gw: API Gateway
+ auth: Lambda — custom identity / Tenant / DB lookup
+ backend: Backend
+ client -> gw: Token
+ gw -> auth
+ auth -> backend: Allow theo authorizer response/API type
+}
 ```
-OPTION 1: COGNITO AUTHORIZER (Đơn giản, zero code)
-────────────────────────────────────────────────────
 
-  Client ──── Access Token ────▶ API Gateway
-                                    │
-                              ┌─────▼──────┐
-                              │  Cognito   │
-                              │ Authorizer │
-                              │            │
-                              │ • Validate │
-                              │   JWT sig  │
-                              │ • Check    │
-                              │   expiry   │
-                              │ • Verify   │
-                              │   scopes   │
-                              └─────┬──────┘
-                                    │ ✅ Valid
-                                    ▼
-                              Backend Service
-                              (nhận user claims
-                               từ request context)
-
-
-OPTION 2: LAMBDA AUTHORIZER (Custom logic)
-───────────────────────────────────────────
-
-  Client ──── Token ────▶ API Gateway
-                              │
-                        ┌─────▼──────────┐
-                        │ Lambda         │
-                        │ Authorizer     │
-                        │                │
-                        │ • Custom logic │
-                        │ • Check DB     │
-                        │ • Multi-tenant │
-                        │ • Rate limit   │
-                        │   per user     │
-                        └─────┬──────────┘
-                              │ IAM Policy
-                              ▼  (allow/deny)
-                        Backend Service
-```
+Deny/invalid phải bị chặn ở Gateway. REST API Cognito authorizer, HTTP API JWT authorizer và Lambda authorizer response/caching models khác nhau. Per-user rate limiting cần cơ chế rate enforcement riêng, không mặc định có chỉ vì dùng Lambda Authorizer.
 
 | Tiêu chí | Cognito Authorizer | Lambda Authorizer |
 |----------|-------------------|-------------------|
@@ -693,37 +611,21 @@ Trong [doc 15](15-security.md), ta đã hiểu mTLS cho phép 2 services **xác 
 
 > ⚠️ **Lưu ý thời gian:** AWS App Mesh có mốc **End of Support ngày 30/09/2026**. Không nên chọn App Mesh cho workload mới.
 
+```d2 title="4.1. Các lựa chọn triển khai mTLS"
+direction: right
+workload: ECS Task / EKS Pod {
+ app: Application — HTTP
+ envoy: Envoy Proxy — TLS termination / Identity
+ app -- envoy
+}
+other: Other Services
+ca: ACM Private CA — PKI issuance
+provision: Certificate provisioning / Rotation integration
+ca -> provision -> workload.envoy
+workload.envoy <-> other: mTLS — Encrypted / Mutual identity
 ```
-APP MESH mTLS ARCHITECTURE
-────────────────────────────
 
-  ┌─ ECS Task / EKS Pod ──────────────┐
-  │                                   │
-  │  ┌──────────────┐  ┌───────────┐  │      mTLS
-  │  │  Application │──│  Envoy    │  │◄═══════════▶ Other Services
-  │  │  (HTTP)      │  │  Proxy    │  │  encrypted
-  │  │              │  │           │  │  + mutual auth
-  │  │  Không biết  │  │  • TLS    │  │
-  │  │  về mTLS     │  │ termination  │
-  │  │              │  │  • Cert   │  │
-  │  └──────────────┘  │    from   │  │
-  │                    │    ACM PCA│  │
-  │                    └───────────┘  │
-  └───────────────────────────────────┘
-                  │
-                  │ Certificate
-                  │ provisioning
-                  ▼
-  ┌───────────────────────────────────┐
-  │  ACM Private CA                   │
-  │  (AWS Certificate Manager         │
-  │   Private Certificate Authority)  │
-  │                                   │
-  │  • Issue certificates cho services│
-  │  • Auto-rotate                    │
-  │  • Managed PKI                    │
-  └───────────────────────────────────┘
-```
+Mô hình Envoy/App Mesh legacy được minh họa để hiểu trách nhiệm certificate. Rotation/provisioning cần integration phù hợp; CA không tự đẩy mọi certificate tới ứng dụng nếu chưa có controller/agent/policy.
 
 > 📖 So sánh với [doc 15](15-security.md): Istio dùng **built-in CA** (istiod) cấp cert. App Mesh (legacy) có thể dùng **ACM Private CA**.
 
@@ -830,32 +732,20 @@ Trong [doc 16 — Configuration & Secrets Management](16-configuration-secrets-m
 
 ### 5.1. AWS Secrets Manager
 
+```d2 title="5.1. AWS Secrets Manager"
+direction: right
+app: Application
+sm: "Secrets Manager\nSecret prod/db/orders\nUsername/password — dữ liệu minh họa" {shape: cylinder}
+rotation: Rotation Lambda — schedule ví dụ30ngày
+rds: RDS
+app -> sm: GetSecretValue
+sm -> app: Authorized secret value
+sm -> rotation: Trigger rotation
+rotation -> rds: Set / Test credentials
+rotation -> sm: Promote version theo rotation protocol
 ```
-SECRETS MANAGER — AUTOMATIC ROTATION
-──────────────────────────────────────
 
-  ┌──────────────┐     ┌────────────────────┐     ┌──────────┐
-  │ Application  │────▶│  Secrets Manager   │     │   RDS    │
-  │              │     │                    │     │          │
-  │ GetSecret    │     │  Secret:           │     │          │
-  │ Value()      │     │  "prod/db/orders"  │     │          │
-  │              │     │  {                 │     │          │
-  │ ◄── Creds ───│     │   "username":      │     │          │
-  │              │     │     "admin",       │     │          │
-  │              │     │   "password":      │     │          │
-  └──────────────┘     │     "xKj9!mP..."   │     │          │
-                       │  }                 │     │          │
-                       │                    │     │          │
-                       │  Auto Rotation:    │     │          │
-                       │  ┌───────────────┐ │     │          │
-                       │  │Lambda (rotate)│─│────▶│ ALTER    │
-                       │  │Every 30 days  │ │     │ USER pwd │
-                       │  └───────────────┘ │     │          │
-                       └────────────────────┘     └──────────┘
-
-  → Application luôn lấy password MỚI NHẤT
-  → Password tự động rotate → giảm rủi ro leak
-```
+App phải refresh cache/pool/credentials theo policy mới nhận secret mới; không tự động luôn dùng latest password chỉ vì gọi SDK một lần lúc startup.
 
 **Tạo secret + auto rotation (Terraform):**
 
@@ -907,20 +797,18 @@ resource "aws_secretsmanager_secret_rotation" "db_password" {
 | **RDS Integration** | ✅ Native rotation | ❌ | ❌ |
 | **Best for** | DB passwords, API keys (cần rotate) | Feature flags, config values | Config + secrets (cost-sensitive) |
 
+```d2 title="5.2. AWS Systems Manager Parameter Store"
+direction: right
+need: "Cần rotation/integration quản lý secret?"
+sm: "Secrets Manager\nVí dụ database credentials / Rotation / Secret sharing"
+config: "Config value hoặc feature flag?"
+ssm: "Parameter Store hoặc AppConfig theo dynamic rollout needs"
+need -> sm: "Có"
+need -> config: "Không"
+config -> ssm: "Config, không secret lifecycle đặc thù"
 ```
-CHỌN GÌ? DECISION TREE
-─────────────────────────
 
-  Cần auto-rotate?
-  ├── Có → Secrets Manager
-  └── Không
-      ├── Là database password?
-      │   └── Có → Secrets Manager (native RDS rotation)
-      ├── Cần cross-account share?
-      │   └── Có → Secrets Manager
-      └── Config value / feature flag?
-          └── Parameter Store (Free tier)
-```
+So sánh cross-account sharing, tiers, KMS, rotation và pricing theo tính năng/version hiện hành; không dùng quy tắc mọi cross-account value đều chỉ có Secrets Manager hoặc mọi feature flag đều nên là Parameter Store Free tier.
 
 ### 5.3. Tích hợp Secrets vào ECS / EKS / Lambda
 
@@ -1038,29 +926,20 @@ resource "aws_lambda_function" "order_processor" {
 
 **AWS KMS (Key Management Service)** quản lý encryption keys cho mọi thứ trên AWS.
 
+```d2 title="5.4. KMS — Encryption at Rest & in Transit"
+direction: right
+key: "KMS Key — Key Encryption Key"
+datakey: "Data Key — plaintext chỉ ở encrypting process theo SDK"
+data: "Encrypt actual S3/EBS/DynamoDB data"
+wrapped: "Encrypted Data Key — lưu cùng ciphertext"
+decrypt: "KMS decrypt data key khi principal được authorize"
+key -> datakey: "GenerateDataKey theo access policy"
+datakey -> data
+key -> wrapped: "Wrap / Encrypt data key"
+wrapped -> decrypt
 ```
-KMS ENCRYPTION MODEL
-──────────────────────
 
-  ┌──────────────────────────────────────────────┐
-  │  Envelope Encryption                         │
-  │                                              │
-  │  ┌──────────────┐     ┌────────────────────┐ │
-  │  │ CMK (Master) │     │ Data Key           │ │
-  │  │              │────▶│ (generated per     │ │
-  │  │ Stored in    │     │  object/request)   │ │
-  │  │ KMS (never   │     │                    │ │
-  │  │ leaves KMS)  │     │ Encrypts actual    │ │
-  │  └──────────────┘     │ data (S3, EBS,     │ │
-  │                       │ DynamoDB, etc.)    │ │
-  │                       └────────────────────┘ │
-  │                                              │
-  │  → CMK KHÔNG BAO GIỜ rời khỏi KMS            │
-  │  → Data Key = unique per encryption operation│
-  │  → Nếu 1 Data Key bị lộ, chỉ ảnh hưởng       │
-  │    1 object, không phải toàn bộ              │
-  └──────────────────────────────────────────────┘
-```
+KMS key material được bảo vệ bởi KMS; data-key usage/caching/reuse phụ thuộc dịch vụ/client. Không mặc định một data key luôn chỉ dùng đúng một object; blast radius phụ thuộc envelope-encryption design. Xóa plaintext key khỏi memory khi không còn cần.
 
 | Loại Key | Mô tả | Cost | Rotation |
 |----------|--------|------|----------|
@@ -1077,48 +956,27 @@ KMS ENCRYPTION MODEL
 
 ### 6.1. VPC Design cho Microservice
 
+```d2 title="6.1. VPC Design cho Microservice"
+direction: right
+vpc: VPC — 10.0.0.0/16 {
+ a: AZ-a {
+  public: Public10.0.1.0/24 { alb: ALB node; nat: NAT Gateway }
+  private: Private10.0.3.0/24 { order: Order; user: User }
+  isolated: Isolated10.0.5.0/24 { rds: RDS Primary; cache: ElastiCache }
+ }
+ b: AZ-b {
+  public: Public10.0.2.0/24 { alb: ALB node; nat: NAT Gateway }
+  private: Private10.0.4.0/24 { order: Order; user: User }
+  isolated: Isolated10.0.6.0/24 { rds: RDS Replica; cache: ElastiCache }
+ }
+ a.public.alb -> a.private
+ b.public.alb -> b.private
+ a.private -> a.isolated: Allowed DB traffic
+ b.private -> b.isolated: Allowed DB traffic
+}
 ```
-VPC DESIGN CHO MICROSERVICE — MULTI-AZ
-────────────────────────────────────────
 
-  VPC: 10.0.0.0/16
-  ┌─────────────────────────────────────────────────────────────┐
-  │                                                             │
-  │  AZ-a                              AZ-b                     │
-  │  ┌────────────────────────┐       ┌────────────────────────┐│
-  │  │ Public Subnet          │       │ Public Subnet          ││
-  │  │ 10.0.1.0/24            │       │ 10.0.2.0/24            ││
-  │  │ ┌─────────┐ ┌─────────┐│       │ ┌─────────┐ ┌─────────┐││
-  │  │ │  ALB    │ │ NAT GW  ││       │ │  ALB    │ │ NAT GW  │││
-  │  │ └────┬────┘ └────┬────┘│       │ └────┬────┘ └────┬────┘││
-  │  └──────┼───────────┼─────┘       └──────┼───────────┼─────┘│
-  │         │           │                    │           │      │
-  │  ┌──────┼───────────┼─────┐       ┌──────┼───────────┼─────┐│
-  │  │ Private Subnet   │     │       │ Private Subnet   │     ││
-  │  │ 10.0.3.0/24      │     │       │ 10.0.4.0/24      │     ││
-  │  │ ┌──────┐ ┌──────┐│     │       │ ┌──────┐ ┌──────┐│     ││
-  │  │ │Order │ │User  ││     │       │ │Order │ │User  ││     ││
-  │  │ │Svc   │ │Svc   ││     │       │ │Svc   │ │Svc   ││     ││
-  │  │ └──────┘ └──────┘│     │       │ └──────┘ └──────┘│     ││
-  │  └────────────────────────┘       └────────────────────────┘│
-  │                                                             │
-  │  ┌────────────────────────┐       ┌────────────────────────┐│
-  │  │ Isolated Subnet        │       │ Isolated Subnet        ││
-  │  │ 10.0.5.0/24            │       │ 10.0.6.0/24            ││
-  │  │ ┌──────┐ ┌───────────┐ │       │ ┌──────┐ ┌───────────┐ ││
-  │  │ │ RDS  │ │ElastiCache│ │       │ │ RDS  │ │ElastiCache│ ││
-  │  │ │(primary)│          │ │       │ │(replica)│          │ ││
-  │  │ └──────┘ └───────────┘ │       │ └──────┘ └───────────┘ ││
-  │  │ ← NO internet access   │       │ ← NO internet access   ││
-  │  └────────────────────────┘       └────────────────────────┘│
-  │                                                             │
-  └─────────────────────────────────────────────────────────────┘
-
-  Subnet Types:
-  • Public   = có Internet Gateway → ALB, NAT Gateway
-  • Private  = có NAT Gateway → ECS Tasks, EKS Pods (outbound only)
-  • Isolated = KHÔNG có internet → RDS, ElastiCache (chỉ internal)
-```
+Một logical ALB có nodes ở nhiều subnets/AZs, không bắt buộc là2 ALBs độc lập. Public subnet có route Internet Gateway; private có outbound NAT theo policy; isolated không route Internet. Routes/SG/NACL quyết định reachability, không chỉ tên subnet.
 
 ### 6.2. Security Groups — Stateful Firewall
 
@@ -1221,26 +1079,23 @@ resource "aws_security_group" "database" {
 
 **VPC Endpoints** cho phép services truy cập AWS services (S3, DynamoDB, Secrets Manager...) **không qua Internet** — traffic đi qua AWS private network.
 
+```d2 title="6.4. VPC Endpoints — PrivateLink"
+direction: down
+nat: Public Service Endpoint Path {
+ task: ECS Task
+ nat: NAT Gateway
+ endpoint: S3 Public Endpoint
+ task -> nat -> endpoint
+}
+private: Gateway Endpoint Path {
+ task: ECS Task
+ vpce: S3 Gateway VPC Endpoint
+ s3: S3
+ task -> vpce -> s3
+}
 ```
-KHÔNG CÓ VPC ENDPOINT vs CÓ VPC ENDPOINT
-──────────────────────────────────────────
 
-  ❌ Không có VPC Endpoint:
-
-  ECS Task ──▶ NAT Gateway ──▶ Internet ──▶ S3
-                  │
-                  │ 💰 NAT Gateway cost: $0.045/GB
-                  │ 🔒 Traffic qua public internet
-                  │ 🐌 Thêm latency
-
-  ✅ Có VPC Endpoint:
-
-  ECS Task ──▶ VPC Endpoint ──▶ S3 (AWS backbone)
-                  │
-                  │ 💰 Gateway Endpoint: FREE (S3, DynamoDB)
-                  │ 🔒 Traffic KHÔNG rời AWS network
-                  │ ⚡ Latency thấp hơn
-```
+NAT path có processing cost phụ thuộc region/pricing; S3/DynamoDB Gateway Endpoints không có endpoint hourly/data-processing charge như Interface Endpoints. Không khẳng định AWS-to-AWS traffic qua NAT bắt buộc rời AWS backbone hay endpoint luôn nhanh hơn; VPC endpoint giảm phụ thuộc NAT/public endpoint routing và hỗ trợ policy boundary.
 
 | Loại | Services | Cost | Protocol |
 |------|----------|------|----------|
@@ -1339,50 +1194,18 @@ resource "aws_wafv2_web_acl" "api" {
 
 Trong [doc 15](15-security.md), ta đã hiểu **Zero Trust = "Never trust, always verify"**. Trên AWS, Zero Trust áp dụng qua nhiều layers:
 
+```d2 title="7.1. Zero Trust Principles áp dụng cho AWS"
+direction: right
+zero: Zero Trust Layers {
+ identity: IAM Role/workload identity / Cognito / MFA cho human users
+ network: VPC / Private Subnets / SG allow-lists / VPC Endpoints
+ application: mTLS / Token validation / Input validation / WAF
+ data: KMS at rest / TLS in transit / Sensitive-field encryption
+ monitoring: CloudTrail / GuardDuty / Security Hub / Config / Detective / Macie
+}
 ```
-ZERO TRUST TRÊN AWS — DEFENSE IN DEPTH
-────────────────────────────────────────
 
-  Principle                    AWS Implementation
-  ─────────                    ──────────────────
-  "Never trust network"    →   VPC isolation, SGs, PrivateLink
-  "Verify every request"  →   IAM, Cognito, API GW Authorizer
-  "Verify every service"  →   IAM Roles (Task/Pod level), mTLS
-  "Encrypt everything"    →   KMS, TLS everywhere, ACM
-  "Least privilege"        →   IAM policies, Permission Boundaries
-  "Assume breach"          →   GuardDuty, CloudTrail, Security Hub
-  "Continuous monitoring"  →   Config Rules, Detective, Macie
-
-  ┌──────────────────────────────────────────────────────────┐
-  │                    ZERO TRUST LAYERS                     │
-  │                                                          │
-  │  ┌─ Layer 1: Identity ─────────────────────────────────┐ │
-  │  │ • IAM Role per service (not shared)                 │ │
-  │  │ • Cognito for user AuthN                            │ │
-  │  │ • MFA everywhere                                    │ │
-  │  └─────────────────────────────────────────────────────┘ │
-  │  ┌─ Layer 2: Network ──────────────────────────────────┐ │
-  │  │ • VPC + Private Subnets                             │ │
-  │  │ • Security Groups (allow-list, not deny-list)       │ │
-  │  │ • VPC Endpoints (no public internet)                │ │
-  │  └─────────────────────────────────────────────────────┘ │
-  │  ┌─ Layer 3: Application ──────────────────────────────┐ │
-  │  │ • mTLS between services (Service mesh / policy)     │ │
-  │  │ • JWT validation per request                        │ │
-  │  │ • Input validation + WAF                            │ │
-  │  └─────────────────────────────────────────────────────┘ │
-  │  ┌─ Layer 4: Data ─────────────────────────────────────┐ │
-  │  │ • KMS encryption at rest                            │ │
-  │  │ • TLS in transit                                    │ │
-  │  │ • Column-level encryption (sensitive fields)        │ │
-  │  └─────────────────────────────────────────────────────┘ │
-  │  ┌─ Layer 5: Monitoring ───────────────────────────────┐ │
-  │  │ • CloudTrail (WHO did WHAT)                         │ │
-  │  │ • GuardDuty (threat detection)                      │ │
-  │  │ • Security Hub (aggregated findings)                │ │
-  │  └─────────────────────────────────────────────────────┘ │
-  └──────────────────────────────────────────────────────────┘
-```
+Map nguyên tắc: verify mỗi request/identity, least privilege IAM + permission boundaries, assume breach và continuous monitoring. MFA áp dụng cho interactive identity phù hợp, không mặc định mọi machine-to-machine request phải nhập MFA.
 
 ### 7.2. Triển khai Zero Trust — Từng Layer
 
@@ -1430,34 +1253,27 @@ n4.n17 -> n5.n18
 
 **AWS Verified Access** là dịch vụ Zero Trust network access — cho phép truy cập ứng dụng **không cần VPN**, dựa trên identity và device trust.
 
+```d2 title="7.3. AWS Verified Access"
+direction: down
+vpn: VPN — mô hình network access rộng trong ví dụ {
+ employee: Employee Laptop
+ network: VPC / Internal Services
+ employee -> network: VPN tunnel — phạm vi do routes/policies quyết định
+}
+verified: Verified Access — Per-application Policy {
+ employee: Employee Laptop — identity / device posture / context
+ policy: Verified Access Policy Evaluation
+ a: App A — Allowed
+ b: App B — Denied
+ c: App C — Denied
+ employee -> policy
+ policy -> a: Allow
+ policy -- b: Deny {style.stroke-dash: 5}
+ policy -- c: Deny {style.stroke-dash: 5}
+}
 ```
-TRADITIONAL VPN vs VERIFIED ACCESS
-────────────────────────────────────
 
-  ❌ VPN (old way):
-  ┌──────────┐    VPN Tunnel   ┌──────────────┐
-  │ Employee │═══════════════▶ │ VPC          │
-  │ Laptop   │                 │              │
-  │          │  Full network   │ ALL services │ ← Truy cập TẤT CẢ
-  │          │  access         │ accessible   │   trong VPC
-  └──────────┘                 └──────────────┘
-
-  ✅ Verified Access (Zero Trust):
-  ┌──────────┐                 ┌──────────────────────┐
-  │ Employee │────▶ Verified   │                      │
-  │ Laptop   │     Access      │  ┌── App A ✅        │
-  │          │     Endpoint    │  │   (allowed)       │
-  │ Identity:│     ┌────────┐  │  │                   │
-  │ Cognito  │────▶│ Policy │──│──┤                   │
-  │ + Device │     │ Engine │  │  ├── App B ❌        │
-  │   trust  │     └────────┘  │  │   (denied)        │
-  └──────────┘                 │  └── App C ❌        │
-                               └──────────────────────┘
-                               
-  → Chỉ truy cập ĐÚng app được phép
-  → Verify: identity + device posture + context
-  → Không cần VPN client
-```
+VPN cũng có thể enforce least privilege, không mặc định cho full VPC access. Verified Access cần supported trust providers và policy/configuration; không giả định Cognito là device/user trust integration mặc định.
 
 **Use case**: DevOps cần truy cập internal dashboard — thay vì VPN, dùng Verified Access với Cognito + device trust check.
 
@@ -1469,36 +1285,20 @@ TRADITIONAL VPN vs VERIFIED ACCESS
 
 **CloudTrail** ghi lại **MỌI API call** trên AWS — ai làm gì, lúc nào, từ đâu.
 
+```d2 title="8.1. AWS CloudTrail — API Activity Logging"
+direction: right
+calls: "AWS API activity trong logging scope"
+trail: "CloudTrail Event\neventTime2024-01-15T10:30Z\nRole order-service-role • GetSecretValue\nsourceIP10.0.3.45 • Secret prod/db/orders"
+s3: "S3 — long-term log storage"
+cw: "CloudWatch Logs — query/metric integration"
+event: "EventBridge — event-driven alerts theo support"
+calls -> trail
+trail -> s3
+trail -> cw
+trail -> event
 ```
-CLOUDTRAIL — "BIG BROTHER" CỦA AWS
-─────────────────────────────────────
 
-  Mọi API Call trên AWS
-     │
-     ▼
-  ┌──────────────────────────────────────┐
-  │  CloudTrail                          │
-  │                                      │
-  │  Event log:                          │
-  │  {                                   │
-  │    "eventTime": "2024-01-15T10:30Z", │
-  │    "userIdentity": {                 │
-  │      "arn": "arn:aws:iam::123:role/  │
-  │              order-service-role"     │
-  │    },                                │
-  │    "eventName": "GetSecretValue",    │
-  │    "sourceIPAddress": "10.0.3.45",   │
-  │    "resources": [{                   │
-  │      "ARN": "arn:aws:secretsmanager: │
-  │              :secret:prod/db/orders" │
-  │    }]                                │
-  │  }                                   │
-  └──────────────────────────────────────┘
-     │
-     ├──▶ S3 (long-term storage)
-     ├──▶ CloudWatch Logs (real-time query)
-     └──▶ EventBridge (real-time alerts)
-```
+Management/data/network events có configuration/support khác nhau; CloudTrail không tự ghi mọi API/data event nếu logging scope chưa bật. ARNs trong hình cũ rút gọn để minh họa, không phải deployment-ready ARN literals.
 
 | Event Type | Mô tả | Cost | Ví dụ |
 |-----------|--------|------|-------|
@@ -1512,26 +1312,26 @@ CLOUDTRAIL — "BIG BROTHER" CỦA AWS
 
 **AWS Config** theo dõi **cấu hình** của AWS resources và kiểm tra compliance rules.
 
+```d2 title="8.2. AWS Config — Configuration Compliance"
+direction: right
+public: "S3 Public Bucket"
+s3rule: "Config rule s3-bucket-public-read-prohibited"
+s3fix: "Non-compliant → Remediation block public access"
+rds: "RDS Encrypted"
+rdsrule: "rds-storage-encrypted"
+ok: "Compliant"
+sg: "SG mở SSH22 rộng"
+sgrule: "restricted-ssh"
+sgfix: "Non-compliant → Remove/Restrict rule"
+public -> s3rule
+s3rule -> s3fix
+rds -> rdsrule
+rdsrule -> ok
+sg -> sgrule
+sgrule -> sgfix
 ```
-AWS CONFIG — CONTINUOUS COMPLIANCE
-────────────────────────────────────
 
-  AWS Resources        Config Rules              Remediation
-  ┌──────────┐         ┌──────────────────┐       ┌─────────────┐
-  │ S3 Bucket│────────▶│ s3-bucket-public │─ ❌ ─▶│ Auto-fix:   │
-  │ (public) │ detect  │ -read-prohibited │       │ Block public│
-  └──────────┘         └──────────────────┘       │ access      │
-                                                  └─────────────┘
-  ┌──────────┐         ┌──────────────────┐
-  │ RDS      │────────▶│ rds-storage-     │─ ✅ ─▶ Compliant
-  │(encrypted)│detect  │ encrypted        │
-  └──────────┘         └──────────────────┘
-
-  ┌──────────┐         ┌──────────────────┐       ┌─────────────┐
-  │ SG (open │────────▶│ restricted-ssh   │─ ❌ ─▶│ Auto-fix:   │
-  │ SSH 22)  │ detect  │                  │       │ Remove rule │
-  └──────────┘         └──────────────────┘       └─────────────┘
-```
+Config evaluates compliance; auto-fix cần remediation configuration/SSM role/guardrails, không tự diễn ra vì bật rule.
 
 **Config Rules quan trọng cho Microservice:**
 
@@ -1549,32 +1349,24 @@ AWS CONFIG — CONTINUOUS COMPLIANCE
 
 **Security Hub** tổng hợp security findings từ **nhiều nguồn** vào một dashboard duy nhất.
 
+```d2 title="8.3. AWS Security Hub"
+direction: right
+guard: "GuardDuty — Threats"
+inspector: "Inspector — Vulnerabilities"
+config: "Config — Compliance"
+macie: "Macie — Sensitive data in S3"
+third: "Third-party findings — Prowler / Checkov integration"
+hub: "Security Hub\nAggregate / Prioritize findings\nCIS / AWS best-practice checks / Score"
+event: "EventBridge → Configured remediation"
+guard -> hub
+inspector -> hub
+config -> hub
+macie -> hub
+third -> hub
+hub -> event
 ```
-SECURITY HUB — SINGLE PANE OF GLASS
-──────────────────────────────────────
 
-  ┌──────────────┐
-  │  GuardDuty   │──────┐
-  │  (threats)   │      │
-  └──────────────┘      │
-  ┌──────────────┐      │     ┌──────────────────────┐
-  │  Inspector   │──────┼────▶│   Security Hub       │
-  │  (vulns)     │      │     │                      │
-  └──────────────┘      │     │  • Aggregate findings│
-  ┌──────────────┐      │     │  • Prioritize        │
-  │  Config      │──────┤     │  • CIS Benchmarks    │
-  │  (compliance)│      │     │  • AWS Best Practices│
-  └──────────────┘      │     │  • Security Score    │
-  ┌──────────────┐      │     │                      │
-  │  Macie       │──────┤     │  → EventBridge       │
-  │  (PII in S3) │      │     │  → Auto-remediation  │
-  └──────────────┘      │     └──────────────────────┘
-  ┌──────────────┐      │
-  │  3rd Party   │──────┘
-  │  (Prowler,   │
-  │   Checkov)   │
-  └──────────────┘
-```
+Findings/integration standards và security scores phụ thuộc service version, enabled standards và account/region settings.
 
 ### 8.4. Amazon GuardDuty — Threat Detection
 
@@ -1607,81 +1399,37 @@ Isolation SG hạn chế kết nối mới; Security Group là stateful nên kh�
 
 ## 9. Ví dụ thực tế — E-Commerce Security Architecture
 
+```d2 title="9. Ví dụ thực tế — E-Commerce Security Architecture"
+direction: down
+client: Users / Mobile / Third-party clients
+edge: CloudFront + WAF + Shield — DDoS / SQLi / XSS / Rate / Geo rules
+api: API Gateway + Cognito — MFA login / JWT / orders read-write scopes
+vpc: VPC10.0.0.0/16 {
+ apps: Private Services {
+  order: Order — orders-role
+  payment: Payment — payment-role
+  inventory: Inventory — inv-role
+  order <-> payment: mTLS + AuthZ
+  payment <-> inventory: mTLS + AuthZ
+ }
+ data: Isolated Subnets {
+  order: RDS Orders — KMS encrypted
+  payment: RDS Payments — KMS encrypted
+ }
+ endpoints: VPC Endpoints — S3 / Secrets Manager / KMS / ECR / SQS
+ apps.order -> data.order: SG db allows authorized app / Encrypted channel
+ apps.payment -> data.payment: SG db allows authorized app / Encrypted channel
+}
+dynamo: DynamoDB Inventory — AWS managed service / KMS
+secrets: Secrets Manager Rotation / Parameter Store Config / KMS / ACM integrations
+audit: Organization CloudTrail / GuardDuty / Security Hub / Config
+client -> edge -> api -> vpc.apps
+vpc.apps.inventory -> dynamo: Authorized AWS API qua endpoint/route phù hợp
+secrets -> vpc.apps: Scoped credentials/config
+vpc.apps -- audit: Audit / Detection / Compliance
 ```
-E-COMMERCE SECURITY ARCHITECTURE — FULL STACK
-────────────────────────────────────────────────
 
-  ┌─ Internet ──────────────────────────────────────────────────────┐
-  │  Users / Mobile Apps / Third-party APIs                         │
-  └────────────────────────────┬────────────────────────────────────┘
-                               │
-  ┌────────────────────────────▼────────────────────────────────────┐
-  │  Layer 1: EDGE SECURITY                                         │
-  │  ┌──────────────────────────────────────────────────────────┐   │
-  │  │  CloudFront + AWS WAF + Shield Standard                  │   │
-  │  │  • DDoS protection (Layer 3/4)                           │   │
-  │  │  • SQL Injection / XSS rules                             │   │
-  │  │  • Rate limiting: 2000 req/5min per IP                   │   │
-  │  │  • Geo blocking (nếu cần)                                │   │
-  │  └──────────────────────────────────────────────────────────┘   │
-  └────────────────────────────┬────────────────────────────────────┘
-                               │
-  ┌────────────────────────────▼────────────────────────────────────┐
-  │  Layer 2: AUTHENTICATION                                        │
-  │  ┌──────────────────────────────────────────────────────────┐   │
-  │  │  API Gateway + Cognito Authorizer                        │   │
-  │  │  • Cognito User Pool (MFA enabled)                       │   │
-  │  │  • JWT validation (Access Token)                         │   │
-  │  │  • OAuth 2.0 scopes: orders:read, orders:write           │   │
-  │  └──────────────────────────────────────────────────────────┘   │
-  └────────────────────────────┬────────────────────────────────────┘
-                               │
-  ┌──────────── VPC: 10.0.0.0/16 ───────────────────────────────────┐
-  │                            │                                    │
-  │  Layer 3: NETWORK ISOLATION│                                    │
-  │  ┌── Private Subnet ───────▼────────────────────────────────┐   │
-  │  │                                                          │   │
-  │  │  ┌──────────┐  mTLS   ┌──────────┐  mTLS  ┌──────────┐   │   │
-  │  │  │ Order    │◄═══════▶│ Payment  │◄══════▶│ Inventory│   │   │
-  │  │  │ Service  │         │ Service  │        │ Service  │   │   │
-  │  │  │          │         │          │        │          │   │   │
-  │  │  │ IAM Role:│         │ IAM Role:│        │ IAM Role:│   │   │
-  │  │  │ orders-  │         │ payment- │        │ inv-role │   │   │
-  │  │  │ role     │         │ role     │        │          │   │   │
-  │  │  └────┬─────┘         └────┬─────┘        └────┬─────┘   │   │
-  │  │       │ SG: svc-sg         │ SG: svc-sg        │         │   │
-  │  └───────┼────────────────────┼───────────────────┼─────────┘   │
-  │          │                    │                   │             │
-  │  ┌── Isolated Subnet ─────────┼───────────────────┼───────┐     │
-  │  │       │                    │                   │       │     │
-  │  │  ┌────▼─────┐        ┌─────▼────┐         ┌────▼─────┐ │     │
-  │  │  │ RDS      │        │ RDS      │         │ DynamoDB │ │     │
-  │  │  │ (orders) │        │ (payment)│         │ (inv)    │ │     │
-  │  │  │ 🔐 KMS   │        │ 🔐 KMS   │         │ 🔐 KMS   │ │     │
-  │  │  │ encrypted│        │ encrypted│         │ encrypted│ │     │
-  │  │  └──────────┘        └──────────┘         └──────────┘ │     │
-  │  │  SG: db-sg (chỉ accept từ svc-sg)                      │     │
-  │  └────────────────────────────────────────────────────────┘     │
-  │                                                                 │
-  │  VPC Endpoints: S3 (Gateway), Secrets Manager, KMS, ECR, SQS    │
-  └─────────────────────────────────────────────────────────────────┘
-
-  Layer 5: SECRETS & ENCRYPTION
-  ┌─────────────────────────────────────────────────────────────┐
-  │  Secrets Manager: DB passwords (auto-rotate 30 days)        │
-  │  Parameter Store: Feature flags, config values              │
-  │  KMS CMK: Encrypt RDS, S3, SQS, DynamoDB                    │
-  │  ACM: TLS certificates cho ALB + internal TLS/mTLS           │
-  └─────────────────────────────────────────────────────────────┘
-
-  Layer 6: AUDIT & MONITORING
-  ┌─────────────────────────────────────────────────────────────┐
-  │  CloudTrail: Organization trail (all accounts, all regions) │
-  │  GuardDuty: Threat detection (auto-isolate on HIGH severity)│
-  │  Security Hub: CIS Benchmarks score + centralized findings  │
-  │  Config: 15+ compliance rules (encryption, SG, rotation)    │
-  └─────────────────────────────────────────────────────────────┘
-```
+DynamoDB không phải instance nằm trong isolated subnet và không dùng `db-sg` như RDS; dùng IAM/resource policies và endpoints phù hợp. Ví dụ rate2.000req/5phút/IP, rotation30ngày và15+compliance rules là policy minh họa. GuardDuty auto-isolation chỉ xảy ra khi event/remediation workflow được cấu hình, không phải default finding behavior.
 
 ---
 

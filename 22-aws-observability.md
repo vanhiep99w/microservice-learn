@@ -48,39 +48,34 @@ Doc này trả lời câu hỏi: **Distributed Tracing triển khai với X-Ray 
 
 > 💡 Giả định: Bạn đã đọc [doc 11](11-observability-evolvability.md) và hiểu lý thuyết. Doc này tập trung vào **cách AWS hiện thực hóa** các khái niệm đó.
 
-```
-┌────────────────────────────────────────────────────────────────────┐
-│            OBSERVABILITY LANDSCAPE trên AWS                        │
-│                                                                    │
-│  ┌─────── Traces (Distributed Tracing) ────────────────────────┐   │
-│  │  AWS X-Ray                    ← managed tracing             │   │
-│  │  OpenTelemetry + X-Ray SDK    ← vendor-neutral              │   │
-│  │  ADOT Collector               ← OTel collector managed      │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                    │
-│  ┌─────── Logs (Centralized Logging) ──────────────────────────┐   │
-│  │  CloudWatch Logs              ← default, tích hợp sẵn       │   │
-│  │  CloudWatch Logs Insights     ← query engine                │   │
-│  │  OpenSearch (ELK trên AWS)    ← full-text search, Kibana    │   │
-│  │  S3 + Athena                  ← archive & ad-hoc query      │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                    │
-│  ┌─────── Metrics & Alerting ──────────────────────────────────┐   │
-│  │  CloudWatch Metrics           ← built-in AWS metrics        │   │
-│  │  CloudWatch Container Insights← ECS/EKS metrics             │   │
-│  │  CloudWatch EMF               ← custom business metrics     │   │
-│  │  Amazon Managed Prometheus    ← Prometheus-compatible       │   │
-│  │  Amazon Managed Grafana       ← dashboards                  │   │
-│  │  CloudWatch Alarms            ← alerting + auto actions     │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                    │
-│  ┌─────── Incident Response ───────────────────────────────────┐   │
-│  │  SNS                          ← notifications               │   │
-│  │  EventBridge                  ← event routing               │   │
-│  │  Systems Manager Runbooks     ← automated remediation       │   │
-│  │  AWS Chatbot                  ← Slack/Teams integration     │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-└────────────────────────────────────────────────────────────────────┘
+```d2 title="1. Giới thiệu"
+direction: right
+traces: Distributed Tracing {
+ xray: AWS X-Ray — Managed Tracing
+ otel: OpenTelemetry SDK — Vendor-neutral Instrumentation
+ xray_sdk: X-Ray SDK — AWS-specific Instrumentation
+ adot: ADOT Collector — OTel Distribution
+}
+logs: Centralized Logging {
+ cw: CloudWatch Logs
+ query: CloudWatch Logs Insights
+ search: OpenSearch — Search / Dashboards
+ archive: S3 + Athena — Archive / Ad-hoc Query
+}
+metrics: Metrics / Alerting {
+ cw: CloudWatch Metrics
+ containers: Container Insights — ECS / EKS
+ emf: CloudWatch EMF — Business Metrics
+ prometheus: Amazon Managed Prometheus
+ grafana: Amazon Managed Grafana
+ alarms: CloudWatch Alarms — Alert / Auto Actions
+}
+incidents: Incident Response {
+ sns: SNS — Notifications
+ events: EventBridge — Event Routing
+ runbooks: Systems Manager Runbooks — Remediation
+ chat: AWS Chatbot — Slack / Teams integration trong ví dụ
+}
 ```
 
 ---
@@ -274,32 +269,22 @@ resource "aws_lambda_function" "payment_processor" {
 
 X-Ray Service Map hiển thị **biểu đồ trực quan** toàn bộ hệ thống — mỗi node là 1 service, edges là connections, màu sắc thể hiện health.
 
+```d2 title="2.3. X-Ray Service Map"
+direction: right
+gw: "API Gateway — OK"
+inventory: "Inventory — OK"
+order: "Order — OK"
+payment: "Payment — SLOW"
+aurora: "Aurora DB — OK"
+stripe: "Stripe API — SLOW"
+gw -> inventory
+gw -> order
+order -> payment: "450ms minh họa"
+order -> aurora
+payment -> stripe: "380ms — bottleneck minh họa"
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                  X-RAY SERVICE MAP                           │
-│                                                              │
-│                    ┌──────────┐                              │
-│        ┌──────────▶│ Inventory│                              │
-│        │           │  🟢 OK   │                              │
-│  ┌─────┴────┐      └──────────┘                              │
-│  │   API    │                                                │
-│  │ Gateway  │      ┌──────────┐       ┌──────────┐           │
-│  │  🟢 OK   │─────▶│  Order   │──────▶│ Payment  │           │
-│  └──────────┘      │  🟢 OK   │       │  🟡 Slow │           │
-│                    └────┬─────┘       └────┬─────┘           │
-│                         │                  │                 │
-│                    ┌────▼─────┐       ┌────▼─────┐           │
-│                    │ Aurora   │       │ Stripe   │           │
-│                    │ DB 🟢    │       │ API 🟡   │           │
-│                    └──────────┘       └──────────┘           │
-│                                                              │
-│  🟢 < 1% errors, < 200ms     Latency breakdown:              │
-│  🟡 1-5% errors hoặc > 500ms   Order → Payment: 450ms        │
-│  🔴 > 5% errors                Payment → Stripe: 380ms ⚠️    │
-│                                                              │
-│  → Bottleneck: Stripe API response time                      │
-└──────────────────────────────────────────────────────────────┘
-```
+
+Legend ví dụ: xanh errors<1% và latency<200ms; vàng errors1–5% hoặc latency>500ms; đỏ errors>5%. Ngưỡng phân loại cần nhất quán với metrics hiển thị, không phải X-Ray tự mặc định mọi ngưỡng này.
 
 ### 2.4. Sampling Rules — Kiểm soát chi phí
 
@@ -369,33 +354,28 @@ resource "aws_xray_sampling_rule" "errors" {
 
 ### 2.5. X-Ray vs OpenTelemetry trên AWS
 
+```d2 title="2.5. X-Ray vs OpenTelemetry trên AWS"
+direction: down
+native: X-Ray SDK Path {
+ app: App + X-Ray SDK
+ daemon: X-Ray Daemon
+ xray: X-Ray Service
+ app -> daemon -> xray
+}
+otel: OpenTelemetry / ADOT Path {
+ app: App + OTel SDK
+ collector: ADOT Collector
+ xray: X-Ray — traces
+ metrics: Prometheus / CloudWatch — metrics theo exporter
+ jaeger: Jaeger — alternative trace backend
+ app -> collector
+ collector -> xray
+ collector -> metrics
+ collector -> jaeger
+}
 ```
-┌────────────────────────────────────────────────────────────────┐
-│          TRACING OPTIONS trên AWS                              │
-│                                                                │
-│  Option 1: X-Ray SDK (AWS native)                              │
-│  ┌──────────┐    ┌───────────┐    ┌───────────┐                │
-│  │ App +    │───▶│ X-Ray     │───▶│ X-Ray     │                │
-│  │ X-Ray SDK│    │ Daemon    │    │ Service   │                │
-│  └──────────┘    └───────────┘    └───────────┘                │
-│  ✅ Đơn giản, auto-instrument AWS SDK                          │
-│  ❌ Vendor lock-in, chỉ export sang X-Ray                      │
-│                                                                │
-│  Option 2: OpenTelemetry + ADOT (khuyến nghị)                  │
-│  ┌──────────┐    ┌───────────┐    ┌───────────┐                │
-│  │ App +    │───▶│ ADOT      │───▶│ X-Ray     │                │
-│  │ OTel SDK │    │ Collector │───▶│ Prometheus│                │
-│  └──────────┘    └───────────┘───▶│ Jaeger    │                │
-│                                   └───────────┘                │
-│  ✅ Vendor-neutral, multi-backend                              │
-│  ✅ Richer instrumentation libraries                           │
-│  ⚠️ Setup phức tạp hơn một chút                                │
-│                                                                │
-│  💡 Khuyến nghị: Dùng OpenTelemetry SDK + ADOT Collector       │
-│     → export sang X-Ray cho traces, CloudWatch cho metrics     │
-│     → dễ migrate sang backend khác trong tương lai             │
-└────────────────────────────────────────────────────────────────┘
-```
+
+OTel giảm vendor coupling, có nhiều instrumentation/exporters nhưng cần cấu hình đúng protocols/pipelines. Traces không được export như metrics tới Prometheus; mỗi signal dùng exporter tương ứng. Đối chiếu lifecycle của X-Ray SDK/Daemon khi chọn cho dự án mới.
 
 ---
 
@@ -1025,41 +1005,18 @@ resource "aws_cloudwatch_dashboard" "order_service" {
 
 **AMP** là fully managed Prometheus-compatible service — không cần quản lý Prometheus server, tự động scale, multi-AZ.
 
+```d2 title="5.1. Amazon Managed Prometheus (AMP)"
+direction: right
+pods: "EKS Application Pods\nExpose /metrics"
+agent: "ADOT Collector / Prometheus Agent\nScrape + remote_write"
+amp: "Amazon Managed Prometheus\nPromQL • Multi-AZ storage\nIAM access • Managed capacity"
+grafana: "Amazon Managed Grafana\nDashboards • SSO • Alerts"
+pods -> agent: "Scrape metrics"
+agent -> amp: "remote_write"
+amp -> grafana: "Queries / Data source"
 ```
-┌───────────────────────────────────────────────────────────┐
-│          AMAZON MANAGED PROMETHEUS (AMP)                  │
-│                                                           │
-│  ┌─── EKS Cluster ───────────────────────────────────┐    │
-│  │                                                   │    │
-│  │  ┌──────────────┐     ┌───────────────────────┐   │    │
-│  │  │ Application  │     │ Prometheus Metrics    │   │    │
-│  │  │ Pods         │────▶│ (/metrics endpoint)   │   │    │
-│  │  └──────────────┘     └──────────┬────────────┘   │    │
-│  │                                  │                │    │
-│  │  ┌──────────────────────────────▼─────────────┐   │    │
-│  │  │ ADOT Collector (hoặc Prometheus Agent)     │   │    │
-│  │  │ remote_write → AMP endpoint                │   │    │
-│  │  └──────────────────────────────┬─────────────┘   │    │
-│  └─────────────────────────────────┼─────────────────┘    │
-│                                    │                      │
-│                                    ▼                      │
-│  ┌──────────────────────────────────────────────────┐     │
-│  │  Amazon Managed Prometheus                       │     │
-│  │  ├── PromQL query engine                         │     │
-│  │  ├── Multi-AZ storage (150 days default)         │     │
-│  │  ├── Auto scaling                                │     │
-│  │  └── IAM-based access control                    │     │
-│  └────────────────────┬─────────────────────────────┘     │
-│                       │                                   │
-│                       ▼                                   │
-│  ┌──────────────────────────────────────────────────┐     │
-│  │  Amazon Managed Grafana                          │     │
-│  │  ├── Pre-built dashboards                        │     │
-│  │  ├── SSO integration (SAML/OAuth)                │     │
-│  │  └── Alert Manager integration                   │     │
-│  └──────────────────────────────────────────────────┘     │
-└───────────────────────────────────────────────────────────┘
-```
+
+Retention ví dụ150ngày cần kiểm tra workspace settings hiện hành. IAM/SigV4, SSO/auth và Alertmanager integrations phải được cấu hình; diagram không đại diện cho mọi default.
 
 #### Cấu hình AMP (Terraform)
 
@@ -1166,42 +1123,26 @@ resource "aws_grafana_workspace" "main" {
 
 ### 6.1. Alerting Pipeline trên AWS
 
+```d2 title="6.1. Alerting Pipeline trên AWS"
+direction: down
+cw: "CloudWatch Alarms"
+prom: "Prometheus Alertmanager"
+xray: "X-Ray Insights / Anomaly signal"
+route: "Configured routing / SNS Topics"
+p1: "Critical P1 → PagerDuty on-call"
+p2: "Warning P2–P3 → Slack alerts-warning"
+p4: "Info P4 → Email / Dashboard"
+response: "EventBridge / SSM Runbook\nScale ECS • Restart unhealthy tasks\nDB failover • WAF IP rule"
+cw -> route
+prom -> route: "Webhook/Integration"
+xray -> route: "Event integration"
+route -> p1
+route -> p2
+route -> p4
+p1 -> response: "Approved automation policy"
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                    ALERTING PIPELINE                                 │
-│                                                                      │
-│  ┌─── Detect ──────────────────────────────────────────────────────┐ │
-│  │  CloudWatch Alarm  │  Prometheus AlertManager  │  X-Ray Insights│ │
-│  └───────┬────────────┴──────────┬────────────────┴─────────┬──────┘ │
-│          │                       │                          │        │
-│          └───────────────────────┼──────────────────────────┘        │
-│                                  ▼                                   │
-│  ┌─── Route ─────────────────────────────────────────────────────┐   │
-│  │                        SNS Topic                              │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐    │   │
-│  │  │ Critical    │  │ Warning     │  │ Info                │    │   │
-│  │  │ (P1)        │  │ (P2-P3)     │  │ (P4)                │    │   │
-│  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────────────┘    │   │
-│  └─────────┼────────────────┼────────────────┼───────────────────┘   │
-│            │                │                │                       │
-│            ▼                ▼                ▼                       │
-│  ┌─── Notify ────────────────────────────────────────────────────┐   │
-│  │                                                               │   │
-│  │  PagerDuty    Slack Channel      Email / CloudWatch           │   │
-│  │  (on-call)    (#alerts-warning)  Dashboard                    │   │
-│  │                                                               │   │
-│  └─────────┬─────────────────────────────────────────────────────┘   │
-│            │                                                         │
-│            ▼                                                         │
-│  ┌─── Respond (Automated) ────────────────────────────────────────┐  │
-│  │  EventBridge Rule → SSM Runbook                                │  │
-│  │  • Auto scale up ECS service                                   │  │
-│  │  • Restart unhealthy tasks                                     │  │
-│  │  • Failover database                                           │  │
-│  │  • Block suspicious IPs (WAF)                                  │  │
-│  └────────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────────┘
-```
+
+SNS không mặc định tự phân loại severity hay thực thi remediation; cần message attributes/subscriptions/rules. Automations phải có permission, guardrails, stop conditions và audit.
 
 ```hcl source="snippets/6-1-alerting-pipeline-tren-aws.tf"
 # SNS Topics — phân loại severity
@@ -1406,69 +1347,51 @@ resource "aws_cloudwatch_event_target" "ssm_automation" {
 
 ## 8. Ví dụ thực tế — E-Commerce Observability Stack
 
+```d2 title="8. Ví dụ thực tế — E-Commerce Observability Stack"
+direction: right
+traces: Traces {
+ sdk: OpenTelemetry SDK
+ collector: ADOT Sidecar / DaemonSet
+ xray: X-Ray — Service Map / Insights
+ sdk -> collector -> xray
+}
+logs: Logs {
+ ecs: ECS awslogs — JSON traceId / correlationId
+ cw: CloudWatch Logs — Insights / Metric Filters
+ archive: S3 → Glacier archive
+ search: OpenSearch Dashboards — Critical logs
+ ecs -> cw
+ cw -> archive: Export pipeline
+ cw -> search: Subscription + supported relay
+}
+metrics: Metrics {
+ sources: ECS / ALB / RDS / SQS / DynamoDB / Container Insights / Custom EMF
+ dashboards: System / Business / SLO Dashboards
+ sources -> dashboards
+}
+alert: Alerting / Remediation {
+ alarms: Composite / Threshold Alarms
+ pager: P1 PagerDuty
+ slack: P2 Slack
+ dashboard: P3 Dashboard
+ automation: SSM / Scaling policy / Lambda WAF actions
+ alarms -> pager
+ alarms -> slack
+ alarms -> dashboard
+ alarms -> automation
+}
+metrics.sources -> alert.alarms
+logs.cw -> alert.alarms: Extracted error metrics
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│            E-COMMERCE OBSERVABILITY STACK trên AWS                       │
-│                                                                          │
-│  ┌─── Traces ───────────────────────────────────────────────────────┐    │
-│  │  OpenTelemetry SDK (application)                                 │    │
-│  │       │                                                          │    │
-│  │  ADOT Collector (sidecar / DaemonSet)                            │    │
-│  │       │                                                          │    │
-│  │  AWS X-Ray                                                       │    │
-│  │  ├── Service Map: toàn bộ dependencies                           │    │
-│  │  ├── Sampling: 10% default, 100% errors, 0% health checks        │    │
-│  │  └── Insights: auto-detect anomalies                             │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│                                                                          │
-│  ┌─── Logs ─────────────────────────────────────────────────────────┐    │
-│  │  ECS: awslogs driver → CloudWatch Logs                           │    │
-│  │  ├── Structured JSON logs (traceId, correlationId)               │    │
-│  │  ├── Logs Insights: query & debug                                │    │
-│  │  ├── Retention: 30 ngày CW, archive → S3 → Glacier               │    │
-│  │  └── Metric Filter: extract error counts → CloudWatch Metric     │    │
-│  │                                                                  │    │
-│  │  Critical services: Subscription Filter → OpenSearch (Kibana)    │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│                                                                          │
-│  ┌─── Metrics ──────────────────────────────────────────────────────┐    │
-│  │  Built-in: CloudWatch Metrics (ECS, ALB, RDS, SQS, DynamoDB)     │    │
-│  │  Container: Container Insights (ECS cluster/service/task)        │    │
-│  │  Custom: EMF (OrderCount, OrderValue, ProcessingTime)            │    │
-│  │                                                                  │    │
-│  │  Dashboards:                                                     │    │
-│  │  ├── System Dashboard: CPU, Memory, Task Count per service       │    │
-│  │  ├── Business Dashboard: Orders/min, Revenue, Conversion Rate    │    │
-│  │  └── SLA Dashboard: Error Rate, P50/P90/P99 Latency              │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│                                                                          │
-│  ┌─── Alerting ─────────────────────────────────────────────────────┐    │
-│  │  P1 Critical (PagerDuty):                                        │    │
-│  │  ├── Error rate > 5% for 5 min + P99 > 2s (Composite Alarm)      │    │
-│  │  ├── Payment service down (health check failed 3x)               │    │
-│  │  └── SQS DLQ messages > 0 (unprocessed failures)                 │    │
-│  │                                                                  │    │
-│  │  P2 Warning (Slack #alerts):                                     │    │
-│  │  ├── Error rate > 1% for 10 min                                  │    │
-│  │  ├── P99 latency > 1s for 10 min                                 │    │
-│  │  ├── Queue depth > 500 messages                                  │    │
-│  │  └── CPU > 80% for 15 min (scaling issue?)                       │    │
-│  │                                                                  │    │
-│  │  P3 Info (Dashboard only):                                       │    │
-│  │  ├── New deployment detected                                     │    │
-│  │  ├── Auto scaling event                                          │    │
-│  │  └── Cost anomaly detected                                       │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│                                                                          │
-│  ┌─── Auto Remediation ─────────────────────────────────────────────┐    │
-│  │  Error rate alarm → SSM Runbook → Force new ECS deployment       │    │
-│  │  Queue depth alarm → Auto Scaling policy → Scale up consumers    │    │
-│  │  WAF rate alarm → Lambda → Block IP in WAF                       │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│                                                                          │
-│  Estimated Cost: ~$400-600/month (10 services, CloudWatch-based)         │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+
+Retention minh họa30ngày CloudWatch rồi archive. Custom EMF: OrderCount, OrderValue, ProcessingTime. Dashboards: CPU/memory/task count; orders/min/revenue/conversion; error rate/P50/P90/P99.
+
+- **P1:** error rate>5% trong5phút VÀ P99>2s; Payment health check fail3lần; DLQ messages>0.
+- **P2:** errors>1%10phút; P99>1s10phút; queue depth>500; CPU>80%15phút.
+- **P3:** deployment, scaling và cost anomaly events theo notification policy.
+- **Remediation:** error alarm→SSM force ECS deployment; queue alarm→consumer scaling; WAF alarm→Lambda block policy.
+
+Sampling ví dụ10% default/100%errors/0%health cần tail-based pipeline phù hợp nếu quyết định sau khi biết lỗi; head sampling10% không tự đảm bảo giữ mọi error trace. Ước tính cũ400–600USD/tháng cho10services chỉ là illustrative workload, không phải báo giá hiện hành.
 
 ---
 

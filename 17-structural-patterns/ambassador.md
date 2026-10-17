@@ -76,40 +76,38 @@ n1.n3 -> n5: "mTLS, route, load balancing"
 
 Một request điển hình có thể diễn ra như sau:
 
-```mermaid
-sequenceDiagram
-    participant C as Checkout Service
-    participant A as Ambassador localhost:15001
-    participant P as Payment Service
-
-    C->>A: Outbound request theo contract nội bộ
-    A->>P: Route đến endpoint phù hợp
-    alt Lỗi transient và operation an toàn để retry
-        A->>P: Retry trong budget với backoff + jitter
-    end
-    P-->>A: Response hoặc lỗi đã phân loại
-    A-->>C: Forward response và ghi network telemetry
+```d2 title="Luồng request outbound"
+direction: right
+caller: "Checkout Service\nOutbound request theo contract nội bộ\nPOST /charges + deadline + Idempotency-Key"
+ambassador: "Ambassador — localhost:15001\nEndpoint / certificate / traffic policy từ discovery"
+payment: "Payment Service\nForward qua mTLS đến endpoint phù hợp"
+condition: "Lỗi transient VÀ operation an toàn / idempotent?"
+retry: "Retry cùng key\nTrong budget • Backoff • Jitter"
+result: "AUTHORIZED / DECLINED / kết quả chưa rõ\nResponse hoặc lỗi có phân loại"
+return: "Ambassador forward result về caller\nGhi network telemetry"
+caller -> ambassador
+ambassador -> payment
+payment -> condition
+condition -> retry: "Có"
+retry -> payment: "Attempt tiếp theo"
+condition -> result: "Không retry / đã có kết quả"
+result -> return
+return -> caller
 ```
 
 `Control Plane` trong sơ đồ không nhất thiết nằm trên đường đi của từng request. Tùy implementation, nó có thể push cấu hình xuống proxy hoặc cung cấp dữ liệu để proxy cập nhật route. Điểm cần giữ là request không nên phụ thuộc vào việc application biết IP hoặc certificate của từng instance.
 
 ### Vị trí trong topology
 
-```text
-┌──────────────────── Workload ─────────────────────┐
-│                                                   │
-│  ┌──────────────────┐     ┌───────────────────┐   │
-│  │ Checkout Service │────▶│ Ambassador        │   │
-│  │ business code    │     │ localhost:15001   │   │
-│  └──────────────────┘     └─────────┬─────────┘   │
-│                                     │             │
-└─────────────────────────────────────┼─────────────┘
-                                      │ outbound
-                                      ▼
-                            ┌───────────────────┐
-                            │ Payment Service   │
-                            │ nhiều replicas    │
-                            └───────────────────┘
+```d2 title="Vị trí trong topology"
+direction: right
+pod: Checkout Workload / Pod {
+ app: Checkout Service — Business code
+ proxy: Ambassador — localhost15001
+ app -> proxy: Payment client call
+}
+payment: Payment Service Replicas
+pod.proxy -> payment: Outbound / mTLS
 ```
 
 Cùng Pod hoặc cùng host làm giảm khoảng cách giữa application và proxy, nhưng không làm mất mọi rủi ro. Proxy vẫn có resource limit, lifecycle, config và failure mode riêng. Khi dùng Kubernetes, cần tính CPU và memory của proxy vào tổng resource của Pod, đồng thời thiết kế readiness và graceful shutdown cho cả hai container.
@@ -210,30 +208,28 @@ Access log và trace có thể chứa header hoặc metadata nhạy cảm. Khôn
 
 Giả sử `Checkout Service` gọi `Payment Service` trong một hệ thống E-Commerce. Checkout muốn giữ một client contract ổn định, còn platform team muốn đưa mTLS, endpoint discovery và network telemetry ra khỏi business code.
 
-```text
-┌──────────────────── Pod của Checkout ────────────────────┐
-│                                                          │
-│  ┌──────────────────────┐     ┌──────────────────────┐   │
-│  │ Checkout Service     │     │ Ambassador           │   │
-│  │ gọi Payment client   │────▶│ 127.0.0.1:15001      │───┼── mTLS ──▶ Payment Service
-│  └──────────────────────┘     └──────────────────────┘   │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
+```d2 title="Topology của Checkout"
+direction: right
+pod: Checkout Workload / Pod {
+ app: Checkout Service — Business code
+ proxy: Ambassador — localhost15001
+ app -> proxy: Payment client call
+}
+payment: Payment Service Replicas
+pod.proxy -> payment: Outbound / mTLS
 ```
 
 Application chỉ cần biết local endpoint. Ambassador biết route `payment-service`, endpoint thật và policy TLS. Nếu payload của Payment Service không trùng domain contract, một `Payment Adapter` có thể nằm trong Checkout trước local proxy:
 
-```text
-Checkout domain
-    │ PaymentPort / contract nội bộ
-    ▼
-Payment Adapter (nếu cần mapping schema hoặc semantics)
-    │ request theo contract Payment Service
-    ▼
-Ambassador localhost
-    │ transport, mTLS, discovery, timeout policy
-    ▼
-Payment Service
+```d2 title="Topology của Checkout"
+direction: right
+domain: "Checkout Domain"
+adapter: "Payment Adapter nếu cần schema / Semantics mapping"
+proxy: "Ambassador localhost"
+payment: "Payment Service"
+domain -> adapter: "PaymentPort — Internal contract"
+adapter -> proxy: "Payment Service contract"
+proxy -> payment: "Transport / mTLS / Discovery / Timeout policy"
 ```
 
 Adapter và Ambassador có thể nối tiếp nhau nhưng không phải cùng một pattern. Adapter chuyển đổi contract. Ambassador vận chuyển request qua outbound network boundary.
@@ -263,19 +259,23 @@ Luồng xử lý:
 5. Payment Service trả kết quả. Ambassador forward response và ghi latency, status, upstream cùng trace context.
 6. Nếu timeout xảy ra sau khi request có thể đã tới Payment Service, Checkout không được suy luận rằng charge chắc chắn chưa xảy ra. Application phải xử lý trạng thái chưa xác định theo contract, chẳng hạn tra status hoặc giữ `PENDING_PAYMENT` để reconciliation.
 
-```mermaid
-sequenceDiagram
-    participant C as Checkout Service
-    participant A as Ambassador localhost:15001
-    participant P as Payment Service
-
-    C->>A: POST /charges + deadline + Idempotency-Key
-    A->>P: Forward qua mTLS đến endpoint Payment
-    alt Lỗi transient và Payment contract idempotent
-        A->>P: Retry cùng key, có backoff + jitter
-    end
-    P-->>A: AUTHORIZED, DECLINED hoặc trạng thái chưa rõ
-    A-->>C: Forward result + network telemetry
+```d2 title="Luồng charge"
+direction: right
+caller: "Checkout Service\nOutbound request theo contract nội bộ\nPOST /charges + deadline + Idempotency-Key"
+ambassador: "Ambassador — localhost:15001\nEndpoint / certificate / traffic policy từ discovery"
+payment: "Payment Service\nForward qua mTLS đến endpoint phù hợp"
+condition: "Lỗi transient VÀ operation an toàn / idempotent?"
+retry: "Retry cùng key\nTrong budget • Backoff • Jitter"
+result: "AUTHORIZED / DECLINED / kết quả chưa rõ\nResponse hoặc lỗi có phân loại"
+return: "Ambassador forward result về caller\nGhi network telemetry"
+caller -> ambassador
+ambassador -> payment
+payment -> condition
+condition -> retry: "Có"
+retry -> payment: "Attempt tiếp theo"
+condition -> result: "Không retry / đã có kết quả"
+result -> return
+return -> caller
 ```
 
 Ambassador không nên tự biến `DECLINED` thành retryable error, cũng không nên đổi `PENDING_PAYMENT` thành `FAILED` chỉ để trả response đơn giản hơn. Phân loại đó phụ thuộc semantics của Payment Service và workflow Checkout.

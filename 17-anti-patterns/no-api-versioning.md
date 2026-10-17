@@ -54,16 +54,14 @@
 
 Tên anti-pattern này không có nghĩa mọi endpoint phải có `/v1`. Versioning chỉ là một công cụ. Điều cần bảo vệ là consumer cũ không bị phá vỡ ngoài ý muốn khi provider thay đổi. Một thay đổi additive, chẳng hạn thêm field optional mà consumer có thể bỏ qua, có thể không cần tạo version mới.
 
-```text
-Provider và consumer có contract:
-
-  Consumer ── phụ thuộc request/response ──> Provider
-       │                                      │
-       └── cần compatibility và lifecycle ───┘
-
-Không có versioning không đồng nghĩa chỉ thiếu /v1.
-Vấn đề là thay đổi contract nhưng không có cách bảo vệ consumer.
+```d2 title="No API Versioning là gì"
+direction: right
+consumer: "Consumer"
+provider: "Provider"
+consumer -> provider: "Request / Response contract — Compatibility + Lifecycle"
 ```
+
+Không có versioning không chỉ là thiếu /v1, mà là thay contract không có cách bảo vệ consumers.
 
 ### Phạm vi của tài liệu
 
@@ -170,13 +168,15 @@ Order Consumer chỉ đọc `id` và `fullName`. Provider muốn chuẩn hóa d�
 
 Consumer cũ có thể fail khi deserialize nếu schema strict. Nếu serializer cho phép thiếu field, logic phía sau vẫn có thể nhận `fullName` rỗng và xử lý sai. Vấn đề không nằm ở tên field mới, mà ở việc provider xóa field cũ khi consumer chưa migrate.
 
-```text
-❌ One-step breaking change
-
-Deploy Provider mới
-        │
-        ▼
-fullName bị xóa ──> Consumer cũ vẫn đọc fullName ──> lỗi hoặc sai dữ liệu
+```d2 title="Cách thay đổi làm consumer bị phá vỡ"
+direction: right
+deploy: "Deploy provider mới"
+remove: "Xóa fullName"
+old: "Consumer cũ vẫn đọc fullName"
+error: "Lỗi hoặc sai dữ liệu"
+deploy -> remove
+remove -> old
+old -> error
 ```
 
 ### Cách giữ contract cũ bằng adapter
@@ -459,10 +459,15 @@ Consumer cũng nên test cách mình xử lý field mới, field thiếu, versio
 
 API Gateway có thể route theo URI hoặc header version:
 
-```text
-Client ──> API Gateway
-             ├── /api/v1/** hoặc X-API-Version: v1 ──> Provider contract cũ
-             └── /api/v2/** hoặc X-API-Version: v2 ──> Provider contract mới
+```d2 title="Vai trò của API Gateway"
+direction: right
+client: "Client"
+gateway: "API Gateway"
+v1: "Provider contract cũ"
+v2: "Provider contract mới"
+client -> gateway
+gateway -> v1: "/api/v1/** hoặc X-API-Version v1"
+gateway -> v2: "/api/v2/** hoặc X-API-Version v2"
 ```
 
 Gateway hữu ích để giữ public route ổn định, áp policy edge và chuyển traffic đến implementation tương ứng. Nó cũng có thể hỗ trợ transformation trong giai đoạn migration, nhưng transformation không thay thế việc quản lý owner, schema, consumer và deprecation.

@@ -69,22 +69,24 @@ Circuit Breaker không sửa được dependency và cũng không hoàn tác sid
 
 Ví dụ, Order Service gọi Payment Service với timeout 30 giây. Khi Payment Service bị treo, mỗi request tới Payment vẫn giữ thread và connection trong thời gian dài. Đủ nhiều request sẽ làm tài nguyên của Order Service cạn kiệt, dù bản thân Order Service chưa có lỗi.
 
-```text
-Không có Circuit Breaker:
-  Payment Service chậm hoặc không phản hồi
-      │
-      ├── Order Service tiếp tục gửi request
-      ├── Mỗi request chờ đến khi timeout
-      ├── Thread và connection bị giữ
-      └── Caller quá tải → lỗi lan sang các chức năng khác
-
-Có Circuit Breaker:
-  Dependency bắt đầu trả lỗi hoặc chậm
-      │
-      ├── CB ghi nhận kết quả trong sliding window
-      ├── Khi vượt threshold, CB chuyển sang OPEN
-      ├── Request mới bị từ chối ngay
-      └── Caller giữ tài nguyên cho các chức năng còn lại
+```d2 title="Failure mode cần ngăn chặn"
+direction: down
+bad: Không Circuit Breaker {
+ slow: Payment chậm / Không phản hồi
+ calls: Order tiếp tục gọi
+ wait: Mỗi call đợi timeout
+ resources: Giữ thread / Connection
+ cascade: Caller quá tải / Cascading failure
+ slow -> calls -> wait -> resources -> cascade
+}
+good: Có Circuit Breaker {
+ errors: Dependency lỗi / Chậm
+ window: Ghi kết quả vào sliding window
+ open: Vượt threshold — OPEN
+ reject: Từ chối call mới ngay
+ capacity: Giữ tài nguyên cho flow khác
+ errors -> window -> open -> reject -> capacity
+}
 ```
 
 Circuit Breaker đặc biệt hữu ích với dependency remote trong đường gọi đồng bộ. Với lỗi chỉ thoáng qua, retry có giới hạn có thể đã đủ. Với lỗi kéo dài, việc tiếp tục retry thường chỉ tạo thêm tải.
@@ -101,13 +103,17 @@ Tài liệu này tập trung vào một Circuit Breaker cho **một cặp caller
 
 Một Circuit Breaker thường có ba trạng thái: `CLOSED`, `OPEN` và `HALF-OPEN`.
 
-```mermaid
-stateDiagram-v2
-    [*] --> CLOSED
-    CLOSED --> OPEN: Failure rate hoặc slow-call rate vượt ngưỡng
-    OPEN --> HALF_OPEN: Hết wait duration
-    HALF_OPEN --> CLOSED: Probe thành công theo policy
-    HALF_OPEN --> OPEN: Probe thất bại hoặc quá chậm
+```d2 title="State machine"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+CLOSED: "CLOSED"
+initial1 -> CLOSED
+OPEN: "OPEN"
+CLOSED -> OPEN: "Failure rate hoặc slow-call rate vượt ngưỡng"
+HALF_OPEN: "HALF_OPEN"
+OPEN -> HALF_OPEN: "Hết wait duration"
+HALF_OPEN -> CLOSED: "Probe thành công theo policy"
+HALF_OPEN -> OPEN: "Probe thất bại hoặc quá chậm"
 ```
 
 Circuit Breaker bắt đầu ở `CLOSED`. Khi mạch `OPEN` đủ lâu, nó không tự cho toàn bộ traffic quay lại ngay. Nó chuyển sang `HALF-OPEN` để dùng một số request thăm dò, rồi quyết định đóng lại hoặc mở tiếp.
@@ -194,12 +200,19 @@ Circuit Breaker, timeout và retry giải quyết ba câu hỏi khác nhau trong
 
 Khi dùng cả hai, Circuit Breaker nên bọc ngoài Retry:
 
-```text
-Request
-  └─ Circuit Breaker
-       ├─ Nếu OPEN → fallback hoặc lỗi ngay
-       └─ Nếu CLOSED → Retry có giới hạn
-            └─ Timeout cho từng lần gọi dependency
+```d2 title="Circuit Breaker bọc ngoài Retry"
+direction: right
+request: "Request"
+cb: "Circuit Breaker"
+fallback: "Fallback / Lỗi ngay"
+retry: "Retry có giới hạn"
+timeout: "Per-try Timeout"
+call: "Dependency Call"
+request -> cb
+cb -> fallback: "OPEN"
+cb -> retry: "CLOSED / Cho phép"
+retry -> timeout
+timeout -> call
 ```
 
 Một request logic có thể có ba attempt. Nếu cả ba attempt thất bại, Circuit Breaker nên ghi nhận **một kết quả failure của request logic**, thay vì coi đó là ba request độc lập. Cách này giúp failure rate phản ánh số operation thật sự thất bại và tránh mở mạch quá sớm.
@@ -212,19 +225,28 @@ Khi Circuit Breaker ở `OPEN`, retry không được chạy. Retry vào một d
 
 Mỗi attempt cần có một **per-try timeout** để không chờ vô hạn. Toàn bộ chuỗi attempt và backoff cũng cần nằm trong **overall deadline** của request gốc.
 
-```text
-Overall deadline của request: 10s
-  ├── Attempt 1: tối đa 2s
-  ├── Backoff: 0.5s
-  ├── Attempt 2: tối đa 2s
-  ├── Backoff: 1s
-  └── Attempt 3: tối đa 2s
-
-Nếu hết deadline trước khi đủ attempt:
-  → dừng retry
-  → ghi nhận kết quả cho Circuit Breaker
-  → chạy fallback hoặc trả lỗi theo contract
+```d2 title="Timeout mỗi lần thử và deadline tổng"
+direction: right
+deadline: "Overall Deadline10s"
+a1: "Attempt1 max2s"
+b1: "Backoff0.5s"
+a2: "Attempt2 max2s"
+b2: "Backoff1s"
+a3: "Attempt3 max2s"
+stop: "Stop retry khi hết deadline"
+record: "Ghi kết quả cho CB / Fallback hoặc Error"
+deadline -> a1
+a1 -> b1
+b1 -> a2
+a2 -> b2
+b2 -> a3
+a1 -> stop: "Deadline hết"
+a2 -> stop: "Deadline hết"
+a3 -> record
+stop -> record
 ```
+
+Timeline là upper-bound từng attempt; chỉ backoff/retry khi lỗi retryable và còn budget.
 
 Timeout quá dài làm Circuit Breaker phản ứng muộn. Timeout quá ngắn lại có thể coi request hợp lệ là failure và mở mạch oan. Giá trị thật cần dựa trên latency đo được của dependency và budget của request. Xem thêm [Timeout Pattern](./timeout.md) về các lớp timeout và deadline propagation.
 

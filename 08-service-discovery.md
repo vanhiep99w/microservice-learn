@@ -181,72 +181,23 @@ Service Registry chứa gì?
 
 Có 2 cách để service đăng ký vào registry:
 
+```d2 title="3.2. Self-Registration vs Third-Party Registration"
+direction: down
+self: Self-registration {
+ payment: "Payment Service\nStart: register • Heartbeat mỗi 30s\nStop: deregister"
+ registry: Eureka / Consul Registry
+ payment -> registry: Register / Heartbeat / Deregister
+}
+third: Third-party Registration {
+ payment: Payment Service — không biết Registry
+ registrar: "Registrar\nKubernetes / Prana / Registrator"
+ registry: Consul / etcd Registry
+ payment -> registrar: Deploy / Start / Stop / Crash signal
+ registrar -> registry: Register / Deregister
+}
 ```
-CÁCH 1: SELF-REGISTRATION — Service tự đăng ký
-───────────────────────────────────────────────
 
-  ┌───────────────┐             ┌──────────────────┐
-  │  Payment      │──register──▶│  Service Registry│
-  │  Service      │             │  (Eureka/Consul) │
-  │               │◄─heartbeat──│                  │
-  │  Khi start:   │             └──────────────────┘
-  │  1. Gọi API   │
-  │     register  │
-  │  2. Gửi       │
-  │     heartbeat │
-  │     mỗi 30s   │
-  │  3. Khi stop: │
-  │     deregister│
-  └───────────────┘
-
-  Ưu điểm:
-    ✅ Đơn giản, không cần thêm component
-    ✅ Service kiểm soát được registration của mình
-  
-  Nhược điểm:
-    ❌ Service phải biết registry (coupling)
-    ❌ Phải implement registration logic cho MỌI ngôn ngữ
-    ❌ Service quên deregister khi crash → stale entry
-
-  Ví dụ: Netflix Eureka Client, Consul Agent (embedded)
-
-
-CÁCH 2: THIRD-PARTY REGISTRATION — Bên thứ 3 đăng ký hộ
-─────────────────────────────────────────────────────────
-
-  ┌─────────────┐                     ┌──────────────────┐
-  │  Payment    │                     │  Service Registry│
-  │  Service    │                     │  (Consul/etcd)   │
-  │             │                     └────────▲─────────┘
-  │  Không biết │                              │
-  │  registry   │                         register/
-  │  tồn tại!   │                         deregister
-  └──────┬──────┘                              │
-         │                             ┌───────┴────────┐
-         │ deploy/start/stop           │   Registrar    │
-         └─────────────────────────────│  (bên thứ 3)   │
-                                       │                │
-                                       │ • Kubernetes   │
-                                       │ • Netflix Prana│
-                                       │ • Registrator  │
-                                       └────────────────┘
-
-  Registrar theo dõi service lifecycle:
-    Service start  → Registrar đăng ký vào registry
-    Service stop   → Registrar xóa khỏi registry
-    Service crash  → Registrar phát hiện → xóa
-
-  Ưu điểm:
-    ✅ Service không cần biết registry → không coupling
-    ✅ Hỗ trợ mọi ngôn ngữ (registrar xử lý hết)
-    ✅ Không bị stale entry khi crash
-  
-  Nhược điểm:
-    ❌ Thêm 1 component phải quản lý (registrar)
-    ❌ Registrar thành single point of failure
-
-  Ví dụ: Kubernetes (kubelet), Registrator (Docker), Consul + Nomad
-```
+**Self-registration:** đơn giản, service tự kiểm soát nhưng coupling với registry, cần logic theo ngôn ngữ và có thể để stale entry khi crash. Ví dụ Eureka Client, Consul Agent embedded. **Third-party:** service không cần discovery SDK; registrar theo dõi start/stop/crash để cập nhật registry. Đổi lại thêm component cần HA/vận hành; phát hiện và xóa stale entry không tức thời. Ví dụ Registrator, Consul + Nomad; Kubernetes dùng control-plane/controllers để quản lý endpoints.
 
 | Tiêu chí | Self-Registration | Third-Party Registration |
 |----------|-------------------|------------------------|
@@ -343,73 +294,41 @@ Trong **Client-Side Discovery**, service **consumer** (caller) chịu trách nhi
 2. **Chọn** 1 instance (load balancing)
 3. **Gọi** trực tiếp đến instance đó
 
-```
-CLIENT-SIDE DISCOVERY — Flow:
-─────────────────────────────
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │                                                             │
-  │  Order Service (consumer/caller)                            │
-  │                                                             │
-  │  Step 1: Query registry                                     │
-  │  ─────────────────                                          │
-  │  Order Service → "Cho tôi danh sách payment-service"        │
-  │                                                             │
-  │                    ┌──────────────────┐                     │
-  │                    │  Service Registry│                     │
-  │                    │                  │                     │
-  │                    │  payment-service:│                     │
-  │                    │  • 10.0.1.1:8084 │                     │
-  │                    │  • 10.0.1.2:8084 │                     │
-  │                    │  • 10.0.1.3:8084 │                     │
-  │                    └────────┬─────────┘                     │
-  │                             │                               │
-  │  Step 2: Nhận danh sách     │                               │
-  │  ──────────────────────     ▼                               │
-  │  instances = [10.0.1.1, 10.0.1.2, 10.0.1.3]                 │
-  │                                                             │
-  │  Step 3: Client-side Load Balancing                         │
-  │  ─────────────────────────────────                          │
-  │  Chọn instance theo algorithm (Round Robin, Random, ...)    │
-  │  → Chọn 10.0.1.2:8084                                       │
-  │                                                             │
-  │  Step 4: Gọi trực tiếp                                      │
-  │  ─────────────────────                                      │
-  │  Order Service ──── HTTP/gRPC ────▶ 10.0.1.2:8084           │
-  │  (KHÔNG qua proxy/load balancer nào)                        │
-  │                                                             │
-  └─────────────────────────────────────────────────────────────┘
+```d2 title="4.1. Cách hoạt động"
+shape: sequence_diagram
+order: Order Service — Consumer
+registry: Service Registry
+payment: Payment — 10.0.1.2:8084
+order -> registry: 1. Query payment-service
+registry -> order: 2. Instances 10.0.1.1, 10.0.1.2, 10.0.1.3 :8084 {style.stroke-dash: 5}
+order.note: 3. Client-side LB — Round Robin / Random — chọn 10.0.1.2
+order -> payment: 4. HTTP/gRPC trực tiếp — không qua proxy/LB
 ```
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant R as Service Registry
-    participant P1 as Payment #1 (10.0.1.1)
-    participant P2 as Payment #2 (10.0.1.2)
-    participant P3 as Payment #3 (10.0.1.3)
-
-    Note over P1,P3: Khi khởi động → đăng ký vào Registry
-    P1->>R: register(payment-service, 10.0.1.1:8084)
-    P2->>R: register(payment-service, 10.0.1.2:8084)
-    P3->>R: register(payment-service, 10.0.1.3:8084)
-
-    Note over O: Khi cần gọi payment-service
-    O->>R: query("payment-service")
-    R-->>O: [10.0.1.1, 10.0.1.2, 10.0.1.3]
-
-    Note over O: Client-side LB: chọn 10.0.1.2
-    O->>P2: POST /charge (direct call)
-    P2-->>O: 200 OK
-
-    Note over P3: Payment #3 crash!
-    P3--xR: heartbeat timeout
-    R->>R: remove 10.0.1.3
-
-    Note over O: Lần gọi tiếp theo
-    O->>R: query("payment-service")
-    R-->>O: [10.0.1.1, 10.0.1.2]
-    Note over O: 10.0.1.3 đã bị loại!
+```d2 title="4.1. Cách hoạt động"
+shape: sequence_diagram
+"O": "Order Service"
+"R": "Service Registry"
+"P1": "Payment #1 (10.0.1.1)"
+"P2": "Payment #2 (10.0.1.2)"
+"P3": "Payment #3 (10.0.1.3)"
+"P1".note1: "[Payment #1 (10.0.1.1) — Payment #3 (10.0.1.3)]\nKhi khởi động → đăng ký vào Registry"
+"P1" -> "R": "register(payment-service, 10.0.1.1:8084)"
+"P2" -> "R": "register(payment-service, 10.0.1.2:8084)"
+"P3" -> "R": "register(payment-service, 10.0.1.3:8084)"
+"O".note2: "Khi cần gọi payment-service"
+"O" -> "R": "query(\"payment-service\")"
+"R" -> "O": "[10.0.1.1, 10.0.1.2, 10.0.1.3]" { style.stroke-dash: 5 }
+"O".note3: "Client-side LB: chọn 10.0.1.2"
+"O" -> "P2": "POST /charge (direct call)"
+"P2" -> "O": "200 OK" { style.stroke-dash: 5 }
+"P3".note4: "Payment #3 crash!"
+"P3" -> "R": "heartbeat timeout" { style.stroke-dash: 5; target-arrowhead.shape: cross }
+"R" -> "R": "remove 10.0.1.3"
+"O".note5: "Lần gọi tiếp theo"
+"O" -> "R": "query(\"payment-service\")"
+"R" -> "O": "[10.0.1.1, 10.0.1.2]" { style.stroke-dash: 5 }
+"O".note6: "10.0.1.3 đã bị loại!"
 ```
 
 ### 4.2. Load Balancing tại Client
@@ -479,65 +398,39 @@ CLIENT-SIDE LOAD BALANCING ALGORITHMS:
 
 Trong **Server-Side Discovery**, client gọi qua **Load Balancer / Router** — component này query registry và forward request đến instance phù hợp. Client **không biết** registry tồn tại.
 
-```
-SERVER-SIDE DISCOVERY — Flow:
-─────────────────────────────
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │                                                             │
-  │  Order Service (consumer/caller)                            │
-  │                                                             │
-  │  // Chỉ biết tên service, KHÔNG biết registry               │
-  │  paymentClient.call("payment-service", "/charge")           │
-  │         │                                                   │
-  │         │ DNS hoặc VIP (Virtual IP)                         │
-  │         ▼                                                   │
-  │  ┌──────────────┐      query      ┌──────────────────┐      │
-  │  │ Load Balancer│──────────────▶  │  Service Registry│      │
-  │  │ / Router     │◀──────────────  │                  │      │
-  │  │              │   instances     │  payment-service:│      │
-  │  │ • Nhận request│   list         │  • 10.0.1.1:8084 │      │
-  │  │ • Query registry               │  • 10.0.1.2:8084 │      │
-  │  │ • LB chọn instance             │  • 10.0.1.3:8084 │      │
-  │  │ • Forward request              └──────────────────┘      │
-  │  └───────┬──────┘                                           │
-  │          │                                                  │
-  │          │ forward                                          │
-  │          ▼                                                  │
-  │  ┌──────────────┐                                           │
-  │  │ Payment      │                                           │
-  │  │ 10.0.1.2:8084│                                           │
-  │  └──────────────┘                                           │
-  │                                                             │
-  │  Client (Order Service) KHÔNG CẦN:                          │
-  │  • Biết registry ở đâu                                      │
-  │  • Implement LB algorithm                                   │
-  │  • Import discovery SDK                                     │
-  │  → Chỉ cần gọi bằng TÊN service                             │
-  │                                                             │
-  └─────────────────────────────────────────────────────────────┘
+```d2 title="5.1. Cách hoạt động"
+shape: sequence_diagram
+order: Order Service — chỉ biết tên
+lb: Load Balancer / Router
+registry: Service Registry
+payment: Payment — 10.0.1.2:8084
+order -> lb: DNS / VIP — payment-service /charge
+lb -> registry: Query payment-service
+registry -> lb: Instances 10.0.1.1, 10.0.1.2, 10.0.1.3 :8084 {style.stroke-dash: 5}
+lb.note: Nhận request • Query registry • Chọn instance
+lb -> payment: Forward request
 ```
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant LB as Load Balancer
-    participant R as Service Registry
-    participant P1 as Payment #1
-    participant P2 as Payment #2
+Client không cần biết registry, import discovery SDK hoặc implement LB; chỉ gọi tên service. Cách LB đồng bộ endpoint list tùy nền tảng, không bắt buộc query registry trên từng request.
 
-    Note over P1,P2: Đăng ký vào Registry
-    P1->>R: register(payment-service, 10.0.1.1)
-    P2->>R: register(payment-service, 10.0.1.2)
-
-    Note over O: Gọi qua Load Balancer (không biết Registry)
-    O->>LB: POST payment-service/charge
-    LB->>R: query("payment-service")
-    R-->>LB: [10.0.1.1, 10.0.1.2]
-    Note over LB: LB chọn 10.0.1.1
-    LB->>P1: POST /charge (forwarded)
-    P1-->>LB: 200 OK
-    LB-->>O: 200 OK
+```d2 title="5.1. Cách hoạt động"
+shape: sequence_diagram
+"O": "Order Service"
+"LB": "Load Balancer"
+"R": "Service Registry"
+"P1": "Payment #1"
+"P2": "Payment #2"
+"P1".note1: "[Payment #1 — Payment #2]\nĐăng ký vào Registry"
+"P1" -> "R": "register(payment-service, 10.0.1.1)"
+"P2" -> "R": "register(payment-service, 10.0.1.2)"
+"O".note2: "Gọi qua Load Balancer (không biết Registry)"
+"O" -> "LB": "POST payment-service/charge"
+"LB" -> "R": "query(\"payment-service\")"
+"R" -> "LB": "[10.0.1.1, 10.0.1.2]" { style.stroke-dash: 5 }
+"LB".note3: "LB chọn 10.0.1.1"
+"LB" -> "P1": "POST /charge (forwarded)"
+"P1" -> "LB": "200 OK" { style.stroke-dash: 5 }
+"LB" -> "O": "200 OK" { style.stroke-dash: 5 }
 ```
 
 ### 5.2. Ưu nhược điểm
@@ -589,31 +482,15 @@ Thực tế chọn thế nào?
 
 DNS (Domain Name System) là cơ chế "discovery" cơ bản nhất — map tên sang IP. Có thể dùng DNS cho service discovery bằng cách **cập nhật DNS records** khi service instances thay đổi.
 
-```
-DNS-BASED DISCOVERY:
-────────────────────
-
-  Order Service muốn gọi payment-service:
-
-  Step 1: DNS lookup
-    nslookup payment-service.myapp.local
-    → 10.0.1.1
-    → 10.0.1.2
-    → 10.0.1.3
-
-  Step 2: Gọi bằng IP nhận được
-    HTTP POST http://10.0.1.2:8084/charge
-
-  ┌──────────────┐    DNS query     ┌──────────────┐
-  │ Order Service│──────────────▶   │  DNS Server  │
-  │              │◀──────────────   │  (CoreDNS,   │
-  │              │  A records:      │   Consul DNS)│
-  │              │  10.0.1.1        │              │
-  │              │  10.0.1.2        └──────────────┘
-  │              │  10.0.1.3
-  │              │
-  │  Chọn 1 IP   │────── HTTP ──────▶ 10.0.1.2:8084
-  └──────────────┘                   (Payment Service)
+```d2 title="7.1. Cách hoạt động"
+shape: sequence_diagram
+order: Order Service
+dns: DNS Server — CoreDNS / Consul DNS
+payment: Payment — 10.0.1.2:8084
+order -> dns: Lookup payment-service.myapp.local
+dns -> order: A records — 10.0.1.1 / 10.0.1.2 / 10.0.1.3 {style.stroke-dash: 5}
+order.note: Chọn một IP
+order -> payment: HTTP POST /charge
 ```
 
 ### 7.2. DNS SRV Records
@@ -693,101 +570,39 @@ HẠN CHẾ CỦA DNS-BASED DISCOVERY:
 
 ### 8.1. Netflix Eureka
 
+```d2 title="8.1. Netflix Eureka"
+direction: down
+servers: Eureka Servers {
+ one: Eureka Server — Node 1
+ two: Eureka Server — Node 2
+ one <-> two: Peer-to-peer replication
+}
+payment: Payment Service { client: Eureka Client }
+order: Order Service { client: Eureka Client }
+payment.client -> servers.one: Register • Heartbeat 30s • Fetch registry
+order.client -> servers.two: Register • Heartbeat 30s • Fetch registry
 ```
-NETFLIX EUREKA:
-───────────────
 
-  Kiểu:      Client-Side Discovery
-  Ngôn ngữ:  Java (Spring Cloud)
-  Model:     AP (Availability + Partition tolerance — CAP theorem)
-
-  Kiến trúc:
-  ┌─────────────────────────────────────────────────────────┐
-  │                                                         │
-  │  ┌──────────────┐     ┌──────────────┐                  │
-  │  │ Eureka Server│◄───▶│ Eureka Server│  ← Peer-to-peer  │
-  │  │   (node 1)   │     │   (node 2)   │    replication   │
-  │  └──────┬───────┘     └──────┬───────┘                  │
-  │         │                    │                          │
-  │    ┌────┴──────┐        ┌────┴───────┐                  │
-  │    │ Payment   │        │  Order     │                  │
-  │    │ Service   │        │  Service   │                  │
-  │    │           │        │            │                  │
-  │    │ ┌────────┐│        │ ┌────────┐ │                  │
-  │    │ │ Eureka ││        │ │ Eureka │ │                  │
-  │    │ │ Client ││        │ │ Client │ │                  │
-  │    │ └────────┘│        │ └────────┘ │                  │
-  │    │           │        │            │                  │
-  │    │ • Register│        │ • Register │                  │
-  │    │ • Heartbeat│       │ • Heartbeat│                  │
-  │    │   (30s)   │        │   (30s)    │                  │
-  │    │ • Fetch   │        │ • Fetch    │                  │
-  │    │   registry│        │   registry │                  │
-  │    └───────────┘        └────────────┘                  │
-  │                                                         │
-  └─────────────────────────────────────────────────────────┘
-
-  Đặc điểm:
-  • AP model: Eureka ưu tiên AVAILABILITY — khi network partition,
-    mỗi Eureka node vẫn serve (có thể data cũ) thay vì refuse
-  • Self-preservation mode: Nếu > 85% instances ngưng heartbeat
-    → Eureka KHÔNG xóa chúng (nghĩ là network issue, không phải
-    tất cả cùng crash)
-  • Client cache registry locally → vẫn hoạt động khi Eureka down
-```
+Eureka là client-side discovery, thường dùng Java/Spring Cloud, ưu tiên availability khi partition và có thể trả registry cũ. Self-preservation có thể giữ entries khi tỷ lệ renew giảm mạnh (ví dụ ngưỡng 85%, tùy cấu hình), thay vì coi mọi instance đều chết. Client cache registry local để giảm phụ thuộc availability của Eureka.
 
 ### 8.2. HashiCorp Consul
 
+```d2 title="8.2. HashiCorp Consul"
+direction: down
+servers: Consul Servers — 3 hoặc 5 nodes {
+ leader: Server 1 — Leader
+ two: Server 2
+ three: Server 3
+ leader <-> two: Raft consensus
+ leader <-> three: Raft consensus
+}
+node1: Node 1 { agent: Consul Agent; payment: Payment Service; payment -- agent }
+node2: Node 2 { agent: Consul Agent; order: Order Service; order -- agent }
+node1.agent -- servers
+node2.agent -- servers
 ```
-HASHICORP CONSUL:
-─────────────────
 
-  Kiểu:      Cả Client-Side và Server-Side (DNS interface + HTTP API)
-  Ngôn ngữ:  Go (language-agnostic)
-  Model:     CP (Consistency + Partition tolerance — Raft consensus)
-
-  Kiến trúc:
-  ┌─────────────────────────────────────────────────────────┐
-  │                                                         │
-  │  ┌────────────────────────────────────┐                 │
-  │  │         CONSUL SERVERS             │                 │
-  │  │         (3 hoặc 5 nodes)           │                 │
-  │  │                                    │                 │
-  │  │  ┌────────┐ ┌────────┐ ┌────────┐  │                 │
-  │  │  │Server 1│ │Server 2│ │Server 3│  │                 │
-  │  │  │(Leader)│ │        │ │        │  │                 │
-  │  │  └────┬───┘ └────┬───┘ └────┬───┘  │                 │
-  │  │       └─── Raft ─┴──── Consensus ──┘                 │
-  │  └────────────────────┬───────────────┘                 │
-  │                       │                                 │
-  │  ┌────────────────────┴───────────────────────┐         │
-  │  │           CONSUL AGENTS (mỗi node)         │         │
-  │  │                                            │         │
-  │  │  ┌─────────────┐       ┌─────────────┐     │         │
-  │  │  │   Node 1    │       │   Node 2    │     │         │
-  │  │  │ ┌─────────┐ │       │ ┌─────────┐ │     │         │
-  │  │  │ │ Consul  │ │       │ │ Consul  │ │     │         │
-  │  │  │ │ Agent   │ │       │ │ Agent   │ │     │         │
-  │  │  │ └────┬────┘ │       │ └────┬────┘ │     │         │
-  │  │  │      │      │       │      │      │     │         │
-  │  │  │ ┌────▼────┐ │       │ ┌────▼────┐ │     │         │
-  │  │  │ │ Payment │ │       │ │  Order  │ │     │         │
-  │  │  │ │ Service │ │       │ │ Service │ │     │         │
-  │  │  │ └─────────┘ │       │ └─────────┘ │     │         │
-  │  │  └─────────────┘       └─────────────┘     │         │
-  │  └────────────────────────────────────────────┘         │
-  │                                                         │
-  └─────────────────────────────────────────────────────────┘
-
-  Đặc điểm:
-  • Multi-datacenter native — hỗ trợ WAN federation
-  • DNS interface — query bằng DNS: payment.service.consul
-  • Health check tích hợp — HTTP, TCP, gRPC, script
-  • Key-Value store — lưu config (giống etcd)
-  • Service Mesh (Consul Connect) — mTLS giữa services
-  • Multi-language — agent chạy trên node, không phụ thuộc 
-    ngôn ngữ service
-```
+Consul dùng Go, agent độc lập ngôn ngữ service. Có HTTP API và DNS (`payment.service.consul`), health checks HTTP/TCP/gRPC/script, KV config, multi-datacenter/WAN federation và Consul Connect mTLS. Raft bảo vệ consistency của server state; đặc tính nhất quán của read còn phụ thuộc chế độ query. App có thể dùng client-side API hoặc DNS/proxy integration.
 
 ### 8.3. Apache ZooKeeper
 
@@ -844,144 +659,54 @@ ETCD:
 
 ### 8.5. Kubernetes Service Discovery
 
+```d2 title="8.5. Kubernetes Service Discovery"
+direction: down
+order: "Order Pod"
+dns: "CoreDNS\npayment-service.default.svc.cluster.local"
+service: "K8s Service — payment-service\nClusterIP 10.96.45.123"
+proxy: "kube-proxy / Service dataplane\nEndpoints chỉ chứa ready Pods"
+p1: "Payment Pod 1 — 10.244.1.x"
+p2: "Payment Pod 2 — 10.244.2.x"
+p3: "Payment Pod 3 — 10.244.3.x"
+order -> dns: "Resolve tên"
+dns -> order: "ClusterIP"
+order -> service: "HTTP :8084/charge"
+service -> proxy
+proxy -> p1
+proxy -> p2
+proxy -> p3
 ```
-KUBERNETES SERVICE DISCOVERY:
-─────────────────────────────
 
-  Kiểu:      Server-Side Discovery (built-in)
-  Model:     DNS + Virtual IP (ClusterIP)
-
-  Khi bạn dùng Kubernetes → Service Discovery MIỄN PHÍ!
-  Không cần Eureka, Consul, ZooKeeper.
-
-  Cách hoạt động:
-  1. Deploy Payment Service (3 pods)
-  2. Tạo Kubernetes Service: "payment-service"
-  3. Kubernetes tự động:
-     • Assign ClusterIP (virtual IP) cho service
-     • Tạo DNS entry: payment-service.namespace.svc.cluster.local
-     • kube-proxy route traffic đến healthy pods
-     • Khi pod crash → tự loại khỏi endpoint list
-
-  ┌──────────────────────────────────────────────────────┐
-  │  Kubernetes Cluster                                  │
-  │                                                      │
-  │  Order Pod                                           │
-  │    │                                                 │
-  │    │  http://payment-service:8084/charge             │
-  │    │  (chỉ cần TÊN service!)                         │
-  │    ▼                                                 │
-  │  ┌─────────────────────────────────────┐             │
-  │  │  K8s Service: payment-service       │             │
-  │  │  ClusterIP: 10.96.45.123            │             │
-  │  │  DNS: payment-service.default.svc   │             │
-  │  └───────────────┬─────────────────────┘             │
-  │                  │ kube-proxy (iptables/IPVS)        │
-  │         ┌────────┼────────┐                          │
-  │         ▼        ▼        ▼                          │
-  │    ┌─────────┐┌─────────┐┌─────────┐                 │
-  │    │  Pod 1  ││  Pod 2  ││  Pod 3  │                 │
-  │    │ Payment ││ Payment ││ Payment │                 │
-  │    │10.244.1 ││10.244.2 ││10.244.3 │                 │
-  │    └─────────┘└─────────┘└─────────┘                 │
-  │                                                      │
-  └──────────────────────────────────────────────────────┘
-```
+Kubernetes cấp ClusterIP, DNS và cập nhật EndpointSlices khi readiness/lifecycle đổi; dataplane thực hiện routing (ví dụ iptables/IPVS với kube-proxy). Không cần dựng Eureka/Consul chỉ để có discovery cơ bản.
 
 ### 8.6. AWS Elastic Load Balancer
 
 AWS cung cấp **Load Balancer** hoạt động như **Server-Side Discovery** — client chỉ cần biết DNS name của LB, LB tự biết backend instances nào healthy và route traffic đến.
 
+```d2 title="8.6. AWS Elastic Load Balancer"
+direction: down
+order: "Order Service"
+alb: "ALB payment-alb\npayment-alb.us-east-1.elb.amazonaws.com\nListener :443 HTTPS"
+tg: "Payment Target Group\nRule /charge • Health check /health"
+a: "ECS Payment Task 1 — 10.0.1.10"
+b: "ECS Payment Task 2 — 10.0.1.20"
+c: "ECS Payment Task 3 — 10.0.2.30"
+order -> alb: "HTTPS qua DNS name"
+alb -> tg
+tg -> a
+tg -> b
+tg -> c
 ```
-AWS ELASTIC LOAD BALANCER:
-──────────────────────────
 
-  Kiểu:      Server-Side Discovery
-  Model:     Managed (fully managed by AWS)
-  Kết hợp:   Auto Scaling Group, ECS, EKS, Cloud Map
+ECS Service tự register/deregister tasks vào Target Group; ALB ngừng route tới unhealthy targets sau health-check policy. Auto Scaling và control-plane cập nhật target có độ trễ, không phải tức thời.
 
-  3 loại Load Balancer:
-  ┌───────────────────────────────────────────────────────────┐
-  │                                                           │
-  │  1. ALB (Application Load Balancer) — Layer 7             │
-  │     • HTTP/HTTPS, WebSocket                               │
-  │     • Path-based routing: /users → User TG,               │
-  │                           /orders → Order TG              │
-  │     • Host-based routing: api.myapp.com → TG A,           │
-  │                           admin.myapp.com → TG B          │
-  │     • gRPC support                                        │
-  │     → Phù hợp: microservices, REST APIs                   │
-  │                                                           │
-  │  2. NLB (Network Load Balancer) — Layer 4                 │
-  │     • TCP/UDP, ultra-low latency                          │
-  │     • Hàng triệu requests/giây                            │
-  │     • Static IP / Elastic IP                              │
-  │     → Phù hợp: gRPC, real-time, IoT, gaming               │
-  │                                                           │
-  │  3. CLB (Classic Load Balancer) — Legacy                  │
-  │     • Layer 4 + 7 (cơ bản)                                │
-  │     • ⚠️ Không nên dùng cho dự án mới                     │
-  │                                                           │
-  └───────────────────────────────────────────────────────────┘
+| Loại LB | Đặc điểm | Use case |
+|---|---|---|
+| ALB — L7 | HTTP/HTTPS, WebSocket, gRPC; path `/users`/`/orders`, host `api`/`admin` tới target groups | Microservices, REST APIs |
+| NLB — L4 | TCP/UDP, static/Elastic IP, throughput cao | Real-time, IoT, gaming; gRPC khi phù hợp |
+| CLB — Legacy | L4/L7 cơ bản | Không ưu tiên cho dự án mới |
 
-  Kiến trúc — ALB + ECS (phổ biến nhất):
-  ┌────────────────────────────────────────────────────────────┐
-  │                                                            │
-  │  Order Service                                             │
-  │    │                                                       │
-  │    │  http://payment-alb.us-east-1.elb.amazonaws.com       │ 
-  │    │  (chỉ cần DNS name của ALB!)                          │
-  │    ▼                                                       │
-  │  ┌────────────────────────────────────────────┐            │
-  │  │  ALB: payment-alb                          │            │
-  │  │  DNS: payment-alb.us-east-1.elb.amazonaws  │            │
-  │  │                                            │            │
-  │  │  Listener: 443 (HTTPS)                     │            │
-  │  │  Rule: /charge → payment-target-group      │            │
-  │  └──────────────────┬─────────────────────────┘            │
-  │                     │  Target Group (health check: /health)│
-  │          ┌──────────┼──────────┐                           │
-  │          ▼          ▼          ▼                           │
-  │     ┌─────────┐┌─────────┐┌─────────┐                      │
-  │     │  ECS    ││  ECS    ││  ECS    │                      │
-  │     │ Task 1  ││ Task 2  ││ Task 3  │                      │
-  │     │ Payment ││ Payment ││ Payment │                      │
-  │     │10.0.1.10││10.0.1.20││10.0.2.30│                      │
-  │     └─────────┘└─────────┘└─────────┘                      │
-  │                                                            │
-  │  ECS tự động register/deregister task vào Target Group     │
-  │  ALB health check → loại task unhealthy                    │
-  │  Auto Scaling → thêm/bớt task → ALB tự cập nhật            │
-  │                                                            │
-  └────────────────────────────────────────────────────────────┘
-
-  Service Discovery tự động:
-  ──────────────────────────
-  • ECS Service tạo task mới → tự register vào Target Group
-  • Task crash / stop → tự deregister khỏi Target Group
-  • Auto Scaling thêm task → ALB thấy ngay (không cần poll)
-  • Health check fail → ALB ngưng gửi traffic đến task đó
-
-  Nâng cao — AWS Cloud Map (Service Discovery native):
-  ────────────────────────────────────────────────────
-  • AWS Cloud Map = managed service registry
-  • ECS tích hợp Cloud Map → service tự register
-  • Hỗ trợ DNS discovery (service-name.namespace)
-    VÀ API discovery (DiscoverInstances API)
-  • Kết hợp ALB + Cloud Map:
-    - Cloud Map: service-to-service discovery (internal)
-    - ALB: external traffic routing
-
-  Khi nào dùng ALB vs Cloud Map?
-  ──────────────────────────────
-  │ Scenario                    │ Giải pháp              │
-  │─────────────────────────────│────────────────────────│
-  │ External → services         │ ALB (public-facing)    │
-  │ Service → service (HTTP)    │ ALB (internal) hoặc    │
-  │                             │ Cloud Map (DNS-based)  │
-  │ Service → service (gRPC)    │ NLB hoặc Cloud Map     │
-  │ Cần cả LB + discovery       │ ALB + Cloud Map        │
-```
+Cloud Map là managed registry, tích hợp ECS registration, DNS `service.namespace` và API `DiscoverInstances`. Public ingress thường dùng ALB; internal HTTP có thể dùng internal ALB hoặc Cloud Map; internal gRPC có thể dùng ALB/NLB/Cloud Map theo protocol và nhu cầu. Cần LB và registry thì có thể kết hợp ALB + Cloud Map.
 
 Ưu nhược điểm:
 
@@ -1168,54 +893,27 @@ HEADLESS SERVICE — Khi cần biết IP của TỪNG pod:
 
 **Service Mesh** (Istio, Linkerd) giải quyết Service Discovery theo cách **transparent** — service code không cần thay đổi:
 
+```d2 title="10. Service Mesh và Service Discovery"
+direction: right
+cluster: Kubernetes + Istio {
+ order: Order Pod {
+  app: Order App — call payment
+  envoy: "Envoy Sidecar\nDiscovery • LB • Retry/CB • mTLS"
+  app -> envoy
+ }
+ payment: Payment Pod {
+  envoy: "Envoy Sidecar\nmTLS • Auth • Metrics"
+  app: Payment App — nhận request
+  envoy -> app
+ }
+ control: "istiod — Control Plane\nRegistry / Endpoint updates\nTLS certificates • Config management"
+ control -> order.envoy: Push config
+ control -> payment.envoy: Push config
+ order.envoy -> payment.envoy: Service traffic
+}
 ```
-SERVICE MESH — Discovery qua Sidecar Proxy:
-────────────────────────────────────────────
 
-  ┌──────────────────────────────────────────────────────────┐
-  │  Kubernetes Cluster + Istio Service Mesh                 │
-  │                                                          │
-  │  ┌──────────────────────┐   ┌──────────────────────┐     │
-  │  │  Pod: Order Service  │   │  Pod: Payment Service│     │
-  │  │                      │   │                      │     │
-  │  │  ┌─────────────────┐ │   │ ┌─────────────────┐  │     │
-  │  │  │  Order App      │ │   │ │  Payment App    │  │     │
-  │  │  │                 │ │   │ │                 │  │     │
-  │  │  │ call("payment") │ │   │ │ (nhận request)  │  │     │
-  │  │  └────────┬────────┘ │   │ └────────▲────────┘  │     │
-  │  │           │          │   │          │           │     │
-  │  │  ┌────────▼────────┐ │   │ ┌────────┴────────┐  │     │
-  │  │  │  Envoy Sidecar  │─┼───┼─▶  Envoy Sidecar  │  │     │
-  │  │  │                 │ │   │ │                 │  │     │
-  │  │  │ • Service       │ │   │ │ • mTLS          │  │     │
-  │  │  │   Discovery     │ │   │ │ • Auth          │  │     │
-  │  │  │ • Load Balancing│ │   │ │ • Metrics       │  │     │
-  │  │  │ • Retry/CB      │ │   │ │                 │  │     │
-  │  │  │ • mTLS          │ │   │ │                 │  │     │
-  │  │  └─────────────────┘ │   │ └─────────────────┘  │     │
-  │  └──────────────────────┘   └──────────────────────┘     │
-  │                                                          │
-  │  ┌──────────────────────────────────┐                    │
-  │  │  Istio Control Plane (istiod)    │                    │
-  │  │                                  │                    │
-  │  │  • Pilot: push service registry  │                    │
-  │  │    đến tất cả Envoy sidecars     │                    │
-  │  │  • Citadel: cấp TLS certificates │                    │
-  │  │  • Galley: config management     │                    │
-  │  └──────────────────────────────────┘                    │
-  │                                                          │
-  │  Ưu điểm:                                                │
-  │  • App code KHÔNG CẦN import SDK (Eureka, Consul...)     │
-  │  • Discovery + LB + Retry + CB + mTLS → tất cả ở sidecar │
-  │  • Hỗ trợ mọi ngôn ngữ (sidecar là proxy, không phải SDK)│
-  │  • Consistent behavior cho TẤT CẢ services               │
-  │                                                          │
-  │  Nhược điểm:                                             │
-  │  • Thêm latency (qua 2 sidecar proxies)                  │
-  │  • Phức tạp: vận hành Istio control plane                │
-  │  • Resource overhead: mỗi pod thêm 1 Envoy container     │
-  └──────────────────────────────────────────────────────────┘
-```
+App không cần import Eureka/Consul SDK; proxy hỗ trợ nhiều ngôn ngữ và policy nhất quán. Đổi lại thêm hop latency, RAM/CPU sidecar và vận hành control plane. Tên Pilot/Citadel/Galley là tên các thành phần trong mô hình Istio cũ; diagram gom theo trách nhiệm trong `istiod`. Retry/CB phụ thuộc policy đã cấu hình.
 
 > **Chi tiết**: Service Mesh sẽ được trình bày kỹ trong [doc 13 — Orchestration](13-orchestration.md).
 
@@ -1223,98 +921,40 @@ SERVICE MESH — Discovery qua Sidecar Proxy:
 
 ## 11. Ví dụ thực tế — E-Commerce
 
+```d2 title="11. Ví dụ thực tế — E-Commerce"
+direction: down
+internet: Internet
+lb: Cloud Load Balancer — AWS / GCP
+cluster: Kubernetes Cluster {
+ ingress: Namespace ingress-nginx / kong {
+  gateway: Kong / NGINX Ingress — Deployment 2–3 replicas
+ }
+ prod: Namespace production {
+  user: User Service — 3 Pods
+  order: Order Service — 5 Pods
+  product: Product Service — 3 Pods
+  payment: Payment Service — 3 Pods
+  inventory: Inventory Service — 3 Pods
+  notification: Notification Service — 2 Pods
+  dns: CoreDNS — service names tới ClusterIP
+  order -> payment: HTTP payment-service:8084/charge
+  order -> inventory
+  order -> dns: DNS lookup
+ }
+ ingress.gateway -> prod.user: /users
+ ingress.gateway -> prod.order: /orders
+ ingress.gateway -> prod.product: Product route
+}
+internet -> lb -> cluster.ingress.gateway
 ```
-E-COMMERCE — SERVICE DISCOVERY ARCHITECTURE:
-─────────────────────────────────────────────
 
-Scenario: Hệ thống e-commerce trên Kubernetes, 6 services.
+Kong/NGINX chạy như Pods trong namespace riêng, scale bằng HPA; cloud LB đứng trước theo Service/Ingress integration đã cài. Controller của nhà cung cấp quyết định loại LB, không phải mọi `type=LoadBalancer` đều tự tạo ALB. Gateway dùng DNS/endpoint discovery tùy cấu hình.
 
-  Internet
-      │
-  ┌───▼──────────────────────────────────────────────────────────┐
-  │  Kubernetes Cluster                                          │
-  │                                                              │
-  │  ┌──────────────────────────────────────────────────────────┐│
-  │  │  Cloud Load Balancer (AWS ALB / GCP LB)                  ││
-  │  │  → K8s tự tạo khi Ingress/Service type=LoadBalancer      ││
-  │  └────────────────────────┬─────────────────────────────────┘│
-  │                           │                                  │
-  │  ┌────────────────────────▼────────────────────────────────┐ │
-  │  │  Namespace: ingress-nginx (hoặc kong)                   │ │
-  │  │                                                         │ │
-  │  │  ┌─────────────────────────────────────────────────┐    │ │
-  │  │  │  Kong / NGINX Ingress Controller                │    │ │
-  │  │  │  (cũng là PODS — thường 2-3 replicas)           │    │ │
-  │  │  │                                                 │    │ │
-  │  │  │  ┌──────────┐  ┌──────────┐  ┌──────────┐       │    │ │
-  │  │  │  │  Pod 1   │  │  Pod 2   │  │  Pod 3   │       │    │ │
-  │  │  │  │  Kong    │  │  Kong    │  │  Kong    │       │    │ │
-  │  │  │  └──────────┘  └──────────┘  └──────────┘       │    │ │
-  │  │  └─────────────────────────────────────────────────┘    │ │
-  │  └─────────────────────────────────────────────────────────┘ │
-  │                           │                                  │
-  │           Ingress rules route theo path:                     │
-  │           /users → user-service, /orders → order-service     │
-  │           Kong cũng dùng K8s DNS để tìm service!             │
-  │                           │                                  │
-  │  ┌────────────────────────▼────────────────────────────────┐ │
-  │  │  Namespace: production                                  │ │
-  │  │                                                         │ │
-  │  │  ┌─────────┐  ┌──────────┐  ┌───────────┐               │ │
-  │  │  │  User   │  │  Order   │  │  Product  │               │ │
-  │  │  │ Service │  │  Service │  │  Service  │               │ │
-  │  │  │ (3 pods)│  │ (5 pods) │  │  (3 pods) │               │ │
-  │  │  └─────────┘  └────┬─────┘  └───────────┘               │ │
-  │  │                    │                                    │ │
-  │  │            ┌───────┼────────┐                           │ │
-  │  │            ▼                ▼                           │ │
-  │  │       ┌──────────┐  ┌───────────┐                       │ │
-  │  │       │ Payment  │  │ Inventory │                       │ │
-  │  │       │ Service  │  │  Service  │                       │ │
-  │  │       │ (3 pods) │  │  (3 pods) │                       │ │
-  │  │       └──────────┘  └───────────┘                       │ │
-  │  │                                                         │ │
-  │  │       ┌───────────────┐                                 │ │
-  │  │       │ Notification  │                                 │ │
-  │  │       │   Service     │                                 │ │
-  │  │       │   (2 pods)    │                                 │ │
-  │  │       └───────────────┘                                 │ │
-  │  └─────────────────────────────────────────────────────────┘ │
-  │                                                              │
-  │  Kong / NGINX Ingress trong K8s:                             │
-  │  ──────────────────────────────                              │
-  │  • Chạy như pods (Deployment), KHÔNG phải component đặc biệt │
-  │  • Thường ở namespace riêng (ingress-nginx, kong)            │
-  │  • Scale bằng HPA giống service thường                       │
-  │  • Cloud LB (ALB/NLB) đứng trước → route traffic vào         │
-  │    Kong pods qua Service type=LoadBalancer                   │
-  │  • Kong dùng K8s DNS để discover backend services            │
-  │    (cùng cơ chế CoreDNS như mọi pod khác)                    │
-  │                                                              │
-  │  Service Discovery Flow:                                     │
-  │  ───────────────────────                                     │
-  │                                                              │
-  │  1. Order Service cần gọi Payment:                           │
-  │     → http://payment-service:8084/charge                     │
-  │     → CoreDNS resolve → ClusterIP 10.96.45.123               │
-  │     → kube-proxy → route đến 1 trong 3 Payment pods          │
-  │                                                              │
-  │  2. Payment pod #2 crash:                                    │
-  │     → kubelet detect (liveness probe fail)                   │
-  │     → Endpoints controller loại pod khỏi endpoint list       │
-  │     → kube-proxy update iptables → traffic chỉ đến pod 1, 3  │
-  │     → Kubernetes tạo pod mới (ReplicaSet) → tự đăng ký       │
-  │                                                              │
-  │  3. Auto-scaling Order Service 5 → 8 pods:                   │
-  │     → HPA tạo 3 pods mới                                     │
-  │     → Pods pass readiness probe                              │
-  │     → Endpoints controller thêm vào endpoint list            │
-  │     → Tự động nhận traffic                                   │
-  │                                                              │
-  │  KHÔNG CẦN: Eureka, Consul, manual config                    │
-  │  Kubernetes xử lý TẤT CẢ: register, discover, health check   │
-  └──────────────────────────────────────────────────────────────┘
-```
+1. Order resolve `payment-service` ra ClusterIP `10.96.45.123`; dataplane route tới một trong ba Payment Pods.
+2. Payment Pod #2 không ready/crash: controller cập nhật endpoints, dataplane ngừng chọn Pod đó; ReplicaSet tạo replacement rồi thêm lại khi ready.
+3. HPA đổi desired replicas của Order từ 5 lên 8; Deployment/ReplicaSet tạo Pods, readiness pass thì endpoints mới nhận traffic.
+
+Discovery cơ bản không cần Eureka/Consul hay cấu hình IP thủ công.
 
 ```
 ORDER FLOW — Service Discovery in action:

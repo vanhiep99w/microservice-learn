@@ -46,30 +46,22 @@ Trong các doc trước, chúng ta đã tìm hiểu:
 
 Bài này trả lời câu hỏi thực tế nhất: **"OK, tôi hiểu lý thuyết rồi — vậy cụ thể tách service bằng cách nào?"**
 
+```d2 title="1. Giới thiệu"
+direction: right
+system: "Monolith hoặc ý tưởng hệ thống"
+choose: "Chọn chiến lược phân tách"
+capability: "Business Capability — Greenfield"
+ddd: "DDD Subdomain — Greenfield"
+strangler: "Strangler Fig — Brownfield Migration"
+other: "Khác — Use Case / Volatility / Team"
+system -> choose
+choose -> capability
+choose -> ddd
+choose -> strangler
+choose -> other
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│              DECOMPOSITION STRATEGIES OVERVIEW                  │
-│                                                                 │
-│   Có monolith / ý tưởng hệ thống                                │
-│          │                                                      │
-│          ▼                                                      │
-│   ┌─────────────────────────────────────┐                       │
-│   │    Chọn chiến lược phân tách        │                       │
-│   └──────────────┬──────────────────────┘                       │
-│                  │                                              │
-│     ┌────────────┼────────────┬──────────────┐                  │
-│     ▼            ▼            ▼              ▼                  │
-│  ┌────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐             │
-│  │Business│ │Subdomain │ │Strangler │ │  Khác:    │             │
-│  │Capabil.│ │  (DDD)   │ │   Fig    │ │Use Case,  │             │
-│  │        │ │          │ │          │ │Volatility,│             │
-│  │Greenf. │ │Greenf.   │ │Brownf.   │ │Team, ...  │             │
-│  │project │ │project   │ │migration │ │           │             │
-│  └────────┘ └──────────┘ └──────────┘ └───────────┘             │
-│                                                                 │
-│  Greenfield = dự án mới    Brownfield = migrate từ monolith     │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Greenfield là dự án mới; Brownfield là migration từ hệ thống đang tồn tại.
 
 > **Lưu ý quan trọng**: Không có chiến lược "đúng nhất" — mỗi chiến lược phù hợp với **bối cảnh** và **giai đoạn** khác nhau. Thực tế, nhiều tổ chức **kết hợp** nhiều chiến lược.
 
@@ -79,38 +71,25 @@ Bài này trả lời câu hỏi thực tế nhất: **"OK, tôi hiểu lý thuy
 
 ### 2.1. Tách quá nhỏ vs quá lớn
 
+```d2 title="2.1. Tách quá nhỏ vs quá lớn"
+direction: down
+nano: Nano-services {
+ s1: S1; s2: S2; s3: S3; s4: S4; s5: S5; s6: S6
+ s1 -> s2 -> s3 -> s4 -> s5 -> s6
+}
+large: Mini-monoliths {
+ a: "Service A\nUser management • Auth • Profile • Social • Notification"
+ b: Service B — tất cả business logic còn lại
+}
+fit: Sweet Spot — Business Capability {
+ user: User Service
+ order: Order Service
+ payment: Payment Service
+ catalog: Catalog Service
+}
 ```
-Tách quá nhỏ (Nano-services) 🔬        Tách quá lớn (Mini-monoliths) 🏔️
-──────────────────────────────          ──────────────────────────────────
 
-┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐ ┌──┐          ┌────────────┐  ┌────────────┐
-│S1│→│S2│→│S3│→│S4│→│S5│→│S6│          │  Service A │  │  Service B │
-└──┘ └──┘ └──┘ └──┘ └──┘ └──┘          │            │  │            │
-                                       │  User Mgmt │  │  Tất cả    │
-Vấn đề:                                │  + Auth    │  │  Business  │
-• Network latency chồng chất           │  + Profile │  │  Logic     │
-• Distributed transaction phức tạp     │  + Social  │  │  còn lại   │
-• Debug/trace qua nhiều service        │  + Notif.  │  │            │
-• Deploy 1 feature → update 5 service  │  + ...     │  │            │
-• Overhead vận hành: 30 services       └────────────┘  └────────────┘
-  cho team 5 người
-                                        Vấn đề:
-                                        • Coupling cao bên trong service
-                                        • Khó scale từng phần
-                                        • Team lớn, khó coordinate
-                                        • Deploy chậm vì quá nhiều code
-
-             ✅ Sweet Spot — Vừa phải
-             ────────────────────────
-             ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
-             │  User  │ │ Order  │ │Payment │ │Catalog │
-             │Service │ │Service │ │Service │ │Service │
-             └────────┘ └────────┘ └────────┘ └────────┘
-             
-             • Mỗi service = 1 business capability
-             • Team 3-8 người own 1-3 services
-             • Ít cross-service calls
-```
+Nano-services: network latency chồng chất, distributed transactions/debug phức tạp, feature đụng nhiều services, 30 services quá tải team 5 người. Mini-monoliths: coupling nội bộ, khó scale một phần, team lớn/coordination và deploy chậm. Sweet spot minh họa: team 3–8 người own 1–3 services, ít cross-service calls.
 
 ### 2.2. Service Granularity — Kích thước phù hợp
 
@@ -177,86 +156,51 @@ Business Capability              ≠  Technical Function
 
 ### 3.2. Cách xác định Business Capability
 
+```d2 title="3.2. Cách xác định Business Capability"
+direction: right
+org: "Phân tích tổ chức\nSales • Marketing • Kho vận • Tài chính"
+sales: "Sales Capabilities\nCustomer / Order Management • Pricing"
+logistics: "Kho vận Capabilities\nInventory / Shipping / Supplier Management"
+customer: "Customer Service"
+order: "Order Service"
+pricing: "Pricing Service"
+inventory: "Inventory Service"
+shipping: "Shipping Service"
+org -> sales
+org -> logistics
+sales -> customer
+sales -> order
+sales -> pricing
+logistics -> inventory
+logistics -> shipping
 ```
-Bước 1: Phân tích tổ chức doanh nghiệp
-────────────────────────────────────────
-Hỏi: "Doanh nghiệp có những phòng ban / chức năng gì?"
 
-   ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-   │  Sales   │ │Marketing │ │  Kho vận │ │ Tài chính│
-   └──────────┘ └──────────┘ └──────────┘ └──────────┘
-
-Bước 2: Liệt kê capability của từng phòng ban
-────────────────────────────────────────
-   Sales:
-   • Quản lý khách hàng (Customer Management)
-   • Quản lý đơn hàng (Order Management)
-   • Quản lý giá (Pricing)
-   
-   Kho vận:
-   • Quản lý tồn kho (Inventory Management)
-   • Quản lý vận chuyển (Shipping Management)
-   • Quản lý nhà cung cấp (Supplier Management)
-
-Bước 3: Map capability → service
-────────────────────────────────────────
-   Customer Management  → Customer Service
-   Order Management     → Order Service
-   Pricing             → Pricing Service
-   Inventory Management → Inventory Service
-   Shipping Management  → Shipping Service
-```
+Bắt đầu từ câu hỏi doanh nghiệp có chức năng gì, liệt kê capability rồi map candidates; sơ đồ không bắt buộc mỗi phòng ban hiện tại phải trở thành một service.
 
 ### 3.3. Ví dụ thực tế — E-Commerce
 
+```d2 title="3.3. Ví dụ thực tế — E-Commerce"
+direction: right
+ecommerce: E-Commerce Capability Map {
+ core: Core {
+  product: Product Management — CRUD / Phân loại / Giá
+  order: Order Management — Tạo / Trạng thái / Hủy
+  payment: Payment Processing — Thu / Hoàn / Ví / Đối soát
+ }
+ supporting: Supporting {
+  inventory: Inventory — Tồn kho / Reserve / Nhập hàng
+  shipping: Shipping — Phí / Tracking
+  support: Customer Support — Ticket / Live chat / FAQ
+ }
+ generic: Generic {
+  identity: User Identity — Đăng ký / Login / Phân quyền
+  notification: Notification — Email / SMS / Push
+  search: Search — Full-text / Filter
+ }
+}
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│            E-COMMERCE — BUSINESS CAPABILITY MAP                  │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐     │
-│  │                 CORE CAPABILITIES                       │     │
-│  │                                                         │     │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │     │
-│  │  │  Product     │  │   Order      │  │  Payment     │   │     │
-│  │  │  Management  │  │  Management  │  │  Processing  │   │     │
-│  │  │              │  │              │  │              │   │     │
-│  │  │• CRUD sản    │  │• Tạo đơn hàng│  │• Thu tiền    │   │     │
-│  │  │  phẩm        │  │• Theo dõi    │  │• Hoàn tiền   │   │     │
-│  │  │• Phân loại   │  │  trạng thái  │  │• Quản lý ví  │   │     │
-│  │  │• Quản lý giá │  │• Hủy đơn     │  │• Đối soát    │   │     │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘   │     │
-│  └─────────────────────────────────────────────────────────┘     │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐     │
-│  │               SUPPORTING CAPABILITIES                   │     │
-│  │                                                         │     │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │     │
-│  │  │  Inventory   │  │  Shipping    │  │  Customer    │   │     │
-│  │  │  Management  │  │  Management  │  │   Support    │   │     │
-│  │  │              │  │              │  │              │   │     │
-│  │  │• Tồn kho     │  │• Tính phí    │  │• Ticket      │   │     │
-│  │  │• Reserve     │  │  ship        │  │• Live chat   │   │     │
-│  │  │• Nhập hàng   │  │• Tracking    │  │• FAQ         │   │     │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘   │     │
-│  └─────────────────────────────────────────────────────────┘     │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐     │
-│  │               GENERIC CAPABILITIES                      │     │
-│  │                                                         │     │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │     │
-│  │  │    User      │  │ Notification │  │   Search     │   │     │
-│  │  │   Identity   │  │   Service    │  │   Service    │   │     │
-│  │  │              │  │              │  │              │   │     │
-│  │  │• Đăng ký     │  │• Email       │  │• Full-text   │   │     │
-│  │  │• Đăng nhập   │  │• SMS         │  │  search      │   │     │
-│  │  │• Phân quyền  │  │• Push        │  │• Filter      │   │     │
-│  │  └──────────────┘  └──────────────┘  └──────────────┘   │     │
-│  └─────────────────────────────────────────────────────────┘     │
-│                                                                  │
-│  Mapping: 1 Business Capability → 1 Microservice                 │
-│  Tổng: 9 services cho hệ thống e-commerce trung bình             │
-└──────────────────────────────────────────────────────────────────┘
-```
+
+Ví dụ map một capability thành một service, tổng 9 candidates. Core/supporting/generic phụ thuộc lợi thế và context doanh nghiệp; không phải mọi tổ chức đều phải xếp Payment/Search như hình.
 
 ### 3.4. Ưu và nhược điểm
 
@@ -275,17 +219,15 @@ Bước 3: Map capability → service
 
 Chiến lược này dùng **Domain-Driven Design** (xem chi tiết tại [doc 02](02-single-responsibility-bounded-context.md)) để phân tách service:
 
-```
-Domain (toàn bộ hệ thống)
-    │
-    ├── Core Subdomain ────────→ Service quan trọng nhất
-    │                              (tự build, đầu tư nhiều)
-    │
-    ├── Supporting Subdomain ──→ Service hỗ trợ
-    │                              (có thể outsource 1 phần)
-    │
-    └── Generic Subdomain ─────→ Service phổ thông
-                                   (dùng SaaS / open-source)
+```d2 title="4.1. Tổng quan DDD Decomposition"
+direction: right
+domain: "Domain — toàn hệ thống"
+core: "Core Subdomain\nService quan trọng — tự build, đầu tư nhiều"
+support: "Supporting Subdomain\nService hỗ trợ — có thể outsource một phần"
+generic: "Generic Subdomain\nPhổ thông — SaaS / Open-source"
+domain -> core
+domain -> support
+domain -> generic
 ```
 
 ### 4.2. Core / Supporting / Generic Subdomain
@@ -320,48 +262,24 @@ n3 -- n15: "buy SaaS"
 
 ### 4.3. Ví dụ thực tế — Online Banking
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│               ONLINE BANKING — DDD DECOMPOSITION                 │
-│                                                                  │
-│  Domain: Ngân hàng số                                            │
-│                                                                  │
-│  Core Subdomains:                                                │
-│  ─────────────────                                               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
-│  │  Transaction │  │  Loan        │  │  Risk        │            │
-│  │  Processing  │  │  Origination │  │  Assessment  │            │
-│  │              │  │              │  │              │            │
-│  │ • Chuyển tiền│  │ • Đánh giá   │  │ • Fraud      │            │
-│  │ • Thanh toán │  │   khoản vay  │  │   detection  │            │
-│  │ • Đối soát   │  │ • Tính lãi   │  │ • Credit     │            │
-│  │              │  │ • Giải ngân  │  │   scoring    │            │
-│  └──────────────┘  └──────────────┘  └──────────────┘            │
-│  → Tự build 100%, team senior, security-first                    │
-│                                                                  │
-│  Supporting Subdomains:                                          │
-│  ─────────────────────                                           │
-│  ┌──────────────┐  ┌──────────────┐                              │
-│  │  Customer    │  │  Account     │                              │
-│  │  Management  │  │  Management  │                              │
-│  │              │  │              │                              │
-│  │ • KYC/eKYC   │  │ • Mở tài     │                              │
-│  │ • Profile    │  │   khoản      │                              │
-│  │ • Preferences│  │ • Đóng TK    │                              │
-│  └──────────────┘  └──────────────┘                              │
-│  → Tự build, có thể dùng 1 số thư viện                           │
-│                                                                  │
-│  Generic Subdomains:                                             │
-│  ───────────────────                                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
-│  │  Identity &  │  │ Notification │  │  Reporting   │            │
-│  │  Auth        │  │              │  │              │            │
-│  │              │  │              │  │              │            │
-│  │ • Keycloak   │  │ • Firebase   │  │ • Metabase   │            │
-│  │ • OAuth2/OIDC│  │ • Twilio SMS │  │ • Grafana    │            │
-│  └──────────────┘  └──────────────┘  └──────────────┘            │
-│  → Dùng SaaS / open-source, chỉ integrate                        │
-└──────────────────────────────────────────────────────────────────┘
+```d2 title="4.3. Ví dụ thực tế — Online Banking"
+direction: right
+bank: Online Banking {
+ core: Core — tự build / Senior team / Security-first {
+  transactions: Transaction Processing — Chuyển tiền / Thanh toán / Đối soát
+  loans: Loan Origination — Đánh giá / Tính lãi / Giải ngân
+  risk: Risk Assessment — Fraud / Credit scoring
+ }
+ support: Supporting — tự build / Tận dụng thư viện {
+  customer: Customer Management — KYC / eKYC / Profile / Preferences
+  account: Account Management — Mở / Đóng tài khoản
+ }
+ generic: Generic — SaaS / Open-source integration {
+  identity: Identity / Auth — Keycloak / OAuth2 / OIDC
+  notification: Notification — Firebase / Twilio SMS
+  reporting: Reporting — Metabase / Grafana
+ }
+}
 ```
 
 ### 4.4. Business Capability vs Subdomain
@@ -389,22 +307,13 @@ Hai chiến lược rất giống nhau, khác ở **góc nhìn**:
 
 Tên lấy từ loại cây tropical vine bọc quanh cây chủ, dần dần thay thế hoàn toàn:
 
-```
-Giai đoạn 1:          Giai đoạn 2:         Giai đoạn 3:
-Monolith sống         Microservice bắt      Monolith chết
-                      đầu thay thế
-
-  ┌─────────┐         ┌──┐┌─────────┐       ┌──┐┌──┐┌──┐
-  │         │         │MS││         │       │MS││MS││MS│
-  │         │         │ 1││         │       │ 1││ 2││ 3│
-  │Monolith │         └──┘│Monolith │       └──┘└──┘└──┘
-  │         │             │ (nhỏ    │       ┌──┐┌──┐
-  │         │             │  hơn)   │       │MS││MS│
-  │         │             │         │       │ 4││ 5│
-  └─────────┘             └─────────┘       └──┘└──┘
-  
-  100% monolith       30% micro             100% micro
-                      70% monolith          0% monolith
+```d2 title="5.1. Strangler Fig là gì?"
+direction: right
+start: "Giai đoạn 1\n100% Monolith"
+middle: "Giai đoạn 2\nMS1 thay một phần\n30% Microservice / 70% Monolith"
+end: "Giai đoạn 3\nMS1 / MS2 / MS3 / MS4 / MS5\n100% Microservices / 0% Monolith"
+start -> middle: "Strangle dần"
+middle -> end: "Tách phần còn lại"
 ```
 
 > **Tại sao không rewrite toàn bộ?** Vì big-bang rewrite là **rủi ro cực cao**: dự án kéo dài hàng năm, business tiếp tục thay đổi trên monolith cũ, đến khi xong thì requirements đã khác. Joel Spolsky gọi đây là "điều tệ nhất một công ty phần mềm có thể làm".
@@ -433,96 +342,45 @@ n6 -> n7: "Không"
 
 **Chi tiết từng bước:**
 
+```d2 title="5.2. Các bước thực hiện"
+direction: down
+before: Ban đầu {
+ client: Client
+ proxy: Proxy / API Gateway
+ monolith: Monolith — tất cả traffic
+ client -> proxy -> monolith
+}
+after: Chuyển module A {
+ client: Client
+ proxy: Proxy / API Gateway
+ micro: Microservice — Module A
+ monolith: Monolith — phần còn lại
+ client -> proxy
+ proxy -> micro: Route module A
+ proxy -> monolith: Route khác
+}
 ```
-Bước 1: CHỌN MODULE TÁCH TRƯỚC
-──────────────────────────────
-Ưu tiên module:
-  • Thay đổi thường xuyên nhất (high change frequency)
-  • Ít phụ thuộc vào phần còn lại (low coupling)
-  • Có business value cao khi tách (scale riêng, deploy riêng)
-  • Có boundary rõ ràng (dễ tách data)
 
-❌ KHÔNG tách trước: module phức tạp nhất, nhiều dependency nhất
-
-Bước 2: ĐẶT PROXY TRƯỚC MONOLITH
-──────────────────────────────
-             ┌───────────┐
-  Client ──▶ │   Proxy   │──▶ Monolith (tất cả traffic)
-             │ (API GW)  │
-             └───────────┘
-
-Proxy ban đầu chỉ forward tất cả request → monolith.
-Mục đích: có 1 điểm để "rẽ nhánh" traffic sau này.
-
-Bước 3: BUILD MICROSERVICE
-──────────────────────────────
-Build service mới cho module đã chọn:
-  • Implement đầy đủ chức năng
-  • Migrate data (hoặc sync data từ monolith)
-  • Test kỹ (unit, integration, contract)
-
-Bước 4: CHUYỂN TRAFFIC
-──────────────────────────────
-             ┌───────────┐
-  Client ──▶ │   Proxy   │──┬──▶ Microservice (module A)
-             │ (API GW)  │  │
-             └───────────┘  └──▶ Monolith (phần còn lại)
-
-Proxy route traffic của module A → microservice mới.
-Phần còn lại vẫn → monolith.
-
-Bước 5: XÓA CODE CŨ
-──────────────────────────────
-Xóa code module A trong monolith.
-Monolith nhỏ hơn → dễ maintain hơn.
-```
+Các bước: (1) chọn module đổi thường xuyên, low coupling, business value và data boundary rõ; không chọn phần phức tạp/nhiều dependencies nhất trước; (2) đặt proxy; (3) implement service, migrate/sync data, test unit/integration/contract; (4) chuyển traffic; (5) xóa code module A khỏi monolith.
 
 ### 5.3. Ví dụ thực tế — Migrate E-Commerce Monolith
 
+```d2 title="5.3. Ví dụ thực tế — Migrate E-Commerce Monolith"
+direction: down
+start: "Monolith\nUser / Product / Order / Payment / Inventory / Search\nShared PostgreSQL"
+p1: "Tháng 1–2: Search → Elasticsearch\nLow coupling • Scale riêng\nMonolith events → consume & index"
+p2: "Tháng 3–4: User / Auth\nSSO • OAuth2 • Dùng lại cho app khác"
+p3: "Tháng 5–7: Payment\nPCI-DSS • Security boundary"
+p4: "Tháng 8–10: Order + Inventory\nCoupling cao — migration cùng đợt"
+p5: "Tháng 11–12: Product\nXóa monolith"
+start -> p1
+p1 -> p2
+p2 -> p3
+p3 -> p4
+p4 -> p5
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│        STRANGLER FIG — E-COMMERCE MIGRATION PLAN                │
-│                                                                 │
-│  Monolith hiện tại:                                             │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  User | Product | Order | Payment | Inventory | Search  │    │
-│  │  ─────────────────────────────────────────────────────  │    │
-│  │              Shared PostgreSQL Database                 │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                 │
-│  Phase 1 (Tháng 1-2): Tách Search ──────────────────────        │
-│  Lý do: ít coupling, cần scale riêng, có thể dùng               │
-│         Elasticsearch thay vì SQL LIKE                          │
-│  ┌─────────────────────────────────────┐  ┌──────────┐          │
-│  │  User | Product | Order | Payment   │  │  Search  │          │
-│  │  | Inventory                        │  │  Service │          │
-│  │  ─────────────────────────────────  │  │          │          │
-│  │         PostgreSQL                  │  │ Elastic  │          │
-│  └─────────────────────────────────────┘  │ Search   │          │
-│                                           └──────────┘          │
-│  Data sync: Monolith publish event → Search consume & index     │
-│                                                                 │
-│  Phase 2 (Tháng 3-4): Tách User/Auth ───────────────────        │
-│  Lý do: cần riêng cho SSO, OAuth2, dùng lại cho các app khác    │
-│  ┌───────────────────────────────┐  ┌──────┐ ┌──────────┐       │
-│  │ Product | Order | Payment     │  │ User │ │  Search  │       │
-│  │ | Inventory                   │  │ Svc  │ │  Service │       │
-│  │ ───────────────────────────   │  └──────┘ └──────────┘       │
-│  │       PostgreSQL              │                              │
-│  └───────────────────────────────┘                              │
-│                                                                 │
-│  Phase 3 (Tháng 5-7): Tách Payment ─────────────────────        │
-│  Lý do: compliance PCI-DSS, cần security riêng                  │
-│                                                                 │
-│  Phase 4 (Tháng 8-10): Tách Order + Inventory ──────────        │
-│  Lý do: hai module coupling cao, tách cùng đợt                  │
-│                                                                 │
-│  Phase 5 (Tháng 11-12): Tách Product, xóa monolith ─────        │
-│                                                                 │
-│  Timeline: 12 tháng (thay vì 18-24 tháng big-bang rewrite)      │
-│  Risk: THẤP (rollback từng phase nếu lỗi)                       │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Timeline minh họa 12 tháng, so với 18–24 tháng big-bang trong ví dụ. Giảm rủi ro nhờ rollback từng phase, không phải bảo đảm migration luôn nhanh/an toàn hơn.
 
 ### 5.4. Kỹ thuật hỗ trợ Strangler Fig
 
@@ -534,25 +392,31 @@ Monolith nhỏ hơn → dễ maintain hơn.
 | **Dark Launch** | Service mới chạy nhận traffic thật nhưng **không trả response** cho user, chỉ so sánh kết quả với monolith | Khi cần validate service mới trước khi chuyển traffic |
 | **Feature Toggle** | Bật/tắt route traffic giữa monolith và microservice | Khi cần rollback nhanh |
 
+```d2 title="5.4. Kỹ thuật hỗ trợ Strangler Fig"
+direction: down
+before: Trước {
+ controller: OrderController
+ service: OrderService
+ repo: OrderRepository
+ db: DB
+ controller -> service -> repo -> db
+}
+abstraction: Thêm abstraction {
+ controller: OrderController
+ interface: IOrderService — Interface / Feature flag
+ old: OldOrderService
+ new: NewOrderService
+ db: DB
+ micro: Order Microservice
+ controller -> interface
+ interface -> old: Flag false
+ interface -> new: Flag true
+ old -> db
+ new -> micro
+}
 ```
-Branch by Abstraction — Ví dụ:
-────────────────────────────────
 
-Trước:
-  OrderController → OrderService → OrderRepository → DB
-
-Bước 1 (Abstraction):
-  OrderController → IOrderService (interface)
-                        ├── OldOrderService → DB       ← code cũ
-                        └── NewOrderService → Order MS  ← gọi microservice
-
-Bước 2 (Switch):
-  Feature flag: use_new_order_service = true
-  → Route sang NewOrderService
-
-Bước 3 (Clean up):
-  Xóa OldOrderService, xóa interface, chỉ giữ NewOrderService
-```
+Switch `use_new_order_service=true` sau kiểm chứng. Khi hết rollback window và mọi caller đã migrate: xóa Old implementation/abstraction không còn cần, giữ implementation mới.
 
 ### 5.5. Ưu và nhược điểm
 
@@ -571,17 +435,17 @@ Bước 3 (Clean up):
 
 Tách service dựa trên **user journey** hoặc **use case**:
 
-```
-Use Case: "Khách hàng đặt hàng"
-──────────────────────────────────
-
-  User ──▶ Browse Products ──▶ Add to Cart ──▶ Checkout ──▶ Pay
-
-  Mapping:
-  • Browse Products  → Catalog Service
-  • Add to Cart      → Cart Service
-  • Checkout         → Order Service
-  • Pay              → Payment Service
+```d2 title="6.1. Decompose by Use Case / User Story"
+direction: right
+user: "User"
+browse: "Browse Products\nCatalog Service"
+cart: "Add to Cart\nCart Service"
+checkout: "Checkout\nOrder Service"
+pay: "Pay\nPayment Service"
+user -> browse
+browse -> cart
+cart -> checkout
+checkout -> pay
 ```
 
 **Khi nào dùng**: Khi hệ thống **user-facing** rõ ràng, các journey không chồng chéo nhiều.
@@ -631,25 +495,15 @@ Entities:
 
 Tách các phần **thay đổi thường xuyên** ra khỏi phần **ổn định**:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                  DECOMPOSE BY VOLATILITY                    │
-│                                                             │
-│  Thay đổi thường xuyên (tuần/ngày):   Ổn định (tháng/năm):  │
-│  ────────────────────────────────     ───────────────────── │
-│  ┌──────────────┐  ┌──────────────┐   ┌──────────────┐      │
-│  │  Pricing     │  │  Promotion   │   │    User      │      │
-│  │  Service     │  │  Service     │   │   Service    │      │
-│  │              │  │              │   │              │      │
-│  │ Giá thay đổi │  │ Campaign mới │   │ Đăng ký/     │      │
-│  │ theo mùa,    │  │ mỗi tuần     │   │ đăng nhập    │      │
-│  │ đối thủ,     │  │              │   │ ít thay đổi  │      │
-│  │ demand       │  │              │   │              │      │
-│  └──────────────┘  └──────────────┘   └──────────────┘      │
-│                                                             │
-│  → Deploy 10 lần/tuần                 → Deploy 1 lần/tháng  │
-│  → Cần canary deploy, feature flag    → Đơn giản, ổn định   │
-└─────────────────────────────────────────────────────────────┘
+```d2 title="6.3. Decompose by Volatility"
+direction: right
+volatile: "Thay đổi tuần/ngày\nVí dụ deploy 10 lần/tuần • Canary / Feature flags" {
+ pricing: Pricing — theo mùa / đối thủ / demand
+ promotion: Promotion — campaign mới mỗi tuần
+}
+stable: "Ổn định tháng/năm\nVí dụ deploy 1 lần/tháng" {
+ user: User — đăng ký / đăng nhập
+}
 ```
 
 **Khi nào dùng**: Khi bạn nhận thấy 1 module trong monolith **liên tục gây conflict khi merge**, hoặc **block** các team khác deploy.
@@ -737,70 +591,39 @@ Chi tiết:
 
 ### 7.2. Ví dụ áp dụng — Hệ thống Food Delivery
 
+```d2 title="7.2. Ví dụ áp dụng — Hệ thống Food Delivery"
+direction: right
+core: Core {
+ order: Order — Tạo / Hủy / Theo dõi
+ delivery: Delivery — Assign driver / Tracking / ETA
+ matching: Restaurant Matching — Nearby / Ranking / Recommendation
+}
+supporting: Supporting {
+ menu: Menu — CRUD / Giá theo giờ / Khuyến mãi
+ customer: Customer Profile
+ driver: Driver Management
+}
+generic: Generic {
+ auth: Auth — Firebase
+ payment: Payment — Stripe
+ notification: Notification
+ geo: Geo — Google Maps API
+}
+odb: Order DB {shape: cylinder}
+ddb: Delivery DB {shape: cylinder}
+rdb: Restaurant DB {shape: cylinder}
+core.order -> odb
+core.delivery -> ddb
+core.matching -> rdb
+core.order -> supporting.menu: Sync gRPC — menu / giá
+core.order -> generic.payment: Sync REST — charge
+core.order -> core.delivery: Async — assign driver
+core.order -> generic.notification: Async — thông báo
+core.delivery -> core.order: Event — status update
+core.delivery <-> generic.geo: gRPC streaming / WebSocket — tracking
 ```
-1️⃣ Domain & Subdomains:
-───────────────────────
-  Core:       Ordering, Delivery, Restaurant Matching
-  Supporting: Menu Management, Customer Profile, Driver Management
-  Generic:    Auth, Payment, Notification, Maps/Geolocation
 
-2️⃣ Capability Map:
-───────────────────
-  Ordering:
-    • Tạo đơn, hủy đơn, theo dõi đơn
-  Delivery:
-    • Assign driver, tracking realtime, estimate ETA
-  Restaurant Matching:
-    • Tìm nhà hàng gần, ranking, recommendation
-  Menu Management:
-    • CRUD menu, giá theo giờ, khuyến mãi
-  ...
-
-3️⃣ Service Candidates:
-───────────────────────
-  ┌────────────┐  ┌────────────┐  ┌────────────┐
-  │  Order     │  │  Delivery  │  │ Restaurant │
-  │  Service   │  │  Service   │  │  Service   │
-  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘
-        │               │               │
-  ┌─────▼──────┐  ┌─────▼──────┐  ┌─────▼──────┐
-  │   Order    │  │  Delivery  │  │ Restaurant │
-  │   DB       │  │  DB        │  │  DB        │
-  └────────────┘  └────────────┘  └────────────┘
-
-  + Driver Service, Payment Service (Stripe),
-    Notification Service, Auth (Firebase Auth),
-    Geo Service (Google Maps API)
-
-4️⃣ Dependency Check:
-───────────────────────
-  Order → Restaurant: cần menu & giá     → Sync (gRPC)
-  Order → Payment: cần charge tiền       → Sync (REST)
-  Order → Delivery: cần assign driver    → Async (Event)
-  Order → Notification: thông báo user   → Async (Event)
-
-  ⚠️ Order gọi nhiều service → OK vì đây là orchestrator
-     cho use case "đặt hàng"
-  ⚠️ Delivery ↔ Geo: gọi rất nhiều (tracking realtime)
-     → Dùng gRPC streaming hoặc WebSocket
-
-5️⃣ Communication Design:
-───────────────────────
-  Sync:  Order ──gRPC──▶ Restaurant (lấy menu)
-         Order ──REST──▶ Payment (charge)
-  Async: Order ──Event──▶ Delivery (assign driver)
-         Order ──Event──▶ Notification (email/push)
-         Delivery ──Event──▶ Order (status update)
-
-6️⃣ Validate:
-───────────────────────
-  • Team 1 (5 devs): Order + Payment integration
-  • Team 2 (4 devs): Delivery + Driver + Geo
-  • Team 3 (3 devs): Restaurant + Menu
-  • Platform team: Auth, Notification, Infra
-
-  → Mỗi team 3-5 người, own 1-2 services ✅
-```
+Team 1 (5 devs): Order + Payment integration; Team 2 (4): Delivery + Driver + Geo; Team 3 (3): Restaurant + Menu; Platform: Auth, Notification, Infra. Order gọi nhiều dependency vì điều phối use case đặt hàng; vẫn cần timeouts/contracts và tránh coupling quá mức.
 
 ---
 

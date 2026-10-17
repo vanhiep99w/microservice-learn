@@ -63,30 +63,19 @@ Trong kiến trúc Microservice, mỗi service nên **độc lập** và **tự 
 
 **Câu hỏi kinh điển**: Copy-paste code hay tạo shared library?
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    THE SHARED CODE DILEMMA                          │
-│                                                                     │
-│   Copy-Paste                          Shared Library                │
-│   ┌──────────┐                        ┌──────────┐                  │
-│   │Service A │  Code giống nhau       │Service A │                  │
-│   │ ┌──────┐ │  nhưng độc lập         │    │     │                  │
-│   │ │utils │ │                        │    ▼     │                  │
-│   │ └──────┘ │                        │ ┌──────┐ │                  │
-│   └──────────┘                        │ │shared│◄├──┐               │
-│   ┌──────────┐                        │ │ lib  │ │  │               │
-│   │Service B │                        │ └──────┘ │  │               │
-│   │ ┌──────┐ │                        └──────────┘  │               │
-│   │ │utils │ │  ← Duplicate nhưng     ┌──────────┐  │               │
-│   │ └──────┘ │    không coupling      │Service B │  │               │
-│   └──────────┘                        │ ┌──────┐ │  │               │
-│                                       │ │shared│◄├──┘               │
-│   ✅ Independence                     │ │ lib  │ │                  │
-│   ❌ Maintenance burden               │ └──────┘ │                  │
-│                                       └──────────┘                  │
-│                                       ✅ DRY                        │
-│                                       ⚠️ Coupling risk              │
-└─────────────────────────────────────────────────────────────────────┘
+```d2 title="1. Giới thiệu — Vấn đề chia sẻ code"
+direction: right
+copy: Copy-Paste — Independent / Maintenance burden {
+ a: Service A { utils: Local Utilities A }
+ b: Service B { utils: Local Utilities B }
+}
+shared: Shared Library — DRY / Coupling risk {
+ a: Service A
+ b: Service B
+ lib: Versioned Shared Library
+ a -> lib: Import
+ b -> lib: Import
+}
 ```
 
 > **Nguyên tắc vàng**: _"Don't share code that creates coupling between services. Do share code that helps services be independently better."_ — Sam Newman, Building Microservices
@@ -164,27 +153,16 @@ n1.n4 -> n2.n10
 
 **Ví dụ kinh điển — "User" khác nhau ở mỗi service:**
 
+```d2 title="2.2. Không nên share — Domain/Business Logic"
+direction: right
+contexts: Mỗi Bounded Context có model riêng {
+ auth: Auth Service { user: "User\nid / email / passwordHash / roles[] / mfaEnabled / lastLogin" }
+ order: Order Service { customer: "Customer\nid / name / shippingAddr / loyaltyTier / creditLimit" }
+ notification: Notification Service { recipient: "Recipient\nid / email / phone / preferences / timezone" }
+}
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  CÙNG CONCEPT "USER" — NHƯNG MỖI SERVICE CẦN KHÁC NHAU          │
-│                                                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │  Auth Service   │  │  Order Service  │  │  Notification   │  │
-│  │                 │  │                 │  │  Service        │  │
-│  │  User {         │  │  Customer {     │  │  Recipient {    │  │
-│  │    id           │  │    id           │  │    id           │  │
-│  │    email        │  │    name         │  │    email        │  │
-│  │    passwordHash │  │    shippingAddr │  │    phone        │  │
-│  │    roles[]      │  │    loyaltyTier  │  │    preferences  │  │
-│  │    mfaEnabled   │  │    creditLimit  │  │    timezone     │  │
-│  │    lastLogin    │  │  }              │  │  }              │  │
-│  │  }              │  │                 │  │                 │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
-│                                                                 │
-│  ❌ KHÔNG nên tạo SharedUserModel cho cả 3 service              │
-│  ✅ Mỗi service định nghĩa model riêng phù hợp Bounded Context  │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Không dùng một SharedUserModel cho cả ba context chỉ vì cùng nói về một người.
 
 ### 2.3. Decision Framework — Checklist xác định nhanh
 
@@ -257,27 +235,20 @@ n7 -> n9: "Không"
 
 Đây là hình thức **phổ biến nhất**. Code chung được đóng gói thành library/package và publish lên registry.
 
+```d2 title="3.1. Shared Library (Package/Module)"
+direction: right
+source: "Shared Library Source — Git"
+repo: "Maven Repo — Nexus / Artifactory / GitHub Packages"
+a: "Service A — Lib v1.2.0"
+b: "Service B — Lib v1.1.0"
+c: "Service C — Lib v1.2.0"
+source -> repo: "Publish"
+repo -> a: "Resolve pinned version"
+repo -> b: "Resolve pinned version"
+repo -> c: "Resolve pinned version"
 ```
-┌───────────────────────────────────────────────────────────┐
-│                  SHARED LIBRARY FLOW                      │
-│                                                           │
-│   ┌─────────────┐        ┌───────────────────────┐        │
-│   │ Shared Lib  │──────▶ │  Maven Repository     │        │
-│   │ Source Code │ deploy │  (Nexus / Artifactory │        │
-│   │  (Git repo) │        │   / GitHub Packages)  │        │
-│   └─────────────┘        └──────────┬────────────┘        │
-│                                     │                     │
-│                    ┌────────────────┼──────────────┐      │
-│                    ▼                ▼              ▼      │
-│              ┌──────────┐    ┌──────────┐    ┌──────────┐ │
-│              │Service A │    │Service B │    │Service C │ │
-│              │ v1.2.0   │    │ v1.1.0   │    │ v1.2.0   │ │
-│              └──────────┘    └──────────┘    └──────────┘ │
-│                                                           │
-│  ✅ Mỗi service chọn version riêng                        │
-│  ✅ Update không buộc deploy tất cả                       │
-└───────────────────────────────────────────────────────────┘
-```
+
+Mỗi service chọn version riêng; publish library mới không buộc redeploy toàn bộ consumers.
 
 **Ví dụ thực tế (Java / Spring Boot — Maven):**
 
@@ -341,37 +312,22 @@ n7 -> n9: "Không"
 
 Thay vì share code trực tiếp, share **schema/contract** rồi **generate code** từ đó. Mỗi service có code riêng, nhưng đảm bảo compatible.
 
+```d2 title="3.2. Code Generation (Schema-first)"
+direction: right
+schema: "Shared Schema — .proto / .yaml / .avsc / .json"
+generator: "protoc / OpenAPI Generator / Avro"
+java: "Java Stubs → Service A"
+go: "Go Stubs → Service B"
+ts: "TypeScript Types → Service C"
+py: "Python Classes → Service D"
+schema -> generator
+generator -> java
+generator -> go
+generator -> ts
+generator -> py
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                  CODE GENERATION FLOW                       │
-│                                                             │
-│   ┌───────────────────┐                                     │
-│   │  Shared Schema    │                                     │
-│   │  (.proto / .yaml  │                                     │
-│   │   / .avsc / .json)│                                     │
-│   └────────┬──────────┘                                     │
-│            │                                                │
-│            ▼                                                │
-│   ┌───────────────────┐                                     │
-│   │  Code Generator   │                                     │
-│   │  (protoc/openapi  │                                     │
-│   │   generator/avro) │                                     │
-│   └────────┬──────────┘                                     │
-│            │                                                │
-│   ┌────────┼────────┬────────────┐                          │
-│   ▼        ▼        ▼            ▼                          │
-│  Java    Go     TypeScript   Python                         │
-│  stubs   stubs    types      classes                        │
-│   │        │        │            │                          │
-│   ▼        ▼        ▼            ▼                          │
-│ Service  Service  Service    Service                        │
-│    A       B        C          D                            │
-│                                                             │
-│  ✅ Polyglot friendly — mỗi service dùng ngôn ngữ khác      │
-│  ✅ Schema là source of truth                               │
-│  ✅ Không runtime dependency                                │
-└─────────────────────────────────────────────────────────────┘
-```
+
+Schema là source of truth, polyglot-friendly. Không gọi schema generator lúc runtime; generated code vẫn có thể cần runtime libraries/serializers và vẫn phải giữ contract compatibility.
 
 **Ví dụ — Protobuf schema:**
 
@@ -407,31 +363,16 @@ Từ schema này, generate:
 
 Thay vì embed shared code vào application, chạy nó như một **sidecar container** cạnh service. Phù hợp cho infrastructure concerns.
 
+```d2 title="3.3. Sidecar / Service Mesh"
+direction: right
+workload: Pod / Task Definition {
+ app: Application Container — Business Logic
+ sidecar: Sidecar — Envoy / Dapr / Fluentd tùy concern
+ app <-> sidecar: Local IPC / Network / Shared files tùy loại
+}
 ```
-┌──────────────────────────────────────────────────────┐
-│                  SIDECAR PATTERN                     │
-│                                                      │
-│   Pod / Task Definition                              │
-│   ┌─────────────────────────────────────────────┐    │
-│   │  ┌──────────────┐    ┌──────────────────┐   │    │
-│   │  │  Application │    │    Sidecar       │   │    │
-│   │  │  Container   │◄──▶│  (Envoy/Dapr/    │   │    │
-│   │  │              │    │   Fluentd...)    │   │    │
-│   │  │  Chỉ chứa    │    │                  │   │    │
-│   │  │  business    │    │  Xử lý:          │   │    │
-│   │  │  logic       │    │  - mTLS          │   │    │
-│   │  │              │    │  - Retry/CB      │   │    │
-│   │  │              │    │  - Logging       │   │    │
-│   │  │              │    │  - Tracing       │   │    │
-│   │  └──────────────┘    └──────────────────┘   │    │
-│   └─────────────────────────────────────────────┘    │
-│                                                      │
-│  ✅ Ngôn ngữ agnostic — sidecar chạy riêng process   │
-│  ✅ Service không cần biết về infra concerns         │
-│  ❌ Thêm latency (intra-pod communication)           │
-│  ❌ Phức tạp hơn khi debug                           │
-└──────────────────────────────────────────────────────┘
-```
+
+Sidecar chạy process riêng, độc lập ngôn ngữ; có thể xử lý transport security, retry/CB, logging hoặc tracing tùy implementation. Đổi lại có resource/latency overhead và debug phức tạp; không phải sidecar nào cũng có mọi tính năng.
 
 **Khi nào dùng Sidecar thay vì Shared Library:**
 
@@ -446,31 +387,18 @@ Thay vì embed shared code vào application, chạy nó như một **sidecar con
 
 Thay vì share code, tạo một **service chuyên trách** cung cấp capability đó qua API.
 
+```d2 title="3.4. Platform Service (Shared Capability as a Service)"
+direction: right
+a: "Service A"
+b: "Service B"
+c: "Service C"
+auth: "Centralized Auth Platform Service"
+a -> auth
+b -> auth
+c -> auth
 ```
-┌────────────────────────────────────────────────────────┐
-│              PLATFORM SERVICE APPROACH                 │
-│                                                        │
-│   Thay vì share logging library → Logging Service      │
-│   Thay vì share auth library    → Auth Service         │
-│   Thay vì share email utils     → Notification Service │
-│                                                        │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐             │
-│   │Service A │  │Service B │  │Service C │             │
-│   └────┬─────┘  └────┬─────┘  └────┬─────┘             │
-│        │             │             │                   │
-│        └─────────────┼─────────────┘                   │
-│                      ▼                                 │
-│              ┌───────────────┐                         │
-│              │ Auth Service  │  ← Platform Service     │
-│              │ (centralized) │                         │
-│              └───────────────┘                         │
-│                                                        │
-│   ✅ Không code coupling                               │
-│   ✅ Single source of truth                            │
-│   ❌ Network dependency (latency, availability)        │
-│   ❌ Single point of failure nếu không HA              │
-└────────────────────────────────────────────────────────┘
-```
+
+Shared capability có thể là Logging, Auth hoặc Notification Service thay cho email utilities. Giảm shared implementation coupling nhưng thêm network dependency, latency/availability và cần HA; local token validation không bắt buộc gọi Auth mỗi request.
 
 ### 3.5. Copy-Paste (Duplicate & Diverge)
 
@@ -656,33 +584,25 @@ Trong Microservice, các service giao tiếp qua **API** (REST, gRPC) hoặc **e
 2. Từ schema đó, **generate code** cho từng service
 3. Mỗi service có **code riêng** (generated), nhưng đảm bảo **compatible** với nhau
 
+```d2 title="5.1. Ý tưởng cốt lõi — \"Share contract, không share code\""
+direction: right
+library: Shared implementation {
+ order: Order
+ payment: Payment
+ dto: SharedOrderDTO.java — Library
+ order -> dto: Import pinned artifact
+ payment -> dto: Import pinned artifact
+}
+schema: Shared Contract {
+ proto: order_events.proto
+ order: OrderCreatedEvent.java trong Order
+ payment: OrderCreatedEvent.java trong Payment
+ proto -> order: Generate
+ proto -> payment: Generate
+}
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│            CONTRACT SHARING — CÁCH HOẠT ĐỘNG                        │
-│                                                                     │
-│   ┌───────────────────────────────────────────────────────────┐     │
-│   │  TRUYỀN THỐNG (share code trực tiếp):                     │     │
-│   │                                                           │     │
-│   │  Order Service ──import──▶ SharedOrderDTO.java ◀──import──│     │
-│   │                            (shared library)      Payment  │     │
-│   │                                                  Service  │     │
-│   │  ❌ Coupling: thay đổi DTO → cả 2 phải rebuild            │     │
-│   └───────────────────────────────────────────────────────────┘     │
-│                                                                     │
-│   ┌───────────────────────────────────────────────────────────┐     │
-│   │  CONTRACT SHARING (share schema, generate code):          │     │
-│   │                                                           │     │
-│   │  order_events.proto ──generate──▶ OrderCreatedEvent.java  │     │
-│   │  (schema file)       │            (trong Order Service)   │     │
-│   │                      │                                    │     │
-│   │                      └──generate──▶ OrderCreatedEvent.java│     │
-│   │                                    (trong Payment Service)│     │
-│   │                                                           │     │
-│   │  ✅ Mỗi service có file riêng, build riêng                │     │
-│   │  ✅ Schema thay đổi → chỉ re-generate, không coupling     │     │
-│   └───────────────────────────────────────────────────────────┘     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+
+Mỗi consumer build/upgrade riêng. Thay library không tự ép rebuild pinned consumers; schema-first giảm implementation coupling nhưng không xóa coupling về contract và compatibility.
 
 > **Tóm lại**: Thay vì 2 services cùng import 1 Java class (coupling), ta viết 1 file mô tả cấu trúc → tool tự generate ra Java class cho từng service. Hai class giống nhau về structure nhưng **hoàn toàn độc lập** về build/deploy.
 
@@ -1031,49 +951,24 @@ Phù hợp cho **event-driven architecture** — define schema cho messages trê
 
 #### Flow hoạt động:
 
+```d2 title="Flow hoạt động:"
+shape: sequence_diagram
+order: Order Producer
+registry: Schema Registry
+kafka: Kafka
+payment: Payment Consumer
+order -> order:1. Build event
+order -> registry:2. Serializer register / Lookup schema
+registry -> registry:3. Check schema tồn tại / Compatibility khi đăng ký mới
+registry -> order:4. Schema ID {style.stroke-dash: 5}
+order -> kafka:5/6. Serialize bytes + Schema ID; broker persist message
+kafka -> payment:7. Deliver bytes + Schema ID
+payment -> registry:8. Fetch writer schema by ID nếu cache miss
+registry -> payment: Writer schema {style.stroke-dash: 5}
+payment -> payment:9. Deserialize thành object
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│             AVRO + SCHEMA REGISTRY FLOW                               │
-│                                                                       │
-│  ① Order Service (Producer) gửi event                                │
-│  ┌───────────────────┐     ┌──────────────────┐     ┌──────────────┐  │
-│  │ Order Service     │     │ Schema Registry  │     │   Kafka      │  │
-│  │                   │     │ (Confluent)      │     │   Broker     │  │
-│  │ 1. Build event    │     │                  │     │              │  │
-│  │    object         │     │                  │     │              │  │
-│  │                   │     │                  │     │              │  │
-│  │ 2. Serializer     │────▶│ 3. Kiểm tra      │     │              │  │
-│  │    gửi schema     │     │    schema có tồn │     │              │  │
-│  │    tới registry   │     │    tại? Có compat│     │              │  │
-│  │                   │     │   với version cũ?│     │              │  │
-│  │                   │◀────│                  │     │              │  │
-│  │                   │     │ 4. Trả về        │     │              │  │
-│  │ 5. Serialize      │     │    schema ID     │     │              │  │
-│  │    event thành    │─────────────────────────────▶│ 6. Lưu       │  │
-│  │    bytes + kèm    │     │                  │     │    message   │  │
-│  │    schema ID      │     │                  │     │    + schemaID│  │
-│  └───────────────────┘     └──────────────────┘     └──────┬───────┘  │
-│                                                            │          │
-│  ② Payment Service (Consumer) nhận event                  │          │
-│  ┌───────────────────┐     ┌──────────────────┐            │          │
-│  │ Payment Service   │     │ Schema Registry  │            │          │
-│  │                   │◀────────────────────────────────────┘          │
-│  │ 7. Nhận bytes     │     │                  │                       │
-│  │    + schema ID    │     │                  │                       │
-│  │                   │────▶│ 8. Lấy schema    │                       │
-│  │ 9. Deserializer   │◀────│    theo ID       │                       │
-│  │    dùng schema    │     │                  │                       │
-│  │    để parse bytes │     │                  │                       │
-│  │    → Java object  │     │                  │                       │
-│  └───────────────────┘     └──────────────────┘                       │
-│                                                                       │
-│  KEY INSIGHT:                                                         │
-│  • Message trên Kafka KHÔNG chứa schema (nhẹ, nhỏ)                    │
-│  • Message chỉ chứa schema ID + data bytes                            │
-│  • Schema Registry là "từ điển" trung tâm — ai cần thì tra            │
-│  • Registry tự kiểm tra compatibility khi producer đăng ký schema mới │
-└───────────────────────────────────────────────────────────────────────┘
-```
+
+Confluent Avro wire format chứa framing/schema ID và payload bytes, không nhúng toàn schema. Serializers/deserializers cache schema nên không nhất thiết gọi registry cho mỗi message.
 
 #### Bước 1: Viết Avro schema
 
@@ -1263,28 +1158,21 @@ Vấn đề với provider-driven:
 
 #### Flow hoạt động với Spring Cloud Contract:
 
-```mermaid
-sequenceDiagram
-    participant Consumer as Order Service<br/>(Consumer)
-    participant Repo as Contract Repo<br/>(Git/Nexus)
-    participant Provider as Payment Service<br/>(Provider)
-
-    Note over Consumer: Bước 1: Consumer team viết<br/>contract mô tả "tôi cần gì"
-    Consumer->>Repo: Push contract file (.groovy/.yaml)
-
-    Note over Provider: Bước 2: Provider chạy test<br/>verify contract khi CI/CD build
-    Repo->>Provider: Pull contracts của tất cả consumers
-    Provider->>Provider: Auto-generate test từ contract
-    Provider->>Provider: Chạy test against real controller
-    
-    alt Test PASS ✅
-        Provider->>Repo: Publish stub JAR (WireMock stubs)
-        Note over Consumer: Bước 3: Consumer dùng stub<br/>để test integration
-        Repo->>Consumer: Pull stub JAR
-        Consumer->>Consumer: Test với WireMock stub<br/>(không cần Provider chạy thật)
-    else Test FAIL ❌
-        Provider->>Provider: CI/CD FAIL!<br/>Breaking change detected!
-    end
+```d2 title="Flow hoạt động với Spring Cloud Contract:"
+direction: down
+consumer: "Order Service — Consumer\nBước 1: viết contract mô tả cần gì"
+repo: "Contract Repo — Git / Nexus\nPush .groovy / .yaml"
+provider: "Payment Service — Provider\nBước 2: pull tất cả consumer contracts trong CI/CD"
+verify: "Auto-generate test từ contract\nChạy against real controller"
+stub: "Test PASS\nPublish stub JAR — WireMock stubs"
+test: "Bước 3: Consumer pull stub JAR\nIntegration test với WireMock\nKhông cần Provider chạy thật"
+fail: "Test FAIL\nCI/CD FAIL — Breaking change detected"
+consumer -> repo
+repo -> provider
+provider -> verify
+verify -> stub: "PASS"
+stub -> test
+verify -> fail: "FAIL"
 ```
 
 #### Bước 1: Consumer viết contract
@@ -1498,44 +1386,27 @@ Khi contract nằm trong repo của Order Service, Payment Service cần lấy f
 
 Order Service CI build xong sẽ publish **2 artifact riêng biệt** lên Nexus:
 
+```d2 title="Có bao nhiêu contract repo trong 1 dự án thực tế?"
+direction: right
+repo: "Order Service Repo — CI / mvn deploy"
+app: "com.mycompany:order-service:1.0.0\nSpring Boot App JAR"
+proto: "com.mycompany:order-service-proto:1.0.0\nGenerated Java classes only"
+nexus: "Nexus"
+payment: "Payment Service pom.xml dependency\norder-service-proto version1.0.0"
+repo -> app
+repo -> proto
+proto -> nexus: "Publish"
+nexus -> payment: "Resolve dependency"
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│  CÁCH 1: PUBLISH GENERATED CLASSES LÊN NEXUS                          │
-│                                                                       │
-│  Repo: order-service (CI/CD pipeline)                                 │
-│  ┌────────────────────────────────────────────────────────┐           │
-│  │  mvn deploy → publish 2 artifacts:                     │           │
-│  │                                                        │           │
-│  │  ① com.mycompany:order-service:1.0.0                  │           │
-│  │     → JAR chạy app (Spring Boot fat JAR)               │           │
-│  │                                                        │           │
-│  │  ② com.mycompany:order-service-proto:1.0.0            │           │
-│  │     → JAR CHỈ chứa generated Java classes từ .proto    │           │
-│  │     → OrderCreatedEvent.java, OrderItem.java, ...      │           │
-│  │     → KHÔNG chứa business logic                        │           │
-│  └────────────────────────────────────────────────────────┘           │
-│                          │                                            │
-│                          ▼  publish lên Nexus                         │
-│                                                                       │
-│  Repo: payment-service                                                │
-│  ┌────────────────────────────────────────────────────────┐           │
-│  │  pom.xml chỉ cần thêm dependency:                      │           │
-│  │                                                        │           │
-│  │  <dependency>                                          │           │
-│  │    <groupId>com.mycompany</groupId>                    │           │
-│  │    <artifactId>order-service-proto</artifactId>        │           │
-│  │    <version>1.0.0</version>                            │           │
-│  │  </dependency>                                         │           │
-│  │                                                        │           │
-│  │  → Có sẵn OrderCreatedEvent.java để dùng               │           │
-│  │  → KHÔNG cần biết file .proto ở đâu                    │           │
-│  │  → KHÔNG cần cài protoc hay plugin generate            │           │
-│  └────────────────────────────────────────────────────────┘           │
-│                                                                       │
-│  ✅ Đơn giản nhất — Payment team chỉ khai báo dependency              │
-│  ✅ Version rõ ràng — upgrade = đổi version trong pom.xml             │
-│  ❌ Phụ thuộc Order team publish kịp thời                             │
-└───────────────────────────────────────────────────────────────────────┘
+
+Proto artifact chứa OrderCreatedEvent.java / OrderItem.java, không business logic. Payment không cần protoc hoặc đường dẫn .proto; upgrade bằng version trong pom.xml, nhưng phụ thuộc Order team publish.
+
+```xml
+<dependency>
+  <groupId>com.mycompany</groupId>
+  <artifactId>order-service-proto</artifactId>
+  <version>1.0.0</version>
+</dependency>
 ```
 
 **Cách 2 — Git submodule (consumer tự generate):**
@@ -1756,18 +1627,23 @@ Quy tắc:
 
 ### 6.3. Diamond Dependency
 
+```d2 title="6.3. Diamond Dependency"
+direction: right
+order: "Order Service — Spring Boot"
+auth: "common-auth2.0.0"
+logging: "common-logging1.5.0"
+web3: "common-web3.0.0"
+web2: "common-web2.0.0"
+conflict: "Một resolved common-web version\nNoSuchMethodError nếu API incompatible"
+order -> auth
+order -> logging
+auth -> web3
+logging -> web2
+web3 -> conflict
+web2 -> conflict
 ```
-❌ ANTI-PATTERN: Diamond Dependency
 
-   Order Service (Spring Boot)
-   ├── com.mycompany:common-auth:2.0.0
-   │   └── com.mycompany:common-web:3.0.0       ← version 3
-   └── com.mycompany:common-logging:1.5.0
-       └── com.mycompany:common-web:2.0.0       ← version 2 ⚠️
-
-   → Maven chọn 1 version (nearest-wins), có thể gây NoSuchMethodError!
-   → Gradle thì chọn highest version, vẫn có thể incompatible
-```
+Maven dùng nearest-definition, cùng độ sâu thì first declaration; Gradle mặc định thường chọn version cao hơn, có thể bị override bởi constraints/locking. Chọn được một version không bảo đảm binary compatibility.
 
 **Giải pháp**:
 - Shared libraries **không nên depend lẫn nhau** khi có thể
@@ -1814,36 +1690,19 @@ Shared code không chỉ ảnh hưởng tới **thiết kế** mà còn ảnh h�
 
 ### 7.1. Vấn đề cốt lõi — "Thay đổi 1 library → bao nhiêu service phải build lại?"
 
-```
-┌───────────────────────────────────────────────────────────────────────┐
-│     SHARED LIBRARY THAY ĐỔI → RIPPLE EFFECT TRÊN CI/CD                │
-│                                                                       │
-│  Dev sửa 1 bug trong common-auth v1.5.1                               │
-│                                                                       │
-│  ❌ NẾU KHÔNG CÓ CHIẾN LƯỢC ĐÚNG:                                     │
-│  ┌───────────────┐                                                    │
-│  │ common-auth   │──push──▶ Nexus (v1.5.1)                            │
-│  │ bug fix       │                │                                   │
-│  └───────────────┘                │                                   │
-│                    ┌──────────────┼──────────────┬──────────────┐     │
-│                    ▼              ▼              ▼              ▼     │
-│              ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│              │ Order    │  │ Payment  │  │ User     │  │ Inventory│   │
-│              │ Service  │  │ Service  │  │ Service  │  │ Service  │   │
-│              │ rebuild? │  │ rebuild? │  │ rebuild? │  │ rebuild? │   │
-│              │ redeploy?│  │ redeploy?│  │ redeploy?│  │ redeploy?│   │
-│              └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
-│                                                                       │
-│  → 15 services × (build + test + deploy) = hàng giờ pipeline          │
-│  → 1 service fail test → block tất cả? Hay bỏ qua?                    │
-│  → Rollback library version → rollback tất cả services?               │
-│                                                                       │
-│  ✅ NẾU CÓ CHIẾN LƯỢC ĐÚNG:                                           │
-│  • Mỗi service tự chọn khi nào upgrade                                │
-│  • Library có pipeline riêng, publish version mới lên Nexus           │
-│  • Service pipeline chỉ trigger khi CHÍNH NÓ thay đổi                 │
-│  • Upgrade library = 1 PR bình thường, review + test riêng            │
-└───────────────────────────────────────────────────────────────────────┘
+```d2 title="7.1. Vấn đề cốt lõi — \"Thay đổi 1 library → bao nhiêu service phải build lại?\""
+direction: right
+fix: "Dev fix common-auth1.5.1"
+nexus: "Publish Nexus"
+bad: "Trigger tất cả15 service pipelines"
+hours: "Build / Test / Deploy hàng giờ\nTest một service fail có block cả fleet?"
+good: "Independent consumer upgrade PRs"
+service: "Review / Test / Deploy từng service khi đổi pinned dependency"
+fix -> nexus
+nexus -> bad: "Coupled pipeline anti-pattern"
+bad -> hours
+nexus -> good: "Versioned library pipeline"
+good -> service
 ```
 
 ### 7.2. Pipeline cho Shared Library — Phải tách riêng
@@ -2007,37 +1866,24 @@ jobs:
 
 Khi library publish version mới, services **KHÔNG nên tự động upgrade**. Thay vào đó:
 
+```d2 title="7.3. Upgrade Library — Quy trình đúng"
+direction: right
+publish: "Library team publish common-auth1.5.1"
+announce: "Slack / Email — Release + Changelog XYZ"
+choose: "Service team quyết định upgrade timeline"
+order: "Order PR pom.xml1.5.0 →1.5.1"
+ci: "CI → Review → Merge → Deploy"
+payment: "Payment upgrade tuần sau"
+user: "User chưa cần upgrade nếu bug không ảnh hưởng"
+publish -> announce
+announce -> choose
+choose -> order
+order -> ci
+choose -> payment
+choose -> user
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│           QUY TRÌNH UPGRADE SHARED LIBRARY                           │
-│                                                                      │
-│  Bước 1: Library team publish common-auth v1.5.1 lên Nexus           │
-│          │                                                           │
-│          ▼                                                           │
-│  Bước 2: Gửi thông báo (Slack/Email) tới service teams               │
-│          "common-auth v1.5.1 released — bug fix XYZ, xem changelog"  │
-│          │                                                           │
-│          ▼                                                           │
-│  Bước 3: Mỗi service team TỰ QUYẾT ĐỊNH khi nào upgrade              │
-│          │                                                           │
-│          ├──▶ Order team: Tạo PR đổi version trong pom.xml           │
-│          │    ┌──────────────────────────────────────────┐           │
-│          │    │ <dependency>                             │           │
-│          │    │   <groupId>com.mycompany</groupId>       │           │
-│          │    │   <artifactId>common-auth</artifactId>   │           │
-│          │    │   <version>1.5.0 → 1.5.1</version>       │           │
-│          │    │ </dependency>                            │           │
-│          │    └──────────────────────────────────────────┘           │
-│          │    → CI chạy test → Review → Merge → Deploy               │
-│          │                                                           │
-│          ├──▶ Payment team: Upgrade tuần sau (đang bận feature)      │
-│          │                                                           │
-│          └──▶ User team: Không cần upgrade (bug không ảnh hưởng)     │
-│                                                                      │
-│  ✅ Mỗi service deploy RIÊNG, theo timeline RIÊNG                    │
-│  ✅ Không có "big bang" upgrade tất cả cùng lúc                      │
-└──────────────────────────────────────────────────────────────────────┘
-```
+
+Mỗi service có timeline riêng; security fixes cần có deadline upgrade, không trì hoãn vô hạn.
 
 ### 7.4. Tự động hóa: Dependabot / Renovate cho Shared Library
 
@@ -2061,31 +1907,24 @@ updates:
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=27-shared-code-strategy&snapshot=article&file=snippets%2F7-4-tu-dong-hoa-dependabot-renovate-cho-shared-library.yaml)
 
-```
-┌───────────────────────────────────────────────────────────────────┐
-│           DEPENDABOT / RENOVATE FLOW                              │
-│                                                                   │
-│  common-auth v1.5.1                                               │
-│  published lên Nexus                                              │
-│       │                                                           │
-│       ▼                                                           │
-│  Dependabot phát hiện version mới                                 │
-│       │                                                           │
-│       ├──▶ Order Service repo: Tự tạo PR                          │
-│       │    "Bump common-auth from 1.5.0 to 1.5.1"                 │
-│       │    → CI tự chạy test                                      │
-│       │    → PATCH version + test PASS → Auto-merge ✅            │
-│       │                                                           │
-│       ├──▶ Payment Service repo: Tự tạo PR                        │
-│       │    → CI test FAIL → Giữ PR open, notify team ⚠️           │
-│       │                                                           │
-│       └──▶ User Service repo: Tự tạo PR                           │
-│            → CI PASS → Auto-merge ✅                              │
-│                                                                   │
-│  Với MAJOR version (v2.0.0):                                      │
-│  → Tạo PR nhưng KHÔNG auto-merge                                  │
-│  → Require manual review + migration                              │
-└───────────────────────────────────────────────────────────────────┘
+```d2 title="7.4. Tự động hóa: Dependabot / Renovate cho Shared Library"
+direction: right
+publish: "common-auth1.5.1 lên Nexus"
+detect: "Dependabot / Renovate phát hiện"
+order: "Order PR1.5.0 →1.5.1 / CI PASS"
+payment: "Payment PR / CI FAIL"
+user: "User PR / CI PASS"
+merge: "Auto-merge nếu policy cho PATCH"
+open: "Giữ PR open / Notify team"
+major: "MAJOR2.0.0 → Manual review / Migration"
+publish -> detect
+detect -> order
+detect -> payment
+detect -> user
+order -> merge
+user -> merge
+payment -> open
+detect -> major: "Major update"
 ```
 
 ### 7.5. Contract Schema thay đổi → Ảnh hưởng pipeline thế nào?
@@ -2253,50 +2092,26 @@ n1.n6 -> n3.n10: "Dependabot phát hiện\nversion mới trên Nexus" { style.st
 
 **Bối cảnh**: Hệ thống e-commerce có 5 services chính, cùng viết bằng Java / Spring Boot. Dùng Maven multi-module, publish shared libraries lên Nexus nội bộ.
 
+```d2 title="8.1. E-Commerce: Shared code giữa Order, Payment, Inventory"
+direction: down
+libraries: Maven Shared Libraries {
+ logging: common-logging — Logback / MDC / CID filter / OTel
+ auth: common-auth — Spring Security JWT Filter / PreAuthorize helpers
+ events: common-events — Event DTO / Kafka serializer / Avro schema
+}
+services: Independent Services {
+ order: Order
+ payment: Payment
+ inventory: Inventory
+ notification: Notification
+ catalog: Catalog
+}
+generated: common-proto-generated — OrderCreatedEvent / PaymentCompletedEvent / InventoryReservedEvent
+libraries -> services: Pinned dependency versions theo nhu cầu
+ generated -> services: Generated contract classes
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│              E-COMMERCE SHARED CODE MAP (Spring Boot)             │
-│                                                                   │
-│   Shared Libraries (Maven artifacts):                             │
-│   ┌────────────────┐ ┌────────────────┐ ┌────────────────┐        │
-│   │common-logging  │ │common-auth     │ │common-events   │        │
-│   │                │ │                │ │                │        │
-│   │• Logback +     │ │• Spring        │ │• Event DTOs    │        │
-│   │  MDC config    │ │  Security      │ │• Kafka         │        │
-│   │• Correlation   │ │  JWT Filter    │ │  Serializer    │        │
-│   │  ID filter     │ │• @PreAuthorize │ │• Avro schemas  │        │
-│   │• Sleuth/OTel   │ │  helpers       │ │                │        │
-│   └──────┬─────────┘ └──────┬─────────┘ └──────┬─────────┘        │
-│          │                  │                  │                  │
-│   ┌──────┼──────────────────┼──────────────────┼──────────┐       │
-│   │      ▼                  ▼                  ▼          │       │
-│   │   Order ──────────── Payment                          │       │
-│   │   Service            Service                          │       │
-│   │      │                                                │       │
-│   │      ▼                                                │       │
-│   │   Inventory ──────── Notification                     │       │
-│   │   Service            Service                          │       │
-│   │                         │                             │       │
-│   │                      Catalog                          │       │
-│   │                      Service                          │       │
-│   └───────────────────────────────────────────────────────┘       │
-│                                                                   │
-│   Generated Code (từ Protobuf / OpenAPI):                         │
-│   ┌───────────────────────────────────────────┐                   │
-│   │  common-proto-generated                   │                   │
-│   │  • OrderCreatedEvent.java                 │                   │
-│   │  • PaymentCompletedEvent.java             │                   │
-│   │  • InventoryReservedEvent.java            │                   │
-│   │  → protobuf-maven-plugin generate classes │                   │
-│   └───────────────────────────────────────────┘                   │
-│                                                                   │
-│   KHÔNG share:                                                    │
-│   • Order domain logic (pricing, discount rules)                  │
-│   • Payment processing logic (gateway integration)                │
-│   • Inventory calculation logic (stock management)                │
-│   • Mỗi service có riêng JPA Entities, business rules             │
-└───────────────────────────────────────────────────────────────────┘
-```
+
+Không share domain pricing/discount rules, payment processing/gateway logic, inventory stock calculations hoặc JPA entities; mỗi service giữ business rules riêng.
 
 **Chi tiết quyết định share/không share:**
 
@@ -2407,33 +2222,32 @@ n1.n3 -> n2: "Phân tích import\ntrong mỗi service"
 
 ## 10. Tổng kết
 
+```d2 title="10. Tổng kết"
+direction: down
+question: "Code cần chia sẻ?"
+domain: "Domain / Business Logic"
+cross: "Cross-cutting Concern"
+contract: "API Contract / Event Schema"
+utility: "Utility dưới50 dòng"
+duplicate: "Không shared domain implementation\nDuplicate theo context hoặc Platform Service"
+same: "Cùng stack → Micro Shared Library"
+poly: "Polyglot → Code Generation / Sidecar"
+complex: "Complex capability → Platform Service"
+schema: "Schema-first / Code Generation"
+copy: "Copy-paste có thể hợp lý"
+question -> domain
+question -> cross
+question -> contract
+question -> utility
+domain -> duplicate
+cross -> same
+cross -> poly
+cross -> complex
+contract -> schema
+utility -> copy
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    SHARED CODE STRATEGY                      │
-│                       DECISION TREE                          │
-│                                                              │
-│   Code cần chia sẻ?                                          │
-│   │                                                          │
-│   ├── Domain/Business Logic?                                 │
-│   │   └── ❌ KHÔNG share → Duplicate hoặc Platform Service   │
-│   │                                                          │
-│   ├── Cross-cutting Concern?                                 │
-│   │   ├── Cùng tech stack? → ✅ Shared Library (micro)       │
-│   │   ├── Polyglot?       → ✅ Code Generation / Sidecar     │
-│   │   └── Complex feature? → ✅ Platform Service             │
-│   │                                                          │
-│   ├── API Contract / Event Schema?                           │
-│   │   └── ✅ Schema-first + Code Generation                  │
-│   │                                                          │
-│   └── Simple utility (< 50 lines)?                           │
-│       └── 🟡 Copy-paste cũng OK                              │
-│                                                              │
-│   KEY PRINCIPLES:                                            │
-│   • "Share things that help services be independently better"│
-│   • "A little copying is better than a little dependency"    │
-│   • "Share contracts, not implementations"                   │
-└──────────────────────────────────────────────────────────────┘
-```
+
+Chia sẻ thứ giúp từng service tốt hơn một cách độc lập; một ít duplication có thể tốt hơn một dependency; share contracts, not implementations.
 
 **Ba nguyên tắc nhớ nhanh:**
 

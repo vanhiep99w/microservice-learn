@@ -63,18 +63,17 @@ Một số thao tác mất nhiều thời gian hơn request thông thường:
 
 Nếu xử lý đồng bộ, client phải giữ connection trong suốt thời gian chờ:
 
-```text
-❌ Xử lý đồng bộ:
-
-Client ── POST /reports ──▶ API ──▶ xử lý vài phút
-   │                         │
-   │                         └─ giữ connection và request resource
-   │
-   └─ chờ response
-
-Gateway hoặc Load Balancer timeout
-   └─ client không biết job đã chạy đến đâu
-      └─ client retry có thể tạo tác vụ thứ hai
+```d2 title="Tác vụ dài và timeout"
+direction: right
+client: "Client POST /reports"
+api: "API — xử lý vài phút\nGiữ connection / Request resources"
+timeout: "Gateway / LB Timeout"
+unknown: "Client không biết job progress"
+retry: "Retry có thể tạo job thứ hai"
+client -> api
+api -> timeout
+timeout -> unknown
+unknown -> retry
 ```
 
 Cách này tạo ra ba rủi ro chính:
@@ -85,16 +84,19 @@ Cách này tạo ra ba rủi ro chính:
 
 Async Request-Reply đưa thời gian xử lý dài ra khỏi request ban đầu:
 
-```text
-✅ Xử lý bất đồng bộ:
-
-Client ── POST /reports ──▶ API ──▶ ghi job + enqueue
-   │                         │
-   ◀── 202 + status URL ─────┘
-
-Worker xử lý trong nền
-   │
-Client ── GET /reports/{jobId}/status ──▶ trạng thái hoặc kết quả
+```d2 title="Tác vụ dài và timeout"
+shape: sequence_diagram
+client: Client
+api: API
+worker: Background Worker
+store: Job / Status Store
+client -> api: POST /reports
+api -> store: Persist job + reliable enqueue intent
+api -> client: 202 + status URL {style.stroke-dash: 5}
+worker -> store: Claim / Process / Update job progress
+client -> api: GET /reports/jobId/status
+api -> store: Read status / Result
+api -> client: Trạng thái hoặc kết quả {style.stroke-dash: 5}
 ```
 
 Client chỉ chờ việc **tiếp nhận request**, không chờ toàn bộ công việc. API vẫn phải bảo đảm job được ghi nhận và có cơ chế đưa job vào queue; trả `202` không thể thay thế cho việc theo dõi phần xử lý phía sau.
@@ -103,13 +105,19 @@ Client chỉ chờ việc **tiếp nhận request**, không chờ toàn bộ cô
 
 Giả sử server đã nhận request nhưng response bị mất do network timeout. Client không biết request có được chấp nhận hay chưa nên gửi lại:
 
-```text
-Request 1: POST /reports ──▶ Server nhận và bắt đầu job A
-                            └─ response bị mất
-
-Retry:    POST /reports ──▶ Server tạo thêm job B
-
-Kết quả: cùng một yêu cầu tạo hai báo cáo.
+```d2 title="Retry có thể tạo tác vụ trùng"
+direction: right
+request: "Request1 POST /reports"
+a: "Server start Job A"
+lost: "Response mất"
+retry: "Client retry POST /reports"
+b: "Server tạo Job B"
+duplicate: "Cùng yêu cầu sinh hai báo cáo"
+request -> a
+a -> lost
+lost -> retry
+retry -> b
+b -> duplicate
 ```
 
 Nếu thao tác có side effect như charge payment, gửi notification hoặc ghi file, việc trùng lặp còn có thể gây thiệt hại hoặc tốn tài nguyên. Do đó, bước tạo job phải có **idempotency** (xử lý lặp cùng một yêu cầu nhưng không tạo thêm tác động ngoài mong muốn).
@@ -169,12 +177,17 @@ shape: sequence_diagram
 
 Trạng thái là một phần của API contract. Một vòng đời thường dùng là:
 
-```mermaid
-stateDiagram-v2
-    [*] --> pending
-    pending --> processing
-    processing --> completed
-    processing --> failed
+```d2 title="Luồng request và trạng thái job"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+pending: "pending"
+initial1 -> pending
+processing: "processing"
+pending -> processing
+completed: "completed"
+processing -> completed
+failed: "failed"
+processing -> failed
 ```
 
 | Trạng thái | Ý nghĩa | Dữ liệu nên có |
@@ -456,12 +469,18 @@ Async Request-Reply không quy định một cách duy nhất để chuyển rep
 
 **Polling** là cách client gọi status URL theo chu kỳ:
 
-```text
-POST /reports ──▶ 202 + Location: /reports/9f3c/status
-
-sau 30 giây: GET /reports/9f3c/status ──▶ pending
-sau 60 giây: GET /reports/9f3c/status ──▶ processing, progress = 40
-sau đó:      GET /reports/9f3c/status ──▶ completed + downloadUrl
+```d2 title="Polling"
+shape: sequence_diagram
+client: Client
+api: Reports API
+client -> api: POST /reports
+api -> client: 202 Location /reports/9f3c/status {style.stroke-dash: 5}
+client -> api: Sau30s — GET status
+api -> client: pending {style.stroke-dash: 5}
+client -> api: Sau60s — GET status
+api -> client: processing / progress40 {style.stroke-dash: 5}
+client -> api: Poll tiếp theo policy
+api -> client: completed / downloadUrl {style.stroke-dash: 5}
 ```
 
 Polling dễ triển khai vì client chỉ cần HTTP và không phải mở endpoint nhận callback. Đổi lại, mỗi lần Polling tạo thêm request dù trạng thái có thể chưa đổi.

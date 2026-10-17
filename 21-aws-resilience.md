@@ -47,42 +47,37 @@ Doc này trả lời câu hỏi: **Auto Scaling ECS/EKS/Lambda khác nhau thế 
 
 > 💡 Giả định: Bạn đã đọc [doc 10](10-resilience-patterns.md) và hiểu lý thuyết. Doc này tập trung vào **cách AWS hiện thực hóa** các khái niệm đó.
 
+```d2 title="1. Giới thiệu"
+direction: right
+scaling: Auto Scaling {
+ ecs: ECS Service Scaling — Target Tracking / Step
+ eks: EKS — HPA / VPA / Karpenter cho Pod-Node
+ lambda: Lambda — Auto concurrency / Reserved-Provisioned settings
+ aurora: Aurora — Read Replica Auto Scaling
+ dynamo: DynamoDB — Provisioned RCU-WCU Auto Scaling
+}
+resilience: Resilience Patterns {
+ policies: Service Connect / VPC Lattice / Istio — Policies tùy khả năng
+ gateway: API Gateway — Rate Limit / Throttle
+ lb: ALB / NLB — Health Check / Failover
+ dns: Route53 — DNS Failover / Health Check
+ dlq: SQS DLQ — Async Failure Handling
+}
+dr: Disaster Recovery {
+ az: Multi-AZ — High Availability
+ region: Multi-Region — DR / Global Users
+ dns: Route53 DNS Failover
+ s3: S3 Cross-Region Replication
+ aurora: Aurora Global Database
+ dynamo: DynamoDB Global Tables — Multi-Region
+}
+chaos: Chaos Engineering {
+ fis: AWS FIS — Managed Experiments
+ gameday: Game Day — Planned Failure Drills
+}
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│          RESILIENCE & AUTO SCALING LANDSCAPE trên AWS              │
-│                                                                    │
-│  ┌─────── Auto Scaling ────────────────────────────────────────┐   │
-│  │  ECS Service Auto Scaling    ← Target Tracking, Step        │   │
-│  │  EKS HPA / VPA / Karpenter   ← Pod & Node scaling           │   │
-│  │  Lambda Concurrency          ← tự động, reserved/provisioned│   │
-│  │  Aurora Auto Scaling         ← Read Replicas                │   │
-│  │  DynamoDB Auto Scaling       ← RCU/WCU                      │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                    │
-│  ┌─────── Resilience Patterns ────────────────────────────────┐    │
-│  │  Service Connect / VPC Lattice / Istio                     │    │
-│  │                               ← Timeout, Retry, policy      │    │
-│  │  API Gateway                 ← Rate Limiting, Throttling   │    │
-│  │  ALB/NLB                     ← Health Check, Failover      │    │
-│  │  Route 53                    ← DNS Failover, Health Check  │    │
-│  │  SQS Dead Letter Queue       ← Async error handling        │    │
-│  └────────────────────────────────────────────────────────────┘    │
-│                                                                    │
-│  ┌─────── Disaster Recovery ──────────────────────────────────┐    │
-│  │  Multi-AZ                    ← High Availability (99.99%)  │    │
-│  │  Multi-Region                ← DR, global users            │    │
-│  │  Route 53 Failover           ← automatic DNS failover      │    │
-│  │  S3 Cross-Region Replication ← data backup                 │    │
-│  │  Aurora Global Database      ← cross-region replication    │    │
-│  │  DynamoDB Global Tables      ← multi-region active-active  │    │
-│  └────────────────────────────────────────────────────────────┘    │
-│                                                                    │
-│  ┌─────── Chaos Engineering ──────────────────────────────────┐    │
-│  │  AWS FIS                     ← managed chaos experiments   │    │
-│  │  Game Day                    ← planned failure drills      │    │
-│  └────────────────────────────────────────────────────────────┘    │
-└────────────────────────────────────────────────────────────────────┘
-```
+
+Multi-AZ không tự bảo đảm99.99% availability cho cả ứng dụng; SLO còn phụ thuộc service, cấu hình và đường request end-to-end. Replication không thay thế backup độc lập và restore drill.
 
 ---
 
@@ -222,38 +217,23 @@ resource "aws_appautoscaling_scheduled_action" "peak_hours" {
 
 EKS có **ba tầng scaling** — Pod level, Node level, và Cluster level.
 
+```d2 title="2.2. EKS Auto Scaling (Karpenter & HPA/VPA)"
+direction: right
+metrics: "CPU / Memory / Prometheus custom metrics"
+hpa: "HPA — scale Pod count"
+vpa: "VPA — usage analysis\nRecommend / Adjust resource requests theo policy"
+pending: "Pods Pending — thiếu node resources"
+karpenter: "Karpenter — provision/right-size/consolidate\nOn-Demand / Spot"
+ca: "Cluster Autoscaler alternative\nScale ASG / Node Groups"
+metrics -> hpa
+metrics -> vpa
+hpa -> pending
+vpa -> pending: "Nếu cần reschedule/resize"
+pending -> karpenter: "Chọn node autoscaler phù hợp"
+pending -> ca: "Alternative"
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                 EKS SCALING LAYERS                          │
-│                                                             │
-│  ┌─── Layer 1: Pod Scaling ──────────────────────────────┐  │
-│  │  HPA (Horizontal Pod Autoscaler)                      │  │
-│  │  ├── Scale số lượng Pod dựa trên metrics              │  │
-│  │  ├── CPU, Memory, custom metrics (Prometheus)         │  │
-│  │  └── Giống ECS Target Tracking                        │  │
-│  │                                                       │  │
-│  │  VPA (Vertical Pod Autoscaler)                        │  │
-│  │  ├── Tự động điều chỉnh CPU/Memory request/limit      │  │
-│  │  ├── Phân tích usage → recommend → (optional) apply   │  │
-│  │  └── Dùng cho workloads khó horizontal scale          │  │
-│  └───────────────────────────────────────────────────────┘  │
-│                           │                                 │
-│                           ▼                                 │
-│  ┌─── Layer 2: Node Scaling ─────────────────────────────┐  │
-│  │  Karpenter (khuyến nghị)                              │  │
-│  │  ├── Tự động provision node khi Pod pending           │  │
-│  │  ├── Chọn instance type tối ưu (right-sizing)         │  │
-│  │  ├── Mix On-Demand + Spot instances                   │  │
-│  │  ├── Consolidation — gom Pod, terminate node thừa     │  │
-│  │  └── Nhanh hơn Cluster Autoscaler (< 60s)             │  │
-│  │                                                       │  │
-│  │  Cluster Autoscaler (legacy)                          │  │
-│  │  ├── Scale ASG (Auto Scaling Group)                   │  │
-│  │  ├── Chậm hơn Karpenter (2-5 phút)                    │  │
-│  │  └── Ít flexible hơn về instance type                 │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+
+HPA và node autoscaler làm việc ở hai lớp khác nhau. Thời gian<60s hay2–5phút là ví dụ, không cam kết; không cấu hình cả hai controllers cùng quản lý một capacity pool một cách xung đột.
 
 #### HPA — Horizontal Pod Autoscaler
 
@@ -351,37 +331,16 @@ spec:
 
 Lambda có cơ chế scaling **hoàn toàn tự động** — mỗi request tạo 1 execution environment riêng.
 
+```d2 title="2.3. Lambda Concurrency & Scaling"
+direction: right
+lambda: Lambda Concurrency {
+ unreserved: Unreserved — shared account pool
+ reserved: Reserved — ví dụ Payment200 / reservation và upper cap
+ provisioned: Provisioned — pre-warm execution environments / billed
+}
 ```
-┌────────────────────────────────────────────────────────────┐
-│               LAMBDA SCALING MODEL                         │
-│                                                            │
-│  Account Concurrency Limit = 1000 (default, có thể tăng)   │
-│                                                            │
-│  ┌── Unreserved Concurrency ──────────────────────────┐    │
-│  │  Chia sẻ giữa tất cả Lambda functions              │    │
-│  │  Không đảm bảo capacity cho function cụ thể        │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                            │
-│  ┌── Reserved Concurrency ────────────────────────────┐    │
-│  │  Đặt trước capacity cho function cụ thể            │    │
-│  │  Ví dụ: Payment function = 200 concurrent          │    │
-│  │  ⚠️ Vượt limit → throttle (429)                    │    │
-│  │  Miễn phí — chỉ reserve, không charge thêm         │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                            │
-│  ┌── Provisioned Concurrency ─────────────────────────┐    │
-│  │  Pre-warm execution environments                   │    │
-│  │  Loại bỏ cold start hoàn toàn                      │    │
-│  │  ⚠️ Tốn phí — charge theo provisioned units        │    │
-│  │  Dùng cho: latency-sensitive (< 100ms required)    │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                            │
-│  Burst Limit:                                              │
-│  ├── 3000 concurrent (us-east-1, us-west-2, eu-west-1)     │
-│  ├── 1000 concurrent (các region khác)                     │
-│  └── Sau burst: +500/minute cho đến account limit          │
-└────────────────────────────────────────────────────────────┘
-```
+
+Account concurrency ví dụ1.000 có thể khác theo account/region/quota. Reserved không phải pre-warming; Provisioned giảm cold-start cho lượng provisioned, không loại bỏ mọi cold-start/initialization khi spillover hoặc deployment. Burst/scaling rates phụ thuộc hiện hành, không dùng các mốc3.000/1.000/+500phút cũ như guarantee.
 
 #### Cấu hình Lambda Scaling (Terraform)
 
@@ -462,40 +421,41 @@ resource "aws_appautoscaling_policy" "lambda_scaling" {
 
 Multi-AZ là **mức tối thiểu** cho production — deploy service trên **ít nhất 2 Availability Zones** trong cùng Region.
 
+```d2 title="3.1. Multi-AZ — High Availability trong Region"
+direction: down
+region: ap-southeast-1 {
+ alb: ALB — Cross-zone enabled / Healthy targets
+ a: AZ1a {
+  tasks: Order ECS Tasks ×3
+  aurora: Aurora Writer
+  redis: ElastiCache Primary
+  nat: NAT Gateway
+ }
+ b: AZ1b {
+  tasks: Order ECS Tasks ×3
+  aurora: Aurora Reader
+  redis: ElastiCache Replica
+  nat: NAT Gateway
+ }
+ c: AZ1c {
+  tasks: Order ECS Tasks ×2
+  aurora: Aurora Reader
+  redis: ElastiCache Replica
+  nat: NAT Gateway
+ }
+ alb -> a.tasks
+ alb -> b.tasks
+ alb -> c.tasks
+ a.redis -> b.redis: Replication
+ a.redis -> c.redis: Replication
+ storage: Aurora Cluster Storage — replicated / shared
+ a.aurora -- storage
+ b.aurora -- storage
+ c.aurora -- storage
+}
 ```
-┌───────────────────────── Region: ap-southeast-1 ──────────────────────────┐
-│                                                                           │
-│  ┌──────────────── Application Load Balancer ──────────────────────────┐  │
-│  │  Cross-Zone Load Balancing: ENABLED                                 │  │
-│  │  Routes traffic to healthy targets across all AZs                   │  │
-│  └────────┬───────────────────────┬───────────────────────┬────────────┘  │
-│           │                       │                       │               │
-│           ▼                       ▼                       ▼               │
-│  ┌──────── AZ-1a ───────┐  ┌──────── AZ-1b ───────┐  ┌──────── AZ-1c ──┐  │
-│  │                      │  │                      │  │                 │  │
-│  │  ┌────────────────┐  │  │  ┌────────────────┐  │  │  ┌────────────┐ │  │
-│  │  │ ECS Task ×3    │  │  │  │ ECS Task ×3    │  │  │  │ ECS Task×2 │ │  │
-│  │  │ Order Service  │  │  │  │ Order Service  │  │  │  │ Order Svc  │ │  │
-│  │  └────────────────┘  │  │  └────────────────┘  │  │  └────────────┘ │  │
-│  │                      │  │                      │  │                 │  │
-│  │  ┌────────────────┐  │  │  ┌────────────────┐  │  │  ┌────────────┐ │  │
-│  │  │ Aurora         │  │  │  │ Aurora         │  │  │  │ Aurora     │ │  │
-│  │  │ Primary        │──┼──┼──▶ Read Replica   │──┼──┼──▶ Read       │ │  │
-│  │  │ (Writer)       │  │  │  │ (Reader)       │  │  │  │ Replica    │ │  │
-│  │  └────────────────┘  │  │  └────────────────┘  │  │  └────────────┘ │  │
-│  │                      │  │                      │  │                 │  │
-│  │  ┌────────────────┐  │  │  ┌────────────────┐  │  │  ┌────────────┐ │  │
-│  │  │ ElastiCache    │  │  │  │ ElastiCache    │  │  │  │ ElastiCache│ │  │
-│  │  │ Primary        │──┼──┼──▶ Replica        │──┼──┼──▶ Replica    │ │  │
-│  │  └────────────────┘  │  │  └────────────────┘  │  │  └────────────┘ │  │
-│  │                      │  │                      │  │                 │  │
-│  │  ┌────────────────┐  │  │  ┌────────────────┐  │  │  ┌────────────┐ │  │
-│  │  │ NAT Gateway    │  │  │  │ NAT Gateway    │  │  │  │ NAT GW     │ │  │
-│  │  └────────────────┘  │  │  └────────────────┘  │  │  └────────────┘ │  │
-│  └──────────────────────┘  └──────────────────────┘  └─────────────────┘  │
-│                                                                           │
-└───────────────────────────────────────────────────────────────────────────┘
-```
+
+Aurora instances trong cùng cluster dùng shared distributed storage; không diễn tả readers như một chain writer→reader→reader replication. NAT per-AZ phục vụ egress, cần route tables/policy phù hợp.
 
 #### Multi-AZ Checklist
 
@@ -516,39 +476,29 @@ Multi-AZ là **mức tối thiểu** cho production — deploy service trên **�
 
 Multi-Region cần thiết khi: **(1)** Yêu cầu DR cho critical workloads, **(2)** Giảm latency cho global users, **(3)** Compliance — data phải ở region cụ thể.
 
+```d2 title="3.2. Multi-Region — Disaster Recovery & Global Users"
+direction: down
+route: Route53 — Health-check-based DNS Failover
+primary: ap-southeast-1 — Primary {
+ cluster: ECS / EKS — Svc A / B / C / D
+ aurora: Aurora Primary — Read/Write
+ dynamo: DynamoDB — Read/Write
+ s3: S3 Bucket
+}
+dr: ap-northeast-1 — DR {
+ cluster: ECS / EKS — Svc A / B standby
+ aurora: Aurora Secondary — Read-only trước promotion
+ dynamo: DynamoDB Global Table replica
+ s3: S3 Replica
+}
+route -> primary.cluster: Primary DNS target
+route -> dr.cluster: Secondary khi DR ready / Policy failover
+primary.aurora -> dr.aurora: Global Database async replication
+primary.dynamo <-> dr.dynamo: Global Tables theo consistency/topology đã chọn
+primary.s3 -> dr.s3: Cross-Region Replication
 ```
-                         ┌──────────────────────┐
-                         │      Route 53        │
-                         │  Failover Routing    │
-                         │  (Health Check based)│
-                         └─────┬──────────┬─────┘
-                               │          │
-                    Primary    │          │   Secondary
-                               ▼          ▼
-┌──── Region: ap-southeast-1 (Primary) ───────┐  ┌──── Region: ap-northeast-1 (DR) ───────┐
-│                                             │  │                                        │
-│  ┌───────── ECS / EKS Cluster ───────────┐  │  │  ┌──────── ECS / EKS Cluster ───────┐  │
-│  │  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐      │  │  │  │  ┌─────┐ ┌─────┐                 │  │
-│  │  │Svc A│ │Svc B│ │Svc C│ │Svc D│      │  │  │  │  │Svc A│ │Svc B│  (standby)      │  │
-│  │  └─────┘ └─────┘ └─────┘ └─────┘      │  │  │  │  └─────┘ └─────┘                 │  │
-│  └───────────────────────────────────────┘  │  │  └──────────────────────────────────┘  │
-│                                             │  │                                        │
-│  ┌──────────────────┐   Global Database     │  │  ┌──────────────────┐                  │
-│  │ Aurora Primary   │ ──── async repl ──────┼──┼──▶ Aurora Replica   │                  │
-│  │ (read-write)     │   (~1s lag)           │  │  │ (read-only)      │                  │
-│  └──────────────────┘                       │  │  └──────────────────┘                  │
-│                                             │  │                                        │
-│  ┌──────────────────┐   Global Tables       │  │  ┌──────────────────┐                  │
-│  │ DynamoDB Table   │ ──── active-active ───┼──┼──▶ DynamoDB Replica │                  │
-│  │ (read-write)     │                       │  │  │ (read-write)     │                  │
-│  └──────────────────┘                       │  │  └──────────────────┘                  │
-│                                             │  │                                        │
-│  ┌──────────────────┐   Cross-Region Repl   │  │  ┌──────────────────┐                  │
-│  │ S3 Bucket        │ ──────────────────────┼──┼──▶ S3 Replica       │                  │
-│  └──────────────────┘                       │  │  └──────────────────┘                  │
-│                                             │  │                                        │
-└─────────────────────────────────────────────┘  └────────────────────────────────────────┘
-```
+
+Replication lag/RPO tùy dịch vụ và cấu hình, không bảo đảm mọi async replica luôn<1s. DNS failover không tự promote DB hay tạo compute; cần DR readiness/orchestration riêng.
 
 ### 3.3. DR Strategies trên AWS
 
@@ -574,29 +524,25 @@ Circuit Breaker có thể triển khai ở 2 tầng:
 
 > ⚠️ **Lưu ý thời gian:** AWS App Mesh có mốc **End of Support ngày 30/09/2026**. Không nên chọn App Mesh cho workload mới.
 
+```d2 title="4.1. Circuit Breaker ở service layer (ưu tiên non-App-Mesh)"
+direction: right
+order: Order Service {
+ app: Application
+ envoy: Envoy — Outlier detection / Retry / Timeout / Resource circuit limits
+ app -> envoy
+}
+payment: Payment Service {
+ envoy: Envoy — Health / Rate policies theo deployment
+ app: Application
+ envoy -> app
+}
+control: Service-layer control plane / API / Terraform
+control -> order.envoy: Configure policy
+control -> payment.envoy: Configure policy
+order.envoy -> payment.envoy: Service request
 ```
-┌──────────────────────────────────────────────────────────┐
-│          CIRCUIT BREAKER VỚI APP MESH                    │
-│                                                          │
-│  ┌─────────────────────┐      ┌─────────────────────┐    │
-│  │   Order Service     │      │   Payment Service   │    │
-│  │  ┌───────────────┐  │      │  ┌───────────────┐  │    │
-│  │  │  Application  │  │      │  │  Application  │  │    │
-│  │  └───────┬───────┘  │      │  └───────────────┘  │    │
-│  │          │          │      │         ▲           │    │
-│  │  ┌───────▼───────┐  │      │  ┌──────┴────────┐  │    │
-│  │  │ Envoy Proxy   │──┼──────┼──▶ Envoy Proxy   │  │    │
-│  │  │               │  │      │  │               │  │    │
-│  │  │ • Outlier Det │  │      │  │ • Health Check│  │    │
-│  │  │ • Retry       │  │      │  │ • Rate Limit  │  │    │
-│  │  │ • Timeout     │  │      │  │               │  │    │
-│  │  │ • Circuit Brk │  │      │  │               │  │    │
-│  │  └───────────────┘  │      │  └───────────────┘  │    │
-│  └─────────────────────┘      └─────────────────────┘    │
-│                                                          │
-│  Service layer control plane ← cấu hình qua API/Terraform │
-└──────────────────────────────────────────────────────────┘
-```
+
+Envoy/App Mesh là mô hình legacy tham khảo trong hình cũ; ưu tiên non-App-Mesh alternatives của bài. Proxy circuit limits/outlier detection không hoàn toàn đồng nghĩa application-level state-machine CB/fallback.
 
 #### Cấu hình Outlier Detection (legacy App Mesh, chỉ tham khảo migration)
 
@@ -798,60 +744,44 @@ Ngoài service layer, nhiều AWS service có **built-in retry**:
 
 Bulkhead trên AWS được triển khai qua nhiều tầng:
 
-```
-┌────────────────────────────────────────────────────────────┐
-│                  BULKHEAD trên AWS                         │
-│                                                            │
-│  ┌── Infrastructure-Level Bulkhead ───────────────────┐    │
-│  │  • Separate ECS Services (không chia sẻ task)      │    │
-│  │  • Separate EKS namespaces + resource quotas       │    │
-│  │  • Lambda reserved concurrency per function        │    │
-│  │  • Separate VPCs/subnets cho critical services     │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                            │
-│  ┌── Service-Level Bulkhead ──────────────────────────┐    │
-│  │  • Service-layer connection pool (max_connections)  │    │
-│  │  • ALB target group per service                    │    │
-│  │  • API Gateway usage plans per client              │    │
-│  │  • SQS separate queues per workload type           │    │
-│  └────────────────────────────────────────────────────┘    │
-│                                                            │
-│  ┌── Database-Level Bulkhead ─────────────────────────┐    │
-│  │  • Database per Service (doc 09, doc 20)           │    │
-│  │  • Aurora connection limits per service            │    │
-│  │  • DynamoDB separate tables per service            │    │
-│  │  • ElastiCache separate clusters for critical data │    │
-│  └────────────────────────────────────────────────────┘    │
-└────────────────────────────────────────────────────────────┘
+```d2 title="4.3. Bulkhead trên AWS"
+direction: right
+bulkheads: AWS Bulkhead Layers {
+ infra: Infrastructure {
+  ecs: Separate ECS Services / Tasks
+  eks: EKS namespaces + Resource Quotas
+  lambda: Lambda Reserved Concurrency per function
+  network: Separate VPCs / Subnets cho critical workloads
+ }
+ service: Service {
+  pools: Per-dependency connection/concurrency pools
+  alb: Target Group per service
+  api: Per-client Gateway usage policies
+  queues: Separate SQS queues per workload
+ }
+ db: Database {
+  owner: Database per Service
+  aurora: Aurora per-service connection limits
+  dynamo: Separate DynamoDB tables theo boundary
+  cache: Separate critical ElastiCache clusters
+ }
+}
 ```
 
 ### 4.4. Rate Limiting trên AWS
 
+```d2 title="4.4. Rate Limiting trên AWS"
+direction: right
+edge: "Layer1 CloudFront + WAF\nIP rate rule ví dụ2.000req/5phút"
+api: "Layer2 API Gateway\nPer-client usage/throttle\nVí dụ50req/s sustained, burst100\nAccount quota ví dụ10.000req/s"
+alb: "Layer3 ALB + WAF\nIP / Header-based rules"
+app: "Layer4 Application\nRedis Token Bucket / Sliding Window\nPer-user / Tenant / API-key"
+edge -> api
+api -> alb
+alb -> app
 ```
-┌─────────────────────────────────────────────────────────┐
-│              RATE LIMITING LAYERS trên AWS              │
-│                                                         │
-│  Layer 1: CloudFront                                    │
-│  ├── AWS WAF Rate-based Rules                           │
-│  ├── Giới hạn per IP: ví dụ 2000 req / 5 min            │
-│  └── Block DDoS tại edge (trước khi vào Region)         │
-│                                                         │
-│  Layer 2: API Gateway                                   │
-│  ├── Usage Plans + API Keys                             │
-│  ├── Per-client throttling: 100 req/s burst, 50 req/s   │
-│  ├── Account-level: 10,000 req/s (default)              │
-│  └── Method-level throttling (override per endpoint)    │
-│                                                         │
-│  Layer 3: ALB + WAF                                     │
-│  ├── WAF Rate-based Rules trên ALB                      │
-│  └── Giới hạn per IP hoặc per header                    │
-│                                                         │
-│  Layer 4: Application                                   │
-│  ├── Redis-based rate limiter (ElastiCache)             │
-│  ├── Token Bucket / Sliding Window algorithm            │
-│  └── Per-user, per-tenant, per-API-key                  │
-└─────────────────────────────────────────────────────────┘
-```
+
+Đây là logical protection layers; không mọi request cần đi qua cả API Gateway lẫn ALB/WAF layer. API type, account/region quotas và WAF rule windows phải kiểm tra khi triển khai.
 
 #### API Gateway Throttling (Terraform)
 
@@ -1313,65 +1243,48 @@ resource "aws_fis_experiment_template" "network_latency" {
 
 ### 7.1. Bốn chiến lược DR
 
+```d2 title="7.1. Bốn chiến lược DR"
+direction: right
+backup: "Backup & Restore\nRTO giờ / RPO giờ\nCost thấp • S3 backups / AMIs\nKhông warm compute"
+pilot: "Pilot Light\nRTO10–30phút / RPO phút\nDB replica • Min core compute"
+warm: "Warm Standby\nRTO phút / RPO giây\nScaled-down compute đang chạy"
+active: "Active-Active\nRTO/RPO mục tiêu gần0\nFull capacity cả hai regions"
+backup -> pilot
+pilot -> warm
+warm -> active
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                  DR STRATEGIES SPECTRUM                         │
-│                                                                 │
-│  Cost thấp ◄──────────────────────────────────────► Cost cao    │
-│  RTO dài   ◄──────────────────────────────────────► RTO ngắn    │
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌──────────┐  ┌───────────┐  │
-│  │  Backup &   │  │   Pilot     │  │  Warm    │  │  Active-  │  │
-│  │  Restore    │  │   Light     │  │  Standby │  │  Active   │  │
-│  │             │  │             │  │          │  │           │  │
-│  │ RTO: giờ    │  │ RTO: 10-30m │  │ RTO: phút│  │ RTO: ~0   │  │
-│  │ RPO: giờ    │  │ RPO: phút   │  │ RPO: giây│  │ RPO: ~0   │  │
-│  │ Cost: $     │  │ Cost: $$    │  │ Cost: $$$│  │ Cost: $$$$│  │
-│  │             │  │             │  │          │  │           │  │
-│  │ S3 backups  │  │ DB replica  │  │ Scaled   │  │ Full      │  │
-│  │ AMI copies  │  │ Min compute │  │ down     │  │ capacity  │  │
-│  │ No compute  │  │ Core only   │  │ compute  │  │ both      │  │
-│  │             │  │             │  │          │  │ regions   │  │
-│  └─────────────┘  └─────────────┘  └──────────┘  └───────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Chi phí/capacity thường tăng từ trái sang phải, recovery targets thường ngắn hơn. Các RTO/RPO là ví dụ mục tiêu, cần đo qua DR drills; active-active không tự bảo đảm RPO0 hay loại bỏ mọi failover gap.
 
 ### 7.2. DR cho Microservice — Thiết kế chi tiết
 
 #### Pilot Light — Phổ biến nhất cho Microservice
 
+```d2 title="Pilot Light — Phổ biến nhất cho Microservice"
+direction: right
+primary: Primary Region {
+ cluster: ECS ACTIVE — Order×5 / Payment×3 / Notification×3
+ aurora: Aurora Primary — Read/Write
+ dynamo: DynamoDB — Read/Write
+ redis: ElastiCache Primary
+ s3: S3
+ secrets: Secrets Manager
+}
+dr: DR Region {
+ cluster: ECS desired_count0 — task defs / ECR images sẵn
+ aurora: Aurora Replica — Always on / Read-only trước promotion
+ dynamo: DynamoDB Replica — Always on
+ redis: Cache chưa tạo / Cold
+ s3: S3 Replica
+ secrets: Replicated Secrets
+}
+primary.aurora -> dr.aurora: Global DB — Async
+primary.dynamo <-> dr.dynamo: Global Tables
+primary.s3 -> dr.s3: Cross-Region Replication
+primary.secrets -> dr.secrets: Secret replication
 ```
-┌──── Primary Region ──────────────────┐   ┌──── DR Region ─────────────────────┐
-│                                      │   │                                    │
-│  ECS Cluster (ACTIVE)                │   │  ECS Cluster (STOPPED)             │
-│  ┌──────┐ ┌──────┐ ┌──────┐          │   │  Task definitions ready            │
-│  │ ×5   │ │ ×3   │ │ ×3   │          │   │  ECR images replicated             │
-│  │Order │ │Pay   │ │Notif │          │   │  desired_count = 0                 │
-│  └──────┘ └──────┘ └──────┘          │   │                                    │
-│                                      │   │                                    │
-│  Aurora Primary ─── Global DB ───────┼───▶  Aurora Replica (ALWAYS ON)        │
-│  (read-write)    (async, ~1s lag)    │   │  (read-only, promote khi failover) │
-│                                      │   │                                    │
-│  DynamoDB ─── Global Tables ─────────┼───▶  DynamoDB Replica (ALWAYS ON)      │
-│  (read-write)  (active-active)       │   │  (read-write ready)                │
-│                                      │   │                                    │
-│  ElastiCache ─── ❌ No replication ──┼───│  ElastiCache (cold, warm on DR)    │
-│                                      │   │                                    │
-│  S3 ─── Cross-Region Replication ────┼───▶  S3 Replica                        │
-│                                      │   │                                    │
-│  Secrets Manager (replicated) ───────┼───▶  Secrets (ALWAYS AVAILABLE)        │
-│                                      │   │                                    │
-└──────────────────────────────────────┘   └────────────────────────────────────┘
 
-Failover Steps (automated via Lambda + Step Functions):
-1. Route 53 health check fails → trigger failover
-2. Step Functions orchestrate:
-   a. Promote Aurora Replica → Primary
-   b. Update ECS service desired_count (0 → N)
-   c. Create ElastiCache cluster (from snapshot hoặc empty)
-   d. Update Route 53 DNS → DR region ALB
-3. Total time: 10-30 phút
-```
+Pilot Light flow minh họa: health failure → Step Functions/Lambda promote DB, scale ECS từ0 lênN, tạo/warm cache, verify readiness rồi đổi DNS về DR ALB. Redis trong ví dụ không cross-region replicate, không phải mọi ElastiCache deployment đều bắt buộc như vậy. RTO10–30phút là mục tiêu cần kiểm nghiệm.
 
 #### Active-Active — Cho Mission-Critical Services
 
@@ -1432,115 +1345,57 @@ resource "aws_rds_cluster" "dr" {
 
 ### 7.3. Failover tự động với Route 53
 
+```d2 title="7.3. Failover tự động với Route 53"
+direction: down
+health: "Route53 health checker — kiểm tra primary /health"
+primary: "Primary healthy → DNS target Primary ALB"
+bad: "3 consecutive failures theo ví dụ → UNHEALTHY"
+alarm: "CloudWatch Alarm → SNS PagerDuty/Slack"
+event: "EventBridge Rule / Configured integration"
+workflow: "Step Functions\nPromote DB • Scale ECS DR • Warm caches"
+ready: "Verify DR readiness"
+route: "DNS Failover tới DR ALB"
+health -> primary: "Healthy"
+health -> bad: "Fail threshold"
+bad -> alarm
+alarm -> event
+event -> workflow
+workflow -> ready
+ready -> route
 ```
-┌────────────────────────────────────────────────────────────┐
-│            AUTOMATIC FAILOVER FLOW                         │
-│                                                            │
-│  Route 53 Health Checker (3 regions)                       │
-│         │                                                  │
-│         ▼                                                  │
-│  ┌──────────────┐    Healthy     ┌──────────────────┐      │
-│  │ Check primary│───────────────▶│ Route to Primary │      │
-│  │ /health      │                │ Region ALB       │      │
-│  └──────┬───────┘                └──────────────────┘      │
-│         │                                                  │
-│         │ 3 consecutive failures                           │
-│         ▼                                                  │
-│  ┌──────────────┐                ┌──────────────────┐      │
-│  │Mark UNHEALTHY│───────────────▶│ Route to DR      │      │
-│  │              │                │ Region ALB       │      │
-│  └──────┬───────┘                └──────────────────┘      │
-│         │                                                  │
-│         ▼                                                  │
-│  ┌──────────────┐                                          │
-│  │ CloudWatch   │── SNS ──▶ PagerDuty/Slack notification   │
-│  │ Alarm        │                                          │
-│  └──────┬───────┘                                          │
-│         │                                                  │
-│         ▼                                                  │
-│  ┌──────────────┐                                          │
-│  │ EventBridge  │── Step Functions ──▶ Auto promote DB     │
-│  │ Rule         │                     ▶ Scale up DR ECS    │
-│  └──────────────┘                     ▶ Warm up caches     │
-└────────────────────────────────────────────────────────────┘
-```
+
+Control-plane automation và DNS failover phải được phối hợp/config riêng. DNS/cache TTL khiến traffic switch không tức thời; không chuyển users vào DR chưa sẵn sàng.
 
 ---
 
 ## 8. Ví dụ thực tế — E-Commerce Resilience Architecture
 
+```d2 title="8. Ví dụ thực tế — E-Commerce Resilience Architecture"
+direction: down
+edge: "Edge — CloudFront / WAF / Shield\nVí dụ2.000req/5phút/IP • S3 maintenance fallback"
+api: "Regional API Gateway\nVí dụ1.000req/s/client • Free/Pro/Enterprise tiers\nJWT Lambda Authorizer"
+services: ECS Fargate + Service Connect {
+ order: "Order min3/max20\nTimeout15s • Retry2 • CB policy ví dụ5err/30s"
+ payment: "Payment min2/max15\nTimeout30s • Retry1 • CB policy ví dụ3err/30s"
+ inventory: "Inventory min2/max10\nTimeout10s • Retry3 • CB policy ví dụ5err/30s"
+}
+data: Data {
+ aurora: Aurora Multi-AZ / Readers2 / Autoscale1–5 / Global Database
+ dynamo: DynamoDB On-Demand / Global Tables / PITR
+ redis: ElastiCache Multi-AZ — Product fallback / Sessions
+}
+async: Async {
+ queues: SQS per-service + DLQ — maxReceiveCount Order5/Payment3/Notification10
+ bridge: EventBridge retry/DLQ theo rule policy
+}
+dr: Pilot Light — replicated DBs / ECS desired0 / Route53 / Step Functions
+edge -> api -> services
+services -- data: Theo ownership / Query needs
+services -- async: Events / Queue work
+ data -- dr: Replication / Recovery
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│              E-COMMERCE RESILIENCE ARCHITECTURE trên AWS                 │
-│                                                                         │
-│  ┌─── Edge Layer ───────────────────────────────────────────────────┐    │
-│  │  CloudFront + WAF                                                │    │
-│  │  ├── DDoS protection (Shield Standard — free)                    │    │
-│  │  ├── Rate limiting: 2000 req/5min per IP                         │    │
-│  │  └── Static fallback: S3 maintenance page                        │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│           │                                                             │
-│  ┌─── API Layer ────────────────────────────────────────────────────┐    │
-│  │  API Gateway (Regional)                                          │    │
-│  │  ├── Throttling: 1000 req/s per client                           │    │
-│  │  ├── Usage Plans per tier (Free/Pro/Enterprise)                  │    │
-│  │  └── Lambda Authorizer (JWT validation)                          │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│           │                                                              │
-│  ┌─── Service Layer (ECS Fargate + Service Connect) ────────────────┐    │
-│  │                                                                  │    │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐              │    │
-│  │  │ Order Svc   │  │ Payment Svc │  │ Inventory    │              │    │
-│  │  │ min:3 max:20│  │ min:2 max:15│  │ min:2 max:10 │              │    │
-│  │  │             │  │             │  │              │              │    │
-│  │  │ Envoy:      │  │ Envoy:      │  │ Envoy:       │              │    │
-│  │  │ •timeout:15s│  │ •timeout:30s│  │ •timeout:10s │              │    │
-│  │  │ •retry: 2   │  │ •retry: 1   │  │ •retry: 3    │              │    │
-│  │  │ •CB: 5err/30s│ │ •CB: 3err/30s│ │ •CB: 5err/30s│              │    │
-│  │  └──────┬──────┘  └──────┬──────┘  └──────┬───────┘              │    │
-│  │         │                │                │                      │    │
-│  │  Auto Scaling:           │                │                      │    │
-│  │  • CPU Target: 70%       │                │                      │    │
-│  │  • Scale out: 60s cool   │                │                      │    │
-│  │  • Scale in: 300s cool   │                │                      │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│           │                                                              │
-│  ┌─── Data Layer ───────────────────────────────────────────────────┐    │
-│  │  Aurora PostgreSQL (Multi-AZ, 2 read replicas)                   │    │
-│  │  ├── Auto failover: ~30 giây                                     │    │
-│  │  ├── Aurora Auto Scaling read replicas (1-5)                     │    │
-│  │  └── Global Database → DR region                                 │    │
-│  │                                                                  │    │
-│  │  DynamoDB (On-Demand, Global Tables)                             │    │
-│  │  ├── Auto scaling RCU/WCU (nếu Provisioned mode)                 │    │
-│  │  └── Point-in-time recovery enabled                              │    │
-│  │                                                                  │    │
-│  │  ElastiCache Redis (Multi-AZ, auto failover)                     │    │
-│  │  ├── Cache fallback cho Product catalog                          │    │
-│  │  └── Session store (stateless services)                          │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│           │                                                              │
-│  ┌─── Async Layer ──────────────────────────────────────────────────┐    │
-│  │  SQS Queues (per service) + DLQ                                  │    │
-│  │  ├── Order Queue: maxReceiveCount=5 → DLQ                        │    │
-│  │  ├── Payment Queue: maxReceiveCount=3 → DLQ                      │    │
-│  │  └── Notification Queue: maxReceiveCount=10 → DLQ                │    │
-│  │                                                                  │    │
-│  │  EventBridge                                                     │    │
-│  │  ├── Retry policy: 3 retries                                     │    │
-│  │  └── DLQ for failed events                                       │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-│                                                                          │
-│  ┌─── DR ───────────────────────────────────────────────────────────┐    │
-│  │  Strategy: Pilot Light                                           │    │
-│  │  ├── Aurora Global Database (always replicating)                 │    │
-│  │  ├── DynamoDB Global Tables (active-active)                      │    │
-│  │  ├── ECS task definitions ready (desired_count = 0)              │    │
-│  │  ├── Route 53 failover routing                                   │    │
-│  │  └── Failover automation: Step Functions + Lambda                │    │
-│  └──────────────────────────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────────────────────────┘
-```
+
+Auto Scaling ví dụ CPU target70%, scale-out cooldown60s, scale-in300s. Các proxy/CB numbers là logical policy, không mặc định mọi knob được Service Connect expose. DB failover~30s, retry counts, concurrency và quotas không phải SLA; đo/kiểm chứng cấu hình thực tế.
 
 ---
 

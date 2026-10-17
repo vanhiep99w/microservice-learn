@@ -52,35 +52,31 @@ Doc này trả lời câu hỏi: **Dùng database nào trên AWS cho từng serv
 
 > 📌 Lưu ý: Các con số về pricing trong tài liệu là **giá tham khảo theo thời điểm viết** và có thể thay đổi theo region/thời gian. Luôn kiểm tra trang AWS Pricing chính thức trước khi ra quyết định.
 
+```d2 title="1. Giới thiệu"
+direction: right
+db: Database per Service {
+ aurora: RDS / Aurora PostgreSQL-MySQL — Relational / ACID
+ dynamo: DynamoDB — Key-Value / Serverless
+ cache: ElastiCache — Cache / Session
+ search: OpenSearch — Search / Analytics
+ graph: Neptune — Graph
+ document: DocumentDB — MongoDB-compatible
+}
+consistency: Data Consistency Patterns {
+ orchestration: Step Functions — Saga Orchestration
+ choreography: EventBridge — Saga Choreography transport
+ cdc: DynamoDB Streams — CDC / Event processing
+ streaming: MSK / Kinesis — Event Streaming
+ migration: DMS — CDC from RDS
+}
+cross: Cross-Service Data {
+ composition: AppSync GraphQL — API Composition
+ state: EventBridge — Event-Carried State
+ pipeline: DMS + Kinesis — CDC Pipeline
+}
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│            DATA MANAGEMENT LANDSCAPE trên AWS                      │
-│                                                                    │
-│  ┌─────── Database per Service ────────────────────────────────┐   │
-│  │  RDS Aurora (PostgreSQL/MySQL)  ← relational, ACID          │   │
-│  │  DynamoDB                       ← key-value, serverless     │   │
-│  │  ElastiCache (Redis)            ← cache, session            │   │
-│  │  OpenSearch                     ← search, analytics         │   │
-│  │  Neptune                        ← graph                     │   │
-│  │  DocumentDB                     ← MongoDB-compatible        │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                    │
-│  ┌─────── Data Consistency Patterns ───────────────────────────┐   │
-│  │  Step Functions                 ← Saga (orchestration)      │   │
-│  │  EventBridge                    ← Saga (choreography)       │   │
-│  │  DynamoDB Streams               ← CDC, Event Sourcing       │   │
-│  │  MSK (Kafka) / Kinesis          ← event streaming           │   │
-│  │  DMS (Database Migration)       ← CDC from RDS              │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                    │
-│  ┌─────── Cross-Service Data ──────────────────────────────────┐   │
-│  │  AppSync (GraphQL)              ← API Composition           │   │
-│  │  EventBridge                    ← Event-Carried State       │   │
-│  │  DMS + Kinesis                  ← CDC pipeline              │   │
-│  └─────────────────────────────────────────────────────────────┘   │
-│                                                                    │
-└────────────────────────────────────────────────────────────────────┘
-```
+
+DynamoDB Streams là change stream có retention hữu hạn, không tự là authoritative Event Store. Event Sourcing cần lưu domain events bền vững; Streams có thể phân phối thay đổi từ Event Store table.
 
 ---
 
@@ -92,77 +88,44 @@ Doc này trả lời câu hỏi: **Dùng database nào trên AWS cho từng serv
 
 AWS cung cấp **purpose-built databases** — mỗi loại tối ưu cho 1 use case. Đây chính là nền tảng cho **Polyglot Persistence** trong Microservice.
 
+```d2 title="2.1. Tổng quan Database Services trên AWS"
+direction: right
+catalog: AWS Purpose-Built Databases {
+ relational: Relational {
+  rds: RDS — PostgreSQL / MySQL / MariaDB / Oracle / SQL Server
+  aurora: Aurora — MySQL-PostgreSQL / Auto storage / Multi-AZ / Read replicas
+ }
+ keyvalue: Key-Value / Cache {
+  dynamo: DynamoDB — Serverless / Autoscale / Key-value + Document / Low latency
+  cache: ElastiCache — Redis / Memcached / In-memory / Low latency
+ }
+ document: DocumentDB — MongoDB-compatible / Managed / Scalable
+ search: OpenSearch — Full-text / Log analytics / Dashboards
+ graph: Neptune — Property Graph / RDF
+ time: Timestream — IoT / DevOps Metrics / Storage tiering
+ ledger: QLDB — Ledger / Verifiable history trong ví dụ lịch sử
+ warehouse: Redshift — Columnar OLAP / Large-scale Analytics
+}
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                AWS PURPOSE-BUILT DATABASES                          │
-│                                                                     │
-│  ┌─── Relational ───────────┐   ┌─── Key-Value ───────────────┐     │
-│  │  Amazon RDS              │   │  Amazon DynamoDB            │     │
-│  │  • PostgreSQL, MySQL     │   │  • Serverless, auto-scale   │     │
-│  │  • MariaDB, Oracle, SQL  │   │  • Single-digit ms latency  │     │
-│  │                          │   │  • Key-value + document     │     │
-│  │  Amazon Aurora           │   │                             │     │
-│  │  • MySQL/PostgreSQL      │   │  Amazon ElastiCache         │     │
-│  │  • 5x faster MySQL       │   │  • Redis / Memcached        │     │
-│  │  • Auto-scaling storage  │   │  • In-memory cache          │     │
-│  │  • Multi-AZ, read replica│   │  • Sub-ms latency           │     │
-│  └──────────────────────────┘   └─────────────────────────────┘     │
-│                                                                     │
-│  ┌─── Document ─────────────┐   ┌─── Search ───────────────────┐    │
-│  │  Amazon DocumentDB       │   │  Amazon OpenSearch           │    │
-│  │  • MongoDB-compatible    │   │  • Full-text search          │    │
-│  │  • Managed, scalable     │   │  • Log analytics             │    │
-│  └──────────────────────────┘   │  • Dashboards (Kibana)       │    │
-│                                 └──────────────────────────────┘    │
-│  ┌─── Graph ────────────────┐   ┌─── Time-Series ──────────────┐    │
-│  │  Amazon Neptune          │   │  Amazon Timestream           │    │
-│  │  • Property graph +      │   │  • IoT, DevOps metrics       │    │
-│  │    RDF models            │   │  • Auto-tiering storage      │    │
-│  └──────────────────────────┘   └──────────────────────────────┘    │
-│                                                                     │
-│  ┌─── Ledger ───────────────┐   ┌─── Data Warehouse ───────────┐    │
-│  │  Amazon QLDB             │   │  Amazon Redshift             │    │
-│  │  • Immutable, verifiable │   │  • OLAP, columnar            │    │
-│  │  • Audit trail           │   │  • Petabyte-scale analytics  │    │
-│  └──────────────────────────┘   └──────────────────────────────┘    │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+
+Danh mục thể hiện nhóm use case, không bảo đảm mọi offering còn mở cho tài khoản mới: kiểm tra lifecycle, region và engine support trước khi chọn. Các mức latency và claim Aurora “5x MySQL” phụ thuộc workload/benchmark, không phải cam kết cho mọi ứng dụng.
 
 ### 2.2. Amazon RDS & Aurora
 
 **Amazon RDS** (Relational Database Service) — managed relational database. **Aurora** — engine của AWS tương thích MySQL/PostgreSQL, tối ưu cho cloud.
 
+```d2 title="2.2. Amazon RDS & Aurora"
+direction: down
+aurora: Aurora PostgreSQL {
+ writer: Writer — db.r6g.large / Write + Read
+ readers: Readers — db.r6g.large / tối đa15 replicas theo topology
+ storage: Shared Aurora Storage — replicated across3 AZs {shape: cylinder}
+ writer -> storage
+ readers -> storage
+}
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                   AURORA POSTGRESQL                              │
-│                                                                  │
-│  ┌─── Writer Instance ─────┐    ┌─── Reader Instance(s) ─────┐   │
-│  │  db.r6g.large           │    │  db.r6g.large × 1-15       │   │
-│  │  • Write + Read         │    │  • Read-only               │   │
-│  │  • Single writer        │    │  • Auto-scaling replicas   │   │
-│  └────────┬────────────────┘    └──────────┬─────────────────┘   │
-│           │                                │                     │
-│           ▼                                ▼                     │
-│  ┌──────────────────────────────────────────────────────────┐    │
-│  │                 Aurora Storage (shared)                  │    │
-│  │  • 6 copies across 3 AZs                                 │    │
-│  │  • Auto-grows: 10GB → 128TB                              │    │
-│  │  • Continuous backup to S3                               │    │
-│  │  • Point-in-time restore (35 ngày)                       │    │
-│  └──────────────────────────────────────────────────────────┘    │
-│                                                                  │
-│  ┌─── Features quan trọng ─────────────────────────────────────┐ │
-│  │  • Multi-AZ: failover tự động < 30s                         │ │
-│  │  • Read Replicas: tối đa 15, auto-scaling theo CPU          │ │
-│  │  • Aurora Serverless v2: auto-scale compute (0.5 → 128 ACU) │ │
-│  │  • Global Database: < 1s replication cross-region           │ │
-│  │  • IAM Authentication: không cần password, dùng IAM role    │ │
-│  │  • Encryption at rest (KMS) + in transit (SSL/TLS)          │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
+
+Mô hình storage có6copies/3AZ. Storage growth/upper limits, Serverless v2 ACU range, retention tối đa35ngày và failover/cross-region lag phụ thuộc engine/version/region/config; các số128TB,0.5–128ACU,<30s,<1s trong ví dụ cũ không phải SLA phổ quát. Có continuous backup/PITR, reader autoscaling, Global Database, IAM DB auth, KMS at-rest và TLS khi cấu hình.
 
 **RDS vs Aurora — Chọn gì?**
 
@@ -306,87 +269,42 @@ Decision:
 
 ### 2.4. Amazon ElastiCache (Redis / Memcached)
 
+```d2 title="2.4. Amazon ElastiCache (Redis / Memcached)"
+direction: right
+service: "Service"
+redis: "ElastiCache Redis — Cache lookup"
+aurora: "Aurora — Source of truth"
+cache: "Populate cache + TTL"
+response: "Return result"
+service -> redis
+redis -> response: "Hit"
+redis -> aurora: "Miss"
+aurora -> cache
+cache -> response
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                    ELASTICACHE                                     │
-│                                                                    │
-│  ┌─── Redis (recommended) ──────────────────────────────────────┐  │
-│  │                                                              │  │
-│  │  Use cases trong Microservice:                               │  │
-│  │                                                              │  │
-│  │  1. CACHING — Giảm tải DB                                    │  │
-│  │     Service → check Redis → miss? → query Aurora → cache     │  │
-│  │     TTL: product=5min, user=1h, config=24h                   │  │
-│  │                                                              │  │
-│  │  2. SESSION STORE                                            │  │
-│  │     User login → session lưu Redis (TTL 24h)                 │  │
-│  │     → Mọi service instance đều đọc được session              │  │
-│  │                                                              │  │
-│  │  3. RATE LIMITING                                            │  │
-│  │     INCR user:{id}:requests → check > limit? → reject        │  │
-│  │     EXPIRE key TTL=60s (sliding window)                      │  │
-│  │                                                              │  │
-│  │  4. DISTRIBUTED LOCK                                         │  │
-│  │     SET lock:order:123 NX EX 30                              │  │
-│  │     → Chỉ 1 instance xử lý order 123 tại 1 thời điểm         │  │
-│  │                                                              │  │
-│  │  5. REAL-TIME LEADERBOARD                                    │  │
-│  │     ZADD leaderboard score userId                            │  │
-│  │     ZREVRANGE leaderboard 0 9 → top 10                       │  │
-│  │                                                              │  │
-│  │  Deployment:                                                 │  │
-│  │  • Cluster mode: shard data, scale writes                    │  │
-│  │  • Multi-AZ: auto-failover < 30s                             │  │
-│  │  • Encryption: at rest (KMS) + in transit (TLS)              │  │
-│  │  • Auth: Redis AUTH token hoặc IAM                           │  │
-│  │                                                              │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                                                    │
-│  ⚠️ Redis KHÔNG phải primary database                              │
-│  → Data quan trọng (order, payment) luôn lưu RDS/DynamoDB          │
-│  → Redis chỉ là cache / secondary store                            │
-│  → Redis chết? Service chậm hơn nhưng KHÔNG mất data               │
-│                                                                    │
-└────────────────────────────────────────────────────────────────────┘
-```
+
+TTL ví dụ product5phút/user1giờ/config24giờ. Redis còn dùng session TTL24h, rate counter, locks và sorted-set leaderboard (`ZADD`, top10). INCR+EXPIRE đơn thuần không phải sliding-window algorithm; atomic scripts/expiry policy cần thiết. Lock `SET NX EX30` cần owner token/safe unlock/fencing tùy use case. Multi-AZ, sharding, encryption/auth cần cấu hình. Với kiến trúc cache này, order/payment gốc ở RDS/DynamoDB; không xem cache failure là mất source of truth, nhưng session/cart có durability trade-off riêng.
 
 ### 2.5. Amazon OpenSearch (Elasticsearch)
 
+```d2 title="2.5. Amazon OpenSearch (Elasticsearch)"
+direction: right
+admin: "Admin"
+write: "Product Service — Write"
+aurora: "Aurora PostgreSQL — Primary"
+cdc: "DMS / CDC consumer"
+search: "OpenSearch — Derived search index"
+user: "User Search"
+read: "Product Service — Read"
+admin -> write
+write -> aurora
+aurora -> cdc
+cdc -> search
+user -> read
+read -> search: "Full-text / Fuzzy / Autocomplete / Facets / Sort"
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                    OPENSEARCH SERVICE                              │
-│                                                                    │
-│  Vai trò trong Microservice: READ-ONLY secondary store             │
-│                                                                    │
-│  ┌─── Architecture ─────────────────────────────────────────────┐  │
-│  │                                                              │  │
-│  │  Primary DB (Aurora) ──CDC/Event──▶ OpenSearch (read)        │  │
-│  │                                                              │  │
-│  │  Write path:                                                 │  │
-│  │    Admin → Product Service → Aurora PostgreSQL               │  │
-│  │                                 │                            │  │
-│  │                          DMS / Lambda (CDC)                  │  │
-│  │                                 │                            │  │
-│  │                                 ▼                            │  │
-│  │  Read path:                   OpenSearch                     │  │
-│  │    User search → Product Service → OpenSearch                │  │
-│  │    "iPhone giá dưới 20 triệu"                                │  │
-│  │    → Full-text search + faceted filter + sort                │  │
-│  │                                                              │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                                                    │
-│  Use cases:                                                        │
-│  • Product search (full-text, fuzzy, autocomplete)                 │
-│  • Log analytics (ELK stack: OpenSearch + Logstash + Kibana)       │
-│  • Application monitoring (APM)                                    │
-│                                                                    │
-│  ⚠️ Nhắc lại: OpenSearch KHÔNG PHẢI primary database               │
-│  → Không có ACID transaction                                       │
-│  → Near real-time (1s delay write → searchable)                    │
-│  → Luôn kết hợp với primary DB (Aurora/DynamoDB)                   │
-│                                                                    │
-└────────────────────────────────────────────────────────────────────┘
-```
+
+Ví dụ tìm iPhone giá dưới20triệu. Trong kiến trúc này index là derived store/rebuildable, không thay primary transactional DB. Cũng dùng log analytics/APM với OpenSearch Dashboards; search visibility phụ thuộc refresh/indexing, không mặc định chính xác1giây.
 
 ### 2.6. Polyglot Persistence trên AWS — Chọn DB cho từng service
 
@@ -461,21 +379,20 @@ Thay vì tự build orchestrator, Step Functions đã là SEC sẵn:
 
 Step Functions chỉ là **orchestrator** (điều phối) — nó gọi Lambda/ECS/API, còn business logic bên trong viết ngôn ngữ gì cũng được:
 
+```d2 title="3.1. Tại sao Step Functions phù hợp cho Saga?"
+direction: right
+validate: "Step1 ValidateOrder — Lambda Java21"
+reserve: "Step2 ReserveStock — Lambda Java21"
+pay: "Step3 ProcessPayment — Lambda Java21"
+confirm: "Step4 ConfirmOrder — Lambda Java21"
+compensate: "Compensate ReleaseStock — Lambda Java21"
+validate -> reserve
+reserve -> pay
+pay -> confirm: "Success"
+pay -> compensate: "Failure sau reserve"
 ```
-Step Functions (ASL — JSON/YAML)
-    │
-    ├── Step 1: ValidateOrder   → Lambda (Java 21)
-    ├── Step 2: ReserveStock    → Lambda (Java 21)
-    ├── Step 3: ProcessPayment  → Lambda (Java 21)
-    ├── Step 4: ConfirmOrder    → Lambda (Java 21)
-    └── Compensate: ReleaseStock → Lambda (Java 21)
 
-Ngôn ngữ hỗ trợ:
-  • Java (8, 11, 17, 21)    ← phổ biến trong enterprise
-  • Python, Node.js          ← phổ biến trong startup/serverless
-  • .NET (C#), Go, Rust      ← đều hỗ trợ
-  • Hoặc bất kỳ ngôn ngữ nào chạy trong ECS container
-```
+State machine định nghĩa bằng ASL JSON; công cụ IaC có thể dùng YAML/JSON theo workflow. Task implementations có thể là Java/Python/Node/.NET/custom runtime/container, hoặc ECS service; runtime versions cần kiểm tra lifecycle hiện hành.
 
 > 💡 **Thực tế**: Step Functions + Java rất phổ biến trong enterprise — team đã quen Java ecosystem (Spring Boot, Maven) chỉ cần viết Lambda handler bằng Java, Step Functions lo phần orchestration.
 
@@ -567,61 +484,38 @@ Decision — Chọn Saga Orchestrator:
 
 ### 3.2. Orchestration Saga — Order Workflow chi tiết
 
+```d2 title="3.2. Orchestration Saga — Order Workflow chi tiết"
+direction: down
+input: "Input orderId / userId / items / totalAmount"
+validate: "1. Validate Order — items / user"
+reserve: "2. Reserve Stock\nInventory Lambda/ECS POST /inventory/reserve\nRetry3 theo policy • Timeout10s"
+pay: "3. Process Payment\nRetry3 theo policy • Timeout30s"
+confirm: "4. Confirm Order — CONFIRMED"
+email: "5a. Send Email"
+analytics: "5b. Update Analytics"
+shipment: "5c. Create Shipment"
+join: "JOIN — các nhánh parallel hoàn tất"
+end: "End"
+release: "Compensate — Release Stock"
+failed: "Order Failed / Notify User"
+input -> validate
+validate -> reserve: "Success"
+validate -> failed: "Failure"
+reserve -> pay: "Success"
+reserve -> failed: "Failure"
+pay -> confirm: "Success"
+pay -> release: "Failure"
+release -> failed
+confirm -> email: "PAR"
+confirm -> analytics: "PAR"
+confirm -> shipment: "PAR"
+email -> join
+analytics -> join
+shipment -> join
+join -> end
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│          STEP FUNCTIONS: ORDER SAGA WORKFLOW                        │
-│                                                                     │
-│  ┌──────────────┐                                                   │
-│  │  Start       │ Input: { orderId, userId, items, totalAmount }    │
-│  └──────┬───────┘                                                   │
-│         ▼                                                           │
-│  ┌──────────────────┐                                               │
-│  │ 1. Validate Order│ → Lambda: validate items, check user          │
-│  └──────┬───────────┘                                               │
-│         │ success                                                   │
-│         ▼                                                           │
-│  ┌──────────────────┐                                               │
-│  │ 2. Reserve Stock │ → Lambda/ECS: Inventory Service               │
-│  │    Retry: 3x     │   POST /inventory/reserve                     │
-│  │    Timeout: 10s  │                                               │
-│  └──────┬───────────┘                                               │
-│         │ success                     │ fail                        │
-│         ▼                             ▼                             │
-│  ┌──────────────────┐          ┌──────────────────┐                 │
-│  │ 3. Process       │          │ Order Failed     │                 │
-│  │    Payment       │          │ → Notify user    │                 │
-│  │    Retry: 3x     │          └──────────────────┘                 │
-│  │    Timeout: 30s  │                                               │
-│  └──────┬───────────┘                                               │
-│         │ success                     │ fail                        │
-│         ▼                             ▼                             │
-│  ┌──────────────────┐          ┌──────────────────┐                 │
-│  │ 4. Confirm Order │          │ COMPENSATE:      │                 │
-│  │    Update status │          │ Release Stock    │                 │
-│  │    → CONFIRMED   │          │ → Inventory API  │                 │
-│  └──────┬───────────┘          └────────┬─────────┘                 │
-│         │                               │                           │
-│         ▼                               ▼                           │
-│  ┌──────────────┐               ┌──────────────────┐                │
-│  │ 5. Parallel  │               │ Order Failed     │                │
-│  │  ┌─────────┐ │               │ → Notify user    │                │
-│  │  │Send     │ │               └──────────────────┘                │
-│  │  │Email    │ │                                                   │
-│  │  ├─────────┤ │                                                   │
-│  │  │Update   │ │                                                   │
-│  │  │Analytics│ │                                                   │
-│  │  ├─────────┤ │                                                   │
-│  │  │Create   │ │                                                   │
-│  │  │Shipment │ │                                                   │
-│  │  └─────────┘ │                                                   │
-│  └──────┬───────┘                                                   │
-│         ▼                                                           │
-│  ┌──────────────┐                                                   │
-│  │    End       │                                                   │
-│  └──────────────┘                                                   │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
-```
+
+Reserve/charge retries cần idempotent contracts; timeout payment có thể là outcome chưa rõ, phải reconcile trước refund/retry. Failure/compensation của các bước sau confirmation cần business policy riêng.
 
 **Step Functions ASL (Amazon States Language)** — trích đoạn:
 
@@ -708,87 +602,58 @@ Decision — Chọn Saga Orchestrator:
 
 ### 3.3. Compensation (Rollback) trong Step Functions
 
+```d2 title="3.3. Compensation (Rollback) trong Step Functions"
+direction: down
+validate: "Validate"
+reserve: "Reserve Stock"
+payment: "Charge Payment"
+shipment: "Create Shipment"
+driver: "Assign Driver"
+confirm: "Confirm / DONE"
+cancelship: "Cancel Shipment"
+refund: "Refund Payment"
+release: "Release Stock"
+failed: "Order Failed / Notify User"
+validate -> reserve
+reserve -> payment
+payment -> confirm: "Happy path đơn giản"
+payment -> release: "Payment failure sau reserve"
+release -> failed
+payment -> shipment: "Workflow mở rộng — Payment OK"
+shipment -> driver
+driver -> cancelship: "Driver failure sau Shipment OK"
+cancelship -> refund
+refund -> release
 ```
-Compensation = "undo" các bước đã thành công khi bước sau FAIL
-────────────────────────────────────────────────────────────────
 
-Ví dụ: Payment fail → phải undo Reserve Stock
-
-  Happy path:
-  ┌──────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────┐
-  │ Validate │──▶│ Reserve Stock│──▶│ Process Pay  │──▶│ Confirm  │
-  │   ✅     │   │   ✅         │   │   ✅         │   │   ✅     │
-  └──────────┘   └──────────────┘   └──────────────┘   └──────────┘
-
-  Compensation path (Payment fails):
-  ┌──────────┐   ┌──────────────┐   ┌──────────────┐
-  │ Validate │──▶│ Reserve Stock│──▶│ Process Pay  │
-  │   ✅     │   │   ✅         │   │   ❌ FAIL    │
-  └──────────┘   └──────┬───────┘   └──────────────┘
-                        │
-                        ▼ Catch → Compensation
-                 ┌──────────────┐   ┌──────────────┐
-                 │ Release Stock│──▶│ Order Failed │
-                 │ (compensate) │   │ Notify user  │
-                 │   ✅         │   │              │
-                 └──────────────┘   └──────────────┘
-
-
-  Nhiều bước compensation (3 bước đã thành công):
-  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │ Reserve  │─▶│ Charge   │─▶│ Create   │─▶│ Assign   │
-  │ Stock ✅ │  │ Pay ✅   │  │ Shipment │  │ Driver   │
-  └──────────┘  └──────────┘  │ ✅       │  │ ❌ FAIL  │
-                              └──────────┘  └──────────┘
-                                                 │
-                              Compensate ngược:  ▼
-                              ┌──────────┐  ┌──────────┐  ┌──────────┐
-                              │ Cancel   │◀─│ Refund   │◀─│ Release  │
-                              │ Shipment │  │ Payment  │  │ Stock    │
-                              └──────────┘  └──────────┘  └──────────┘
-
-  → Compensation chạy NGƯỢC THỨ TỰ — undo từ bước gần nhất
-  → Mỗi bước compensation phải IDEMPOTENT (gọi lại vẫn OK)
-```
+Bù theo thứ tự ngược các bước đã thành công: Cancel Shipment → Refund Payment → Release Stock. Từng compensation cần idempotent và có recovery path nếu chính compensation lỗi.
 
 ### 3.4. Choreography Saga với EventBridge
 
 > 🔗 Xem thêm EventBridge tại [doc 19 — Section 4.4](19-aws-communication-discovery.md#44-amazon-eventbridge--event-bus)
 
+```d2 title="3.4. Choreography Saga với EventBridge"
+direction: right
+order: "Order Service — Create Order"
+bus: "EventBridge"
+inventory: "Inventory — Reserve Stock"
+payment: "Payment — Charge Customer"
+confirm: "Order — Confirm"
+notification: "Notification — Email"
+release: "Inventory — Release Stock"
+cancel: "Order — Cancel"
+order -> bus: "OrderCreated"
+bus -> inventory: "OrderCreated rule"
+inventory -> bus: "StockReserved"
+bus -> payment: "StockReserved rule"
+payment -> bus: "PaymentDone / PaymentFailed"
+bus -> confirm: "PaymentDone"
+bus -> notification: "PaymentDone"
+bus -> release: "PaymentFailed"
+bus -> cancel: "PaymentFailed"
 ```
-Choreography: Mỗi service tự publish event, service khác react
-─────────────────────────────────────────────────────────────────
 
-  Order Service                    EventBridge                    Inventory
-  ┌──────────┐     OrderCreated    ┌──────────┐    Rule match     ┌──────────┐
-  │ Create   │────────────────────▶│          │──────────────────▶│ Reserve  │
-  │ Order    │                     │  Event   │                   │ Stock    │
-  └──────────┘                     │   Bus    │                   └────┬─────┘
-                                   │          │                        │
-                    StockReserved  │          │◀───────────────────────┘
-                                   │          │
-  Payment                          │          │    Rule match    Payment
-  ┌──────────┐                     │          │──────────────────▶┌──────────┐
-  │ Charge   │◀────────────────────│          │                   │ Process  │
-  │ Customer │                     │          │                   │ Payment  │
-  └────┬─────┘                     │          │                   └──────────┘
-       │            PaymentDone    │          │
-       └──────────────────────────▶│          │
-                                   │          │    Rule match
-  Order Service                    │          │──────────────────▶ Notification
-  ┌──────────┐                     │          │                   ┌──────────┐
-  │ Confirm  │◀────────────────────│          │                   │ Send     │
-  │ Order    │                     └──────────┘                   │ Email    │
-  └──────────┘                                                    └──────────┘
-
-  Compensation trong Choreography:
-  → Mỗi service tự handle failure
-  → Payment fail → publish PaymentFailed event
-  → Inventory listen PaymentFailed → release stock
-  → Order listen PaymentFailed → cancel order
-  
-  ⚠️ Khó trace, khó debug — phải dùng X-Ray correlation ID
-```
+Mỗi service handle events và failure local; dùng trace/correlation context để debug thay vì mặc định mọi nhánh có cùng synchronous stack.
 
 ### 3.5. Orchestration vs Choreography trên AWS — Khi nào chọn gì?
 
@@ -821,47 +686,33 @@ Decision:
 
 ### 4.1. CQRS với DynamoDB + OpenSearch
 
+```d2 title="4.1. CQRS với DynamoDB + OpenSearch"
+direction: right
+admin: "Admin — POST /products, PUT /products/id"
+command: "Product Service — Command"
+db: "DynamoDB products — Write Model"
+stream: "DynamoDB Streams"
+lambda: "Lambda sync worker\nTransform / Denormalize"
+read: "OpenSearch — Read Model"
+user: "User GET /products?q=iphone&category=phone"
+admin -> command
+command -> db
+db -> stream
+stream -> lambda
+lambda -> read
+user -> read: "Full-text / Facets / Autocomplete"
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│          CQRS: DynamoDB (Write) + OpenSearch (Read)                  │
-│                                                                      │
-│  COMMAND SIDE (Write):                                               │
-│  ─────────────────────                                               │
-│  Admin ──▶ Product Service ──▶ DynamoDB (products table)             │
-│            POST /products         │                                  │
-│            PUT /products/{id}     │                                  │
-│                                   │                                  │
-│                            DynamoDB Streams                          │
-│                                   │                                  │
-│                                   ▼                                  │
-│                            Lambda (sync worker)                      │
-│                                   │                                  │
-│                            Transform + Denormalize                   │
-│                                   │                                  │
-│                                   ▼                                  │
-│  QUERY SIDE (Read):         OpenSearch                               │
-│  ──────────────────                                                  │
-│  User ──▶ Product Service ──▶ OpenSearch                             │
-│           GET /products?q=iphone&category=phone                      │
-│           → Full-text search, faceted filtering, autocomplete        │
-│                                                                      │
-│  ┌─── DynamoDB (Write Model) ──┐  ┌─── OpenSearch (Read Model) ──┐   │
-│  │ PK: PROD#123                │  │ {                            │   │
-│  │ SK: METADATA                │  │   "id": "PROD#123",          │   │
-│  │ name: "iPhone 15"           │  │   "name": "iPhone 15",       │   │
-│  │ price: 999                  │  │   "price": 999,              │   │
-│  │ categoryId: "CAT#phone"     │  │   "category": "Smartphone",  │   │
-│  │ brandId: "BRAND#apple"      │  │   "brand": "Apple",          │   │
-│  │ stock: 50                   │  │   "stock": 50,               │   │
-│  │                             │  │   "avgRating": 4.7,          │   │
-│  │ → Normalized                │  │   "totalReviews": 1234,      │   │
-│  │ → Optimized for write       │  │   "searchKeywords": [...]    │   │
-│  └─────────────────────────────┘  │   → Denormalized             │   │
-│                                   │   → Optimized for search     │   │
-│                                   └──────────────────────────────┘   │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
+
+Ví dụ models khác nhau, cùng product:
+
+```json
+{
+  "write": {"PK":"PROD#123","SK":"METADATA","name":"iPhone 15","price":999,"categoryId":"CAT#phone","brandId":"BRAND#apple","stock":50},
+  "read": {"id":"PROD#123","name":"iPhone 15","price":999,"category":"Smartphone","brand":"Apple","stock":50,"avgRating":4.7,"totalReviews":1234,"searchKeywords":[]}
+}
 ```
+
+Write model normalized/write-oriented; projection read denormalized/search-oriented. Các đoạn là minh họa model, không phải một project chạy độc lập.
 
 ### 4.2. CQRS với Aurora + ElastiCache
 
@@ -887,54 +738,15 @@ Cache-Aside: app lookup → miss → query DB → cache. Write-Through cập nh�
 
 ### 4.3. Sync data giữa Write DB và Read DB
 
+```d2 title="4.3. Sync data giữa Write DB và Read DB"
+direction: down
+dynamo: DynamoDB → Streams → Lambda → OpenSearch / Redis
+event: Service → EventBridge → SQS → Lambda → Read DB
+dms: Aurora → DMS CDC → Kinesis / Kafka → Consumer Lambda → OpenSearch
+kinesis: Service → Kinesis Data Streams → Lambda → OpenSearch
 ```
-Các cách sync data trong CQRS trên AWS:
-────────────────────────────────────────
 
-1. DynamoDB Streams → Lambda → OpenSearch/Redis
-   ──────────────────────────────────────────────
-   DynamoDB ──Stream──▶ Lambda ──▶ OpenSearch / Redis
-   
-   ✅ Near real-time (< 1s delay)
-   ✅ At-least-once delivery
-   ✅ Serverless, auto-scale
-   ❌ Lambda timeout 15min (cho batch lớn)
-   ❌ Stream retention 24h (default)
-
-2. EventBridge → SQS → Lambda → Read DB
-   ──────────────────────────────────────
-   Service ──Event──▶ EventBridge ──Rule──▶ SQS ──▶ Lambda ──▶ Read DB
-   
-   ✅ Decouple hoàn toàn
-   ✅ DLQ cho failed events
-   ✅ Event filtering (chỉ sync events quan trọng)
-   ❌ Thêm latency (~1-3s)
-
-3. DMS (Database Migration Service) — CDC from RDS
-   ─────────────────────────────────────────────────
-   Aurora ──CDC (binlog)──▶ DMS ──▶ Kinesis/Kafka ──▶ Lambda ──▶ OpenSearch
-   
-   ✅ Capture mọi DB change (INSERT, UPDATE, DELETE)
-   ✅ Không cần thay đổi application code
-   ✅ Production-grade CDC
-   ❌ Phức tạp hơn, thêm infra
-
-4. Kinesis Data Streams → Lambda → Read DB
-   ────────────────────────────────────────
-   Service ──▶ Kinesis ──▶ Lambda ──▶ OpenSearch
-   
-   ✅ High throughput (1MB/s per shard)
-   ✅ Replay capability (retention 7 ngày, extended 365 ngày)
-   ✅ Multiple consumers (enhanced fan-out)
-   ❌ Shard management, cost per shard-hour
-
-Recommend:
-──────────
-  DynamoDB → OpenSearch   → Dùng DynamoDB Streams + Lambda
-  Aurora → OpenSearch     → Dùng DMS (CDC) hoặc Event-driven
-  Any DB → Redis cache    → Event-driven invalidation (EventBridge)
-  High throughput         → Kinesis Data Streams
-```
+Bốn pipeline là alternatives, không phải bốn bước nối tiếp. DynamoDB Streams/Lambda: serverless, at-least-once, retention24h cần recovery plan; Lambda invocation tối đa15phút. EventBridge/SQS: event filtering/DLQ, thêm queueing latency. DMS CDC: không cần sửa application code nhưng tăng infrastructure/DB log load. Kinesis: shard throughput/retention/EFO/cost theo chế độ/config; phù hợp replay/high throughput, cần idempotency và shard/partition-key planning. Các mốc latency1–3s hay<1s chỉ minh họa.
 
 ---
 
@@ -1081,108 +893,54 @@ Khi nào tạo Snapshot?
 > 🔗 Lý thuyết Outbox Pattern tại [doc 09 — Section 10](09-data-management.md#10-transactional-outbox-pattern)
 > 🔗 Outbox trên AWS tại [doc 19 — Section 5.3](19-aws-communication-discovery.md#53-outbox-pattern-trên-aws)
 
+```d2 title="6.1. Outbox Pattern trên AWS"
+direction: down
+a: DynamoDB Transaction + Streams {
+ tx: TransactWriteItems — PUT orders + outbox
+ stream: Outbox Stream — NEW_IMAGE / filter phù hợp schema
+ relay: Lambda Relayer
+ target: EventBridge / SQS
+ cleanup: Delete / TTL cleanup theo retention policy
+ tx -> stream -> relay -> target
+ target -> cleanup: Sau publish thành công / Recovery-safe
+}
+b: Aurora Transaction + Polling {
+ tx: BEGIN / INSERT orders + outbox / COMMIT
+ worker: Poll unpublished LIMIT100 — ví dụ interval5s
+ target: EventBridge / SQS
+ mark: Mark published / Cleanup
+ tx -> worker -> target -> mark
+}
+c: Aurora Outbox + CDC {
+ outbox: Aurora Outbox WAL / Binlog
+ cdc: DMS hoặc Debezium MSK Connect
+ stream: Kinesis / MSK
+ relay: Consumer / Lambda
+ target: EventBridge
+ outbox -> cdc -> stream -> relay -> target
+}
 ```
-┌───────────────────────────────────────────────────────────────────────┐
-│       OUTBOX PATTERN — 3 Options trên AWS                             │
-│                                                                       │
-│  Option A: DynamoDB + Streams (Serverless, recommended)               │
-│  ───────────────────────────────────────────────────────              │
-│                                                                       │
-│  Order Service:                                                       │
-│    TransactWriteItems:                                                │
-│      PUT orders    { orderId, status, ... }                           │
-│      PUT outbox    { eventId, type: "OrderCreated", payload, ... }    │
-│    → Cả 2 items ghi trong 1 DynamoDB Transaction → atomic             │
-│                                                                       │
-│  DynamoDB Streams → Lambda (event relayer):                           │
-│    Filter: NEW_IMAGE, tableName contains "outbox"                     │
-│    → Lambda đọc event → publish to EventBridge / SQS                  │
-│    → Delete outbox item (hoặc TTL tự xóa)                             │
-│                                                                       │
-│                                                                       │
-│  Option B: Aurora + Polling (Simple, familiar)                        │
-│  ─────────────────────────────────────────────                        │
-│                                                                       │
-│  Order Service:                                                       │
-│    BEGIN TRANSACTION                                                  │
-│      INSERT INTO orders (...)                                         │
-│      INSERT INTO outbox (event_type, payload, published = false)      │
-│    COMMIT                                                             │
-│                                                                       │
-│  Scheduled Lambda (mỗi 5s):                                           │
-│    SELECT * FROM outbox WHERE published = false LIMIT 100             │
-│    → Publish to EventBridge / SQS                                     │
-│    → UPDATE outbox SET published = true WHERE id IN (...)             │
-│                                                                       │
-│  ⚠️ Polling delay (5s), cần cleanup job xóa outbox records cũ         │
-│                                                                       │
-│                                                                       │
-│  Option C: Aurora + DMS CDC (Production-grade)                        │
-│  ─────────────────────────────────────────────                        │
-│                                                                       │
-│  Aurora ──binlog──▶ DMS ──▶ Kinesis/MSK ──▶ Consumer                  │
-│                                                                       │
-│  • DMS capture mọi change từ outbox table (INSERT)                    │
-│  • Stream vào Kinesis → Lambda consume → publish EventBridge          │
-│  • Không cần polling, near real-time                                  │
-│  • Production-grade: Debezium on MSK Connect cũng hoạt động tương tự  │
-│                                                                       │
-│                                                                       │
-│  So sánh:                                                             │
-│  ┌──────────────┬──────────────┬──────────────┬──────────────────┐    │
-│  │              │ DynamoDB +   │ Aurora +     │ Aurora +         │    │
-│  │              │ Streams      │ Polling      │ DMS CDC          │    │
-│  │──────────────│──────────────│──────────────│──────────────────│    │
-│  │ Complexity   │ Thấp         │ Thấp         │ Trung bình       │    │
-│  │ Latency      │ < 1s         │ 5-10s        │ < 1s             │    │
-│  │ Serverless   │ ✅           │ Partial      │ ❌ (DMS instance)│    │
-│  │ Cost         │ Thấp         │ Thấp         │ Trung bình       │    │
-│  │ Reliability  │ Cao          │ Trung bình   │ Cao              │    │
-│  │ Recommend    │ DynamoDB src │ Aurora, đơn  │ Aurora, near     │    │
-│  │              │              │ giản         │ real-time        │    │
-│  └──────────────┴──────────────┴──────────────┴──────────────────┘    │
-│                                                                       │
-└───────────────────────────────────────────────────────────────────────┘
-```
+
+| Option | Complexity / Ops | Latency minh họa | Phù hợp |
+|---|---|---|---|
+| DynamoDB + Streams | Thấp, managed | Near-real-time | DynamoDB source |
+| Aurora + Polling | Đơn giản, cần worker | Poll interval + processing | Aurora, ưu tiên dễ vận hành |
+| Aurora + CDC | Thêm CDC infrastructure | Near-real-time khi hệ thống khỏe | Nhiều downstream, low-latency sync |
+
+Reliability phụ thuộc retries, checkpoints, retention/recovery và idempotency; không xếp polling mặc định kém an toàn hay CDC mặc định không mất event. Lambda event filtering không có rule tùy ý `tableName contains outbox` nếu field đó không tồn tại; filter theo record/source thực tế. TTL không được xóa intent trước khi đảm bảo replay/publish recovery.
 
 ### 6.2. Change Data Capture (CDC) trên AWS
 
 > 🔗 Lý thuyết CDC tại [doc 09 — Section 9.2](09-data-management.md#92-change-data-capture-cdc)
 
+```d2 title="6.2. Change Data Capture (CDC) trên AWS"
+direction: down
+dynamo: DynamoDB CDC { db: DynamoDB Table; streams: DynamoDB Streams; consumer: Lambda Consumer; db -> streams -> consumer }
+dms: DMS CDC { db: Aurora / RDS; dms: DMS; targets: Kinesis / Kafka / S3 / OpenSearch / Redshift / DynamoDB; db -> dms: Transaction log; dms -> targets }
+debezium: MSK Connect { db: Aurora / RDS; connector: Debezium Connector; msk: MSK Kafka; consumers: Consumers độc lập; db -> connector -> msk -> consumers }
 ```
-CDC trên AWS — Capture mọi database change và stream sang hệ thống khác
-────────────────────────────────────────────────────────────────────────
 
-1. DynamoDB Streams (native CDC cho DynamoDB)
-   ──────────────────────────────────────────
-   DynamoDB Table ──Stream──▶ Lambda / Kinesis
-   
-   • Trigger: INSERT, MODIFY, REMOVE
-   • View type: NEW_IMAGE, OLD_IMAGE, NEW_AND_OLD_IMAGES, KEYS_ONLY
-   • Retention: 24 giờ
-   • Ordering: per item (guaranteed)
-   • Use case: sync to OpenSearch, update cache, trigger workflow
-
-2. DMS (Database Migration Service) — CDC for RDS
-   ─────────────────────────────────────────────────
-   Aurora/RDS ──binlog──▶ DMS ──▶ Kinesis / S3 / OpenSearch
-   
-   • Capture INSERT, UPDATE, DELETE từ transaction log
-   • Không ảnh hưởng source DB performance (đọc binlog)
-   • Full load + ongoing replication
-   • Target: Kinesis, Kafka, S3, OpenSearch, Redshift, DynamoDB
-   • Use case: migrate data, CQRS sync, cross-service data replication
-
-3. MSK Connect + Debezium (Production-grade CDC)
-   ──────────────────────────────────────────────
-   Aurora/RDS ──binlog──▶ Debezium Connector ──▶ MSK (Kafka) ──▶ Consumers
-   
-   • Debezium = open-source CDC platform
-   • MSK Connect = managed Kafka Connect
-   • Schema registry, exactly-once semantics
-   • Multiple consumers (each at own pace)
-   • Use case: complex event processing, multiple downstream systems
-```
+DynamoDB record types INSERT/MODIFY/REMOVE; view KEYS_ONLY/NEW_IMAGE/OLD_IMAGE/NEW_AND_OLD_IMAGES; retention24h, ordering theo item. DMS hỗ trợ full-load + ongoing replication theo source/target/engine; đọc WAL/binlog vẫn có overhead cần đo. Debezium là open-source CDC, MSK Connect là managed Kafka Connect; schema registry/checkpoints hữu ích nhưng không tự bảo đảm exactly-once external effects.
 
 ### 6.3. Event-Carried State Transfer với EventBridge
 
@@ -1231,56 +989,25 @@ Nhược điểm:
 
 > 🔗 Lý thuyết API Composition tại [doc 09 — Section 9.4](09-data-management.md#94-api-composition)
 
+```d2 title="6.4. API Composition với AppSync"
+direction: down
+client: "Client GraphQL order ORDER#001"
+appsync: "AppSync — Order resolver"
+user: "Order.user HTTP resolver\nUser Service — name / email"
+items: "Order.items DynamoDB resolver\nOrders table — productName / quantity / price"
+ship: "Order.shipment Lambda resolver\nShipment Service — trackingNumber / estimatedDelivery"
+merge: "GraphQL response\nstatus / user / items / shipment"
+client -> appsync
+appsync -> user
+appsync -> items
+appsync -> ship
+user -> merge
+items -> merge
+ship -> merge
+merge -> client
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│          API COMPOSITION với AWS AppSync (GraphQL)                     │
-│                                                                        │
-│  Vấn đề: Client cần data từ nhiều service                              │
-│  "Trang chi tiết đơn hàng" cần: order + user + product + shipment      │
-│                                                                        │
-│  ┌─── AppSync (GraphQL) ────────────────────────────────────────────┐  │
-│  │                                                                  │  │
-│  │  type Order {                                                    │  │
-│  │    id: ID!                                                       │  │
-│  │    status: String!                                               │  │
-│  │    user: User!          ← resolver → User Service                │  │
-│  │    items: [OrderItem!]  ← resolver → Order DB (DynamoDB)         │  │
-│  │    shipment: Shipment   ← resolver → Shipment Service            │  │
-│  │  }                                                               │  │
-│  │                                                                  │  │
-│  │  Resolvers:                                                      │  │
-│  │  • Order.user    → HTTP resolver → User Service API              │  │
-│  │  • Order.items   → DynamoDB resolver → orders table (direct)     │  │
-│  │  • Order.shipment→ Lambda resolver → aggregate from Shipment svc │  │
-│  │                                                                  │  │
-│  │  Client query:                                                   │  │
-│  │  query {                                                         │  │
-│  │    order(id: "ORDER#001") {                                      │  │
-│  │      status                                                      │  │
-│  │      user { name email }                                         │  │
-│  │      items { productName quantity price }                        │  │
-│  │      shipment { trackingNumber estimatedDelivery }               │  │
-│  │    }                                                             │  │
-│  │  }                                                               │  │
-│  │  → 1 request từ client → AppSync gọi 3 services → aggregate      │  │
-│  │                                                                  │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-│                                                                        │
-│  AppSync Features:                                                     │
-│  • Real-time subscriptions (WebSocket)                                 │
-│  • Caching (server-side, per-resolver TTL)                             │
-│  • Pipeline resolvers (chain multiple data sources)                    │
-│  • Built-in auth (Cognito, IAM, API Key, OIDC)                         │
-│  • Conflict detection (for offline-first mobile apps)                  │
-│                                                                        │
-│  Khi nào dùng AppSync vs API Gateway:                                  │
-│  • Cần aggregate data từ nhiều source → AppSync                        │
-│  • Client cần chọn fields (mobile vs web) → AppSync (GraphQL)          │
-│  • Simple REST proxy → API Gateway                                     │
-│  • Rate limiting, usage plans → API Gateway                            │
-│                                                                        │
-└────────────────────────────────────────────────────────────────────────┘
-```
+
+Model: `Order.id:ID!`, `status:String!`, `user:User!`, `items:[OrderItem!]`, `shipment:Shipment`. AppSync có subscriptions, resolver caching/pipelines và Cognito/IAM/API-key/OIDC auth theo API/config. Direct DB resolver phải thuộc ownership/authorization boundary thích hợp, không mở tùy tiện private DB của service khác. Chọn AppSync khi cần field selection/composition; API Gateway cho REST proxy/usage-plan requirements theo API type.
 
 ---
 
@@ -1288,36 +1015,20 @@ Nhược điểm:
 
 ### 7.1. Schema Migration cho RDS
 
+```d2 title="7.1. Schema Migration cho RDS"
+direction: right
+dev: "Developer viết V3__migration"
+git: "Commit migration file"
+ci: "CI/CD — Flyway / Liquibase"
+db: "Apply Aurora Migration"
+verify: "Verify compatibility / Backfill / Cutover / Contract"
+dev -> git
+git -> ci
+ci -> db
+db -> verify
 ```
-Schema Migration trong Microservice:
-─────────────────────────────────────
-Mỗi service tự quản lý schema migration của DB mình.
-Không có "DBA team" central migration cho tất cả.
 
-Công cụ phổ biến:
-  • Flyway  — SQL-based, version numbered (V1__create_orders.sql)
-  • Liquibase — XML/YAML/SQL, more features, rollback support
-
-Workflow trong CI/CD:
-┌──────────┐    ┌──────────────────┐    ┌──────────┐    ┌──────────┐
-│ Developer│───▶│ Push migration   │───▶│ CI/CD    │───▶│ Apply to │
-│ writes   │    │ file to git      │    │ Pipeline │    │ DB       │
-│ V3__xxx  │    │                  │    │ (Flyway) │    │ (Aurora) │
-└──────────┘    └──────────────────┘    └──────────┘    └──────────┘
-
-Best practices:
-  ✅ Forward-only migrations (không sửa migration đã chạy)
-  ✅ Backward-compatible changes (thêm column nullable, không xóa column đang dùng)
-  ✅ Expand-Contract pattern:
-     Phase 1: Thêm column mới (nullable) ← deploy migration
-     Phase 2: App write to both old + new columns ← deploy code
-     Phase 3: Migrate existing data ← run backfill
-     Phase 4: App read from new column only ← deploy code
-     Phase 5: Drop old column ← deploy migration
-  ✅ Run migration TRƯỚC deploy code (migration phải backward-compatible)
-  ❌ KHÔNG rename column trực tiếp → sẽ break running instances
-  ❌ KHÔNG drop column đang dùng → phải qua expand-contract
-```
+Service owns schema migrations, vẫn có thể có DBA/platform hỗ trợ. Flyway SQL numbered versions, Liquibase XML/YAML/SQL. Không sửa migration đã chạy; expand nullable field trước app, dual-write/backfill/read-cutover theo plan, rồi dừng legacy writes và chỉ drop sau rollback window. Không rename/drop field đang được app cũ dùng.
 
 ### 7.2. DynamoDB Schema Evolution
 
@@ -1357,42 +1068,24 @@ Strategies:
 
 ### 7.3. Blue-Green Database Migration
 
+```d2 title="7.3. Blue-Green Database Migration"
+direction: down
+setup: Setup / Sync {
+ service: Live Service
+ blue: Blue Aurora PostgreSQL
+ green: Green Aurora PostgreSQL v2
+ service -> blue
+ blue -> green: DMS full load + ongoing CDC
+}
+cutover: Sau validation / Cutover {
+ service: Live Service
+ blue: Blue DB — giữ theo rollback plan
+ green: Green DB — nhận writes mới
+ service -> green: Switch connection
+}
 ```
-Blue-Green cho database — Khi cần thay đổi lớn (tách DB, đổi engine):
-──────────────────────────────────────────────────────────────────────
 
-  Phase 1: Setup
-  ┌─────────────┐           ┌─────────────┐
-  │  Blue (old) │           │  Green (new)│
-  │  Aurora     │──DMS CDC─▶│  Aurora (v2)│
-  │  PostgreSQL │  realtime │  PostgreSQL │
-  └──────┬──────┘   sync    └─────────────┘
-         │                        ↑
-    ┌────▼────┐                   │ DMS replication
-    │ Service │                   │ (ongoing)
-    │ (live)  │                   │
-    └─────────┘                   │
-
-  Phase 2: Cutover
-  ┌─────────────┐           ┌─────────────┐
-  │  Blue (old) │           │  Green (new)│
-  │  Aurora     │           │  Aurora (v2)│
-  │  PostgreSQL │           │  PostgreSQL │
-  └─────────────┘           └──────┬──────┘
-                                   │
-                              ┌────▼────┐
-                              │ Service │
-                              │ (live)  │
-                              └─────────┘
-
-  Bước thực hiện:
-  1. Tạo Green DB (Aurora clone hoặc DMS full load + CDC)
-  2. DMS ongoing replication Blue → Green (real-time sync)
-  3. Test application against Green DB
-  4. Cutover: switch connection string → Green
-  5. Monitor 24-48h → nếu OK → decommission Blue
-  6. Nếu có vấn đề → rollback: switch back to Blue
-```
+Steps: tạo Green/clone hoặc full-load+CDC, kiểm chứng replication/schema/app, cutover có write-consistency plan, monitor24–48h theo yêu cầu rồi decommission Blue. **Không đơn giản switch ngược về Blue sau khi Green nhận writes**: Blue có thể stale, cần reverse-sync/reconciliation/rollback design.
 
 ---
 
@@ -1402,68 +1095,52 @@ Blue-Green cho database — Khi cần thay đổi lớn (tách DB, đổi engine
 
 Áp dụng cho hệ thống **ShopVN** (200K DAU, 50K đơn/ngày):
 
+```d2 title="8. Ví dụ thực tế — E-Commerce Data Architecture trên AWS"
+direction: right
+write: Write Paths {
+ order: Order Service
+ odb: Aurora — orders / order_items / outbox
+ user: User Service
+ udb: Aurora — users / addresses
+ payment: Payment Service
+ pdb: Separate Aurora — payments / refunds / PCI boundary
+ inventory: Inventory Service
+ idb: Aurora — stock / reservations / version locking
+ product: Product Service
+ prod: Aurora — products / categories
+ cart: Cart Service
+ cdb: DynamoDB cart — TTL30ngày
+ notification: Notification Service
+ ndb: DynamoDB log — TTL90ngày
+ order -> odb
+ user -> udb
+ payment -> pdb
+ inventory -> idb
+ product -> prod
+ cart -> cdb
+ notification -> ndb
+}
+events: Durable Relay / Event Delivery {
+ cdc: DMS / CDC consumer
+ bridge: EventBridge
+ sqs: SQS + DLQ
+ consumers: Consumers
+ cdc -> bridge -> sqs -> consumers
+}
+read: Read Paths {
+ search: OpenSearch — Full-text / Facets
+ cache: Redis Product Detail — TTL5phút
+ session: Redis Sessions — TTL24giờ
+ history: Aurora Read Replica — Order History
+ reporting: Redshift — Dashboard / Reporting
+}
+write.odb -> events.cdc: Outbox CDC
+write.udb -> events.bridge: User events qua reliable relay
+write.prod -> read.search: CDC / Sync pipeline
+write.cdb -> read.reporting: Streams → Lambda → Analytics
 ```
-┌────────────────────────────────────────────────────────────────────────────┐
-│              SHOPVN — DATA ARCHITECTURE                                    │
-│                                                                            │
-│  ┌──── Write Path ────────────────────────────────────────────────────┐    │
-│  │                                                                    │    │
-│  │  Order Service ──▶ Aurora PostgreSQL (orders, order_items)         │    │
-│  │    └── Outbox table ──▶ DMS CDC ──▶ EventBridge                    │    │
-│  │                                                                    │    │
-│  │  User Service ──▶ Aurora PostgreSQL (users, addresses)             │    │
-│  │    └── User events ──▶ EventBridge ──▶ Consumer services           │    │
-│  │                                                                    │    │
-│  │  Payment Service ──▶ Aurora PostgreSQL (payments, refunds)         │    │
-│  │    └── Separate Aurora cluster (PCI isolation)                     │    │
-│  │                                                                    │    │
-│  │  Inventory Service ──▶ Aurora PostgreSQL (stock, reservations)     │    │
-│  │    └── Optimistic locking (version column)                         │    │
-│  │                                                                    │    │
-│  │  Product Service ──▶ Aurora PostgreSQL (products, categories)      │    │
-│  │    └── DMS CDC ──▶ OpenSearch (search index)                       │    │
-│  │                                                                    │    │
-│  │  Cart Service ──▶ DynamoDB (cart items, TTL 30 ngày)               │    │
-│  │    └── DynamoDB Streams ──▶ Lambda ──▶ Analytics                   │    │
-│  │                                                                    │    │
-│  │  Notification Service ──▶ DynamoDB (notification log, TTL 90 ngày) │    │
-│  │                                                                    │    │
-│  └────────────────────────────────────────────────────────────────────┘    │
-│                                                                            │
-│  ┌──── Read Path ─────────────────────────────────────────────────────┐    │
-│  │                                                                    │    │
-│  │  Product search ──▶ OpenSearch (full-text, faceted filter)         │    │
-│  │  Product detail ──▶ ElastiCache Redis (cache, TTL 5 min)           │    │
-│  │  User session ──▶ ElastiCache Redis (session store, TTL 24h)       │    │
-│  │  Order history ──▶ Aurora Read Replica                             │    │
-│  │  Dashboard / Reporting ──▶ Redshift (aggregated data)              │    │
-│  │                                                                    │    │
-│  └────────────────────────────────────────────────────────────────────┘    │
-│                                                                            │
-│  ┌──── Saga (Order Workflow) ─────────────────────────────────────────┐    │
-│  │                                                                    │    │
-│  │  Step Functions (Standard mode):                                   │    │
-│  │  CreateOrder → ReserveStock → ProcessPayment → ConfirmOrder        │    │
-│  │                    ↓ fail         ↓ fail                           │    │
-│  │               OrderFailed    ReleaseStock → OrderFailed            │    │
-│  │                                                                    │    │
-│  └────────────────────────────────────────────────────────────────────┘    │
-│                                                                            │
-│  ┌──── Event Streaming ───────────────────────────────────────────────┐    │
-│  │                                                                    │    │
-│  │  EventBridge (central event bus):                                  │    │
-│  │  • OrderCreated → Inventory (reserve) + Notification (email)       │    │
-│  │  • PaymentCompleted → Order (confirm) + Shipping (create)          │    │
-│  │  • UserUpdated → Order (update cache) + Notification (update)      │    │
-│  │  • LowStock → SNS → Ops team alert                                 │    │
-│  │                                                                    │    │
-│  │  SQS (decouple consumer):                                          │    │
-│  │  • EventBridge → SQS → Consumer (với DLQ + retry)                  │    │
-│  │                                                                    │    │
-│  └────────────────────────────────────────────────────────────────────┘    │
-│                                                                            │
-└────────────────────────────────────────────────────────────────────────────┘
-```
+
+Sagas điều phối CreateOrder → ReserveStock → ProcessPayment → ConfirmOrder, bù đúng bước đã commit khi fail. EventBridge rules: OrderCreated → Inventory/Notification; PaymentCompleted → Order/Shipping; UserUpdated → Order cache/Notification; LowStock → SNS Ops. DMS cần target/consumer/relay hợp lệ để publish EventBridge, không mặc định hỗ trợ direct EventBridge destination. Các TTL là retention policy ví dụ; DynamoDB TTL cleanup không đúng tại một thời điểm tuyệt đối.
 
 ```d2 title="8. Ví dụ thực tế — E-Commerce Data Architecture trên AWS"
 direction: down

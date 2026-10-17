@@ -124,37 +124,31 @@ Bốn pattern này không thay thế nhau — chúng **phối hợp**: Correlati
 
 Trước khi đi vào từng pattern, hãy nhìn toàn cảnh: telemetry sinh ra ở service, được thu gom, lưu trữ, và tiêu thụ bởi con người hoặc hệ thống tự động.
 
-```
-┌──────────────────────────────────────────────────────────────────────────┐
-│                     OBSERVABILITY — BỨC TRANH TOÀN CẢNH                  │
-│                                                                          │
-│  TELEMETRY SOURCES (mỗi service phát ra dữ liệu)                         │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                       │
-│  │ Order Svc   │  │ Payment Svc │  │   ... Svc   │                       │
-│  │ • log JSON  │  │ • log JSON  │  │ • log JSON  │   Mỗi request mang   │
-│  │ • OTel SDK  │  │ • OTel SDK  │  │ • OTel SDK  │   theo Correlation   │
-│  │ • /health   │  │ • /health   │  │ • /health   │   ID + traceparent   │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                       │
-│         │                │                │                              │
-│         ▼                ▼                ▼                              │
-│  ┌─────────────────────────────────────────────────┐                     │
-│  │        COLLECTORS (thu gom, xử lý, chuyển tiếp) │                     │
-│  │   Fluent Bit / OTel Collector / Prometheus      │                     │
-│  └────────┬───────────────┬───────────────┬────────┘                     │
-│           ▼               ▼               ▼                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                       │
-│  │ LOG STORE   │  │ TRACE STORE │  │ METRICS DB  │  LƯU TRỮ &           │
-│  │ Loki / ES   │  │ Jaeger/Tempo│  │ Prometheus  │  TRUY VẤN            │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘                       │
-│         └────────────────┼────────────────┘                              │
-│                          ▼                                               │
-│         ┌────────────────────────┐   ┌──────────────────┐                │
-│         │ Dashboards / Search    │   │ Alerting         │                │
-│         │ Kibana / Grafana       │   │ Alertmanager     │                │
-│         └────────────────────────┘   └──────────────────┘                │
-│                                                                          │
-│  Orchestrator (K8s) ──poll──▶ /health ──▶ restart pod / gỡ traffic       │
-└──────────────────────────────────────────────────────────────────────────┘
+```d2 title="2. Bức tranh toàn cảnh — Observability pipeline"
+direction: down
+sources: Services — JSON Logs / OTel SDK / Health endpoints {
+ order: Order
+ payment: Payment
+ other: Other Services
+}
+collectors: Fluent Bit / OTel Collector / Prometheus
+logs: Loki / Elasticsearch
+traces: Jaeger / Tempo
+metrics: Prometheus
+ui: Kibana / Grafana — Dashboards / Search
+alerts: Alertmanager
+k8s: Orchestrator — Kubernetes
+health: Health Endpoints
+sources -> collectors: Telemetry — Correlation ID / Trace context khi có
+collectors -> logs
+collectors -> traces
+collectors -> metrics
+logs -> ui
+traces -> ui
+metrics -> ui
+metrics -> alerts: Alert rules
+k8s -> health: Poll probes
+health -> k8s: Liveness restart / Readiness remove traffic
 ```
 
 Ba thành phần quan trọng của pipeline:
@@ -974,42 +968,29 @@ Telemetry sao chép dữ liệu khắp nơi: từ service → collector → back
 
 Áp cả bốn pattern vào hệ thống e-commerce quen thuộc từ [17 — Design Patterns](17-design-patterns.md):
 
+```d2 title="10. Ví dụ tổng hợp — Observability cho E-Commerce"
+direction: down
+client: Client — X-Correlation-ID
+gateway: API Gateway — Sinh / Validate CID và Trace; log route / Latency
+services: Services — JSON logs / OTel HTTP-Kafka-DB spans / RED metrics {
+ order: Order
+ payment: Payment
+ inventory: Inventory
+ notification: Notification
+}
+collectors: OTel Collector + Fluent Bit
+stores: Loki logs / Tempo traces / Prometheus metrics
+grafana: Grafana — Search / Dashboard / Alert
+k8s: Kubernetes Probes
+client -> gateway: Request
+ gateway -> client: Echo support Correlation-ID
+gateway -> services: Propagate traceparent + CID
+services -> collectors -> stores -> grafana
+k8s -> services: Poll /health/live shallow và /health/ready
+services -> k8s: Probe results — Restart / Traffic removal
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│              E-COMMERCE — OBSERVABILITY VIEW                        │
-│                                                                     │
-│   Client                                                            │
-│     │  X-Correlation-ID (echo về client = mã tra cứu hỗ trợ)        │
-│     ▼                                                               │
-│   ┌──────────────┐   sinh Correlation ID + trace đầu tiên           │
-│   │ API Gateway  │   log: cid, trace_id, route, latency             │
-│   └──────┬───────┘                                                 │
-│          │ traceparent + cid trên MỌI hop                          │
-│   ┌──────▼───────────────────────────────────────────────┐          │
-│   │                                                      │          │
-│   │  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────────┐  │          │
-│   │  │ Order  │  │Payment │  │Invent- │  │Notification│  │          │
-│   │  │ Svc    │  │ Svc    │  │ory Svc │  │ Svc        │  │          │
-│   │  └────────┘  └────────┘  └────────┘  └────────────┘  │          │
-│   │  Mỗi service:                                        │          │
-│   │   • log JSON (cid + trace_id trong mọi entry)        │          │
-│   │   • OTel SDK spans (HTTP + Kafka + DB)               │          │
-│   │   • /health/live (shallow) + /health/ready (deep)    │          │
-│   │   • metrics RED (rate, errors, duration)             │          │
-│   └──────────────────────────────────────────────────────┘          │
-│          │                          ▲ poll /health                  │
-│          ▼                          │                               │
-│   ┌───────────────┐          ┌──────────────┐                       │
-│   │ OTel Collector│          │ Kubernetes   │──restart / gỡ traffic │
-│   │ + Fluent Bit  │          │ (probes)     │                       │
-│   └───────┬───────┘          └──────────────┘                       │
-│           │                                                          │
-│   ┌───────▼────────────────────────────────────────────┐            │
-│   │ Loki (log)   Tempo (trace)   Prometheus (metrics)  │            │
-│   │          → Grafana: search + dashboard + alert     │            │
-│   └────────────────────────────────────────────────────┘            │
-└─────────────────────────────────────────────────────────────────────┘
-```
+
+Readiness kiểm tra dependency có chọn lọc; tránh deep check mọi dependency khiến lỗi cục bộ kéo toàn bộ fleet ra khỏi endpoints.
 
 **Một request đặt hàng đi qua hệ thống này:**
 

@@ -105,23 +105,15 @@ TẠI SAO CONFIGURATION MANAGEMENT QUAN TRỌNG?
 | **Consistency** | 1 codebase, dễ đồng nhất | Config rải rác, dễ bị drift |
 | **Dependencies** | Trong 1 process | Service A cần biết URL Service B |
 
-```
-CẤU HÌNH RẢI RÁC TRONG MICROSERVICE
-──────────────────────────────────────
-
-  ┌──────────────┐   ┌───────────────┐   ┌───────────────┐
-  │ User Service │   │ Order Service │   │Payment Service│
-  │              │   │               │   │               │
-  │ DB_HOST=?    │   │ DB_HOST=?     │   │ DB_HOST=?     │
-  │ DB_PORT=?    │   │ DB_PORT=?     │   │ STRIPE_KEY=?  │
-  │ REDIS_URL=?  │   │ KAFKA_URL=?   │   │ KAFKA_URL=?   │
-  │ JWT_SECRET=? │   │ USER_SVC_URL=?│   │ ORDER_SVC_URL?│
-  │ LOG_LEVEL=?  │   │ LOG_LEVEL=?   │   │ LOG_LEVEL=?   │
-  └──────────────┘   └───────────────┘   └───────────────┘
-         │                  │                  │
-         └────── Mỗi service cần 5-20 configs ─┘
-                 × 4 environments
-                 = RẤT NHIỀU giá trị cần quản lý!
+```d2 title="2.1. Monolith vs Microservice Configuration"
+direction: right
+services: Cấu hình rải rác {
+ user: "User Service\nDB_HOST / DB_PORT / REDIS_URL / JWT_SECRET / LOG_LEVEL"
+ order: "Order Service\nDB_HOST / DB_PORT / KAFKA_URL / USER_SVC_URL / LOG_LEVEL"
+ payment: "Payment Service\nDB_HOST / STRIPE_KEY / KAFKA_URL / ORDER_SVC_URL / LOG_LEVEL"
+}
+management: Mỗi service5-20 configs ×4 environments → Nhiều giá trị phải quản lý
+services -> management
 ```
 
 ### 2.2. Các loại Configuration
@@ -173,82 +165,30 @@ CÁC LOẠI CONFIGURATION
 
 Câu hỏi rất tốt! Cần hiểu rõ externalize giải quyết **2 vấn đề khác nhau**:
 
+```d2 title="3.1. Tại sao phải Externalize Config?"
+direction: down
+hardcoded: Hardcoded Config {
+ code: DB_HOST trong source code
+ ci: Sửa code / Commit / Build image / Push
+ deploy: Deploy image mới
+ code -> ci -> deploy
+}
+static: Externalized Static Config {
+ ops: DevOps đổi DB_HOST
+ config: Env var / ConfigMap
+ restart: Rolling restart / App đọc config khi startup
+ ops -> config -> restart
+}
+dynamic: Dynamic Config {
+ ops: DevOps đổi LOG_LEVEL
+ server: Config Server
+ poll: App poll / Watch / SDK refresh
+ apply: Apply log level — không restart nếu app hỗ trợ
+ ops -> server -> poll -> apply
+}
 ```
-EXTERNALIZE CONFIG GIẢI QUYẾT GÌ?
-───────────────────────────────────
 
-  VẤN ĐỀ 1: "ĐỔI CONFIG = PHẢI REBUILD IMAGE" (cốt lõi!)
-  ──────────────────────────────────────────────────────────
-
-  ❌ Config nằm trong code:
-  ┌──────────────────────────────────────────────────────────────┐
-  │  // hardcode                                                 │
-  │  DB_HOST = "prod-db.example.com"                             │
-  │                                                              │
-  │  Đổi DB_HOST:                                                │
-  │  1. Sửa source code                                          │
-  │  2. Commit + push                                            │
-  │  3. CI build Docker image MỚI (mất 5-10 phút)               │
-  │  4. Push image lên registry                                  │
-  │  5. Deploy image mới lên K8s                                 │
-  │                                                              │
-  │  → 20 phút cho 1 thay đổi config!                           │
-  │  → Image dev ≠ image staging ≠ image prod (3 images khác nhau)│
-  └──────────────────────────────────────────────────────────────┘
-
-  ✅ Config tách riêng (externalize):
-  ┌──────────────────────────────────────────────────────────────┐
-  │  DB_HOST = os.getenv("DB_HOST")                              │
-  │                                                              │
-  │  Đổi DB_HOST:                                                │
-  │  1. Sửa env var / ConfigMap                                  │
-  │  2. Restart Pod (mất 10 giây)                                │
-  │  → KHÔNG cần rebuild image                                   │
-  │  → KHÔNG cần chạy lại CI pipeline                            │
-  │  → Cùng 1 image chạy ở dev, staging, prod                   │
-  └──────────────────────────────────────────────────────────────┘
-
-
-  VẤN ĐỀ 2: "ĐỔI CONFIG = CÓ CẦN RESTART KHÔNG?"
-  ──────────────────────────────────────────────────
-  Tùy LOẠI config mà cách xử lý khác nhau:
-
-  ┌─────────────────────────────────────────────────────────────────┐
-  │                                                                 │
-  │  📌 STATIC CONFIG (DB_HOST, DB_PASSWORD, KAFKA_URL...)          │
-  │  → Đọc 1 LẦN lúc app start (tạo connection pool, init client) │
-  │  → Đổi config → CẦN RESTART pod (nhưng KHÔNG cần rebuild!)    │
-  │  → Restart pod trong K8s: rolling restart, mất ~10 giây        │
-  │  → Đây là cách BÌNH THƯỜNG, hầu hết config hoạt động kiểu này │
-  │                                                                 │
-  │  📌 DYNAMIC CONFIG (feature flags, log level, rate limit...)    │
-  │  → App đọc LẶP LẠI (poll mỗi 30s, hoặc watch realtime)       │
-  │  → Đổi config → KHÔNG cần restart, app tự nhận giá trị mới    │
-  │  → Cần code hỗ trợ (file watcher, config server SDK)           │
-  │                                                                 │
-  └─────────────────────────────────────────────────────────────────┘
-
-
-  VÍ DỤ CỤ THỂ:
-  ───────────────
-
-  Đổi DB_HOST (static):
-  ┌────────────┐   sửa ConfigMap   ┌────────────┐   restart pod   ┌──────────┐
-  │   DevOps   │─────────────────▶ │  ConfigMap │──────────────▶  │ Pod mới  │
-  │            │   (10 giây)       │            │   (10 giây)     │ đọc lại  │
-  └────────────┘                   └────────────┘                 │ DB_HOST  │
-                                                                  └──────────┘
-  Tổng: ~20 giây (vs 20 phút nếu phải rebuild image!)
-
-
-  Đổi LOG_LEVEL (dynamic):
-  ┌────────────┐   sửa Config Server    ┌──────────────┐   app poll  ┌──────────┐
-  │   DevOps   │──────────────────────▶ │ Config Server│────────────▶│ Pod ĐANG │
-  │            │   (10 giây)            │              │  (tự động)  │ CHẠY     │
-  └────────────┘                        └──────────────┘             │ đổi log  │
-                                                                     │ level    │
-  Tổng: ~10 giây, KHÔNG restart gì cả!                               └──────────┘
-```
+Externalize cho phép dùng cùng image ở dev/staging/prod, không phải rebuild khi config đổi. Static như DB clients/connection pools thường đọc một lần và cần reinitialization/restart; dynamic cần code hỗ trợ refresh. Các thời gian cũ20phút/20giây/10giây chỉ là minh họa, không bảo đảm rollout an toàn/nhanh nếu bỏ validation và deployment gates.
 
 Tóm lại, **giá trị chính của externalize config** là:
 
@@ -260,14 +200,15 @@ Tóm lại, **giá trị chính của externalize config** là:
 
 > 💡 **"Đổi config không cần rebuild"** ≠ "đổi config không cần restart". Static config (DB_HOST) vẫn cần restart pod — nhưng restart pod thì rất nhanh (10s), còn rebuild image thì chậm (10-20 phút). Đó là sự khác biệt lớn.
 
-```
-BUILD ONCE, DEPLOY ANYWHERE:
-┌────────────┐     ┌──────────────────────────────┐
-│            │     │  Dev:  DB_HOST=localhost     │
-│  Docker    │────▶│  Staging: DB_HOST=staging-db │
-│  Image     │     │  Prod: DB_HOST=prod-db       │
-│  (1 bản)   │     │                              │
-└────────────┘     └──────────────────────────────┘
+```d2 title="3.1. Tại sao phải Externalize Config?"
+direction: right
+image: "Một immutable Docker Image"
+dev: "Dev — DB_HOST localhost"
+staging: "Staging — DB_HOST staging-db"
+prod: "Prod — DB_HOST prod-db"
+image -> dev: "Inject config"
+image -> staging: "Inject config"
+image -> prod: "Inject config"
 ```
 
 ### 3.2. The Twelve-Factor App — Config
@@ -446,45 +387,25 @@ ENV VARS BEST PRACTICES
 
 Khi có 20+ services, quản lý env vars riêng lẻ cho từng service trở nên rối. **Config Server** là service tập trung, lưu trữ và phân phát config cho tất cả services.
 
+```d2 title="5.1. Config Server là gì? Tại sao cần?"
+direction: down
+scattered: Config rải rác {
+ a: Service A — env / .env
+ b: Service B — env / .env
+ c: Service C — env / .env
+}
+central: Shared Config Source {
+ server: Config Server — Version / Encryption / Audit theo tính năng
+ a: Service A
+ b: Service B
+ c: Service C
+ a -> server: Pull / Watch
+ b -> server: Pull / Watch
+ c -> server: Pull / Watch
+}
 ```
-KHÔNG CÓ vs CÓ CONFIG SERVER
-──────────────────────────────
 
-  ❌ Không có Config Server:
-  ┌──────────────────────────────────────────────────────────┐
-  │  Mỗi service tự quản lý config riêng                     │
-  │                                                          │
-  │  ┌────────┐ env vars  ┌────────┐ env vars  ┌────────┐    │
-  │  │ Svc A  │           │ Svc B  │           │ Svc C  │    │
-  │  │ .env   │           │ .env   │           │ .env   │    │
-  │  └────────┘           └────────┘           └────────┘    │
-  │                                                          │
-  │  → Config rải rác, không biết config nào ở đâu           │
-  │  → Đổi 1 config chung (ví dụ KAFKA_URL) = sửa 20 chỗ     │
-  │  → Không version, không audit                            │
-  └──────────────────────────────────────────────────────────┘
-
-  ✅ Có Config Server:
-  ┌──────────────────────────────────────────────────────────┐
-  │                  ┌──────────────┐                        │
-  │                  │ Config Server│                        │
-  │                  │              │                        │
-  │                  │ • Versioned  │                        │
-  │                  │ • Encrypted  │                        │
-  │                  │ • Audit log  │                        │
-  │                  └──────┬───────┘                        │
-  │                ┌────────┼────────┐                       │
-  │                │        │        │                       │
-  │           ┌────▼──┐ ┌───▼───┐ ┌──▼─────┐                 │
-  │           │ Svc A │ │ Svc B │ │ Svc C  │                 │
-  │           │(pull) │ │(pull) │ │(pull)  │                 │
-  │           └───────┘ └───────┘ └────────┘                 │
-  │                                                          │
-  │  → 1 nguồn sự thật (single source of truth)              │
-  │  → Đổi 1 config = tất cả services nhận được              │
-  │  → Version history, rollback dễ dàng                     │
-  └──────────────────────────────────────────────────────────┘
-```
+Quản lý config tập trung giảm phải sửa KAFKA_URL ở nhiều chỗ, hỗ trợ history/rollback khi được cấu hình. Env vars/.env cũng có thể được quản lý có version/audit bằng GitOps; Config Server không tự bảo đảm mọi client nhận giá trị mới ngay lập tức.
 
 ### 5.2. Spring Cloud Config Server
 
@@ -607,64 +528,35 @@ ETCD — CÁCH DÙNG
 
 **AWS AppConfig** (thuộc AWS Systems Manager) là config server managed của AWS — không cần tự vận hành server, có **safe deployment** và **feature flags** tích hợp sẵn.
 
+```d2 title="5.5. AWS AppConfig"
+direction: right
+app: AWS AppConfig — Application order-service {
+ dev: Environment dev { settings: "Profile settings\nDB_HOST localhost • LOG_LEVEL DEBUG"; strategy: Strategy — AllAtOnce }
+ staging: Environment staging { settings: "Profile settings\nDB_HOST staging-db • LOG_LEVEL INFO"; strategy: Strategy ví dụ — Linear50PercentEvery30Seconds }
+ prod: Environment prod { settings: "Profile settings\nDB_HOST prod-db • LOG_LEVEL WARN"; strategy: Strategy ví dụ — Canary10Percent20Minutes }
+}
 ```
-AWS APPCONFIG — KIẾN TRÚC
-───────────────────────────
 
-  ┌──────────────────────────────────────────────────────────────┐
-  │                     AWS AppConfig                            │
-  │                                                              │
-  │  Application: "order-service"                                │
-  │  ├── Environment: "dev"                                      │
-  │  │   └── Configuration Profile: "settings"                   │
-  │  │       → DB_HOST=localhost, LOG_LEVEL=DEBUG                │
-  │  ├── Environment: "staging"                                  │
-  │  │   └── Configuration Profile: "settings"                   │
-  │  │       → DB_HOST=staging-db, LOG_LEVEL=INFO                │
-  │  └── Environment: "prod"                                     │
-  │      └── Configuration Profile: "settings"                   │
-  │          → DB_HOST=prod-db, LOG_LEVEL=WARN                   │
-  │                                                              │
-  │  Deployment Strategy:                                        │
-  │  ├── AllAtOnce (dev)                                         │
-  │  ├── Linear50PercentEvery30Seconds (staging)                 │
-  │  └── Canary10Percent20Minutes (prod) ← deploy config an toàn │
-  └──────────────────────────────────────────────────────────────┘
-```
+Tên deployment strategies trong hình minh họa rollout policy; kiểm tra presets/custom strategy thực tế thay vì mặc định mọi tên này tồn tại sẵn.
 
 **Điểm đặc biệt của AppConfig: Safe deployment cho config!**
 
+```d2 title="5.5. AWS AppConfig"
+direction: right
+config: "Config mới — validate trước deploy"
+p10: "Phút0 — 10% instances\nCloudWatch alarm / Error-rate monitor"
+p50: "Phút10 — 50% nếu metrics OK"
+p100: "Phút20 — 100% nếu metrics OK"
+rollback: "Alarm breach → Rollback config cũ theo policy"
+config -> p10
+p10 -> p50: "OK"
+p50 -> p100: "OK"
+p10 -> rollback: "Alarm"
+p50 -> rollback: "Alarm"
+p100 -> rollback: "Alarm / Bake window"
 ```
-APPCONFIG — DEPLOY CONFIG AN TOÀN (KHÔNG CÓ Ở CÁC TOOL KHÁC!)
-────────────────────────────────────────────────────────────────
 
-  Vấn đề: Đổi config sai (ví dụ timeout=0) → TẤT CẢ pods crash!
-
-  ❌ Config Server thường (Consul, etcd, Spring Cloud):
-  ┌──────────────────────────────────────────────────────┐
-  │  Đổi config → TẤT CẢ services nhận ngay lập tức      │
-  │  → Config sai = 100% services lỗi cùng lúc 💀        │
-  │  → Phải rollback thủ công                            │
-  └──────────────────────────────────────────────────────┘
-
-  ✅ AWS AppConfig — Canary deployment cho config:
-  ┌──────────────────────────────────────────────────────┐
-  │  Đổi config → AppConfig deploy từ từ:                │
-  │                                                      │
-  │  Phút 0:  10% instances nhận config mới              │
-  │           → Monitor: error rate tăng không?          │
-  │           → CloudWatch alarm kiểm tra                │
-  │                                                      │
-  │  Phút 10: OK → 50% instances nhận config mới         │
-  │           → Monitor tiếp...                          │
-  │                                                      │
-  │  Phút 20: OK → 100% instances nhận config mới ✅     │
-  │                                                      │
-  │  NẾU error rate tăng ở bất kỳ bước nào:              │
-  │  → TỰ ĐỘNG ROLLBACK về config cũ!                    │
-  │  → Chỉ 10% bị ảnh hưởng, không phải 100%             │
-  └──────────────────────────────────────────────────────┘
-```
+Progressive rollout là strategy minh họa, không timeline cố định của mọi AppConfig deployment. Nếu fail ở bước50% thì blast radius có thể tới50%, không luôn chỉ10%. Validation/monitoring/rollback phải cấu hình; các config systems khác cũng có thể được bọc bằng progressive delivery tooling.
 
 **Cách dùng AppConfig:**
 
@@ -785,43 +677,30 @@ APPCONFIG — KHI NÀO DÙNG?
 
 **Tích hợp AppConfig với ECS/EKS/Lambda:**
 
+```d2 title="5.5. AWS AppConfig"
+direction: down
+ecs: ECS Fargate Task {
+ app: App Container
+ agent: AppConfig Agent — Poll / Cache
+ app -> agent: localhost 2772
+}
+lambda: Lambda Function {
+ app: Function Code
+ extension: AppConfig Lambda Extension — Layer
+ app -> extension: localhost 2772
+}
+eks: EKS Pod {
+ app: App Container
+ agent: AppConfig Agent — Sidecar container
+ app -> agent: Localhost
+}
+appconfig: AWS AppConfig Data API
+ecs.agent -> appconfig
+lambda.extension -> appconfig
+eks.agent -> appconfig
 ```
-APPCONFIG + AWS SERVICES
-──────────────────────────
 
-  ECS (Fargate):
-  ┌───────────────────────────────────────────┐
-  │  Task Definition                          │
-  │  ┌─────────────────┐  ┌────────────────┐  │
-  │  │  App Container  │  │ AppConfig Agent│  │
-  │  │                 │  │ (sidecar)      │  │
-  │  │  localhost:2772 ─▶ │ poll + cache   │  │
-  │  │  get config     │  │ config mới nhất│  │
-  │  └─────────────────┘  └────────────────┘  │
-  └───────────────────────────────────────────┘
-
-  Lambda:
-  ┌───────────────────────────────────────────┐
-  │  Lambda Function                          │
-  │  ┌──────────────────┐                     │
-  │  │  AppConfig       │                     │
-  │  │  Lambda Extension│ ← AWS cung cấp sẵn  │
-  │  │  (layer)         │    không cần setup  │
-  │  │                  │                     │
-  │  │  localhost:2772  │                     │
-  │  └──────────────────┘                     │
-  └───────────────────────────────────────────┘
-
-  EKS:
-  ┌───────────────────────────────────────────┐
-  │  Pod                                      │
-  │  ┌─────────────────┐  ┌────────────────┐  │
-  │  │  App Container  │  │ AppConfig Agent│  │
-  │  │                 │─▶│ (sidecar pod)  │  │
-  │  └─────────────────┘  └────────────────┘  │
-  │  hoặc dùng SDK trực tiếp trong app        │
-  └───────────────────────────────────────────┘
-```
+Lambda cần thêm extension/layer, IAM và configuration; không mặc định có sẵn chỉ vì dùng AppConfig. EKS sidecar là container cùng Pod, hoặc app gọi SDK trực tiếp nếu chọn.
 
 ### 5.6. So sánh các Config Server
 
@@ -941,28 +820,29 @@ spec:
 
 ### 6.3. Config Reload — Hot Reload không cần restart
 
+```d2 title="6.3. Config Reload — Hot Reload không cần restart"
+direction: down
+volume: Volume Refresh {
+ cm: ConfigMap changed
+ file: Mounted file update — eventual
+ app: App watcher / Reload
+ cm -> file -> app
+}
+reloader: Reloader {
+ cm: ConfigMap changed
+ controller: Reloader Controller
+ rollout: Rolling restart Pods
+ cm -> controller -> rollout
+}
+checksum: Checksum Annotation {
+ config: Rendered config đổi
+ annotation: Pod-template checksum đổi
+ rollout: Deployment rollout
+ config -> annotation -> rollout
+}
 ```
-CONFIG RELOAD STRATEGIES
-──────────────────────────
 
-  Vấn đề: Đổi ConfigMap → Pod vẫn dùng config CŨ (nếu dùng env vars)!
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │  Cách 1: Volume mount (tự động update)                      │
-  │  → K8s tự update file trong volume sau ~1 phút              │
-  │  → App cần watch file changes                               │
-  │  → Không cần restart Pod                                    │
-  ├─────────────────────────────────────────────────────────────┤
-  │  Cách 2: Reloader (tự động restart Pod)                     │
-  │  → Dùng tool "Reloader" hoặc "stakater/Reloader"            │
-  │  → Khi ConfigMap đổi → tự động rolling restart Pods         │
-  │  → Đơn giản, nhưng có downtime nhỏ                          │
-  ├─────────────────────────────────────────────────────────────┤
-  │  Cách 3: Checksum annotation                                │
-  │  → Hash config vào annotation trong Deployment              │
-  │  → Config đổi → hash đổi → Deployment thay đổi → rollout    │
-  └─────────────────────────────────────────────────────────────┘
-```
+Env vars không tự đổi trong process đang chạy. ConfigMap projected volume update có delay theo kubelet/cache; subPath mount không nhận update. Restart/rollout downtime phụ thuộc readiness/capacity/drain, không mặc định phải có downtime hay đúng1phút.
 
 **Reloader — tự động restart khi ConfigMap đổi:**
 
@@ -1110,36 +990,25 @@ n7 -> n9: "Sync từ external store"
 
 ### 8.2. Kiến trúc Vault
 
+```d2 title="8.2. Kiến trúc Vault"
+direction: down
+vault: Vault Server {
+ api: HTTP REST API / CLI / UI
+ auth: Auth Methods — Token / K8s / AppRole / LDAP / OIDC
+ engines: Secret Engines — KVv2 / Database / AWS / PKI / Transit
+ audit: Audit Devices — File / Syslog / Socket
+ system: System — Seal / Unseal / HA / Raft
+ storage: Encrypted Storage Backend — Integrated Raft / Consul theo cấu hình {shape: cylinder}
+ api -> auth
+ api -> engines
+ api -> audit
+ api -> system
+ engines -> storage
+ system -> storage
+}
 ```
-VAULT ARCHITECTURE
-───────────────────
 
-  ┌─────────────────────────────────────────────────────────┐
-  │                      VAULT SERVER                       │
-  │                                                         │
-  │  ┌─────────────────────────────────────────────────┐    │
-  │  │                   API Layer                     │    │
-  │  │         (HTTP REST API / CLI / UI)              │    │
-  │  └──────────────────────┬──────────────────────────┘    │
-  │                         │                               │
-  │  ┌──────────┬───────────┼───────────┬──────────┐        │
-  │  │  Auth    │  Secret   │  Audit    │  System  │        │
-  │  │ Methods  │ Engines   │  Devices  │  Backend │        │
-  │  │          │           │           │          │        │
-  │  │ • Token  │ • KV v2   │ • File    │ • Seal/  │        │
-  │  │ • K8s    │ • Database│ • Syslog  │   Unseal │        │
-  │  │ • AppRole│ • AWS     │ • Socket  │ • HA     │        │
-  │  │ • LDAP   │ • PKI     │           │ • Raft   │        │
-  │  │ • OIDC   │ • Transit │           │          │        │
-  │  └──────────┴───────────┴───────────┴──────────┘        │
-  │                         │                               │
-  │  ┌──────────────────────▼──────────────────────────┐    │
-  │  │              Storage Backend                    │    │
-  │  │     (Raft / Consul / S3 / DynamoDB / etc.)      │    │
-  │  │              ← ENCRYPTED →                      │    │
-  │  └─────────────────────────────────────────────────┘    │
-  └─────────────────────────────────────────────────────────┘
-```
+Storage backend support/HA properties phụ thuộc Vault version và backend; không xem mọi object store liệt kê trong ví dụ cũ là lựa chọn HA production tương đương.
 
 ### 8.3. Secret Engines
 
@@ -1194,100 +1063,59 @@ SECRET ENGINES — CÁC LOẠI "KHO BÍ MẬT"
 
 ### 8.4. Authentication Methods
 
+```d2 title="8.4. Authentication Methods"
+shape: sequence_diagram
+pod: Pod order-svc — production
+vault: Vault
+k8s: Kubernetes API
+pod -> vault: Kubernetes Auth — ServiceAccount Token
+vault -> k8s: TokenReview / Verify identity theo auth method
+k8s -> vault: Validation result {style.stroke-dash: 5}
+vault -> pod: Vault token với policies / TTL nếu hợp lệ {style.stroke-dash: 5}
 ```
-VAULT AUTH METHODS — SERVICE CHỨNG MINH DANH TÍNH
-───────────────────────────────────────────────────
 
-  Vấn đề: Service cần đọc secret từ Vault,
-  nhưng Vault phải biết "Service nào đang hỏi?"
-
-  ┌──────────────────────────────────────────────────────────────┐
-  │                                                              │
-  │  Kubernetes Auth (phổ biến nhất cho K8s):                    │
-  │  ┌──────────┐  K8s SA Token  ┌────────┐  verify  ┌────────┐  │
-  │  │ Pod      │───────────────▶│ Vault  │─────────▶│ K8s API│  │
-  │  │(order-svc)│  "Tôi là Pod  │        │ "Token   │        │  │
-  │  │          │   order-svc    │        │  này có  │        │  │
-  │  │          │   namespace    │        │  thật    │        │  │
-  │  │          │   production"  │        │  không?" │        │  │
-  │  └──────────┘                │        │          └────────┘  │
-  │                              │        │  ✅ Xác nhận         │
-  │                              │ Vault  │                      │
-  │                              │ Token  │                      │
-  │                              │◄───────│                      │
-  │                                                              │
-  │  AppRole Auth (cho CI/CD, non-K8s):                          │
-  │  → Role ID (công khai) + Secret ID (bí mật, dùng 1 lần)      │
-  │  → Giống username + OTP                                      │
-  │                                                              │
-  │  OIDC/JWT Auth (cho user access):                            │
-  │  → Login bằng SSO → Vault verify JWT → cấp Vault token       │
-  │                                                              │
-  └──────────────────────────────────────────────────────────────┘
-```
+AppRole dùng RoleID + SecretID với TTL/num_uses theo cấu hình, không mặc định SecretID luôn dùng một lần. OIDC/JWT auth verify identity/token để phát Vault token theo role/policy; cần bảo vệ bootstrap credentials.
 
 ### 8.5. Dynamic Secrets — Tính năng mạnh nhất
 
-```
-DYNAMIC SECRETS — TẠI SAO LÀ "GAME CHANGER"?
-──────────────────────────────────────────────
-
-  ❌ Static Secrets (truyền thống):
-  ┌──────────────────────────────────────────────────────┐
-  │  1 DB password cho tất cả instances của order-service│
-  │  → Dùng mãi không đổi                                │
-  │  → Lộ 1 lần = attacker có access vĩnh viễn           │
-  │  → Rotate = phải restart tất cả instances            │
-  │  → Không biết ai dùng password khi nào               │
-  └──────────────────────────────────────────────────────┘
-
-  ✅ Dynamic Secrets (Vault):
-  ┌──────────────────────────────────────────────────────┐
-  │  Mỗi Pod nhận credentials RIÊNG, TẠM THỜI            │
-  │                                                      │
-  │  Pod 1: user=v-order-pod1-abc  pass=random1  (1h)    │
-  │  Pod 2: user=v-order-pod2-def  pass=random2  (1h)    │
-  │  Pod 3: user=v-order-pod3-ghi  pass=random3  (1h)    │
-  │                                                      │
-  │  → Mỗi Pod có credentials riêng                      │
-  │  → Hết 1 giờ → Vault tự xóa user khỏi DB             │
-  │  → Pod renew lease nếu cần tiếp                      │
-  │  → Lộ 1 cred = chỉ ảnh hưởng 1 Pod, hết hạn sau 1h   │
-  │  → Audit: biết chính xác Pod nào query gì            │
-  └──────────────────────────────────────────────────────┘
+```d2 title="8.5. Dynamic Secrets — Tính năng mạnh nhất"
+direction: down
+static: Static Shared Credential {
+ db: DB credential dùng chung
+ p1: Pod1
+ p2: Pod2
+ p3: Pod3
+ db -> p1
+ db -> p2
+ db -> p3
+}
+dynamic: Dynamic Credentials — ví dụ lease1h {
+ vault: Vault Database Engine
+ p1: Pod1 — user v-order-pod1-abc / random1
+ p2: Pod2 — user v-order-pod2-def / random2
+ p3: Pod3 — user v-order-pod3-ghi / random3
+ vault -> p1
+ vault -> p2
+ vault -> p3
+}
 ```
 
-```
-DYNAMIC SECRETS FLOW — TỪNG BƯỚC
-──────────────────────────────────
+Credentials riêng giúp gán identity/audit và giới hạn thời gian sử dụng; renew/revoke cần app/agent/Vault/DB hoạt động theo policy. Lộ một credential vẫn có quyền DB của role đó, không chỉ quyền trong một Pod. Vault audit ghi secret/auth operations; audit từng DB query cần database audit riêng. Static credentials vẫn có thể rotate; không mặc định phải dùng vĩnh viễn.
 
-  Pod (order-svc)           Vault               PostgreSQL
-       │                      │                      │
-       │ 1. Auth (K8s token)  │                      │
-       │─────────────────────▶│                      │
-       │◄── Vault token ──────│                      │
-       │                      │                      │
-       │ 2. "Cho tôi DB creds"│                      │
-       │─────────────────────▶│                      │
-       │                      │ 3. CREATE ROLE       │
-       │                      │    v-order-abc       │
-       │                      │───────────────────▶  │
-       │                      │◄── OK ─────────────  │
-       │                      │                      │
-       │◄── username: v-order-abc                    │
-       │    password: random123                      │
-       │    lease: 1h         │                      │
-       │                      │                      │
-       │ 4. Connect DB ─────────────────────────────▶│
-       │    user=v-order-abc                         │
-       │    pass=random123                           │
-       │◄──────────────────────────────── Connected ─│
-       │                      │                      │
-       │ ... 1 hour later ... │                      │
-       │                      │ 5. REVOKE ROLE       │
-       │                      │    v-order-abc       │
-       │                      │───────────────────▶  │
-       │                      │    (tự động!)        │
+```d2 title="8.5. Dynamic Secrets — Tính năng mạnh nhất"
+shape: sequence_diagram
+pod: Pod order-svc
+vault: Vault
+pg: PostgreSQL
+pod -> vault: 1. Authenticate K8s token
+vault -> pod: Vault Token {style.stroke-dash: 5}
+pod -> vault: 2. Request DB credentials
+vault -> pg: 3. CREATE ROLE v-order-abc
+pg -> vault: OK {style.stroke-dash: 5}
+vault -> pod: username v-order-abc / password random123 / lease1h — minh họa {style.stroke-dash: 5}
+pod -> pg: 4. Connect bằng temporary credentials
+pg -> pod: Connected {style.stroke-dash: 5}
+vault -> pg: 5. Lease hết / Revoke — revoke role theo DB plugin
 ```
 
 ### 8.6. Vault với Kubernetes
@@ -1362,18 +1190,13 @@ spec:
 
 **AWS Secrets Manager** chuyên quản lý secrets trên AWS, có tích hợp **auto-rotation** với RDS, Redshift, DocumentDB.
 
-```
-AWS SECRETS MANAGER — CÁCH HOẠT ĐỘNG
-──────────────────────────────────────
-
-  ┌──────────┐                    ┌───────────────────┐
-  │ ECS Task │  GetSecretValue    │  AWS Secrets      │
-  │ / Lambda │───────────────────▶│  Manager          │
-  │ / EC2    │                    │                   │
-  │          │◄── secret value ── │  • Encrypted (KMS)│
-  │          │                    │  • Versioned      │
-  │          │                    │  • Auto-rotate    │
-  └──────────┘                    └───────────────────┘
+```d2 title="9.1. AWS Secrets Manager"
+shape: sequence_diagram
+app: ECS Task / Lambda / EC2
+sm: AWS Secrets Manager
+app -> sm: GetSecretValue — IAM-authorized
+sm.note: KMS encryption / Versioning / Rotation theo cấu hình
+sm -> app: Secret value {style.stroke-dash: 5}
 ```
 
 ```python source="snippets/9-1-aws-secrets-manager.py"
@@ -1400,28 +1223,22 @@ db_creds = get_secret("prod/order-service/db")
 
 **Auto-rotation với RDS:**
 
+```d2 title="9.1. AWS Secrets Manager"
+shape: sequence_diagram
+sm: Secrets Manager
+rotation: Rotation Lambda
+rds: RDS
+app: Application
+sm -> rotation: 1. Trigger rotation — ví dụ mỗi30ngày
+rotation -> rds: 2. Tạo / Update credential theo rotation strategy
+rds -> rotation: Update / Test result {style.stroke-dash: 5}
+rotation -> sm: 3. Stage / Promote secret version sau validation
+app -> sm: 4. Refresh secret bằng SDK/cache policy
+sm -> app: New secret version {style.stroke-dash: 5}
+app.note: Reinitialize / Reconnect pool nếu cần
 ```
-AUTO-ROTATION FLOW
-───────────────────
 
-  Secrets Manager             Lambda (Rotation)          RDS
-       │                           │                      │
-       │  1. Trigger rotation      │                      │
-       │  (mỗi 30 ngày)            │                      │
-       │──────────────────────────▶│                      │
-       │                           │                      │
-       │                           │ 2. Tạo password mới  │
-       │                           │───────────────────▶  │
-       │                           │    ALTER USER...     │
-       │                           │◄── OK ─────────────  │
-       │                           │                      │
-       │◄── 3. Update secret ──────│                      │
-       │    password = new_pass    │                      │
-       │                           │                      │
-       │  4. App đọc secret        │                      │
-       │  → Tự động nhận new_pass  │                      │
-       │  → KHÔNG cần restart app! │                      │
-```
+Flow rút gọn; rotation implementations có create/set/test/finish stages, single/alternating user strategies. Không restart được chỉ khi app/agent thực sự refresh credentials và xử lý connections cũ/mới, không tự động chỉ vì secret trên server đổi.
 
 ### 9.2. AWS Systems Manager Parameter Store
 
@@ -1616,36 +1433,22 @@ spec:
 
 ### 11.1. Environment-per-Config
 
+```d2 title="11.1. Environment-per-Config"
+direction: down
+store: Config Store — Vault / Config Server / Kubernetes {
+ dev: "/dev/order-service/\ndb_host localhost\nlog_level DEBUG\nfeature_new_ui true"
+ staging: "/staging/order-service/\ndb_host staging-db\nlog_level INFO\nfeature_new_ui true"
+ prod: "/prod/order-service/\ndb_host prod-db\nlog_level WARN\nfeature_new_ui false"
+}
+selector: ENVIRONMENT — Chọn namespace /dev hoặc /staging hoặc /prod
+selector -> store: Đọc config của đúng environment
 ```
-ENVIRONMENT-PER-CONFIG PATTERN
-───────────────────────────────
 
-  Mỗi environment có config riêng, KHÔNG share:
+Config có thể dùng cùng schema/defaults nhưng override, access control và secrets phải cô lập theo environment.
 
-  ┌─────────────────────────────────────────────────────┐
-  │  Config Store (Vault / Config Server / K8s)         │
-  │                                                     │
-  │  /dev/                                              │
-  │  ├── order-service/db_host = "localhost"            │
-  │  ├── order-service/log_level = "DEBUG"              │
-  │  └── order-service/feature_new_ui = true            │
-  │                                                     │
-  │  /staging/                                          │
-  │  ├── order-service/db_host = "staging-db"           │
-  │  ├── order-service/log_level = "INFO"               │
-  │  └── order-service/feature_new_ui = true            │
-  │                                                     │
-  │  /prod/                                             │
-  │  ├── order-service/db_host = "prod-db"              │
-  │  ├── order-service/log_level = "WARN"               │
-  │  └── order-service/feature_new_ui = false ← chưa bật│
-  └─────────────────────────────────────────────────────┘
-
-  Service đọc config dựa trên biến ENVIRONMENT:
-  ┌──────────────────────────────────────────────────────┐
-  │  env = os.getenv("ENVIRONMENT")  # "dev" / "prod"    │
-  │  config = config_store.get(f"/{env}/order-service/") │
-  └──────────────────────────────────────────────────────┘
+```python
+env = os.getenv("ENVIRONMENT")  # "dev" / "prod"
+config = config_store.get(f"/{env}/order-service/")
 ```
 
 ### 11.2. Feature Flags
@@ -1700,44 +1503,22 @@ FEATURE FLAGS LƯU Ở ĐÂU?
 
 **Cách hoạt động trong thực tế:**
 
+```d2 title="11.2. Feature Flags"
+shape: sequence_diagram
+pm: PM / QA
+flags: Feature Flag Service
+sdk: Service SDK
+app: Business Code
+pm -> flags: Admin UI — new_checkout enabled / rollout25%
+flags.note: Persist flag definition
+sdk -> flags: App start / Poll mỗi10–30s
+flags -> sdk: Flag values / Targeting rules {style.stroke-dash: 5}
+sdk.note: Cache in memory / Refresh theo SDK policy
+app -> sdk: is_enabled new_checkout / user_id
+sdk -> app: Local evaluation — New hoặc Old checkout {style.stroke-dash: 5}
 ```
-FEATURE FLAG SYSTEM — KIẾN TRÚC
-─────────────────────────────────
 
-  PM / QA                Feature Flag Service           Microservices
-     │                         │                            │
-     │  Bật "new_checkout"     │                            │
-     │  cho 25% users          │                            │
-     │  (qua Admin UI)         │                            │
-     │────────────────────────▶│                            │
-     │                         │                            │
-     │                         │  UPDATE database           │
-     │                         │  new_checkout:             │
-     │                         │    enabled=true            │
-     │                         │    rollout=25%             │
-     │                         │                            │
-     │                         │◄─── SDK poll (mỗi 10-30s)──│
-     │                         │                            │
-     │                         │──── flag values ──────────▶│
-     │                         │                            │
-     │                         │     Service code:          │
-     │                         │     if is_enabled(         │
-     │                         │       "new_checkout",      │
-     │                         │       user_id):            │
-     │                         │         show_new_checkout()│
-     │                         │     else:                  │
-     │                         │         show_old_checkout()│
-
-  SDK bên trong service:
-  ┌──────────────────────────────────────────────────────────┐
-  │  1. Khi app start → SDK kết nối Feature Flag Service     │
-  │  2. SDK tải TẤT CẢ flags về → cache trong memory         │
-  │  3. Mỗi 10-30s → SDK poll lại → cập nhật cache           │
-  │  4. Code gọi is_enabled("flag") → đọc từ memory cache    │
-  │     → Rất nhanh (< 1ms), không gọi network mỗi lần       │
-  │  5. PM đổi flag → SDK nhận được sau 10-30s → áp dụng     │
-  └──────────────────────────────────────────────────────────┘
-```
+SDK cache/evaluation có thể tránh network call mỗi request; tốc độ <1ms chỉ là minh họa. PM đổi flag sẽ tới client theo polling/streaming/cache policy, không tức thời.
 
 **Ví dụ với Unleash (open-source Feature Flag):**
 
@@ -1801,79 +1582,53 @@ USE CASES CỤ THỂ
 
 ### 11.3. Config Hierarchy & Override
 
+```d2 title="11.3. Config Hierarchy & Override"
+direction: right
+env: "1. Environment Variables — ERROR"
+server: "2. Config Server — Runtime values"
+file: "3. Mounted ConfigMap / File — DEBUG"
+defaults: "4. App Defaults — INFO"
+result: "LOG_LEVEL ERROR trong policy ví dụ"
+env -> server: "Ưu tiên cao hơn"
+server -> file: "Ưu tiên cao hơn"
+file -> defaults: "Ưu tiên cao hơn"
+env -> result
 ```
-CONFIG HIERARCHY — THỨ TỰ ƯU TIÊN
-────────────────────────────────────
 
-  Ưu tiên CAO → THẤP:
-
-  ┌────────────────────────────────────────┐
-  │ 1. Environment Variables (cao nhất)    │  ← Override mọi thứ
-  ├────────────────────────────────────────┤
-  │ 2. Config Server (runtime)             │  ← Dynamic config
-  ├────────────────────────────────────────┤
-  │ 3. Config file (mounted)               │  ← ConfigMap / file
-  ├────────────────────────────────────────┤
-  │ 4. Application config (trong code)     │  ← Defaults
-  └────────────────────────────────────────┘
-
-  Ví dụ:
-  • Code: LOG_LEVEL = "INFO"          (default)
-  • ConfigMap: LOG_LEVEL = "DEBUG"     (override)
-  • Env var: LOG_LEVEL = "ERROR"       (override cao nhất)
-  → Kết quả: LOG_LEVEL = "ERROR"
-
-  Lợi ích:
-  → Dev có thể override config cục bộ
-  → Ops có thể override bằng env vars trong K8s
-  → Emergency: đổi env var → restart Pod → fix ngay
-```
+Precedence này là policy minh họa, không phải chuẩn mọi framework. Dev/Ops có thể override local/env theo config resolution đã định; env change thường cần restart app.
 
 ---
 
 ## 12. Ví dụ thực tế — E-Commerce Configuration
 
+```d2 title="12. Ví dụ thực tế — E-Commerce Configuration"
+direction: down
+git: Git Repository {
+ cm: k8s/configmaps — user / order / payment
+ refs: k8s/external-secrets — reference AWS secrets
+ flags: feature-flags/flags.yaml
+}
+cluster: Kubernetes {
+ argo: ArgoCD
+ configmaps: ConfigMaps — non-sensitive
+ eso: External Secrets Operator
+ secrets: Kubernetes Secrets
+ unleash: Unleash — Dynamic flags
+ apps: Services { user: User; order: Order; payment: Payment }
+ argo -> configmaps
+ argo -> eso: ExternalSecret references
+ argo -> unleash: Flag configuration theo integration
+ eso -> secrets: Materialize secret
+ configmaps -> apps: Config
+ secrets -> apps: Secret
+ unleash -> apps: SDK flags
+}
+aws: AWS Secrets Manager
+cluster.argo -> git: Pull / Sync
+cluster.eso -> aws: Fetch authorized secret
 ```
-E-COMMERCE — CONFIGURATION ARCHITECTURE
-─────────────────────────────────────────
 
-  ┌─────────────────────────────────────────────────────────────┐
-  │                    Git Repository                           │
-  │                                                             │
-  │  k8s/                                                       │
-  │  ├── configmaps/                                            │
-  │  │   ├── user-service-config.yaml    (DB_HOST, LOG_LEVEL)   │
-  │  │   ├── order-service-config.yaml                          │
-  │  │   └── payment-service-config.yaml                        │
-  │  ├── external-secrets/                                      │
-  │  │   ├── user-service-secrets.yaml   (reference → AWS)      │
-  │  │   ├── order-service-secrets.yaml                         │
-  │  │   └── payment-service-secrets.yaml                       │
-  │  └── feature-flags/                                         │
-  │      └── flags.yaml                                         │
-  └───────────────────┬─────────────────────────────────────────┘
-                      │ ArgoCD sync
-                      ▼
-  ┌─────────────────────────────────────────────────────────────┐
-  │                  Kubernetes Cluster                         │
-  │                                                             │
-  │  ConfigMaps ──────▶ Non-sensitive config                    │
-  │  ESO ──── sync ───▶ AWS Secrets Manager ──▶ K8s Secrets     │
-  │  Unleash ─────────▶ Feature Flags (dynamic)                 │
-  │                                                             │
-  │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐      │
-  │  │ User Service │  │Order Service │  │Payment Service│      │
-  │  │              │  │              │  │               │      │
-  │  │ Config:      │  │ Config:      │  │ Config:       │      │
-  │  │  ConfigMap   │  │  ConfigMap   │  │  ConfigMap    │      │
-  │  │ Secrets:     │  │ Secrets:     │  │ Secrets:      │      │
-  │  │  K8s Secret  │  │  K8s Secret  │  │  K8s Secret   │      │
-  │  │  (from ESO)  │  │  (from ESO)  │  │  (from ESO)   │      │
-  │  │ Flags:       │  │ Flags:       │  │ Flags:        │      │
-  │  │  Unleash SDK │  │  Unleash SDK │  │  Unleash SDK  │      │
-  │  └──────────────┘  └──────────────┘  └───────────────┘      │
-  └─────────────────────────────────────────────────────────────┘
-```
+Không commit plaintext secrets. ESO sync và SDK refresh theo policy riêng; app nhận config/secret thay đổi còn phụ thuộc mount/env và code reload behavior.
 
 ---
 

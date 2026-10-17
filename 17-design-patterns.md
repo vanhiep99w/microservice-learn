@@ -30,20 +30,18 @@ Tài liệu này là **trang chỉ mục (index) và cẩm nang ra quyết đị
 
 ## 2. Bản đồ 8 nhóm pattern
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                MICROSERVICE DESIGN PATTERNS MAP                     │
-│                                                                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │  Structural  │  │Decomposition │  │     Data     │               │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
-│  │Communication │  │ Reliability  │  │ Deployment   │               │
-│  └──────────────┘  └──────────────┘  └──────────────┘               │
-│  ┌──────────────┐  ┌──────────────┐                                 │
-│  │Observability │  │Anti-patterns │                                 │
-│  └──────────────┘  └──────────────┘                                 │
-└─────────────────────────────────────────────────────────────────────┘
+```d2 title="2. Bản đồ 8 nhóm pattern"
+direction: right
+patterns: Microservice Design Patterns {
+ structural: Structural
+ decomposition: Decomposition
+ data: Data
+ communication: Communication
+ reliability: Reliability
+ deployment: Deployment
+ observability: Observability
+ antipatterns: Anti-patterns
+}
 ```
 
 | Nhóm | Câu hỏi trung tâm | Patterns chính | Tài liệu |
@@ -125,24 +123,28 @@ Không hệ thống nào cần đủ pattern từ ngày đầu — thêm pattern
 
 Một sàn thương mại điện tử điển hình dùng **đồng thời cả 8 nhóm pattern**, mỗi pattern ở đúng tầng của nó:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        E-Commerce Platform                          │
-│                                                                     │
-│   Web / Mobile ──▶ API Gateway ──▶ Web BFF / Mobile BFF             │
-│                    (auth, rate limit)  (aggregation theo client)    │
-│                                              │                      │
-│         ┌────────────┬────────────┬─────────┼────────────┐         │
-│         ▼            ▼            ▼         ▼            ▼         │
-│   Order Service  Product Svc  Payment Svc  User Svc  Notification  │
-│   [sidecar proxy mỗi pod — mTLS, retry]     [Adapter chuẩn hóa     │
-│         │            │            │         │       Email/SMS/Push]│
-│      [PostgreSQL]  [MongoDB]  [PostgreSQL] [PostgreSQL]            │
-│         │                                                          │
-│         └──── Outbox ───▶ Kafka (Event Bus) ◀─────────────────────┘│
-│                                │                                   │
-│                    Inventory / Notification / Analytics subscribe   │
-└─────────────────────────────────────────────────────────────────────┘
+```d2 title="4. Ví dụ kết hợp — E-Commerce Platform"
+direction: down
+client: Web / Mobile
+gateway: API Gateway — Auth / Rate limit
+bff: Web BFF / Mobile BFF — Client aggregation
+services: Domain Services — Sidecar proxy / mTLS / Retry policy {
+ order: Order { db: PostgreSQL {shape: cylinder} }
+ product: Product { db: MongoDB {shape: cylinder} }
+ payment: Payment { db: PostgreSQL {shape: cylinder} }
+ user: User { db: PostgreSQL {shape: cylinder} }
+ notification: Notification — Adapter cho Email / SMS / Push
+}
+kafka: Kafka Event Bus
+consumers: Inventory / Notification / Analytics
+client -> gateway -> bff
+bff -> services.order
+bff -> services.product
+bff -> services.payment
+bff -> services.user
+bff -> services.notification
+services.order.db -> kafka: Outbox / Relay
+kafka -> consumers: Subscribe
 ```
 
 ### Flow "Đặt hàng" — các pattern phối hợp

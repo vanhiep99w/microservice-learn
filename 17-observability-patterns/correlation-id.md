@@ -245,13 +245,17 @@ Mã trả về không nên chứa PII hoặc thông tin bí mật. Nó chỉ là
 
 Giả sử khách hàng gọi `POST /orders`. API Gateway nhận request, tạo `req-789` vì request chưa có ID hợp lệ, rồi forward ID qua các service:
 
-```text
-Client
-  └─ POST /orders
-     └─ API Gateway       correlation_id=req-789
-        └─ Order Service  correlation_id=req-789
-           ├─ Inventory Service  correlation_id=req-789
-           └─ Payment Service    correlation_id=req-789
+```d2 title="Request đặt hàng qua HTTP"
+direction: right
+client: "Client POST /orders"
+gateway: "Gateway — CID req-789"
+order: "Order — CID req-789"
+inventory: "Inventory — CID req-789"
+payment: "Payment — CID req-789"
+client -> gateway
+gateway -> order
+order -> inventory
+order -> payment
 ```
 
 Các log entry có thể tạo thành một dòng thời gian có thể query:
@@ -270,13 +274,13 @@ Query theo `correlation_id=req-789` cho thấy request đã đi qua những serv
 
 Sau khi ghi nhận order, Order Service publish sự kiện `OrderCreated` cho Notification Service. Producer đưa `req-789` vào message header. Notification Service extract header khi consume và ghi log với cùng ID:
 
-```text
-Order Service
-  └─ publish OrderCreated
-     └─ message header: X-Correlation-ID=req-789
-        └─ Message Broker
-           └─ Notification Service
-              └─ consume OrderCreated, correlation_id=req-789
+```d2 title="Sự kiện OrderCreated qua message"
+direction: right
+order: "Order"
+broker: "Message Broker"
+notification: "Notification — Consume OrderCreated\ncorrelation_id req-789"
+order -> broker: "Publish OrderCreated / X-Correlation-ID req-789"
+broker -> notification: "Propagate correlation header"
 ```
 
 Nếu message nằm trong queue 30 giây, khoảng cách timestamp giữa hai service không làm ID thay đổi. Engineer vẫn có thể query một ID để thấy cả producer và consumer, miễn là producer, broker integration và consumer đều giữ metadata.

@@ -131,28 +131,25 @@ Công ty **ShopVN** đang vận hành một **Monolith E-Commerce** được xâ
 
 ### Các module hiện tại trong Monolith
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    MONOLITH SHOPVN                      │
-│                                                         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐  │
-│  │   User   │ │ Product  │ │  Order   │ │  Payment   │  │
-│  │  Module  │ │  Module  │ │  Module  │ │   Module   │  │
-│  └──────────┘ └──────────┘ └──────────┘ └────────────┘  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐  │
-│  │Inventory │ │ Shopping │ │Promotion │ │Notification│  │
-│  │  Module  │ │   Cart   │ │  Module  │ │   Module   │  │
-│  └──────────┘ └──────────┘ └──────────┘ └────────────┘  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                 │
-│  │ Shipping │ │  Review  │ │  Search  │                 │
-│  │  Module  │ │  Module  │ │  Module  │                 │
-│  └──────────┘ └──────────┘ └──────────┘                 │
-│                                                         │
-│              ┌──────────────────────┐                   │
-│              │   Single Database    │                   │
-│              │    (PostgreSQL)      │                   │
-│              └──────────────────────┘                   │
-└─────────────────────────────────────────────────────────┘
+```d2 title="Các module hiện tại trong Monolith"
+direction: down
+monolith: ShopVN Monolith {
+ modules: Modules {
+  m0: "User"
+  m1: "Product"
+  m2: "Order"
+  m3: "Payment"
+  m4: "Inventory"
+  m5: "Shopping Cart"
+  m6: "Promotion"
+  m7: "Notification"
+  m8: "Shipping"
+  m9: "Review"
+  m10: "Search"
+ }
+ db: Single PostgreSQL {shape: cylinder}
+ modules -> db
+}
 ```
 
 ---
@@ -337,39 +334,54 @@ n1 -> n4: "Open Host Service"
 
 ### 1.5. Event Storming — Checkout Flow
 
+```d2 title="1.5. Event Storming — Checkout Flow"
+direction: right
+place: "🟦 PlaceOrder"
+cart: "🟨 Cart"
+checked: "🟧 CartCheckedOut"
+create: "🟦 CreateOrder"
+order: "🟨 Order"
+created: "🟧 OrderCreated"
+voucher: "🟦 ApplyVoucher"
+promotion: "🟨 Promotion"
+applied: "🟧 VoucherApplied"
+rejected: "🟧 VoucherRejected"
+pay: "🟦 InitiatePayment"
+payment: "🟨 Payment"
+paid: "🟧 PaymentCompleted"
+failed: "🟧 PaymentFailed"
+compensation: "🟪 Release stock / Restore voucher"
+confirmed: "🟧 OrderConfirmed"
+reserve: "🟦 ReserveStock"
+inventory: "🟨 Inventory"
+reserved: "🟧 StockReserved"
+stockfailed: "🟧 StockReservationFailed"
+shipment: "🟦 CreateShipment"
+notify: "🟪 Notify buyer — Đơn xác nhận / Merchant — Có đơn mới"
+place -> cart
+cart -> checked
+checked -> create
+create -> order
+order -> created
+created -> voucher
+voucher -> promotion
+promotion -> applied: "Thành công"
+promotion -> rejected: "Thất bại"
+created -> pay
+pay -> payment
+payment -> paid: "Thành công"
+payment -> failed: "Thất bại"
+failed -> compensation
+paid -> confirmed
+created -> reserve
+reserve -> inventory
+inventory -> reserved: "Thành công"
+inventory -> stockfailed: "Thất bại"
+confirmed -> shipment
+confirmed -> notify
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                     EVENT STORMING — CHECKOUT FLOW                           │
-│                                                                              │
-│  🟦 Command    🟧 Domain Event    🟨 Aggregate    🟪 Policy/Rule             │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  🟦 PlaceOrder ──▶ 🟨 Cart ──▶ 🟧 CartCheckedOut                             │
-│        │                              │                                      │
-│        ▼                              ▼                                      │
-│  🟦 CreateOrder ──▶ 🟨 Order ──▶ 🟧 OrderCreated                             │
-│                              │                                               │
-│                              ├──▶ 🟦 ReserveStock ──▶ 🟨 Inventory           │
-│                              │         ├──▶ 🟧 StockReserved ✓               │
-│                              │         └──▶ 🟧 StockReservationFailed ✗      │
-│                              │                                               │
-│                              ├──▶ 🟦 ApplyVoucher ──▶ 🟨 Promotion           │
-│                              │         ├──▶ 🟧 VoucherApplied ✓              │
-│                              │         └──▶ 🟧 VoucherRejected ✗             │
-│                              │                                               │
-│                              └──▶ 🟦 InitiatePayment ──▶ 🟨 Payment          │
-│                                        ├──▶ 🟧 PaymentCompleted ✓            │
-│                                        └──▶ 🟧 PaymentFailed ✗               │
-│                                                   │                          │
-│                                                   ▼                          │
-│                                  🟪 Release stock + Restore voucher          │
-│                                                                              │
-│  (PaymentCompleted) ──▶ 🟧 OrderConfirmed ──▶ 🟦 CreateShipment              │
-│                                                    │                         │
-│                              🟪 Notify buyer "Đơn hàng đã xác nhận"          │
-│                              🟪 Notify merchant "Có đơn hàng mới"            │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+
+Legend: 🟦 Command · 🟨 Aggregate · 🟧 Domain Event · 🟪 Policy. Đây là bản đồ Event Storming; fan-out không có nghĩa các bước luôn chạy đồng thời hoặc chỉ PaymentCompleted đã đủ mọi điều kiện confirm.
 
 **Key takeaways:**
 
@@ -597,27 +609,26 @@ gantt
 
 ### 3.1. Quy tắc chọn Sync vs Async
 
+```d2 title="3.1. Quy tắc chọn Sync vs Async"
+direction: down
+waiting: User cần response ngay? {shape: diamond}
+sync: Sync — REST / gRPC với deadline
+immediate: Cần kết quả ngay? {shape: diamond}
+sideeffect: Side effect / Fan-out? {shape: diamond}
+eventual: Eventual consistency chấp nhận được? {shape: diamond}
+async: Async Event
+strong: Thiết kế consistency / Transaction boundary cần thiết
+waiting -> sync: Có
+waiting -> immediate: Không
+immediate -> sync: Có
+immediate -> sideeffect: Không
+sideeffect -> async: Có
+sideeffect -> eventual: Không
+eventual -> async: Có
+eventual -> strong: Không
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                DECISION FRAMEWORK                             │
-│                                                               │
-│   User đang chờ response?  ──── YES ──▶ SYNC (REST/gRPC)      │
-│         │                                                     │
-│         NO                                                    │
-│         │                                                     │
-│   Cần kết quả ngay?  ──── YES ──▶ SYNC với timeout            │
-│         │                                                     │
-│         NO                                                    │
-│         │                                                     │
-│   Là side effect / fan-out?  ──── YES ──▶ ASYNC (Event)       │
-│         │                                                     │
-│         NO                                                    │
-│         │                                                     │
-│   Cần eventual consistency OK?  ──── YES ──▶ ASYNC (Event)    │
-│         │                                                     │
-│         NO ──▶ SYNC với strong consistency                    │
-└───────────────────────────────────────────────────────────────┘
-```
+
+Sync không tự tạo strong consistency giữa nhiều service. Tác vụ dài có thể trả202 + Status URL dù người dùng khởi tạo từ UI; chọn theo contract và business invariants.
 
 ### 3.2. Communication Matrix
 
@@ -670,38 +681,24 @@ gantt
 
 ### 3.4. API Gateway Design
 
+```d2 title="3.4. API Gateway Design"
+direction: right
+internet: "Internet"
+cdn: "CloudFront CDN"
+alb: "ALB"
+gateway: "Application API Gateway"
+internet -> cdn
+cdn -> alb
+alb -> gateway
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      API GATEWAY                                │
-│                                                                 │
-│  Internet ──▶ CloudFront (CDN) ──▶ ALB ──▶ API Gateway          │
-│                                                                 │
-│  Responsibilities:                                              │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  1. Authentication  │ Validate JWT, reject invalid token │   │
-│  │  2. Rate Limiting   │ Per IP, per user, per API key      │   │
-│  │  3. Routing         │ /api/orders/* → Order Service      │   │
-│  │  4. SSL Termination │ HTTPS → HTTP (internal)            │   │
-│  │  5. Request Logging │ Access log + correlation ID        │   │
-│  │  6. CORS            │ Allowed origins configuration      │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  Routing Table:                                                 │
-│  ┌──────────────────────────┬─────────────────────┐             │
-│  │ Path Pattern             │ Target Service      │             │
-│  ├──────────────────────────┼─────────────────────┤             │
-│  │ /api/v1/auth/*           │ Auth Service        │             │
-│  │ /api/v1/users/*          │ User Service        │             │
-│  │ /api/v1/products/*       │ Catalog Service     │             │
-│  │ /api/v1/search/*         │ Search Service      │             │
-│  │ /api/v1/cart/*           │ Cart Service        │             │
-│  │ /api/v1/orders/*         │ Order Service       │             │
-│  │ /api/v1/payments/*       │ Payment Service     │             │
-│  │ /api/v1/reviews/*        │ Review Service      │             │
-│  │ /api/v1/recommendations/*│ Recommendation      │             │
-│  └──────────────────────────┴─────────────────────┘             │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Sơ đồ dùng application API Gateway sau ALB; không ngụ ý đây là thứ tự bắt buộc của Amazon API Gateway managed. TLS nội bộ vẫn có thể dùng HTTPS/mTLS theo threat model.
+
+| Responsibility | Chi tiết |
+| --- | --- |
+
+| Path pattern | Target service |
+| --- | --- |
 
 ### 3.5. Service Discovery
 
@@ -796,27 +793,26 @@ Response 200 OK:
 
 **Quy trình Health Check:**
 
-```mermaid
-sequenceDiagram
-    participant CM as Cloud Map
-    participant ECS as ECS Agent
-    participant SVC as Service Instance
-
-    loop Mỗi 10 giây
-        ECS->>SVC: GET /health
-        alt Response 200 trong 5s
-            SVC-->>ECS: 200 OK
-            ECS->>CM: Report HEALTHY
-        else Timeout hoặc 5xx
-            SVC--xECS: Timeout / 500
-            ECS->>CM: Report UNHEALTHY (count++)
-        end
-    end
-
-    Note over CM: Sau 3 lần UNHEALTHY liên tiếp
-    CM->>CM: Deregister instance khỏi DNS
-    CM->>ECS: Trigger replacement task
+```d2 title="Health Check — Cơ chế giám sát sức khoẻ"
+direction: down
+tick: "ECS Agent — mỗi 10 giây"
+probe: "GET /health tới Service Instance"
+check: "Response trong 5 giây?"
+healthy: "200 OK\nReport HEALTHY tới Cloud Map"
+unhealthy: "Timeout / 5xx\nReport UNHEALTHY • count++"
+count: "3 lần UNHEALTHY liên tiếp?"
+remove: "Cloud Map deregister instance khỏi DNS\nTheo flow minh họa: yêu cầu ECS replacement"
+tick -> probe
+probe -> check
+check -> healthy: "200 trong 5s"
+check -> unhealthy: "Timeout / 5xx"
+healthy -> tick: "Chu kỳ tiếp theo"
+unhealthy -> count
+count -> tick: "Chưa đủ"
+count -> remove: "Đủ 3 lần"
 ```
+
+Sơ đồ thể hiện vòng kiểm tra và ngưỡng của ví dụ. Khi triển khai thật, ECS Service scheduler chịu trách nhiệm thay task; Cloud Map quản lý registration/health, không tự gọi ECS để tạo task thay thế.
 
 #### Khi một Service Instance gặp sự cố
 
@@ -838,30 +834,16 @@ T+55s        Traffic phân phối đều cho instance #1, #3, #4
 
 **Minh hoạ luồng failover:**
 
+```d2 title="Khi một Service Instance gặp sự cố"
+direction: right
+before: "Cloud Map — order-service.shopvn.local\nInstance1 10.0.1.10 / Instance2 10.0.2.20 / Instance3 10.0.3.30"
+after: "Deregister Instance2 crash\nInstance1 10.0.1.10 / Instance3 10.0.3.30"
+recovery: "Recovery — Register Instance4 mới\nInstance1 10.0.1.10 / Instance3 10.0.3.30 / Instance4 10.0.4.40"
+before -> after
+after -> recovery
 ```
-                    ┌─────────────────────────────────────────┐
-                    │        Cloud Map DNS Resolution         │
-                    │    order-service.shopvn.local           │
-                    │                                         │
-                    │  ┌──────────┐  Trước sự cố:             │
-                    │  │ Instance │  10.0.1.10 ── Instance #1 │
-                    │  │   Pool   │  10.0.2.20 ── Instance #2 │ ← sắp crash
-                    │  │          │  10.0.3.30 ── Instance #3 │
-                    │  └──────────┘                           │
-                    │                                         │
-                    │  ┌──────────┐  Sau deregister:          │
-                    │  │ Instance │  10.0.1.10 ── Instance #1 │
-                    │  │   Pool   │  10.0.3.30 ── Instance #3 │
-                    │  │          │  (chờ instance mới...)    │
-                    │  └──────────┘                           │
-                    │                                         │
-                    │  ┌──────────┐  Sau recovery:            │
-                    │  │ Instance │  10.0.1.10 ── Instance #1 │
-                    │  │   Pool   │  10.0.3.30 ── Instance #3 │
-                    │  │          │  10.0.4.40 ── Instance #4 │ ← mới thay thế
-                    │  └──────────┘                           │
-                    └─────────────────────────────────────────┘
-```
+
+Deregistration không xóa cache DNS đã cấp ngay lập tức; còn TTL/client caching và cơ chế health/discovery của workload.
 
 **Điểm quan trọng:**
 - Caller (ví dụ: API Gateway) **không cần biết** instance nào bị lỗi — DNS tự trả về danh sách instance healthy
@@ -871,92 +853,65 @@ T+55s        Traffic phân phối đều cho instance #1, #3, #4
 
 ### 3.6. Sequence Diagram — Complete Checkout Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant GW as API Gateway
-    participant OS as Order Service
-    participant INV as Inventory
-    participant PRM as Promotion
-    participant PAY as Payment
-    participant K as Kafka
-    participant NTF as Notification
-
-    User->>GW: POST /api/v1/checkout
-    GW->>GW: Validate JWT, Rate Limit
-    GW->>OS: createOrder(userId, items, voucher)
-    
-    Note over OS: Step 1 — Create Order (PENDING)
-    OS->>OS: Save order to DB + Outbox
-    
-    Note over OS,INV: Step 2 — Reserve Stock (Sync)
-    OS->>INV: reserveStock(orderId, items)
-    INV->>INV: Check availability + Lock
-    INV-->>OS: reservationId, TTL=15min
-    
-    Note over OS,PRM: Step 3 — Apply Voucher (Sync)
-    OS->>PRM: applyVoucher(orderId, "SALE50", total)
-    PRM-->>OS: discount=50000, finalTotal=450000
-    
-    Note over OS,PAY: Step 4 — Create Payment (Sync)
-    OS->>PAY: createPaymentIntent(orderId, 450000, "vnpay")
-    PAY-->>OS: paymentUrl, paymentIntentId
-    
-    OS-->>GW: {orderId, paymentUrl, status=PAYMENT_PENDING}
-    GW-->>User: Redirect to VNPay
-
-    Note over User,PAY: User completes payment on VNPay
-    PAY->>PAY: Receive VNPay webhook
-    PAY->>K: payment.captured.v1
-    
-    K->>OS: Consume payment.captured
-    OS->>INV: confirmReservation(reservationId)
-    OS->>OS: Update order status=CONFIRMED
-    OS->>K: order.confirmed.v1
-    
-    K->>NTF: Consume order.confirmed
-    NTF->>User: Push + Email "Đơn hàng đã xác nhận!"
+```d2 title="3.6. Sequence Diagram — Complete Checkout Flow"
+shape: sequence_diagram
+"User": "User" {shape: person}
+"GW": "API Gateway"
+"OS": "Order Service"
+"INV": "Inventory"
+"PRM": "Promotion"
+"PAY": "Payment"
+"K": "Kafka"
+"NTF": "Notification"
+"User" -> "GW": "1. POST /api/v1/checkout"
+"GW" -> "GW": "2. Validate JWT, Rate Limit"
+"GW" -> "OS": "3. createOrder(userId, items, voucher)"
+"OS".note1: "Step 1 — Create Order (PENDING)"
+"OS" -> "OS": "4. Save order to DB + Outbox"
+"OS".note2: "[Order Service — Inventory]\nStep 2 — Reserve Stock (Sync)"
+"OS" -> "INV": "5. reserveStock(orderId, items)"
+"INV" -> "INV": "6. Check availability + Lock"
+"INV" -> "OS": "7. reservationId, TTL=15min" { style.stroke-dash: 5 }
+"OS".note3: "[Order Service — Promotion]\nStep 3 — Apply Voucher (Sync)"
+"OS" -> "PRM": "8. applyVoucher(orderId, \"SALE50\", total)"
+"PRM" -> "OS": "9. discount=50000, finalTotal=450000" { style.stroke-dash: 5 }
+"OS".note4: "[Order Service — Payment]\nStep 4 — Create Payment (Sync)"
+"OS" -> "PAY": "10. createPaymentIntent(orderId, 450000, \"vnpay\")"
+"PAY" -> "OS": "11. paymentUrl, paymentIntentId" { style.stroke-dash: 5 }
+"OS" -> "GW": "12. {orderId, paymentUrl, status=PAYMENT_PENDING}" { style.stroke-dash: 5 }
+"GW" -> "User": "13. Redirect to VNPay" { style.stroke-dash: 5 }
+"User".note5: "[User — Payment]\nUser completes payment on VNPay"
+"PAY" -> "PAY": "14. Receive VNPay webhook"
+"PAY" -> "K": "15. payment.captured.v1"
+"K" -> "OS": "16. Consume payment.captured"
+"OS" -> "INV": "17. confirmReservation(reservationId)"
+"OS" -> "OS": "18. Update order status=CONFIRMED"
+"OS" -> "K": "19. order.confirmed.v1"
+"K" -> "NTF": "20. Consume order.confirmed"
+"NTF" -> "User": "21. Push + Email \"Đơn hàng đã xác nhận!\""
 ```
 
 ### 3.7. Sequence Diagram — Flash Sale Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant GW as API Gateway
-    participant CRT as Cart Service
-    participant INV as Inventory
-    participant OS as Order Service
-    participant PAY as Payment
-    
-    Note over GW: Rate Limit: 100 req/s per user
-    Note over GW: Flash Sale: 20K concurrent users
-    
-    User->>GW: POST /cart/items (flash sale product)
-    GW->>CRT: addToCart(userId, skuId, qty=1)
-    
-    Note over CRT,INV: Atomic stock check (Redis DECR)
-    CRT->>INV: checkAvailability(skuId)
-    
-    alt Stock available
-        INV-->>CRT: available=true, remaining=42
-        CRT-->>GW: Item added
-        GW-->>User: ✅ Đã thêm vào giỏ
-        
-        User->>GW: POST /checkout
-        GW->>OS: createOrder(userId, items)
-        OS->>INV: reserveStock (Lua script atomic)
-        INV-->>OS: reserved (TTL=5min for flash sale)
-        OS->>PAY: createPaymentIntent
-        PAY-->>OS: paymentUrl
-        OS-->>User: Redirect to payment
-    else Stock exhausted
-        INV-->>CRT: available=false, remaining=0
-        CRT-->>GW: Out of stock
-        GW-->>User: ❌ Hết hàng rồi!
-    end
+```d2 title="3.7. Sequence Diagram — Flash Sale Flow"
+direction: down
+user: "User → Gateway\nPOST /cart/items\nRate limit 100 req/s/user • Flash Sale 20K users"
+cart: "Cart Service addToCart(userId, skuId, qty=1)"
+stock: "Inventory checkAvailability(skuId)\nAtomic stock check — Redis DECR"
+available: "available=true, remaining=42\nCart → Gateway → User: Item added"
+empty: "available=false, remaining=0\nCart → Gateway → User: Hết hàng"
+checkout: "User POST /checkout\nGateway → Order: createOrder(userId, items)"
+reserve: "Order → Inventory: reserveStock\nLua script atomic • TTL 5min"
+payment: "Order → Payment: createPaymentIntent\nPayment trả paymentUrl"
+redirect: "Order → User: Redirect to payment"
+user -> cart
+cart -> stock
+stock -> available: "Stock available"
+stock -> empty: "Stock exhausted"
+available -> checkout
+checkout -> reserve
+reserve -> payment
+payment -> redirect
 ```
 
 ### 3.8. Idempotency & Exactly-Once Semantics (thực tế)
@@ -1018,32 +973,45 @@ Mỗi service **sở hữu database riêng**, không service nào truy cập tr�
 | 10 | **Review** | MongoDB | — | Flexible content: text + images + ratings | ~50GB/năm |
 | 11 | **Recommendation** | Redis (feature store) | PostgreSQL (metadata) | Real-time feature serving + model metadata | ~5GB Redis |
 
+```d2 title="4.1. Database per Service — Polyglot Persistence"
+direction: right
+stores: Database per Service {
+ s0: "User" {
+  db: "PostgreSQL + Redis" {shape: cylinder}
+ }
+ s1: "Catalog" {
+  db: "PostgreSQL + OpenSearch" {shape: cylinder}
+ }
+ s2: "Order" {
+  db: "PostgreSQL + Replica" {shape: cylinder}
+ }
+ s3: "Payment" {
+  db: "PostgreSQL — PCI-DSS boundary" {shape: cylinder}
+ }
+ s4: "Cart" {
+  db: "Redis + DynamoDB" {shape: cylinder}
+ }
+ s5: "Inventory" {
+  db: "PostgreSQL + Redis" {shape: cylinder}
+ }
+ s6: "Promotion" {
+  db: "PostgreSQL + Redis" {shape: cylinder}
+ }
+ s7: "Search" {
+  db: "OpenSearch + Redis" {shape: cylinder}
+ }
+ s8: "Notification" {
+  db: "MongoDB" {shape: cylinder}
+ }
+ s9: "Review" {
+  db: "MongoDB" {shape: cylinder}
+ }
+}
+bus: "Kafka — orders.* / payments.* / catalog.*"
+s3: "S3 — Images / Media"
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                  DATA ARCHITECTURE OVERVIEW                    │
-│                                                                │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  User    │  │ Catalog  │  │  Order   │  │ Payment  │        │
-│  │PostgreSQL│  │PostgreSQL│  │PostgreSQL│  │PostgreSQL│        │
-│  │ + Redis  │  │+ OpenSrch│  │+ Replica │  │(PCI-DSS) │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-│                                                                │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Cart    │  │Inventory │  │Promotion │  │  Search  │        │
-│  │  Redis   │  │PostgreSQL│  │PostgreSQL│  │OpenSearch│        │
-│  │+DynamoDB │  │ + Redis  │  │ + Redis  │  │ + Redis  │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-│                                                                │
-│  ┌──────────┐  ┌──────────┐  ┌─────────────────────────┐       │
-│  │ Notif    │  │  Review  │  │    Event Bus (Kafka)    │       │
-│  │ MongoDB  │  │ MongoDB  │  │  Topics: orders.*       │       │
-│  └──────────┘  └──────────┘  │  payments.* catalog.*   │       │
-│                              └─────────────────────────┘       │
-│  ┌─────────────────────────────────────────────────────┐       │
-│  │         Object Storage (S3): images, media          │       │
-│  └─────────────────────────────────────────────────────┘       │
-└────────────────────────────────────────────────────────────────┘
-```
+
+Mỗi service sở hữu dữ liệu riêng; chọn PostgreSQL không tự bảo đảm PCI-DSS compliance cho Payment.
 
 ### 4.2. Saga Pattern cho Order Flow
 
@@ -1057,25 +1025,40 @@ Mỗi service **sở hữu database riêng**, không service nào truy cập tr�
 
 **Saga State Machine:**
 
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING: Create Order
-    PENDING --> STOCK_RESERVED: Reserve Stock ✓
-    PENDING --> CANCELLED: Reserve Stock ✗
-    STOCK_RESERVED --> PROMO_APPLIED: Apply Promo ✓
-    STOCK_RESERVED --> PAYMENT_PENDING: No Promo (skip)
-    STOCK_RESERVED --> CANCELLING: Apply Promo ✗
-    PROMO_APPLIED --> PAYMENT_PENDING: Create Payment ✓
-    PAYMENT_PENDING --> PAID: Payment Captured ✓
-    PAYMENT_PENDING --> CANCELLING: Payment Failed/Timeout
-    PAID --> CONFIRMED: Deduct Stock ✓
-    CONFIRMED --> FULFILLING: Create Shipment
-    FULFILLING --> SHIPPED: Picked Up
-    SHIPPED --> DELIVERED: Delivered
-    DELIVERED --> COMPLETED: Auto-complete 7 days
-    CANCELLING --> CANCELLED: Compensations done
-    CANCELLED --> [*]
-    COMPLETED --> [*]
+```d2 title="4.2. Saga Pattern cho Order Flow"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+PENDING: "PENDING"
+initial1 -> PENDING: "Create Order"
+STOCK_RESERVED: "STOCK_RESERVED"
+PENDING -> STOCK_RESERVED: "Reserve Stock ✓"
+CANCELLED: "CANCELLED"
+PENDING -> CANCELLED: "Reserve Stock ✗"
+PROMO_APPLIED: "PROMO_APPLIED"
+STOCK_RESERVED -> PROMO_APPLIED: "Apply Promo ✓"
+PAYMENT_PENDING: "PAYMENT_PENDING"
+STOCK_RESERVED -> PAYMENT_PENDING: "No Promo (skip)"
+CANCELLING: "CANCELLING"
+STOCK_RESERVED -> CANCELLING: "Apply Promo ✗"
+PROMO_APPLIED -> PAYMENT_PENDING: "Create Payment ✓"
+PAID: "PAID"
+PAYMENT_PENDING -> PAID: "Payment Captured ✓"
+PAYMENT_PENDING -> CANCELLING: "Payment Failed/Timeout"
+CONFIRMED: "CONFIRMED"
+PAID -> CONFIRMED: "Deduct Stock ✓"
+FULFILLING: "FULFILLING"
+CONFIRMED -> FULFILLING: "Create Shipment"
+SHIPPED: "SHIPPED"
+FULFILLING -> SHIPPED: "Picked Up"
+DELIVERED: "DELIVERED"
+SHIPPED -> DELIVERED: "Delivered"
+COMPLETED: "COMPLETED"
+DELIVERED -> COMPLETED: "Auto-complete 7 days"
+CANCELLING -> CANCELLED: "Compensations done"
+final2: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+CANCELLED -> final2
+final3: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+COMPLETED -> final3
 ```
 
 **Chi tiết từng bước:**
@@ -1092,29 +1075,24 @@ stateDiagram-v2
 
 **Failure Sequence — Payment Failed:**
 
-```mermaid
-sequenceDiagram
-    participant OS as Order Saga
-    participant PAY as Payment
-    participant PRM as Promotion
-    participant INV as Inventory
-    participant K as Kafka
-
-    Note over OS: Payment timeout/failed
-    PAY->>K: payment.failed.v1
-    K->>OS: consume payment.failed
-    
-    rect rgb(36, 29, 29)
-        Note over OS: Compensating Transactions
-        OS->>PRM: reverseVoucherUsage(orderId)
-        PRM-->>OS: reversed ✓
-        OS->>INV: releaseReservation(reservationId)
-        INV-->>OS: released ✓
-        OS->>OS: Update order status=CANCELLED
-    end
-    
-    OS->>K: order.cancelled.v1
-    Note over K: → Notification: "Thanh toán thất bại"
+```d2 title="4.2. Saga Pattern cho Order Flow"
+shape: sequence_diagram
+"OS": "Order Saga"
+"PAY": "Payment"
+"PRM": "Promotion"
+"INV": "Inventory"
+"K": "Kafka"
+"OS".note1: "Payment timeout/failed"
+"PAY" -> "K": "payment.failed.v1"
+"K" -> "OS": "consume payment.failed"
+"OS".note2: "Compensating Transactions"
+"OS" -> "PRM": "reverseVoucherUsage(orderId)"
+"PRM" -> "OS": "reversed ✓" { style.stroke-dash: 5 }
+"OS" -> "INV": "releaseReservation(reservationId)"
+"INV" -> "OS": "released ✓" { style.stroke-dash: 5 }
+"OS" -> "OS": "Update order status=CANCELLED"
+"OS" -> "K": "order.cancelled.v1"
+"K".note3: "→ Notification: \"Thanh toán thất bại\""
 ```
 
 ### 4.3. CQRS — Áp dụng ở đâu?
@@ -1431,13 +1409,17 @@ Giải pháp multi-layer:
 | Shipping → GHN/GHTK | 3 lỗi / 20s | 45s | Queue shipment creation, retry |
 | Gateway → Any Service | 10 lỗi / 60s | 30s | Return 503 with retry-after header |
 
-```mermaid
-stateDiagram-v2
-    [*] --> CLOSED: Normal operation
-    CLOSED --> OPEN: Failure threshold exceeded
-    OPEN --> HALF_OPEN: After timeout (30-60s)
-    HALF_OPEN --> CLOSED: Probe request succeeds
-    HALF_OPEN --> OPEN: Probe request fails
+```d2 title="5.2. Circuit Breaker — Áp dụng ở đâu?"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+CLOSED: "CLOSED"
+initial1 -> CLOSED: "Normal operation"
+OPEN: "OPEN"
+CLOSED -> OPEN: "Failure threshold exceeded"
+HALF_OPEN: "HALF_OPEN"
+OPEN -> HALF_OPEN: "After timeout (30-60s)"
+HALF_OPEN -> CLOSED: "Probe request succeeds"
+HALF_OPEN -> OPEN: "Probe request fails"
 ```
 
 ### 5.3. Retry Policy
@@ -1556,22 +1538,19 @@ Fallback chỉ được kích hoạt trong 2 trường hợp:
 
 #### Case 1: Search Service Down
 
-```
-User gõ "iPhone 15" → Gateway → Search Service (OpenSearch)
-                                      ❌ Circuit Breaker OPEN
-                                      │
-                                      ▼
-                              Fallback Handler
-                                      │
-                              ┌───────┴────────┐
-                              │  Redis Cache   │
-                              │  Key: search:  │
-                              │  popular:{cat} │
-                              └───────┬────────┘
-                                      │
-                                      ▼
-                              Trả về popular products
-                              + banner "Kết quả phổ biến"
+```d2 title="Case 1: Search Service Down"
+direction: right
+user: "User tìm iPhone15"
+gateway: "Gateway"
+search: "Search Service — OpenSearch / CB OPEN"
+fallback: "Fallback Handler"
+redis: "Redis — search:popular:{cat}"
+result: "Popular products / Banner kết quả phổ biến"
+user -> gateway
+gateway -> search
+search -> fallback: "Dependency call bị từ chối"
+fallback -> redis
+redis -> result
 ```
 
 **Cách chuẩn bị cache (pre-warm):**
@@ -1582,17 +1561,20 @@ User gõ "iPhone 15" → Gateway → Search Service (OpenSearch)
 
 #### Case 2: Promotion Service Timeout
 
+```d2 title="Case 2: Promotion Service Timeout"
+direction: right
+user: "User nhập SALE50"
+checkout: "Checkout"
+promotion: "Promotion — Timeout2s"
+fallback: "Fallback — Bỏ qua voucher"
+result: "Thông báo giá gốc cho user"
+user -> checkout
+checkout -> promotion
+promotion -> fallback
+fallback -> result
 ```
-User nhập voucher "SALE50" → Checkout Service → Promotion Service
-                                                      ❌ Timeout 2s
-                                                      │
-                                                      ▼
-                                              Fallback: bỏ qua voucher
-                                                      │
-                                                      ▼
-                                              Checkout tiếp tục với giá gốc
-                                              + thông báo cho user
-```
+
+Chỉ tiếp tục charge sau khi user xác nhận tổng tiền mới. Nếu apply-voucher có side effect, phải đối soát/idempotency thay vì mặc định timeout nghĩa là chưa áp dụng.
 
 - Checkout **vẫn hoạt động bình thường** — chỉ không áp dụng được voucher giảm giá
 - User nhận thông báo: *"Voucher tạm thời không khả dụng. Bạn có thể tiếp tục thanh toán với giá gốc, hoặc thử lại sau."*
@@ -1601,16 +1583,17 @@ User nhập voucher "SALE50" → Checkout Service → Promotion Service
 
 #### Case 3: Shipping Fee Calculation Down
 
-```
-User xem trang checkout → Order Service → Shipping Service (GHN API)
-                                                ❌ Circuit Breaker OPEN
-                                                │
-                                                ▼
-                                        Fallback: flat rate 30,000đ
-                                                │
-                                                ▼
-                                        Hiển thị "Phí ship ước tính: 30,000đ"
-                                        + flag order.shipping_fee_estimated = true
+```d2 title="Case 3: Shipping Fee Calculation Down"
+direction: right
+user: "User xem Checkout"
+order: "Order"
+shipping: "Shipping / GHN API — CB OPEN"
+fallback: "Fallback flat rate30.000đ"
+result: "Hiển thị phí ship ước tính30.000đ\nshipping_fee_estimated=true"
+user -> order
+order -> shipping
+shipping -> fallback
+fallback -> result
 ```
 
 - Khi Shipping Service hoặc API của đối tác vận chuyển (GHN, GHTK) bị down, hệ thống áp dụng **phí ship mặc định 30,000đ** (flat rate tính trung bình từ dữ liệu lịch sử)
@@ -1654,16 +1637,24 @@ Defense in Depth (phòng thủ nhiều lớp) là chiến lược kết hợp **
 - **Bulkhead** cách ly thread pool → nhưng không cung cấp response thay thế
 - **Fallback** trả kết quả degraded → lớp cuối cùng, đảm bảo user luôn nhận response
 
+```d2 title="5.9. Defense in Depth — Thứ tự áp dụng"
+direction: right
+request: "Request"
+rate: "Rate Limit — Quá nhiều request →429"
+timeout: "Overall Timeout / Deadline — Hết hạn → Timeout response"
+retry: "Bounded Retry — Retryable / Budget còn"
+cb: "Circuit Breaker — Quá nhiều lỗi → OPEN"
+bulkhead: "Bulkhead — Pool isolation"
+fallback: "Fallback — Result thay thế / Graceful Degradation"
+request -> rate
+rate -> timeout
+timeout -> retry
+retry -> cb
+cb -> bulkhead
+bulkhead -> fallback
 ```
-Request ──▶ Rate Limit ──▶ Timeout ──▶ Retry ──▶ Circuit Breaker ──▶ Bulkhead ──▶ Fallback
-   │            │             │           │            │                │            │
-   │         Quá nhiều     Quá lâu    Thử lại     Quá nhiều lỗi   Isolate pool  Trả kết quả
-   │         request?      chờ?       lần nữa?    → ngắt mạch    → không lan    thay thế
-   │            │             │           │            │           tràn           │
-   ▼            ▼             ▼           ▼            ▼                │         ▼
-  429          504        Retry/Fail    Open CB    Thread pool      Fallback    Graceful
-                                                   isolated       response    degradation
-```
+
+Sơ đồ giữ thứ tự minh họa của ví dụ, không phải decorator order bắt buộc. CB bên trong Retry đo từng attempt; CB bên ngoài đo logical request. Fallback là đường xử lý lỗi, không phải dependency call tiếp theo khi thành công. Cần per-try timeout ngoài deadline tổng.
 
 **Chi tiết từng lớp trong ShopVN:**
 
@@ -2440,17 +2431,16 @@ T+48 giờ   │ POST-MORTEM:
 
 ### 8.2. Topology môi trường
 
+```d2 title="8.2. Topology môi trường"
+direction: right
+account: AWS Account ShopVN — Minh họa {
+ dev: Dev — Lower cost / Small dataset
+ staging: Staging — Pre-release / Prod-like traffic
+ prod: Prod — HA / SLO / Full scale
+}
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                           AWS ACCOUNT: SHOPVN                        │
-│                                                                      │
-│  ┌────────────────────┐   ┌────────────────────┐   ┌──────────────┐  │
-│  │      DEV           │   │       STAGING      │   │    PROD      │  │
-│  │  lower cost        │   │  pre-release test  │   │  HA + SLO    │  │
-│  │  small dataset     │   │  prod-like traffic │   │  full scale  │  │
-│  └────────────────────┘   └────────────────────┘   └──────────────┘  │
-└──────────────────────────────────────────────────────────────────────┘
-```
+
+Production isolation thường nên dùng account riêng theo multi-account strategy; ba environment cùng account chỉ là sơ đồ đơn giản hóa.
 
 ### 8.3. Compute Strategy theo loại workload
 
@@ -2594,14 +2584,19 @@ n8 -> n9
 
 **Kiến trúc tổng quan:** Tất cả microservices (Order, Payment, Inventory, Catalog, Notification, User…) đều chạy trên **Amazon ECS với launch type Fargate**. AWS hoàn toàn quản lý infrastructure layer — không cần provision hay patch EC2 instance. Mỗi service được đóng gói thành Docker container, định nghĩa Task Definition với CPU/Memory, và deploy qua ECS Service với ALB phía trước.
 
-```
-┌─────────────────────────────────────────────────┐
-│                   ALB / API Gateway             │
-├──────────┬──────────┬──────────┬────────────────┤
-│ Order    │ Payment  │ Catalog  │ Notification   │
-│ (Fargate)│ (Fargate)│ (Fargate)│ (Fargate)      │
-└──────────┴──────────┴──────────┴────────────────┘
-         Tất cả services → ECS Fargate
+```d2 title="Solution A: ECS Fargate-first"
+direction: down
+ingress: ALB / API Gateway
+core: ECS Fargate {
+ s0: "Order Service"
+ s1: "Payment Service"
+ s2: "Catalog Service"
+ s3: "Notification Service"
+}
+ingress -> core.s0
+ingress -> core.s1
+ingress -> core.s2
+ingress -> core.s3
 ```
 
 - **Ưu điểm:**
@@ -2620,16 +2615,19 @@ n8 -> n9
 
 **Kiến trúc tổng quan:** Tất cả microservices chạy trên **Amazon EKS** (Elastic Kubernetes Service). Team quản lý Kubernetes cluster, sử dụng Helm charts để package và deploy services. Mỗi service là một Deployment + Service + Ingress trong K8s, với HPA (Horizontal Pod Autoscaler) để auto-scale.
 
-```
-┌─────────────────────────────────────────────────┐
-│              Ingress Controller (ALB/Nginx)       │
-├──────────┬──────────┬──────────┬────────────────┤
-│ Order    │ Payment  │ Catalog  │ Notification   │
-│ (Pod)    │ (Pod)    │ (Pod)    │ (Pod)          │
-├──────────┴──────────┴──────────┴────────────────┤
-│            EKS Cluster (Managed Node Groups)     │
-└─────────────────────────────────────────────────┘
-         Tất cả services → Kubernetes Pods
+```d2 title="Solution B: EKS-first"
+direction: down
+ingress: Ingress Controller — ALB / Nginx
+core: EKS — Managed Node Groups {
+ s0: "Order Pod"
+ s1: "Payment Pod"
+ s2: "Catalog Pod"
+ s3: "Notification Pod"
+}
+ingress -> core.s0
+ingress -> core.s1
+ingress -> core.s2
+ingress -> core.s3
 ```
 
 - **Ưu điểm:**
@@ -2648,21 +2646,21 @@ n8 -> n9
 
 **Kiến trúc tổng quan:** Phân loại workload và chọn compute phù hợp nhất cho từng loại. **Core API services** (request-response, cần low latency, chạy liên tục) deploy trên **ECS Fargate**. **Event-driven và burst workloads** (xử lý bất đồng bộ, traffic không đều) chạy trên **AWS Lambda**. Khi team platform trưởng thành, có thể migrate dần sang EKS nếu cần.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                  ALB / API Gateway                  │
-├──────────┬──────────┬──────────┐                    │
-│ Order    │ Payment  │ Catalog  │  ← ECS Fargate     │
-│ (Fargate)│ (Fargate)│ (Fargate)│    (core APIs)     │
-├──────────┴──────────┴──────────┤                    │
-│                                │                    │
-│  SQS/SNS/EventBridge triggers  │                    │
-│  ┌────────────┬───────────┐    │                    │
-│  │Notification│ Image     │    │  ← Lambda          │
-│  │ (Lambda)   │ Resize    │    │    (event-driven)  │
-│  │            │ (Lambda)  │    │                    │
-│  └────────────┴───────────┘    │                    │
-└─────────────────────────────────────────────────────┘
+```d2 title="Solution C: Hybrid (ECS cho core + Lambda cho event-driven)"
+direction: down
+ingress: ALB / API Gateway
+core: ECS Fargate {
+ s0: "Order Service"
+ s1: "Payment Service"
+ s2: "Catalog Service"
+}
+ingress -> core.s0
+ingress -> core.s1
+ingress -> core.s2
+triggers: SQS / SNS / EventBridge triggers
+lambda: Lambda { notification: Notification; image: Image Resize }
+triggers -> lambda.notification
+triggers -> lambda.image
 ```
 
 - **Ưu điểm:**

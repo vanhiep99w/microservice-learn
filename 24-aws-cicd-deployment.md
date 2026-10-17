@@ -165,136 +165,66 @@ GitHub Actions đảm nhiệm CI/CD; AWS đảm nhiệm hạ tầng deployment.
 
 ### 3.1. CodePipeline Architecture
 
+```d2 title="3.1. CodePipeline Architecture"
+direction: right
+s0: "1. Source — Push main\nGitHub connection"
+s1: "2. CodeBuild\nBuild / Unit / Integration tests\nPush ECR / Scan registry artifact\nOutput imageDetail.json theo action needs"
+s2: "3. Deploy ECS Staging\nECS Rolling Update / Deployment gates"
+s3: "4. CodeBuild E2E + Smoke Tests\nAgainst staging"
+s4: "5. Manual Approval — Tech lead / SRE\nSNS/Slack notification + Review link"
+s5: "6. CodeDeploy ECS Production Blue-Green\nSupported canary/linear traffic policy\nCloudWatch auto-rollback"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
 ```
-CODEPIPELINE — MULTI-STAGE PIPELINE
-──────────────────────────────────────
 
-  ┌─── Stage 1: Source ────────────────────────────────────┐
-  │  Trigger: Push to main branch                          │
-  │  Source: GitHub (via CodeStar Connection)              │
-  └────────────────────────┬───────────────────────────────┘
-                           │
-  ┌────────────────────────▼───────────────────────────────┐
-  │  Stage 2: Build                                        │
-  │  ┌──────────────────────────────────────────────────┐  │
-  │  │  CodeBuild Project                               │  │
-  │  │  • docker build                                  │  │
-  │  │  • unit tests + integration tests                │  │
-  │  │  • ECR image scan                                │  │
-  │  │  • push image to ECR                             │  │
-  │  │  • output: imageDetail.json                      │  │
-  │  └──────────────────────────────────────────────────┘  │
-  └────────────────────────┬───────────────────────────────┘
-                           │
-  ┌────────────────────────▼───────────────────────────────┐
-  │  Stage 3: Deploy Staging                               │
-  │  ┌──────────────────────────────────────────────────┐  │
-  │  │  CodeDeploy → ECS (Staging)                      │  │
-  │  │  Strategy: Rolling Update                        │  │
-  │  │  Auto rollback: on alarm                         │  │
-  │  └──────────────────────────────────────────────────┘  │
-  └────────────────────────┬───────────────────────────────┘
-                           │
-  ┌────────────────────────▼───────────────────────────────┐
-  │  Stage 4: Test Staging                                 │
-  │  ┌──────────────────────────────────────────────────┐  │
-  │  │  CodeBuild — E2E Tests + Smoke Tests             │  │
-  │  │  Run against staging environment                 │  │
-  │  └──────────────────────────────────────────────────┘  │
-  └────────────────────────┬───────────────────────────────┘
-                           │
-  ┌────────────────────────▼───────────────────────────────┐
-  │  Stage 5: Manual Approval                              │
-  │  ┌──────────────────────────────────────────────────┐  │
-  │  │  SNS → Slack notification                        │  │
-  │  │  "Deploy to PROD? Review changes: [link]"        │  │
-  │  │  Approver: tech-lead / SRE                       │  │
-  │  └──────────────────────────────────────────────────┘  │
-  └────────────────────────┬───────────────────────────────┘
-                           │ ✅ Approved
-  ┌────────────────────────▼───────────────────────────────┐
-  │  Stage 6: Deploy Production                            │
-  │  ┌──────────────────────────────────────────────────┐  │
-  │  │  CodeDeploy → ECS (Production)                   │  │
-  │  │  Strategy: Blue-Green                            │  │
-  │  │  Auto rollback: on CloudWatch Alarm              │  │
-  │  │  Traffic shift: 10% → 50% → 100% (10 min each)   │  │
-  │  └──────────────────────────────────────────────────┘  │
-  └────────────────────────────────────────────────────────┘
-```
+ECS rolling update do ECS scheduler triển khai, không dùng CodeDeploy ECS blue-green action như một rolling strategy. Traffic10→50→100% mỗi10phút là custom rollout intent, không mặc định là mọi CodeDeploy preset; artifact formats phụ thuộc action/provider.
 
 ### 3.2. Multi-Service Pipeline Design
 
+```d2 title="3.2. Multi-Service Pipeline Design"
+direction: down
+per_service: Independent Service Pipelines {
+ order: Order — Source / Build / Stage / Prod
+ payment: Payment — Source / Build / Stage / Prod
+ user: User — Source / Build / Stage / Prod
+}
+mono: Monorepo + Change Detection {
+ source: Source / Changed files + Dependency graph
+ order: Build + Deploy Order
+ payment: Build + Deploy Payment
+ dependents: Build + Deploy affected dependents
+ source -> order: services/order changed
+ source -> payment: services/payment changed
+ source -> dependents: shared/lib changed
+}
 ```
-MULTI-SERVICE PIPELINE — 2 APPROACHES
-────────────────────────────────────────
 
-  Approach 1: Pipeline Per Service (Recommended)
-  ─────────────────────────────────────────────
-  ┌── order-service-pipeline ──────────┐
-  │  Source → Build → Stage → Prod     │  ← Independent
-  └────────────────────────────────────┘
-  ┌── payment-service-pipeline ────────┐
-  │  Source → Build → Stage → Prod     │  ← Independent
-  └────────────────────────────────────┘
-  ┌── user-service-pipeline ───────────┐
-  │  Source → Build → Stage → Prod     │  ← Independent
-  └────────────────────────────────────┘
-
-  → ✅ Deploy independently
-  → ✅ Mỗi team own pipeline
-  → ✅ Failure isolation
-
-
-  Approach 2: Monorepo + Change Detection
-  ──────────────────────────────────────────
-  ┌── monorepo-pipeline ────────────────────────────┐
-  │  Source (detect changes)                        │
-  │  ├── /services/order/ changed?                  │
-  │  │   └── Build + Deploy order-service           │
-  │  ├── /services/payment/ changed?                │
-  │  │   └── Build + Deploy payment-service         │
-  │  └── /shared/lib/ changed?                      │
-  │      └── Build + Deploy ALL dependent services  │
-  └─────────────────────────────────────────────────┘
-
-  → ✅ 1 repo, 1 pipeline config
-  → ❌ Phức tạp change detection
-  → ❌ Shared failure (pipeline fail = block tất cả)
-```
+Per-service pipelines có ownership và failure isolation. Monorepo giảm config/repos nhưng cần affected detection; pipeline failure có block mọi service hay không phụ thuộc DAG/gates thiết kế, không phải đặc tính bắt buộc của monorepo.
 
 ### 3.3. Cross-Account Pipeline
 
 Trong multi-account strategy (xem [doc 18](18-aws-deployment-architecture.md)), pipeline chạy ở **Tooling Account**, deploy sang **Staging/Prod Account**.
 
+```d2 title="3.3. Cross-Account Pipeline"
+direction: down
+tooling: Tooling Account111111111111 {
+ source: Source
+ build: CodeBuild
+ ecr: ECR
+ source -> build -> ecr
+}
+staging: Staging222222222222 { role: Deploy Role; ecs: ECS Cluster; role -> ecs }
+prod: Prod333333333333 { role: Deploy Role; ecs: ECS Cluster; role -> ecs }
+dr: DR444444444444 { role: Deploy Role; ecs: ECS Cluster; role -> ecs }
+tooling.build -> staging.role: AssumeRole
+tooling.build -> prod.role: AssumeRole
+tooling.build -> dr.role: AssumeRole
 ```
-CROSS-ACCOUNT PIPELINE
-───────────────────────
 
-  Tooling Account (111111111111)
-  ┌──────────────────────────────────────────────┐
-  │  CodePipeline                                │
-  │  ┌──────┐    ┌──────────┐                    │
-  │  │Source│───▶│CodeBuild │──▶ ECR (push image)│
-  │  └──────┘    └──────────┘                    │
-  │                    │                         │
-  │              AssumeRole                      │
-  └────────────────────┼─────────────────────────┘
-                       │
-          ┌────────────┼───────────────┐
-          │            │               │
-          ▼            ▼               ▼
-  ┌── Staging ──┐  ┌── Prod ────┐  ┌── DR ──────┐
-  │ Account     │  │ Account    │  │ Account    │
-  │ 222222222222│  │333333333333│  │444444444444│
-  │             │  │            │  │            │
-  │ Cross-Acct  │  │ Cross-Acct │  │ Cross-Acct │
-  │ Role:       │  │ Role:      │  │ Role:      │
-  │ deploy-role │  │ deploy-role│  │ deploy-role│
-  │             │  │            │  │            │
-  │ ECS Cluster │  │ ECS Cluster│  │ ECS Cluster│
-  └─────────────┘  └────────────┘  └────────────┘
-```
+Account IDs minh họa; trust/resource/artifact-KMS policies và environment approvals phải giới hạn đúng pipeline principal.
 
 ---
 
@@ -433,37 +363,29 @@ BUILD PERFORMANCE — TRƯỚC VÀ SAU OPTIMIZATION
 
 **CodeDeploy** quản lý deployment cho ECS — hỗ trợ **Blue-Green** và **Canary** với auto rollback.
 
+```d2 title="5.1. CodeDeploy cho ECS"
+direction: down
+test: Bước1 — Install Green / Test {
+ prod: ALB Listener443 — production
+ test: ALB Listener8443 — optional test
+ blue: Blue Target Group v1
+ green: Green Target Group v2
+ prod -> blue: 100%
+ test -> green: Test traffic
+}
+shift: Bước2 — Shift Canary {
+ prod: ALB Listener443
+ blue: Blue v1
+ green: Green v2
+ alarm: CloudWatch Alarm
+ prod -> blue: 90%
+ prod -> green: 10%
+ alarm -> blue: Rollback100% nếu configured alarm breach
+}
+complete: Bước3 — 100%Green / Blue0% giữ tới termination window
 ```
-CODEDEPLOY + ECS — BLUE-GREEN FLOW
-─────────────────────────────────────
 
-  Step 1: Tạo Green Target Group + Tasks
-  ┌───────────────────────────────────────────────────────┐
-  │  ALB                                                  │
-  │  ├── Listener :443 (production)                       │
-  │  │   └── Target Group BLUE (v1) ← 100% traffic        │
-  │  └── Listener :8443 (test)                            │
-  │      └── Target Group GREEN (v2) ← test traffic       │
-  └───────────────────────────────────────────────────────┘
-
-  Step 2: Shift traffic dần dần
-  ┌───────────────────────────────────────────────────────┐
-  │  ALB :443                                             │
-  │  ├── Target Group BLUE (v1) ← 90% traffic             │
-  │  └── Target Group GREEN (v2) ← 10% traffic            │
-  │                                                       │
-  │  CloudWatch Alarm → monitoring error rate             │
-  │  ❌ Alarm triggered → AUTO ROLLBACK (100% → BLUE)     │
-  │  ✅ Alarm OK → continue shifting                      │
-  └───────────────────────────────────────────────────────┘
-
-  Step 3: Complete — 100% traffic to GREEN
-  ┌───────────────────────────────────────────────────────┐
-  │  ALB :443                                             │
-  │  ├── Target Group BLUE (v1) ← 0% (terminate)          │
-  │  └── Target Group GREEN (v2) ← 100% traffic           │
-  └───────────────────────────────────────────────────────┘
-```
+Tiếp tục shifting khi metrics/gates đạt; terminate Blue theo deployment policy/rollback window chứ không luôn xóa ngay tại thời điểm100%Green.
 
 **AppSpec cho ECS Blue-Green:**
 
@@ -493,79 +415,51 @@ Hooks:
 
 **Lifecycle hooks — Khi nào chạy test:**
 
+```d2 title="5.1. CodeDeploy cho ECS"
+direction: down
+s0: "BeforeInstall — pre-install validation"
+s1: "Install — ECS provision Green tasks"
+s2: "AfterInstall — health / warm-up validation"
+s3: "AllowTestTraffic — route optional test listener"
+s4: "AfterAllowTestTraffic — E2E tests"
+s5: "BeforeAllowTraffic — final validation"
+s6: "AllowTraffic — shift production traffic"
+s7: "AfterAllowTraffic — smoke tests"
+s8: "Complete hoặc rollback theo result / alarms"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
+s5 -> s6
+s6 -> s7
+s7 -> s8
 ```
-CODEDEPLOY LIFECYCLE HOOKS (ECS)
-──────────────────────────────────
 
-  Install Green Tasks
-       │
-  ┌────▼──────────────────┐
-  │ BeforeInstall         │ ← Validate config, DB migrations
-  └────┬──────────────────┘
-       │
-  ┌────▼──────────────────┐
-  │ Install               │ ← ECS provisions new tasks (GREEN)
-  └────┬──────────────────┘
-       │
-  ┌────▼──────────────────┐
-  │ AfterInstall          │ ← Health checks, warm-up
-  └────┬──────────────────┘
-       │
-  ┌────▼──────────────────┐
-  │ AllowTestTraffic      │ ← Route test listener to GREEN
-  └────┬──────────────────┘
-       │
-  ┌────▼──────────────────┐
-  │ AfterAllowTestTraffic │ ← 🧪 E2E tests trên test listener
-  └────┬──────────────────┘
-       │
-  ┌────▼──────────────────┐
-  │ BeforeAllowTraffic    │ ← Final validation trước khi shift prod
-  └────┬──────────────────┘
-       │
-  ┌────▼──────────────────┐
-  │ AllowTraffic          │ ← Shift production traffic to GREEN
-  └────┬──────────────────┘
-       │
-  ┌────▼──────────────────┐
-  │ AfterAllowTraffic     │ ← 🧪 Smoke tests trên prod traffic
-  └────┬──────────────────┘
-       │
-       ▼
-  Complete ✅ (or Rollback ❌)
-```
+Các phase events và Lambda validation hooks khác nhau; không phải mỗi phase đều là hook tùy ý sửa. DB migration nên có dedicated compatible migration job/recovery plan, tránh destructive migration trong app deployment hook.
 
 ### 5.2. CodeDeploy cho Lambda
 
 Lambda hỗ trợ **Canary** và **Linear** traffic shifting natively:
 
+```d2 title="5.2. CodeDeploy cho Lambda"
+direction: down
+canary: Canary10Percent5Minutes {
+ first: t0 — New10% / Old90%
+ next: t5phút — New100% nếu gates OK
+ first -> next
+}
+linear: Linear10PercentEvery1Minute {
+ first: t0 — New10%
+ second: t1phút — New20%
+ third: t2phút — New30%
+ end: t9phút — New100%
+ first -> second -> third -> end
+}
+all: AllAtOnce { switch: t0 — New100% }
 ```
-LAMBDA DEPLOYMENT STRATEGIES
-──────────────────────────────
 
-  Canary10Percent5Minutes:
-  ┌─────────────────────────────────────────────────┐
-  │  t=0:   │██████████│          │ 10% new         │
-  │         │  OLD 90% │ NEW 10%  │                 │
-  │  t=5m:  │          │██████████│ 100% new        │
-  │         │          │ NEW 100% │ (if no errors)  │
-  └─────────────────────────────────────────────────┘
-
-  Linear10PercentEvery1Minute:
-  ┌─────────────────────────────────────────────────┐
-  │  t=0:   │█████████ │ │  10% new                 │
-  │  t=1m:  │████████  │██│  20% new                │
-  │  t=2m:  │███████   │███│  30% new               │
-  │  ...                                            │
-  │  t=9m:  │          │██████████│  100% new       │
-  └─────────────────────────────────────────────────┘
-
-  AllAtOnce:
-  ┌─────────────────────────────────────────────────┐
-  │  t=0:   │██████████│           │ 100% new       │
-  │         │  OLD     │ NEW 100%  │ (instant)      │
-  └─────────────────────────────────────────────────┘
-```
+Trên Lambda deployment cần version/alias và supported CodeDeploy configuration. Các con số mô tả traffic policy, không phải đảm bảo end-to-end deployment/rollback hoàn tất đúng ở mỗi timestamp.
 
 ```yaml source="snippets/5-2-codedeploy-cho-lambda.yaml"
 # SAM template — Lambda Canary deployment
@@ -797,19 +691,22 @@ resource "aws_codedeploy_deployment_config" "custom_canary" {
 | **Cần CodeDeploy** | ❌ | ✅ | ✅ |
 | **Best for** | Non-critical services | Critical services | User-facing, high-traffic |
 
+```d2 title="6.4. So sánh Deployment Strategies trên AWS"
+direction: right
+critical: "Service critical?"
+rolling: "Rolling Update — đơn giản/cost-efficient"
+analysis: "Cần canary analysis / progressive exposure?"
+canary: "Canary — supported CodeDeploy/Controller strategy"
+fast: "Cần switchback nhanh và đủ capacity?"
+bg: "Blue-Green — giữ old environment trong rollback window"
+critical -> rolling: "Không / chấp nhận trade-off"
+critical -> analysis: "Có"
+analysis -> canary: "Có"
+analysis -> fast: "Không"
+fast -> bg: "Có"
 ```
-CHỌN STRATEGY NÀO? DECISION TREE
-───────────────────────────────────
 
-  Service critical?
-  ├── Không → Rolling Update (đơn giản, rẻ)
-  └── Có
-      ├── Cần canary analysis?
-      │   ├── Có → Canary (CodeDeploy)
-      │   └── Không → Blue-Green (CodeDeploy)
-      └── Cần rollback < 1 phút?
-          └── Có → Blue-Green (instant swap)
-```
+Chọn theo risk/compatibility/resources/metrics gates. Yêu cầu rollback<1phút phải kiểm nghiệm trên routing/data/state thực, không coi Blue-Green là bảo đảm instant rollback của toàn hệ thống.
 
 ---
 
@@ -1057,50 +954,26 @@ jobs:
 
 Trong [doc 14](14-cicd-deployment.md), ta đã hiểu **GitOps = Git là Source of Truth**. Trên EKS, **ArgoCD** là GitOps controller phổ biến nhất.
 
+```d2 title="8.1. ArgoCD trên EKS — Setup"
+direction: right
+git: Git Manifests — Order / Payment / User deployment-service-kustomization
+cluster: EKS {
+ argo: ArgoCD {
+  controller: Application Controller — Drift / Sync / Self-heal policy
+  ui: UI — Topology / Sync / Diff / History
+ }
+ apps: Workloads {
+  order: Order ×3
+  payment: Payment ×2
+  user: User ×3
+ }
+ argo.controller -> apps: Apply / Reconcile manifests
+ argo.ui -- argo.controller
+}
+cluster.argo.controller -> git: Poll ví dụ3phút / Webhook trigger
 ```
-ARGOCD TRÊN EKS — ARCHITECTURE
-─────────────────────────────────
 
-  ┌── Git Repository ───────────────────┐
-  │  manifests/                         │
-  │  ├── order-service/                 │
-  │  │   ├── deployment.yaml            │
-  │  │   ├── service.yaml               │
-  │  │   └── kustomization.yaml         │
-  │  ├── payment-service/               │
-  │  │   └── ...                        │
-  │  └── user-service/                  │
-  │      └── ...                        │
-  └──────────────┬──────────────────────┘
-                 │ Poll (every 3 min)
-                 │ hoặc Webhook (instant)
-  ┌──────────────▼─────────────────────┐
-  │  ArgoCD (chạy trên EKS)            │
-  │                                    │
-  │  ┌─────────────────────────────┐   │
-  │  │  Application Controller     │   │
-  │  │  • Detect drift             │   │
-  │  │  • Sync Git → Cluster       │   │
-  │  │  • Auto-heal (self-repair)  │   │
-  │  └─────────────────────────────┘   │
-  │                                    │
-  │  ┌─────────────────────────────┐   │
-  │  │  ArgoCD UI                  │   │
-  │  │  • Visual app topology      │   │
-  │  │  • Sync status              │   │
-  │  │  • Diff view                │   │
-  │  │  • Rollback (1-click)       │   │
-  │  └─────────────────────────────┘   │
-  └──────────────┬─────────────────────┘
-                 │ Apply manifests
-                 ▼
-  ┌────────────────────────────────────┐
-  │  EKS Cluster                       │
-  │  ├── order-service (3 replicas)    │
-  │  ├── payment-service (2 replicas)  │
-  │  └── user-service (3 replicas)     │
-  └────────────────────────────────────┘
-```
+Webhook trigger không bảo đảm apply tức thời. Auto-sync/self-heal theo policy; rollback cần phối hợp source of truth (revert Git/desired version), không chỉ click UI rồi để controller sync lại revision mới.
 
 **Install ArgoCD trên EKS:**
 
@@ -1172,38 +1045,22 @@ spec:
 
 **ArgoCD Image Updater** theo dõi ECR registry — khi có image mới, tự động update manifest trong Git → trigger deploy.
 
+```d2 title="8.3. Image Updater — Auto-deploy on new image"
+direction: right
+s0: "GitHub Actions — Push code / Build / Test"
+s1: "Push ECR — order-service:v1.2.3"
+s2: "ArgoCD Image Updater\nPoll ví dụ2phút / Detect semver tag"
+s3: "Git write-back\nCommit image update theo policy"
+s4: "ArgoCD detect Git revision"
+s5: "Sync / Deploy EKS theo gates"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
 ```
-CI/CD FLOW VỚI IMAGE UPDATER
-──────────────────────────────
 
-  ┌─── CI (GitHub Actions) ────────────────┐
-  │  Code push → Build → Test → Push ECR   │
-  │  (chỉ build & push image, KHÔNG deploy)│
-  └──────────────────────┬─────────────────┘
-                         │ New image: v1.2.3
-                         ▼
-  ┌─── ECR ────────────────────────────────┐
-  │  order-service:v1.2.3 (new!)           │
-  └──────────────────────┬─────────────────┘
-                         │ Detect new image
-  ┌──────────────────────▼─────────────────┐
-  │  ArgoCD Image Updater                  │
-  │  • Poll ECR every 2 min                │
-  │  • Detect new tag matching semver      │
-  │  • Update Git repo (write-back)        │
-  └──────────────────────┬─────────────────┘
-                         │ Commit: "update order-service to v1.2.3"
-  ┌──────────────────────▼──────────────────┐
-  │  Git Repository                         │
-  │  deployment.yaml:                       │
-  │    image: order-service:v1.2.3 (updated)│
-  └──────────────────────┬──────────────────┘
-                         │ Detect change
-  ┌──────────────────────▼──────────────────┐
-  │  ArgoCD                                 │
-  │  Sync → Deploy to EKS                   │
-  └─────────────────────────────────────────┘
-```
+CI không trực tiếp deploy trong mô hình này. Bảo vệ registry trust, image immutability/digests, write-back permissions và production approval; không auto-promote mọi tag ngoài ý muốn.
 
 ```yaml source="snippets/8-3-image-updater-auto-deploy-on-new-image.yaml"
 # ArgoCD Application with Image Updater annotations
@@ -1289,35 +1146,20 @@ PIPELINE IAM — LEAST PRIVILEGE
 
 ### 9.2. Image Scanning — ECR + Trivy
 
+```d2 title="9.2. Image Scanning — ECR + Trivy"
+direction: right
+build: "Docker Build"
+trivy: "Trivy CI Scan\nOS / App dependencies / Config / Secret scanning theo enabled scanners"
+block: "CRITICAL → Block pipeline theo policy"
+ecr: "Push ECR"
+inspector: "ECR Enhanced Scanning — Inspector\nRegistry / Continuous findings theo configuration"
+build -> trivy
+trivy -> block: "Policy violation"
+trivy -> ecr: "Pass"
+ecr -> inspector
 ```
-IMAGE SCANNING PIPELINE
-─────────────────────────
 
-  ┌──── Build ─────────────────────────────────────┐
-  │                                                │
-  │  docker build                                  │
-  │       │                                        │
-  │  ┌────▼──────────────────┐                     │
-  │  │ Trivy Scan (CI)       │ ← Scan TRƯỚC push   │
-  │  │ • OS vulnerabilities  │                     │
-  │  │ • App dependencies    │                     │
-  │  │ • Dockerfile misconfig│                     │
-  │  │ • Secrets in image    │                     │
-  │  └────┬──────────────────┘                     │
-  │       │                                        │
-  │       ├── CRITICAL found? → ❌ BLOCK pipeline  │
-  │       └── No CRITICAL → ✅ Continue            │
-  │                                                │
-  │  docker push ECR                               │
-  │       │                                        │
-  │  ┌────▼──────────────────┐                     │
-  │  │ ECR Scan (registry)   │ ← Scan SAU push     │
-  │  │ • Enhanced scanning   │   (continuous)      │
-  │  │   (Inspector)         │                     │
-  │  │ • Re-scan on new CVE  │                     │
-  │  └──────────────────────┘                      │
-  └────────────────────────────────────────────────┘
-```
+Dockerfile/config/secret scanners có flags/input-specific support; không mặc định image scan tự bao phủ mọi repository/misconfiguration. Scan trước push và registry scan sau push là hai lớp khác nhau.
 
 ```yaml source="snippets/9-2-image-scanning-ecr-trivy.yaml"
 # GitHub Actions — Trivy scan step
@@ -1513,61 +1355,22 @@ resource "aws_ecr_lifecycle_policy" "cleanup" {
 
 ## 11. Ví dụ thực tế — E-Commerce CI/CD trên AWS
 
+```d2 title="11. Ví dụ thực tế — E-Commerce CI/CD trên AWS"
+direction: right
+s0: "Developer git push main"
+s1: "GitHub CI\nCheckout → Parallel per-service unit tests → Build images\nTrivy block CRITICAL → OIDC Push ECR → Integration tests"
+s2: "Staging Account\nECS rolling • 2tasks/service • E2E / Pact"
+s3: "GitHub Environment Protection\nManual approval"
+s4: "Production Account\nCodeDeploy ECS Blue-Green • 4tasks/service\nCanary10%/5phút→100% theo configuration"
+s5: "CloudWatch alarm5xx>1% → Rollback policy\nProd Smoke Tests"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
 ```
-E-COMMERCE CI/CD ARCHITECTURE — PRODUCTION
-─────────────────────────────────────────────
 
-  ┌── Developer ─────────────────────────────────────────────────────┐
-  │  git push → main branch                                          │
-  └────────────────────────────────┬─────────────────────────────────┘
-                                   │
-  ┌── GitHub ──────────────────────▼─────────────────────────────────┐
-  │                                                                  │
-  │  CI Workflow (.github/workflows/ci.yml)                          │
-  │  ┌──────────────────────────────────────────────────────────┐    │
-  │  │  1. Checkout code                                        │    │
-  │  │  2. Run unit tests (parallel per service)                │    │
-  │  │  3. Build Docker image                                   │    │
-  │  │  4. Trivy scan (block on CRITICAL)                       │    │
-  │  │  5. Push to ECR (OIDC — no stored keys)                  │    │
-  │  │  6. Run integration tests                                │    │
-  │  └──────────────────────────────────────────────────────────┘    │
-  │                                                                  │
-  │  Deploy Staging Workflow                                         │
-  │  ┌──────────────────────────────────────────────────────────┐    │
-  │  │  7. Deploy to ECS Staging (Rolling Update)               │    │
-  │  │  8. Run E2E tests against staging                        │    │
-  │  │  9. Run contract tests (Pact)                            │    │
-  │  └──────────────────────────────────────────────────────────┘    │
-  │                                                                  │
-  │  Deploy Production Workflow                                      │
-  │  ┌──────────────────────────────────────────────────────────┐    │
-  │  │  10. Manual approval (GitHub Environment Protection)     │    │
-  │  │  11. Deploy to ECS Prod (Blue-Green via CodeDeploy)      │    │
-  │  │  12. Canary: 10% traffic → 5 min → 100%                  │    │
-  │  │  13. Auto-rollback on CloudWatch Alarm (5xx > 1%)        │    │
-  │  │  14. Smoke tests on prod                                 │    │
-  │  └──────────────────────────────────────────────────────────┘    │
-  └──────────────────────────────────────────────────────────────────┘
-
-  ┌── AWS ───────────────────────────────────────────────────────────┐
-  │                                                                  │
-  │  Staging Account              Production Account                 │
-  │  ┌──────────────────┐         ┌──────────────────┐               │
-  │  │ ECS Cluster      │         │ ECS Cluster      │               │
-  │  │ • Rolling Update │         │ • Blue-Green     │               │
-  │  │ • 2 tasks/service│         │ • 4 tasks/service│               │
-  │  │ • No approval    │         │ • Manual approval│               │
-  │  └──────────────────┘         │ • CodeDeploy     │               │
-  │                               │ • Auto-rollback  │               │
-  │                               └──────────────────┘               │
-  │                                                                  │
-  │  Shared:                                                         │
-  │  • ECR (images shared across accounts)                           │
-  │  • Secrets Manager (per account, per env)                        │
-  │  • CloudWatch Alarms → SNS → Slack                               │
-  └──────────────────────────────────────────────────────────────────┘
-```
+Shared ECR images theo cross-account policy; Secrets Manager tách account/environment; alarms qua SNS/Slack. Staging/prod nên promote cùng immutable artifact, không rebuild sau staging.
 
 **DORA Metrics mục tiêu:**
 

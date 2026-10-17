@@ -70,14 +70,20 @@ Nếu không có quan hệ giữa các bước, engineer phải ghép các log r
 
 Một trace có thể có dạng cây đơn giản:
 
-```text
-Trace ID: 4bf92f3577b34da6a3ce929d0e0e4736
-└─ API Gateway: POST /orders
-   └─ Order Service: createOrder
-      ├─ Inventory Service: reserve
-      └─ Payment Service: charge
-         └─ Bank API: POST /charges
+```d2 title="Trace"
+direction: right
+gateway: "Gateway — POST /orders"
+order: "Order — createOrder"
+inventory: "Inventory — reserve"
+payment: "Payment — charge"
+bank: "Bank — POST /charges"
+gateway -> order
+order -> inventory
+order -> payment
+payment -> bank
 ```
+
+Các spans thuộc Trace ID `4bf92f3577b34da6a3ce929d0e0e4736`; edges thể hiện quan hệ gọi/parent-child, không phải thang thời gian.
 
 Các span con giúp thể hiện quan hệ gọi nhau. Trong async messaging, trace có thể có khoảng trống giữa lúc producer publish message và consumer xử lý message. Nếu một consumer xử lý nhiều message cùng lúc, **Span Links** có thể phù hợp hơn việc ép tất cả message vào một parent duy nhất.
 
@@ -338,18 +344,18 @@ Các duration lồng nhau không nên được cộng máy móc: span `OrderServ
 
 Sau khi tạo order, Order Service có thể publish `OrderCreated` lên Kafka để Notification Service xử lý. Producer inject trace context vào message header; consumer extract context khi đọc message:
 
-```text
-Order Service
-└─ Span: publish OrderCreated
-   └─ Kafka header: traceparent = 00-{trace-id}-{producer-span-id}-01
-
-             Message chờ trong queue
-             ───── khoảng trống thời gian ─────
-
-Notification Service
-└─ Span: consume OrderCreated
-   └─ Span: queue hoặc process message
+```d2 title="Request có async messaging"
+direction: right
+producer: "Order — Publish Span"
+queue: "Kafka — Message chờ trong queue"
+consumer: "Notification — Consume Span"
+process: "Queue / Process Message Span"
+producer -> queue: "traceparent 00-{trace-id}-{producer-span-id}-01"
+queue -> consumer: "Extract propagated context"
+consumer -> process
 ```
+
+Thời gian chờ queue tạo khoảng trống giữa producer và consumer; mũi tên không biểu thị latency bằng độ dài hình học.
 
 Khoảng trống giữa hai span là queue delay, không phải thời gian Notification Service chạy. Nếu consumer xử lý một batch chứa nhiều message, mỗi message có thể đến từ một trace khác nhau; dùng Span Links để liên kết các context thay vì chọn một message làm parent duy nhất.
 

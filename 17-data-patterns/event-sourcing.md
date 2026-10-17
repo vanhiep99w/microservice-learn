@@ -234,15 +234,15 @@ Replay đến version cụ thể cho phép xem state tại một mốc lịch s�
 
 Nếu aggregate có hàng nghìn event, việc replay toàn bộ stream cho mỗi command hoặc lần đọc sẽ làm tăng latency. **Snapshot** lưu state dẫn xuất tại một sequence cụ thể, sau đó chỉ replay phần event mới hơn.
 
-```text
-Event stream:  E1 ── E2 ── ... ── E9000 ── E9001 ── ... ── E10000
-                                      │
-                                      └─ Snapshot { state, version: 9000 }
-
-Rehydrate hiện tại:
-  load snapshot version 9000
-  replay E9001 ... E10000
-  kết quả = state ở version 10000
+```d2 title="Snapshot cho stream dài"
+direction: right
+old: "Events E1 … E9000"
+snapshot: "Snapshot state / version9000"
+tail: "Replay E9001 … E10000"
+current: "Rehydrated state version10000"
+old -> snapshot: "Chụp state"
+snapshot -> tail: "Load gần nhất"
+tail -> current
 ```
 
 Snapshot cần lưu tối thiểu state và version mà state đó đại diện. Snapshot là cache/checkpoint, không phải lịch sử chính. Khi snapshot hỏng hoặc logic snapshot thay đổi, hệ thống phải có thể xóa và dựng lại snapshot từ event stream.
@@ -425,15 +425,16 @@ Không sửa payload lịch sử để làm cho nó trông giống schema hiện
 
 **Upcasting** là bước chuyển đổi event schema cũ thành dạng nội bộ mà code hiện tại hiểu được khi đọc. Ví dụ, `MoneyDeposited` version 1 không có `currency`, còn upcaster bổ sung giá trị mặc định đã được domain chấp nhận trước khi `apply` chạy.
 
-```text
-Event lưu trong store (v1)
-        │
-        ▼
-Upcaster: v1 -> canonical v2
-        │
-        ▼
-Aggregate.apply(canonical event)
+```d2 title="Upcasting và replay an toàn"
+direction: right
+stored: "Stored Event v1"
+upcast: "Upcaster v1 → Canonical v2"
+aggregate: "Aggregate.apply canonical event"
+stored -> upcast
+upcast -> aggregate
 ```
+
+Upcast trong read/replay pipeline, không sửa lịch sử event đã commit.
 
 Upcaster nên deterministic, có test cho từng version và không làm mất thông tin gốc. Nếu không thể suy ra field mới một cách an toàn, cần giữ event cũ với code xử lý riêng hoặc thực hiện migration có kiểm soát; không nên đoán dữ liệu chỉ để replay chạy qua.
 

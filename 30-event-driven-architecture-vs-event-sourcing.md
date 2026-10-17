@@ -123,14 +123,17 @@ Order Service không cần gọi trực tiếp từng service và không cần b
 
 Hãy hình dung broker như bưu điện:
 
-```text
-Order Service viết thư: “Order #123 đã tạo.”
-                  │
-                  ▼
-             Message Broker
-              ├── gửi bản sao cho Payment
-              ├── gửi bản sao cho Inventory
-              └── gửi bản sao cho Notification
+```d2 title="Các thành phần và trách nhiệm"
+direction: right
+order: "Order — Đơn123 đã tạo"
+broker: "Message Broker"
+payment: "Payment"
+inventory: "Inventory"
+notification: "Notification"
+order -> broker: "Publish"
+broker -> payment: "Bản sao event"
+broker -> inventory: "Bản sao event"
+broker -> notification: "Bản sao event"
 ```
 
 ### Luồng OrderCreated
@@ -470,9 +473,18 @@ Event có thể được giữ nhiều năm. Vì vậy:
 
 Một cách nhớ khác:
 
-```text
-EDA:          Service A  ── thông báo ──► Service B
-Event Sourcing: Service A  ── lưu lịch sử ──► Event Store
+```d2 title="So sánh: cái nào chịu trách nhiệm việc gì?"
+direction: right
+eda: Event-Driven Architecture {
+ a: Service A
+ b: Service B
+ a -> b: Thông báo event qua transport
+}
+es: Event Sourcing {
+ a: Service A
+ store: Event Store {shape: cylinder}
+ a -> store: Lưu authoritative event history
+}
 ```
 
 ---

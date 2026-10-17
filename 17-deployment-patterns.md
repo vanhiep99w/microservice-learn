@@ -105,32 +105,23 @@ Blue-Green và Canary kiểm soát release ở **tầng hạ tầng** (chuyển 
 
 ### 1.3. Bản đồ các Deployment Patterns
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                   DEPLOYMENT PATTERNS MAP                           │
-│                                                                     │
-│  TẦNG HẠ TẦNG — điều khiển traffic giữa các version                │
-│  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────┐ │
-│  │ Recreate  │ │  Rolling  │ │Blue-Green │ │  Canary   │ │ A/B   │ │
-│  │ Update    │ │  Update   │ │           │ │           │ │       │ │
-│  │───────────│ │───────────│ │───────────│ │───────────│ │───────│ │
-│  │ Tắt cũ,   │ │ Thay từng │ │ 2 môi     │ │ % traffic │ │ Theo  │ │
-│  │ bật mới   │ │ pod một   │ │ trường,   │ │ tăng dần  │ │ điều  │ │
-│  │ (downtime)│ │ (mặc định)│ │ switch 1 lần│ │ theo metrics│ │ kiện │ │
-│  └───────────┘ └───────────┘ └───────────┘ └───────────┘ └───────┘ │
-│                                                                     │
-│  TẦNG ỨNG DỤNG — điều khiển hành vi trong code                     │
-│  ┌──────────────────────────────────────────────────────────────┐  │
-│  │ Feature Toggle — deploy trước, release sau (per user / %)     │  │
-│  └──────────────────────────────────────────────────────────────┘  │
-│                                                                     │
-│  3 MỐI QUAN TÂM CHUNG (mục 8, 9, 10)                                │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────────┐     │
-│  │ Rollback      │ │ Quan sát      │ │ Tương thích nhiều     │     │
-│  │ kế hoạch      │ │ rollout theo  │ │ version (API, DB,     │     │
-│  │ thoát hiểm    │ │ version       │ │ event, cache, config) │     │
-│  └───────────────┘ └───────────────┘ └───────────────────────┘     │
-└─────────────────────────────────────────────────────────────────────┘
+```d2 title="1.3. Bản đồ các Deployment Patterns"
+direction: right
+infra: Infrastructure — Traffic giữa versions {
+ recreate: Recreate — Tắt cũ / Bật mới; downtime
+ rolling: Rolling — Thay Pod theo batch; mặc định
+ bluegreen: Blue-Green — Hai môi trường / Switch
+ canary: Canary — Tăng traffic theo metrics
+ ab: A/B — Route theo điều kiện
+}
+app: Application {
+ toggle: Feature Toggle — Deploy trước / Release sau; per-user hoặc percentage
+}
+concerns: Mối quan tâm chung {
+ rollback: Rollback / Exit plan
+ observability: Quan sát rollout theo version
+ compatibility: Multi-version API / DB / Events / Cache / Config
+}
 ```
 
 ---
@@ -196,23 +187,21 @@ Blue-Green và Canary không xóa bỏ yêu cầu này; chúng chỉ **kiểm so
 
 **Blue-Green Deployment** chạy **hai môi trường giống hệt nhau**: Blue (đang phục vụ production) và Green (bản mới). Green được deploy đầy đủ và test khi **chưa nhận traffic nào**, sau đó traffic được **chuyển 100% trong một thao tác** (switch). Blue được giữ nguyên để rollback.
 
-```mermaid
-sequenceDiagram
-    participant CI as CI/CD
-    participant G as GREEN (v2)
-    participant LB as Load Balancer
-    participant B as BLUE (v1)
-
-    Note over B,LB: Blue đang nhận 100% traffic
-    CI->>G: Deploy bản sao đầy đủ v2 (0% traffic)
-    CI->>G: Smoke test + verify trên data thật
-    CI->>LB: Switch 100% traffic sang GREEN
-    Note over B: BLUE giữ nguyên — sẵn sàng rollback
-    alt Metrics xấu sau switch
-        CI->>LB: Switch traffic về BLUE (vài giây)
-    else Ổn định suốt rollback window
-        CI->>B: Teardown BLUE
-    end
+```d2 title="4.1. Cách hoạt động"
+direction: right
+start: "BLUE v1 đang nhận 100% traffic"
+deploy: "CI/CD deploy GREEN v2 đầy đủ\nGREEN nhận 0% traffic"
+test: "Smoke test / verify data thật"
+switch: "Load Balancer chuyển 100% sang GREEN\nGiữ BLUE để rollback"
+metrics: "Theo dõi metrics trong rollback window"
+rollback: "Metrics xấu: CI/CD switch về BLUE\nVài giây"
+teardown: "Ổn định hết rollback window:\nCI/CD teardown BLUE"
+start -> deploy
+deploy -> test
+test -> switch
+switch -> metrics
+metrics -> rollback: "Xấu"
+metrics -> teardown: "Ổn định"
 ```
 
 Thuộc tính định danh của Blue-Green:

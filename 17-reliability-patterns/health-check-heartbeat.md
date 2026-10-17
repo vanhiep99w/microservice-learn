@@ -106,13 +106,17 @@ Chi tiết phối hợp toàn bộ Reliability Patterns thuộc [17 — Reliabil
 
 **Instance chết** là process đã thoát, container bị kill hoặc instance không còn renew registration. **Zombie** là process vẫn tồn tại nhưng không còn phục vụ đúng, chẳng hạn HTTP server bị treo, thread pool cạn hoặc dependency bắt buộc không thể truy cập.
 
-```text
-Không có health signal:
-  Instance lỗi ──▶ Registry/LB chưa biết ──▶ traffic vẫn route vào instance lỗi
-                                  └──────▶ user nhận lỗi ngẫu nhiên
-
-Có health signal:
-  Instance lỗi ──▶ probe hoặc TTL fail ──▶ hạ tầng ngừng route / restart phù hợp
+```d2 title="Instance chết và zombie"
+direction: right
+bad: "Instance lỗi"
+unknown: "Không signal — Registry / LB chưa biết"
+errors: "Tiếp tục route → User lỗi ngẫu nhiên"
+signal: "Có signal — Probe / TTL fail"
+action: "Ngừng route / Restart phù hợp"
+bad -> unknown: "Không health signal"
+unknown -> errors
+bad -> signal: "Có health signal"
+signal -> action
 ```
 
 Nếu chỉ nhìn process còn tồn tại, hạ tầng có thể giữ một zombie trong vòng traffic. Nếu mọi failure đều dẫn tới restart, một lỗi dependency dùng chung có thể tạo restart storm dù các process vẫn có khả năng phục hồi.
@@ -329,26 +333,21 @@ Một luồng xử lý reliability điển hình có thể được đọc theo 
 3. Hạ tầng thay đổi route hoặc vòng đời instance theo đúng semantics.
 4. Metrics và alerting ghi nhận để operator biết tín hiệu có phản ánh outage thật hay không.
 
-```mermaid
-sequenceDiagram
-    participant C as Kubelet hoặc Load Balancer
-    participant I as Service instance
-    participant D as Dependency
-    participant O as Orchestrator hoặc Registry
-
-    C->>I: Probe health signal
-    I->>D: Dependency check nếu readiness cần
-    D-->>I: Success hoặc failure
-    I-->>C: 200, 503 hoặc timeout
-    alt Readiness fail
-        C->>O: Cập nhật trạng thái not ready
-        O-->>C: Gỡ instance khỏi endpoints
-    else Liveness fail
-        C->>O: Ghi nhận process không sống
-        O-->>C: Restart container theo policy
-    else Probe pass
-        C->>O: Giữ hoặc khôi phục route
-    end
+```d2 title="Từ tín hiệu đến hành động"
+direction: right
+probe: "Kubelet / Load Balancer\nProbe health signal"
+instance: "Service instance\nCheck dependency nếu readiness cần"
+dependency: "Dependency\nSuccess / Failure"
+response: "200 / 503 / Timeout"
+ready: "Orchestrator / Registry\nNot Ready → gỡ khỏi endpoints"
+live: "Orchestrator\nProcess không sống → restart theo policy"
+pass: "Orchestrator / Registry\nGiữ hoặc khôi phục route"
+probe -> instance
+instance -> dependency
+dependency -> response
+response -> ready: "Readiness fail"
+response -> live: "Liveness fail"
+response -> pass: "Probe pass"
 ```
 
 Probe chỉ là tín hiệu. Kubelet, Load Balancer hoặc Registry mới là component thực hiện restart, gỡ route hoặc cập nhật registration. Vì vậy, cần kiểm tra cả endpoint lẫn hành động của consumer trong integration test.
@@ -451,30 +450,26 @@ Readiness cũng là một cổng an toàn cho rolling update, canary hoặc blue
 
 Payment Service có ba replica. Instance `#3` vẫn còn process nhưng không xử lý request đúng. Luồng failure detection có thể diễn ra như sau:
 
-```text
-Instance #3 của Payment Service bị treo
-        │
-        ▼
-Readiness probe fail 2 lần
-        │
-        ▼
-Kubernetes gỡ instance #3 khỏi Service endpoints
-        │
-        ▼
-Traffic chỉ đi vào instance #1 và #2
-        │
-        ▼
-Liveness probe fail 3 lần vì process thật sự không phản hồi
-        │
-        ▼
-Kubelet restart container #3
-        │
-        ▼
-Startup và readiness pass
-        │
-        ▼
-Instance #3 quay lại endpoints
+```d2 title="Instance Payment bị treo"
+direction: right
+hung: "Payment Instance3 treo"
+readyfail: "Readiness fail2 lần"
+remove: "Kubernetes gỡ Instance3 khỏi Service Endpoints"
+healthy: "Traffic sang healthy Instances1,2"
+livefail: "Liveness fail3 lần — Process không phản hồi"
+restart: "Kubelet restart Container3"
+startup: "Startup + Readiness pass"
+return: "Instance3 trở lại Endpoints"
+hung -> readyfail
+readyfail -> remove
+remove -> healthy
+healthy -> livefail
+livefail -> restart
+restart -> startup
+startup -> return
 ```
+
+Đây là kịch bản minh họa, không phải thứ tự đồng bộ bắt buộc: readiness và liveness được đánh giá độc lập theo cấu hình probes.
 
 Readiness giới hạn lỗi nhìn thấy từ user trước. Liveness và restart xử lý vòng đời instance sau khi xác định process thật sự không còn recover được. Nếu instance chỉ mất kết nối database nhưng HTTP server vẫn phản hồi, policy phù hợp thường là readiness `503` và chờ recovery, không phải restart hàng loạt Pod.
 

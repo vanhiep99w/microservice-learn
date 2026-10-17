@@ -41,28 +41,18 @@ Trong các doc trước, chúng ta đã tìm hiểu cách **tách service** ([do
 
 Cách các service giao tiếp là **quyết định thiết kế quan trọng nhất** — nó ảnh hưởng trực tiếp đến **hiệu năng**, **reliability**, và **mức độ coupling** của hệ thống (xem [doc 03](03-loose-coupling-high-cohesion.md)).
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│           INTER-SERVICE COMMUNICATION LANDSCAPE                  │
-│                                                                  │
-│   ┌───────────────────────────┐ ┌───────────────────────────┐    │
-│   │    SYNCHRONOUS            │ │    ASYNCHRONOUS           │    │
-│   │    (Request-Response)     │ │    (Fire & Forget / Event)│    │
-│   │                           │ │                           │    │
-│   │  ┌───────┐  ┌───────┐     │ │  ┌───────┐  ┌───────┐     │    │
-│   │  │ REST  │  │ gRPC  │     │ │  │Message│  │Pub/Sub│     │    │
-│   │  │(HTTP) │  │(HTTP/2)│    │ │  │ Queue │  │       │     │    │
-│   │  └───────┘  └───────┘     │ │  └───────┘  └───────┘     │    │
-│   │  ┌───────┐                │ │  ┌───────┐                │    │
-│   │  │GraphQL│                │ │  │Event  │                │    │
-│   │  │       │                │ │  │Stream │                │    │
-│   │  └───────┘                │ │  └───────┘                │    │
-│   │                           │ │                           │    │
-│   │  Caller CHỜ response      │ │  Caller KHÔNG CHỜ         │    │
-│   │  Coupling: CAO hơn        │ │  Coupling: THẤP hơn       │    │
-│   │  Đơn giản hơn             │ │  Phức tạp hơn             │    │
-│   └───────────────────────────┘ └───────────────────────────┘    │
-└──────────────────────────────────────────────────────────────────┘
+```d2 title="1. Giới thiệu"
+direction: right
+sync: "Synchronous — Request/Response\nCaller chờ • Coupling cao hơn • Đơn giản hơn" {
+ rest: REST — HTTP
+ grpc: gRPC — HTTP/2
+ graphql: GraphQL
+}
+async: "Asynchronous — Fire & Forget / Event\nCaller không chờ consumer • Phức tạp hơn" {
+ queue: Message Queue
+ pubsub: Pub/Sub
+ stream: Event Stream
+}
 ```
 
 ---
@@ -71,17 +61,14 @@ Cách các service giao tiếp là **quyết định thiết kế quan trọng n
 
 Service A gọi Service B và **chờ response** trước khi tiếp tục. Giống như gọi điện thoại — hai bên phải **cùng online**.
 
-```
-Synchronous — Request / Response:
-
-  Service A                    Service B
-     │                            │
-     │──── Request ──────────────▶│
-     │        (chờ...)            │ (xử lý)
-     │◀──── Response ─────────────│
-     │                            │
-     │  Tiếp tục xử lý           │
-     ▼                            │
+```d2 title="2. Synchronous Communication — Giao tiếp đồng bộ"
+shape: sequence_diagram
+a: Service A
+b: Service B
+a -> b: Request
+b.note1: Xử lý — A chờ response
+b -> a: Response {style.stroke-dash: 5}
+a.note2: Tiếp tục xử lý
 ```
 
 ### 2.1. REST (HTTP/JSON)
@@ -201,32 +188,34 @@ message OrderResponse {
 
 **4 loại RPC trong gRPC:**
 
+```d2 title="2.2. gRPC (HTTP/2 + Protobuf)"
+direction: down
+unary: "1. Unary — 1:1" {
+ client: Client
+ server: Server
+ client -> server: Request
+ server -> client: Response
+}
+server_stream: "2. Server Streaming — 1:N" {
+ client: Client
+ server: Server
+ client -> server: Request
+ server -> client: Response 1, 2, ..., N
+}
+client_stream: "3. Client Streaming — N:1" {
+ client: Client
+ server: Server
+ client -> server: Request 1, 2, ..., N
+ server -> client: Response
+}
+bidi: "4. Bidirectional Streaming — N:N" {
+ client: Client
+ server: Server
+ client <-> server: Cùng lúc — hai chiều độc lập
+}
 ```
-1. Unary (1:1) — Giống REST
-   Client ──Request──▶ Server
-   Client ◀──Response── Server
 
-2. Server Streaming (1:N) — Server gửi nhiều response
-   Client ──Request──▶ Server
-   Client ◀──Response 1── Server
-   Client ◀──Response 2── Server
-   Client ◀──Response N── Server
-   
-   Use case: Real-time tracking, live feed
-
-3. Client Streaming (N:1) — Client gửi nhiều request
-   Client ──Request 1──▶ Server
-   Client ──Request 2──▶ Server
-   Client ──Request N──▶ Server
-   Client ◀──Response── Server
-   
-   Use case: Upload batch data, log streaming
-
-4. Bidirectional Streaming (N:N) — Cả hai chiều
-   Client ◀──▶ Server (cùng lúc)
-   
-   Use case: Chat, real-time collaboration
-```
+Unary giống REST request/response. Server Streaming: real-time tracking, live feed. Client Streaming: upload batch data, log streaming. Bidirectional: chat, real-time collaboration.
 
 **Ưu và nhược:**
 
@@ -323,135 +312,92 @@ Không biết chọn gì?                       → REST (safe default)
 
 Service A gửi message và **không chờ** response. Giống như gửi email — bạn gửi xong rồi làm việc khác, người nhận xử lý khi nào tùy họ.
 
+```d2 title="3.1. Tại sao cần Async?"
+direction: down
+sync: "Sync — tổng latency minh họa 350ms" {
+ order: Order Service
+ payment: Payment Service
+ inventory: Inventory Service
+ order -> payment: "Charge 100 USD — chờ 200ms"
+ payment -> order: OK
+ order -> inventory: Reserve stock — chờ 150ms
+ inventory -> order: OK
+}
+async: "Async — publish minh họa 5ms, không chờ consumer" {
+ order: Order Service
+ broker: Message Broker
+ payment: Payment Service
+ inventory: Inventory Service
+ notification: Notification Service
+ order -> broker: OrderCreated
+ broker -> payment
+ broker -> inventory
+ broker -> notification
+}
 ```
-Vấn đề của Sync:
-────────────────
 
-  Order Service          Payment Service        Inventory Service
-       │                       │                       │
-       │── Charge $100 ──────▶ │                       │
-       │     (chờ 200ms...)    │ (xử lý)               │
-       │◀── OK ────────────────│                       │
-       │                       │                       │
-       │── Reserve stock ─────────────────────────────▶│
-       │     (chờ 150ms...)                            │ (xử lý)
-       │◀── OK ────────────────────────────────────────│
-       │                                               │
-       │  Tổng latency: 350ms                          │
-       │  Nếu Payment down → Order CŨNG down ❌        │
-       │  Temporal coupling: cả 3 phải CÙNG online     │
-
-Async giải quyết:
-─────────────────
-
-  Order Service          Message Broker         Consumers
-       │                    ┌──────┐              │
-       │── OrderCreated ──▶ │      │              │
-       │   (không chờ)      │      │──▶ Payment Service
-       │   Latency: 5ms     │      │──▶ Inventory Service
-       │                    │      │──▶ Notification Service
-       │  Tiếp tục xử lý    └──────┘              │
-       │                                          │
-       │  Payment down? → Message chờ trong queue │
-       │  → Xử lý khi Payment sống lại ✅         │
-```
+Sync tạo temporal coupling: ba service phải online cùng lúc, Payment lỗi ảnh hưởng Order. Async cho phép message đợi trong queue khi Payment down và xử lý sau khi phục hồi; Order tiếp tục sau publish. Số latency là minh họa, không phải SLA.
 
 ### 3.2. Message Queue — Point-to-Point
 
 **Message Queue**: Producer gửi message vào queue, **1 consumer** nhận và xử lý.
 
+```d2 title="3.2. Message Queue — Point-to-Point"
+direction: right
+producer: "Producer"
+queue: "Queue\nmsg1 • msg2 • msg3"
+consumer: "Một consumer cho mỗi lần delivery"
+order: "Order Service"
+email: "email-queue\nGửi email xác nhận đơn 456"
+worker: "Email Worker"
+producer -> queue
+queue -> consumer
+consumer -> queue: "Acknowledge khi xử lý xong"
+order -> email
+email -> worker
 ```
-Point-to-Point: 1 message → 1 consumer
 
-  Producer ──▶ ┌───────────────────┐ ──▶ Consumer
-               │ Queue             │
-               │ [msg1][msg2][msg3]│
-               └───────────────────┘
-
-  • Message được xóa sau khi consumer xử lý (acknowledge)
-  • Nếu có nhiều consumers → mỗi message chỉ đến 1 consumer (load balance)
-  • Message ordering: FIFO (thường là best-effort, không guarantee tuyệt đối)
-
-Ví dụ: Email sending
-  Order Service ──▶ [email-queue] ──▶ Email Worker
-                     "Gửi email xác nhận đơn #456"
-
-  → Chỉ 1 worker xử lý, tránh gửi trùng
-
-Tools: RabbitMQ, Amazon SQS, ActiveMQ
-```
+Point-to-point phân phối mỗi lần delivery tới một consumer trong nhóm để load balance. Acknowledge/delete sau xử lý; ordering/FIFO tùy broker và cấu hình. Redelivery vẫn có thể xảy ra nên email worker cần chống trùng/idempotency. Tools: RabbitMQ, Amazon SQS, ActiveMQ.
 
 ### 3.3. Pub/Sub — Publish/Subscribe
 
 **Pub/Sub**: Publisher gửi event vào topic, **tất cả subscribers** đều nhận được.
 
+```d2 title="3.3. Pub/Sub — Publish/Subscribe"
+direction: right
+order: "Order Service — Publisher"
+topic: "Topic order.created\nOrderCreated {orderId:456, userId:123, amount:500000}"
+payment: "Payment — Charge tiền"
+inventory: "Inventory — Reserve stock"
+notification: "Notification — Email xác nhận"
+analytics: "Analytics — Track conversion"
+order -> topic
+topic -> payment
+topic -> inventory
+topic -> notification
+topic -> analytics
 ```
-Pub/Sub: 1 event → N subscribers
 
-  Publisher ──▶ ┌──────────┐ ──▶ Subscriber A (Payment)
-                │  Topic:  │ ──▶ Subscriber B (Inventory)
-                │  order.  │ ──▶ Subscriber C (Notification)
-                │  created │ ──▶ Subscriber D (Analytics)
-                └──────────┘
-
-  • Message KHÔNG bị xóa khi 1 subscriber đọc
-  • Mỗi subscriber có cursor/offset riêng
-  • Thêm subscriber mới KHÔNG ảnh hưởng publisher
-  • Publisher không biết (và không cần biết) có bao nhiêu subscribers
-
-Ví dụ: Order Created Event
-  Order Service publish: OrderCreated { orderId: 456, userId: 123, amount: 500000 }
-  
-  → Payment Service:      Charge tiền
-  → Inventory Service:    Reserve stock
-  → Notification Service: Gửi email xác nhận
-  → Analytics Service:    Track conversion
-  
-  Order Service KHÔNG cần biết có 4 subscribers
-
-Tools: Apache Kafka, Google Pub/Sub, Amazon SNS, Redis Streams
-```
+Một event tới nhiều subscribers; đọc ở một subscriber không đồng nghĩa các subscriber khác mất event. Cursor/offset riêng và retention phụ thuộc broker; thêm subscriber không phải sửa publisher. Tools: Kafka, Google Pub/Sub, SNS, Redis Streams.
 
 ### 3.4. Event Streaming — Event Log
 
 **Event Streaming**: Giống Pub/Sub nhưng message được **lưu lại vĩnh viễn** (hoặc lâu dài) như một log. Consumer có thể **replay** từ bất kỳ thời điểm nào.
 
+```d2 title="3.4. Event Streaming — Event Log"
+direction: right
+producer: "Producer"
+log: "Topic orders — retained Event Log\n0: OrderCreated {id:1}\n1: OrderCreated {id:2}\n2: OrderPaid {id:1}\n3: OrderShipped {id:1}\n4: OrderCreated {id:3}"
+a: "Consumer A — offset 4\nĐã đọc tới cuối ví dụ"
+b: "Consumer B — offset 2\nĐang bắt kịp"
+c: "Consumer C — offset 0\nMới join, replay từ đầu"
+producer -> log
+log -> a
+log -> b
+log -> c
 ```
-Event Streaming (Event Log):
-────────────────────────────
 
-  Producer ──▶ ┌──────────────────────────────────────┐
-               │ Topic: orders                        │
-               │                                      │
-               │ Offset 0: OrderCreated {id:1}        │
-               │ Offset 1: OrderCreated {id:2}        │
-               │ Offset 2: OrderPaid {id:1}           │
-               │ Offset 3: OrderShipped {id:1}        │
-               │ Offset 4: OrderCreated {id:3}        │
-               │ ...                                  │
-               │ (messages KHÔNG bị xóa)              │
-               └──────────┬───────────────────────────┘
-                          │
-          ┌───────────────┼───────────────┐
-          │               │               │
-   Consumer A          Consumer B      Consumer C
-   (offset: 4)        (offset: 2)     (offset: 0)
-   Đã đọc hết         Đang đọc        Mới join,
-                       bắt kịp         replay từ đầu
-
-Khác biệt với Pub/Sub thông thường:
-  • Messages lưu lại → consumer mới có thể đọc từ quá khứ
-  • Replay: Consumer có thể "quay lại" đọc từ offset bất kỳ
-  • Time-based retention: giữ messages 7 ngày, 30 ngày, hoặc forever
-
-Use cases:
-  • Event Sourcing (lưu toàn bộ lịch sử thay đổi)
-  • Data pipeline (ETL, analytics)
-  • Audit log
-  • Rebuild state (new service đọc lại toàn bộ events để build state)
-
-Tools: Apache Kafka, Amazon Kinesis, Redpanda, Apache Pulsar
-```
+Messages không bị xóa ngay khi consume; có thể replay từ offset trong retention. Retention có thể 7 ngày, 30 ngày hoặc lâu dài theo cấu hình. Use cases: Event Sourcing khi đáp ứng yêu cầu lưu trữ/order, ETL/analytics, audit log, rebuild state. Tools: Kafka, Kinesis, Redpanda, Pulsar.
 
 ### 3.5. So sánh Message Queue vs Pub/Sub vs Event Streaming
 
@@ -573,20 +519,15 @@ Order Service BIẾT về 3 service      Order Service KHÔNG BIẾT ai đang l�
 | **Schema** | Internal model, có thể thay đổi tự do | Public contract, phải backward compatible |
 | **Ví dụ** | `OrderItemAdded` (internal) | `OrderCreated` (publish ra ngoài) |
 
-```
-Order Service nội bộ:
-─────────────────────
-
-  User Action         Domain Events              Integration Event
-  ───────────         ─────────────              ─────────────────
-  "Tạo đơn hàng"  →  OrderItemAdded (internal)
-                  →  OrderPriceCalculated (internal)
-                  →  OrderValidated (internal)
-                  →  OrderCreated ─────────────▶ Publish ra Kafka
-                                                  (cho service khác)
-
-  Domain Events: xử lý logic nội bộ (tính giá, validate, etc.)
-  Integration Event: thông báo cho thế giới bên ngoài
+```d2 title="5.2. Event types — Domain Event vs Integration Event"
+direction: right
+action: "User tạo đơn hàng"
+internal: "Domain Events — xử lý nội bộ\nOrderItemAdded\nOrderPriceCalculated\nOrderValidated"
+integration: "Integration Event\nOrderCreated"
+kafka: "Kafka — thông báo cho service khác"
+action -> internal
+internal -> integration
+integration -> kafka
 ```
 
 ### 5.3. Choreography vs Orchestration — Phân biệt rõ ràng
@@ -610,51 +551,34 @@ ORCHESTRATION (Command-Driven ❌ không phải EDA):
   → Có "ông chủ" điều khiển → Tight coupling tập trung
 ```
 
+```d2 title="5.3. Choreography vs Orchestration — Phân biệt rõ ràng"
+direction: down
+choreography: "Choreography — không coordinator sở hữu toàn flow" {
+ order: Order Service
+ payment: Payment Service — tự charge
+ inventory: Inventory Service — tự reserve
+ notification: Notification Service — tự email
+ shipping: Shipping Service — tự tạo shipment
+ order -> payment: OrderCreated — Event
+ order -> inventory: OrderCreated — Event
+ order -> notification: OrderCreated — Event
+ payment -> shipping: PaymentCompleted — Event
+}
+orchestration: "Orchestration — flow tập trung tại Orchestrator" {
+ order: Order Orchestrator
+ payment: Payment Service
+ inventory: Inventory Service
+ shipping: Shipping Service
+ order -> payment: 1. Charge tiền — Command
+ payment -> order: 2. OK
+ order -> inventory: 3. Reserve stock — Command
+ inventory -> order: 4. OK
+ order -> shipping: 5. Tạo shipment — Command
+ shipping -> order: 6. OK
+}
 ```
-CHOREOGRAPHY — Thuần Event-Driven
-──────────────────────────────────
-  Không có "nhạc trưởng". Mỗi service lắng nghe event và 
-  TỰ BIẾT mình phải làm gì. Giống đàn chim bay: không con nào
-  chỉ huy, mỗi con phản ứng theo con bên cạnh.
 
-  Order Service publish: OrderCreated (event = sự kiện đã xảy ra)
-       │
-       │ (Order Service KHÔNG BIẾT ai subscribe)
-       │
-       ├──▶ Payment Service nghe thấy → tự charge
-       │         → publish: PaymentCompleted
-       │
-       ├──▶ Inventory Service nghe thấy → tự reserve
-       │
-       └──▶ Notification Service nghe thấy → tự gửi email
-
-  PaymentCompleted ──▶ Shipping Service nghe thấy → tự tạo shipment
-
-  Đặc trưng:
-  • Producer KHÔNG biết consumer là ai
-  • Mỗi service tự chứa logic phản ứng
-  • Thêm service mới = chỉ cần subscribe, KHÔNG sửa service cũ
-  • KHÔNG có service nào "sở hữu" toàn bộ flow
-
-ORCHESTRATION — Command-Driven (KHÔNG phải EDA)
-──────────────────────────────────────
-  Có "nhạc trưởng" (Orchestrator) ra lệnh cho từng service.
-  Giống quân đội: chỉ huy ra lệnh, lính thực hiện.
-
-  Order Orchestrator:
-    1. → Payment Service: "Charge tiền"       ← COMMAND (lệnh)
-    2. ← Payment: "OK"
-    3. → Inventory: "Reserve stock"            ← COMMAND
-    4. ← Inventory: "OK"
-    5. → Shipping: "Tạo shipment"              ← COMMAND
-    6. ← Shipping: "OK"
-
-  Đặc trưng:
-  • Orchestrator BIẾT RÕ từng service, gọi đích danh
-  • Logic flow NẰM TẬP TRUNG trong orchestrator
-  • Thêm step mới = SỬA orchestrator
-  • Orchestrator "sở hữu" và điều khiển toàn bộ flow
-```
+Choreography: producer không biết subscribers; service tự chứa logic phản ứng; thêm consumer không đổi producer. Orchestration: coordinator biết đích và thứ tự, thêm bước phải sửa flow. Ví dụ command-driven này khác event choreography; orchestration vẫn có thể dùng messaging làm transport.
 
 **Tại sao Orchestration phá vỡ Event-Driven?**
 
@@ -719,60 +643,40 @@ Orchestration **không xấu** — nó chỉ không phải Event-Driven. Có nh�
 
 ### 5.4. Ví dụ thực tế — Food Delivery
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│      FOOD DELIVERY — EVENT-DRIVEN CHOREOGRAPHY                  │
-│                                                                 │
-│  User đặt đồ ăn                                                 │
-│       │                                                         │
-│       ▼                                                         │
-│  ┌──────────┐                                                   │
-│  │  Order   │──publish──▶ OrderCreated                          │
-│  │ Service  │            { orderId, userId, restaurantId,       │
-│  └──────────┘              items, totalAmount }                 │
-│                              │                                  │
-│            ┌─────────────────┼─────────────────┐                │
-│            ▼                 ▼                 ▼                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  Restaurant  │  │   Payment    │  │  Notification│           │
-│  │   Service    │  │   Service    │  │   Service    │           │
-│  │              │  │              │  │              │           │
-│  │ "Accept /    │  │ "Charge      │  │ "Gửi push:   │           │
-│  │  Reject      │  │  user"       │  │  Đang xử lý" │           │
-│  │  order"      │  │              │  │              │           │
-│  └──────┬───────┘  └──────┬───────┘  └──────────────┘           │
-│         │                 │                                     │
-│         ▼                 ▼                                     │
-│  OrderAccepted       PaymentCompleted                           │
-│         │                 │                                     │
-│         └─────────┬───────┘                                     │
-│                   ▼                                             │
-│            ┌──────────────┐                                     │
-│            │   Delivery   │──publish──▶ DriverAssigned          │
-│            │   Service    │              { driverId, ETA }      │
-│            │              │                                     │
-│            │ "Assign      │                    │                │
-│            │  driver gần  │                    ▼                │
-│            │  nhất"       │           ┌──────────────┐          │
-│            └──────┬───────┘           │  Notification│          │
-│                   │                   │   Service    │          │
-│                   ▼                   │              │          │
-│            DriverPickedUp             │ "Push: Tài xế│          │
-│                   │                   │  đang đến"   │          │
-│                   ▼                   └──────────────┘          │
-│            OrderDelivered                                       │
-│                   │                                             │
-│            ┌──────┴──────┐                                      │
-│            ▼             ▼                                      │
-│    ┌──────────────┐ ┌──────────────┐                            │
-│    │   Payment    │ │  Notification│                            │
-│    │   Service    │ │   Service    │                            │
-│    │              │ │              │                            │
-│    │ "Release     │ │ "Push: Đã    │                            │
-│    │  payment to  │ │  giao xong!" │                            │
-│    │  restaurant" │ │              │                            │
-│    └──────────────┘ └──────────────┘                            │
-└─────────────────────────────────────────────────────────────────┘
+```d2 title="5.4. Ví dụ thực tế — Food Delivery"
+direction: down
+user: "User đặt đồ ăn"
+order: "Order Service"
+event: "OrderCreated\norderId, userId, restaurantId, items, totalAmount"
+restaurant: "Restaurant Service\nAccept / Reject order"
+payment: "Payment Service\nCharge user"
+notify_pending: "Notification\nPush: Đang xử lý"
+accepted: "OrderAccepted"
+paid: "PaymentCompleted"
+join: "Đủ OrderAccepted VÀ PaymentCompleted"
+delivery: "Delivery Service\nAssign driver gần nhất"
+assigned: "DriverAssigned\ndriverId, ETA"
+notify_driver: "Notification\nPush: Tài xế đang đến"
+pickup: "DriverPickedUp"
+delivered: "OrderDelivered"
+release: "Payment Service\nRelease payment to restaurant"
+notify_done: "Notification\nPush: Đã giao xong"
+user -> order
+order -> event: "Publish"
+event -> restaurant
+event -> payment
+event -> notify_pending
+restaurant -> accepted
+payment -> paid
+accepted -> join
+paid -> join
+join -> delivery
+delivery -> assigned: "Publish"
+assigned -> notify_driver
+delivery -> pickup
+pickup -> delivered
+delivered -> release
+delivered -> notify_done
 ```
 
 ---
@@ -783,29 +687,20 @@ Orchestration **không xấu** — nó chỉ không phải Event-Driven. Có nh�
 
 Khi cần **response** nhưng vẫn muốn **decouple** qua message broker:
 
+```d2 title="6.1. Request-Reply qua Message Queue"
+shape: sequence_diagram
+a: Service A
+broker: Broker
+b: Service B
+a -> broker: Request message — replyTo queue-A
+broker -> b: Forward
+b.note: Xử lý request
+b -> broker: Reply message — to queue-A
+broker -> a: Response {style.stroke-dash: 5}
+a.note: Match request/response bằng Correlation ID
 ```
-Request-Reply Pattern:
-──────────────────────
 
-  Service A                    Broker                    Service B
-     │                          │                           │
-     │── Request msg ──────────▶│                           │
-     │   (replyTo: "queue-A")   │── Forward ───────────────▶│
-     │                          │                           │ (xử lý)
-     │                          │◀── Reply msg ─────────────│
-     │◀── Response ─────────────│   (to: "queue-A")         │
-     │                          │                           │
-
-  • Service A gửi request kèm "replyTo" queue
-  • Service B xử lý xong, gửi response về replyTo queue
-  • Service A lắng nghe replyTo queue để nhận response
-  • Correlation ID để match request–response
-
-Khi nào dùng:
-  • Cần response nhưng muốn buffer qua broker
-  • Muốn retry/resilience của message queue
-  • Chấp nhận latency cao hơn sync call
-```
+Dùng khi cần response nhưng muốn buffer, retry/resilience qua broker và chấp nhận latency cao hơn sync call. Service A lắng nghe reply queue; Service B gửi response đúng `replyTo`.
 
 ### 6.2. Saga Pattern (giới thiệu)
 
@@ -858,35 +753,29 @@ service.publisher -> kafka
 
 **Dead Letter Queue** (DLQ) chứa messages **không thể xử lý** sau nhiều lần retry:
 
+```d2 title="6.4. Dead Letter Queue"
+direction: down
+producer: "Producer"
+queue: "Main Queue"
+consumer: "Consumer"
+result: "Xử lý thành công?"
+ack: "Acknowledge / Delete"
+retry: "Lỗi — tăng số lần thử"
+max: "Đạt giới hạn minh họa 3 lần?"
+dlq: "Dead Letter Queue"
+review: "Alert team → Manual review\nFix bug → Replay"
+producer -> queue
+queue -> consumer
+consumer -> result
+result -> ack: "Có"
+result -> retry: "Không"
+retry -> max
+max -> queue: "Chưa đạt — retry"
+max -> dlq: "Đạt"
+dlq -> review
 ```
-Dead Letter Queue:
-──────────────────
 
-  Producer ──▶ Main Queue ──▶ Consumer
-                   │              │
-                   │         ❌ Lỗi (lần 1)
-                   │◀─ Retry ────┘
-                   │──▶ Consumer
-                   │         ❌ Lỗi (lần 2)
-                   │◀─ Retry ────┘
-                   │──▶ Consumer
-                   │         ❌ Lỗi (lần 3 — max retries)
-                   │              │
-                   │         Move to DLQ
-                   │              │
-                   │              ▼
-                   │     ┌─────────────┐
-                   │     │ Dead Letter │ → Alert team
-                   │     │   Queue     │ → Manual review
-                   │     │             │ → Fix & replay
-                   │     └─────────────┘
-
-Tại sao cần DLQ:
-  • Tránh "poison message" block cả queue
-  • Không mất message (giữ lại để xử lý sau)
-  • Alert team khi có lỗi bất thường
-  • Có thể replay DLQ messages sau khi fix bug
-```
+DLQ cô lập poison message, tránh block queue, giữ message để điều tra và replay sau khi fix.
 
 ---
 
@@ -934,25 +823,34 @@ Avro (~35 bytes):
 | **No Idempotency** | Consumer xử lý duplicate message 2 lần | Charge tiền 2 lần, gửi 2 email | Idempotency key, deduplication |
 | **Distributed Monolith** | Sync calls everywhere, shared DB | Deploy 1 service → phải test lại tất cả | Async communication, database per service |
 
+```d2 title="8. Anti-patterns"
+direction: down
+sync: "Sync Chain — ví dụ 430ms, Fraud down ảnh hưởng cả flow" {
+ client: Client
+ gw: API Gateway
+ order: Order
+ payment: Payment
+ fraud: Fraud
+ bank: Bank API
+ client -> gw -> order -> payment -> fraud -> bank
+}
+hybrid: "Hybrid — ví dụ 150ms trên đường trả response" {
+ client: Client
+ gw: API Gateway
+ order: Order
+ payment: Payment
+ fraud: Fraud Check — background
+ notification: Notification
+ analytics: Analytics
+ client -> gw -> order
+ order -> payment: Sync — cần kết quả
+ order -> fraud: Async
+ order -> notification: Async
+ order -> analytics: Async
+}
 ```
-❌ Sync Chain (Temporal Coupling):
 
-  Client → API GW → Order → Payment → Fraud → Bank API
-                                                  │
-  Latency: 50 + 100 + 80 + 200 = 430ms           │
-  Nếu Fraud down: toàn bộ flow CHẾT                │
-
-✅ Hybrid Sync + Async:
-
-  Client → API GW → Order ──sync──▶ Payment (cần kết quả)
-                       │
-                       └──async──▶ Fraud Check (background)
-                       └──async──▶ Notification
-                       └──async──▶ Analytics
-
-  Latency: 50 + 100 = 150ms
-  Fraud down? → Order vẫn tạo, fraud check sau
-```
+Latency minh họa của sync là 50 + 100 + 80 + 200 = 430ms, hybrid là 50 + 100 = 150ms. Chỉ chuyển fraud check sang background khi business/security policy cho phép; dependency down không còn chặn response không có nghĩa được bỏ kiểm soát rủi ro.
 
 ---
 

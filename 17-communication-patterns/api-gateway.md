@@ -49,15 +49,20 @@ Gateway nằm ở **edge**, tức ranh giới giữa traffic bên ngoài và m�
 
 Nếu client gọi trực tiếp từng service, topology nội bộ bị lộ ra ngoài và mỗi client phải tự biết cách kết nối đến nhiều endpoint:
 
-```text
-❌ Client gọi trực tiếp từng service:
-
-  Mobile App
-      ├── GET https://user-service:8081/api/users/123
-      ├── GET https://order-service:8082/api/orders?userId=123
-      ├── GET https://product-service:8083/api/products/456
-      └── GET https://review-service:8084/api/reviews?productId=456
+```d2 title="Vấn đề khi không có API Gateway"
+direction: right
+mobile: "Mobile App"
+user: "User — GET https://user-service:8081/api/users/123"
+order: "Order — GET https://order-service:8082/api/orders?userId=123"
+product: "Product — GET https://product-service:8083/api/products/456"
+review: "Review — GET https://review-service:8084/api/reviews?productId=456"
+mobile -> user
+mobile -> order
+mobile -> product
+mobile -> review
 ```
+
+Client biết từng service URL/port, nhiều round-trips, cross-cutting logic dễ lặp và thiếu một điểm monitor; URL thay đổi buộc client cập nhật.
 
 Cách này tạo ra một số vấn đề:
 
@@ -221,26 +226,26 @@ Không ghi access token, password hoặc dữ liệu thanh toán vào log. Log c
 
 Trang chủ của một sàn E-Commerce cần profile user, giỏ hàng và danh sách gợi ý. Nếu Mobile App gọi từng service, ứng dụng phải quản lý nhiều request và tự ghép dữ liệu. Với API Aggregation, app gọi một endpoint:
 
-```mermaid
-sequenceDiagram
-    participant App as Mobile App
-    participant GW as API Gateway
-    participant U as User Service
-    participant C as Cart Service
-    participant R as Recommendation Service
-
-    App->>GW: GET /api/home
-    par Gọi song song
-        GW->>U: GET /users/123
-        U-->>GW: profile
-    and
-        GW->>C: GET /cart?userId=123
-        C-->>GW: cart
-    and
-        GW->>R: GET /recommendations?userId=123
-        R-->>GW: recommendations
-    end
-    GW-->>App: 200 OK response gộp
+```d2 title="Request trang chủ"
+direction: down
+client: "Mobile App"
+gateway: "API Gateway\nGET /api/home"
+fork: "PAR — fan-out đồng thời"
+user: "User Service\nGET /users/123 → profile"
+cart: "Cart Service\nGET /cart?userId=123 → cart"
+recommend: "Recommendation Service\nGET /recommendations?userId=123 → recommendations"
+join: "JOIN — chờ kết quả các dependency độc lập"
+response: "200 OK — response gộp profile, cart, recommendations"
+client -> gateway
+gateway -> fork
+fork -> user
+fork -> cart
+fork -> recommend
+user -> join
+cart -> join
+recommend -> join
+join -> response
+response -> client
 ```
 
 Một response có thể có dạng:
@@ -298,28 +303,20 @@ Multiple Gateways không tự động trở thành BFF. Nếu một Gateway ch�
 
 Gateway có thể load balance đến các instance của service, nhưng bản thân Gateway cũng cần được phân phối traffic khi có nhiều instance:
 
-```text
-Internet
-   │
-   ▼
-┌─────────────────────────┐
-│ Public Load Balancer    │  health check Gateway
-│ hoặc Ingress            │
-└───────────┬─────────────┘
-            │
-      ┌─────┴─────┐
-      ▼           ▼
-┌──────────┐ ┌──────────┐
-│ Gateway 1│ │ Gateway 2│
-└────┬─────┘ └────┬─────┘
-     └──────┬─────┘
-            ▼
-┌─────────────────────────┐
-│ Service discovery hoặc  │  route và chọn instance
-│ internal Load Balancer  │
-└───────────┬─────────────┘
-            ▼
-      Service instances
+```d2 title="Gateway và Load Balancer"
+direction: down
+internet: "Internet"
+public: "Public LB / Ingress — Health-check gateways"
+g1: "Gateway1"
+g2: "Gateway2"
+internal: "Service Discovery / Internal LB\nRoute + Select instance"
+services: "Service Instances"
+internet -> public
+public -> g1
+public -> g2
+g1 -> internal
+g2 -> internal
+internal -> services
 ```
 
 Public Load Balancer hoặc Ingress bảo vệ High Availability của Gateway. Internal Load Balancer, service discovery hoặc cơ chế tương đương giúp tìm và kiểm tra các upstream instance. Tách hai trách nhiệm này giúp Gateway tập trung vào route và policy thay vì tự gánh toàn bộ health check của hạ tầng.

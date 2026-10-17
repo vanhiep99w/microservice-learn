@@ -72,21 +72,24 @@ Timeout chỉ bảo vệ thời gian chờ của caller. Nó không tự làm ch
 
 Failure mode là cách một sự cố biến thành thiệt hại lớn hơn. Với Timeout Pattern, failure mode chính là dependency không trả response nhưng caller vẫn giữ tài nguyên:
 
-```text
-KHÔNG có timeout:
-  Payment Service bị treo
-      │
-      ├── Request mới tiếp tục chiếm thread của Order Service
-      ├── Connection pool bị giữ hoặc đầy dần
-      └── Thread pool cạn kiệt → Order Service cũng không nhận request mới
-
-CÓ timeout:
-  Payment Service bị treo
-      │
-      ├── Mỗi call chỉ được chờ trong giới hạn đã định
-      ├── Call hết hạn được hủy hoặc trả lỗi
-      └── Thread và connection được trả lại → phần còn lại vẫn có cơ hội hoạt động
+```d2 title="Failure mode cần ngăn chặn"
+direction: right
+bad: Không Timeout {
+ hung: Payment treo
+ hold: Request giữ threads / Connections
+ down: Pool đầy — Order không nhận request mới
+ hung -> hold -> down
+}
+good: Có Timeout {
+ hung: Payment treo
+ limit: Chờ trong giới hạn
+ stop: Hủy hoặc đánh dấu call fail
+ free: Thu hồi tài nguyên / Flow khác tiếp tục
+ hung -> limit -> stop -> free
+}
 ```
+
+Timeout ở caller không luôn hủy side effect downstream. Kết quả payment không rõ cần đối soát/idempotency; cancellation chỉ có hiệu lực nếu transport và callee hỗ trợ.
 
 | Failure mode | Điều xảy ra | Timeout giới hạn ở đâu |
 |---|---|---|
@@ -129,18 +132,17 @@ Một request đi qua nhiều lớp. Cài một timeout ở HTTP client không t
 | **Read hoặc response timeout** | Chờ response sau khi request đã được gửi | Dừng chờ nếu downstream không trả dữ liệu kịp hạn |
 | **Idle timeout** | Connection nhàn rỗi trong pool | Đóng connection đã không hoạt động để tránh giữ connection cũ quá lâu |
 
-```mermaid
-sequenceDiagram
-    participant C as Caller
-    participant D as Dependency
-
-    C->>D: Thiết lập connection
-    Note over C,D: Connection timeout
-    D-->>C: Connection sẵn sàng
-    C->>D: Gửi request
-    Note over C,D: Read / response timeout
-    D-->>C: Response
-    Note over C,D: Idle timeout chỉ áp dụng khi connection nằm yên trong pool
+```d2 title="Timeout ở lớp kết nối và response"
+shape: sequence_diagram
+"C": "Caller"
+"D": "Dependency"
+"C" -> "D": "Thiết lập connection"
+"C".note1: "[Caller — Dependency]\nConnection timeout"
+"D" -> "C": "Connection sẵn sàng" { style.stroke-dash: 5 }
+"C" -> "D": "Gửi request"
+"C".note2: "[Caller — Dependency]\nRead / response timeout"
+"D" -> "C": "Response" { style.stroke-dash: 5 }
+"C".note3: "[Caller — Dependency]\nIdle timeout chỉ áp dụng khi connection nằm yên trong pool"
 ```
 
 `Idle timeout` không phải là response timeout. Nó không nên được dùng để giới hạn một request đang chạy. Ngược lại, nếu chỉ đặt response timeout mà bỏ qua connection timeout, caller vẫn có thể bị treo ngay từ bước thiết lập connection.
@@ -173,14 +175,22 @@ Giá trị và tên cấu hình phụ thuộc driver hoặc client. Điểm cầ
 
 Một request đi sâu qua hệ thống có thể có cấu trúc như sau:
 
-```text
-Client deadline: t + 10s
-  └─ API Gateway request timeout: tối đa 8s
-       └─ Order Service handler: tối đa 5s
-            └─ Payment client overall call: tối đa 3s
-                 ├─ Connection timeout: tối đa 1s
-                 └─ Bank API response timeout: tối đa 2s
+```d2 title="Thứ tự các lớp timeout"
+direction: right
+client: "Client deadline t+10s"
+gateway: "Gateway max8s"
+order: "Order Handler max5s"
+payment: "Payment Client overall max3s"
+connect: "Connection timeout max1s"
+bank: "Bank Response timeout max2s"
+client -> gateway
+gateway -> order
+order -> payment
+payment -> connect
+payment -> bank
 ```
+
+Các timeout con còn bị chặn bởi remaining overall deadline; không cộng máy móc tất cả trần timeout để suy ra latency thực tế.
 
 Các con số trên chỉ là ví dụ minh họa. Quy tắc cần giữ là lớp bên trong không được tiếp tục làm việc lâu hơn phần thời gian còn lại của request gốc. Một timeout cục bộ cũng không nên lớn hơn deadline mà caller đã truyền xuống.
 
@@ -310,44 +320,40 @@ Với operation có side effect như `POST /payments`, timeout không chứng mi
 
 Một luồng checkout có các boundary sau:
 
-```text
-User / Client
-      │ deadline của request
-      ▼
-API Gateway
-      │ forward deadline còn hiệu lực
-      ▼
-Order Service
-      │ authorize payment
-      ▼
-Payment Service
-      │ gọi provider bên ngoài
-      ▼
-Bank API
+```d2 title="Bối cảnh"
+direction: right
+client: "User / Client"
+gateway: "API Gateway"
+order: "Order"
+payment: "Payment"
+bank: "Bank API"
+client -> gateway: "Request Deadline"
+gateway -> order: "Forward remaining deadline"
+order -> payment: "Authorize payment"
+payment -> bank: "External provider call"
 ```
 
 Order Service cần phản hồi trong thời gian người dùng chấp nhận. Payment Service lại phụ thuộc vào Bank API có latency biến động và nằm ngoài quyền kiểm soát của team. Vì vậy, mỗi lớp cần có giới hạn riêng nhưng vẫn phải tôn trọng deadline của checkout.
 
 ### Luồng checkout có deadline
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant G as API Gateway
-    participant O as Order Service
-    participant P as Payment Service
-    participant B as Bank API
-
-    U->>G: POST /checkout, deadline t+5s
-    G->>O: Forward request và deadline
-    O->>P: Authorize order-123, deadline còn lại
-    Note over O,P: Idempotency-Key = order-123-payment
-    P->>B: Charge, local cap tối đa 2s
-    B-->>P: Không phản hồi kịp
-    Note over P: Deadline hoặc response timeout hết
-    P-->>O: Timeout / trạng thái chưa xác định
-    O-->>G: PENDING_PAYMENT hoặc lỗi theo contract
-    G-->>U: Kết quả trong deadline của checkout
+```d2 title="Luồng checkout có deadline"
+shape: sequence_diagram
+"U": "User"
+"G": "API Gateway"
+"O": "Order Service"
+"P": "Payment Service"
+"B": "Bank API"
+"U" -> "G": "POST /checkout, deadline t+5s"
+"G" -> "O": "Forward request và deadline"
+"O" -> "P": "Authorize order-123, deadline còn lại"
+"O".note1: "[Order Service — Payment Service]\nIdempotency-Key = order-123-payment"
+"P" -> "B": "Charge, local cap tối đa 2s"
+"B" -> "P": "Không phản hồi kịp" { style.stroke-dash: 5 }
+"P".note2: "Deadline hoặc response timeout hết"
+"P" -> "O": "Timeout / trạng thái chưa xác định" { style.stroke-dash: 5 }
+"O" -> "G": "PENDING_PAYMENT hoặc lỗi theo contract" { style.stroke-dash: 5 }
+"G" -> "U": "Kết quả trong deadline của checkout" { style.stroke-dash: 5 }
 ```
 
 Ví dụ cấu hình trong một profile đã đo lường có thể là:

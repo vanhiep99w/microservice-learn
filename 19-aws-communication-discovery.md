@@ -43,33 +43,27 @@ Trong [doc 18](18-aws-deployment-architecture.md), chúng ta đã thiết lập 
 
 Doc này áp dụng kiến thức từ doc [06 — Inter-Service Communication](06-inter-service-communication.md), [07 — API Gateway](07-api-gateway.md), [08 — Service Discovery](08-service-discovery.md) vào thực tế AWS — mapping từng pattern lý thuyết sang AWS service cụ thể.
 
-```
-┌────────────────────────────────────────────────────────────────┐
-│              COMMUNICATION LANDSCAPE trên AWS                  │
-│                                                                │
-│  ┌─────────── Client → Service (Ingress) ────────────────┐     │
-│  │  API Gateway (REST/WebSocket)                         │     │
-│  │  ALB (HTTP routing)                                   │     │
-│  │  CloudFront (CDN + Edge)                              │     │
-│  └───────────────────────────────────────────────────────┘     │
-│                                                                │
-│  ┌─────────── Service → Service (Sync) ──────────────────┐     │
-│  │  Internal ALB          ← đơn giản, HTTP routing       │     │
-│  │  ECS Service Connect   ← ECS native, zero-config      │     │
-│  │  Cloud Map             ← DNS-based discovery          │     │
-│  │  VPC Lattice           ← cross-VPC, cross-account     │     │
-│  │  App Mesh (legacy)     ← service mesh (Envoy)         │     │
-│  └────────────────────────────────────────────────────────┘     │
-│                                                                │
-│  ┌─────────── Service → Service (Async) ─────────────────┐     │
-│  │  SQS                   ← point-to-point queue         │     │
-│  │  SNS                   ← pub/sub fan-out              │     │
-│  │  EventBridge           ← event bus, routing rules     │     │
-│  │  MSK (Kafka)           ← event streaming, replay      │     │
-│  │  Step Functions        ← orchestration workflows      │     │
-│  └───────────────────────────────────────────────────────┘     │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
+```d2 title="1. Giới thiệu"
+direction: right
+ingress: Client → Service Ingress {
+ apigw: API Gateway — REST / WebSocket
+ alb: ALB — HTTP Routing
+ cf: CloudFront — CDN / Edge
+}
+sync: Service → Service Sync {
+ alb: Internal ALB — HTTP Routing
+ connect: ECS Service Connect — ECS Native
+ map: Cloud Map — DNS Discovery
+ lattice: VPC Lattice — Cross-VPC / Cross-Account
+ mesh: App Mesh — Legacy Envoy Mesh
+}
+async: Service → Service Async {
+ sqs: SQS — Point-to-Point Queue
+ sns: SNS — Pub/Sub Fan-out
+ events: EventBridge — Bus / Routing Rules
+ msk: MSK Kafka — Streaming / Replay
+ workflow: Step Functions — Workflow Orchestration
+}
 ```
 
 ---
@@ -80,42 +74,29 @@ Doc này áp dụng kiến thức từ doc [06 — Inter-Service Communication](
 
 **API Gateway** (APIGW) — managed service cho REST, HTTP, và WebSocket APIs.
 
+```d2 title="2.1. Amazon API Gateway"
+direction: down
+rest: REST API {
+ gateway: API Gateway REST
+ user: User Lambda
+ order: Order ECS — VPC integration
+ product: Product ECS — ALB integration
+ gateway -> user: GET /users/id — POST /users
+ gateway -> order: POST /orders
+ gateway -> product: GET /products
+}
+http: HTTP API v2 — JWT Authorizer / CORS / Lightweight
+websocket: WebSocket API {
+ connect: Connect route
+ lambda: Lambda handlers
+ db: DynamoDB connection store
+ disconnect: Disconnect route — cleanup
+ connect -> lambda -> db
+ disconnect -> lambda
+}
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                    API Gateway                                │
-│                                                               │
-│  ┌─── REST API ──────────────────────────────────────────┐    │
-│  │                                                       │    │
-│  │  /users/{id}   GET  ──▶ Lambda (User)                 │    │
-│  │  /users        POST ──▶ Lambda (User)                 │    │
-│  │  /orders       POST ──▶ ECS (Order Service) via VPC   │    │
-│  │  /products     GET  ──▶ ECS (Product) via ALB         │    │
-│  │                                                       │    │
-│  │  Features:                                            │    │
-│  │  • Cognito Authorizer (JWT verify)                    │    │
-│  │  • Usage Plans + API Keys (rate limiting per client)  │    │
-│  │  • Request validation (JSON Schema)                   │    │
-│  │  • Response caching (per-stage TTL)                   │    │
-│  │  • WAF integration                                    │    │
-│  │  • Custom domain (api.shopvn.com)                     │    │
-│  └───────────────────────────────────────────────────────┘    │
-│                                                               │
-│  ┌─── HTTP API (v2) ─────────────────────────────────────┐    │
-│  │  Nhẹ hơn REST API, rẻ hơn ~70%                        │    │
-│  │  Đủ dùng cho hầu hết use cases                        │    │
-│  │  JWT authorizer built-in, CORS auto                   │    │
-│  │  Nhưng: không có caching, validation, usage plans     │    │
-│  └───────────────────────────────────────────────────────┘    │
-│                                                               │
-│  ┌─── WebSocket API ─────────────────────────────────────┐    │
-│  │  Real-time: chat, notifications, live updates         │    │
-│  │  $connect → Lambda → DynamoDB (connection store)      │    │
-│  │  $disconnect → cleanup                                │    │
-│  │  Custom routes → Lambda handlers                      │    │
-│  └───────────────────────────────────────────────────────┘    │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
-```
+
+REST API có usage plans/API keys, validation, stage response cache, Cognito authorizer, custom domain/WAF integrations theo support. HTTP API ít tính năng quản trị hơn nhưng thường rẻ hơn; tỷ lệ tiết kiệm phụ thuộc pricing/usage, không cố định70%. WebSocket phục vụ chat/notifications/live updates; custom routes dùng handlers.
 
 **3 loại API Gateway:**
 
@@ -141,31 +122,22 @@ Doc này áp dụng kiến thức từ doc [06 — Inter-Service Communication](
 
 ALB không phải "API Gateway" theo đúng nghĩa, nhưng có thể đóng vai trò tương tự cho nhiều use cases:
 
+```d2 title="2.2. ALB (Application Load Balancer) làm API Gateway"
+direction: right
+alb: "ALB — Listener Rules theo priority"
+user: "Target Group User"
+order: "Target Group Order"
+product: "Target Group Product"
+payment: "Target Group Payment"
+default: "Default fixed response404"
+alb -> user: "Host api.shopvn.com + /users/*"
+alb -> order: "/orders/*"
+alb -> product: "/products/*"
+alb -> payment: "/payments/*"
+alb -> default: "Không match"
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    ALB as API Router                     │
-│                                                          │
-│  Listener Rules (đánh giá theo thứ tự priority):         │
-│                                                          │
-│  Rule 1: Host = api.shopvn.com                           │
-│          Path = /users/*     → Target Group: User        │
-│  Rule 2: Path = /orders/*    → Target Group: Order       │
-│  Rule 3: Path = /products/*  → Target Group: Product     │
-│  Rule 4: Path = /payments/*  → Target Group: Payment     │
-│  Default: → 404 fixed response                           │
-│                                                          │
-│  Features:                                               │
-│  • Path-based routing                                    │
-│  • Host-based routing (multi-domain)                     │
-│  • Header/Query-based routing                            │
-│  • Weighted target groups (canary)                       │
-│  • Sticky sessions                                       │
-│  • Health check per target group                         │
-│  • gRPC support (HTTP/2)                                 │
-│  • Authentication (Cognito / OIDC built-in)              │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-```
+
+Hỗ trợ path/host/header/query routing, weighted target groups, sticky sessions, target-group health checks, gRPC/HTTP2 và Cognito/OIDC listener authentication theo protocol/configuration.
 
 ### 2.3. API Gateway vs ALB — Chọn cái nào?
 
@@ -238,32 +210,20 @@ n5 -> n7
 
 > 🔗 Xem lý thuyết BFF tại [doc 07 — API Gateway](07-api-gateway.md#4-bff-pattern--backend-for-frontend)
 
+```d2 title="2.5. BFF Pattern trên AWS"
+direction: right
+web: "Web App"
+mobile: "Mobile App"
+wbff: "Web BFF — API Gateway + Lambda/ECS\nFull product detail • Pagination"
+mbff: "Mobile BFF — API Gateway + Lambda/ECS\nCompact • Optimized images • Offline-friendly"
+backend: "Shared Backend Services\nUser / Product / Order"
+web -> wbff
+mobile -> mbff
+wbff -> backend
+mbff -> backend
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    BFF trên AWS                             │
-│                                                             │
-│  ┌─────────┐     ┌──────────────────────────────────────┐   │
-│  │  Web    │────▶│ API Gateway (Web BFF)                │   │
-│  │  App    │     │ • Full product detail                │   │
-│  └─────────┘     │ • Pagination                         │   │
-│                  │ → Lambda/ECS aggregation             │   │
-│                  └──────────────────────────────────────┘   │
-│                                                             │
-│  ┌─────────┐     ┌──────────────────────────────────────┐   │
-│  │ Mobile  │────▶│ API Gateway (Mobile BFF)             │   │
-│  │  App    │     │ • Compact responses                  │   │
-│  └─────────┘     │ • Optimized images                   │   │
-│                  │ • Offline-friendly payload           │   │
-│                  │ → Lambda/ECS aggregation             │   │
-│                  └──────────────────────────────────────┘   │
-│                                                             │
-│  Cả 2 BFF gọi chung các backend services:                   │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐                     │
-│  │  User    │ │ Product  │ │  Order   │                     │
-│  │ Service  │ │ Service  │ │ Service  │                     │
-│  └──────────┘ └──────────┘ └──────────┘                     │
-└─────────────────────────────────────────────────────────────┘
-```
+
+Aggregation/client-specific logic nằm ở BFF compute/integration tương ứng; API Gateway không mặc định tự thực thi mọi business aggregation.
 
 **Triển khai BFF trên AWS:**
 
@@ -281,20 +241,20 @@ n5 -> n7
 
 Cách **đơn giản nhất** — mỗi service hoặc nhóm services expose qua 1 Internal ALB (không public).
 
+```d2 title="3.1. Internal ALB"
+direction: right
+order: "Order Service"
+payment: "Payment Service"
+alb: "Internal ALB — user-alb"
+a: "User Service Replica1"
+b: "User Service Replica2"
+order -> alb: "HTTP"
+payment -> alb: "HTTP"
+alb -> a
+alb -> b
 ```
-┌──────────────────────────────────────────────────────────┐
-│                  VPC (Private Subnets)                   │
-│                                                          │
-│  Order Service ──HTTP──▶ ┌─────────────┐ ──▶ User Svc    │
-│                          │ Internal ALB│                 │
-│  Payment Service ─────▶  │ (user-alb)  │ ──▶ User Svc    │
-│                          └─────────────┘                 │
-│                                                          │
-│  URL: http://user-alb.internal.shopvn.com/users/123      │
-│  DNS: Route 53 Private Hosted Zone                       │
-│                                                          │
-└──────────────────────────────────────────────────────────┘
-```
+
+VPC private subnets; ví dụ URL `http://user-alb.internal.shopvn.com/users/123`, DNS từ Route53 Private Hosted Zone.
 
 **Ưu điểm:** Đơn giản, có health check, load balancing, path routing. Dùng Route 53 Private Hosted Zone cho DNS đẹp.
 
@@ -306,34 +266,27 @@ Cách **đơn giản nhất** — mỗi service hoặc nhóm services expose qua
 
 **Service Connect** — built-in service discovery + load balancing cho ECS, không cần ALB.
 
+```d2 title="3.2. ECS Service Connect"
+direction: right
+cluster: ECS + Service Connect {
+ order: Order Task {
+  app: Order App
+  proxy: Service Connect Proxy — Envoy
+  app -> proxy: user-service 8080
+ }
+ user: User Task {
+  proxy: Service Connect Proxy
+  app: User App
+  proxy -> app
+ }
+ namespace: Cloud Map Namespace — shopvn.local
+ order.proxy -> user.proxy: Resolve / LB / Resilience policies
+ namespace -- order.proxy: Endpoint configuration
+ namespace -- user.proxy
+}
 ```
-┌─────────────────────────────────────────────────────────────┐
-│               ECS Cluster + Service Connect                 │
-│                                                             │
-│  ┌─── Order Service Task ──────────────────────────┐        │
-│  │  ┌──────────┐  ┌──────────────────────────────┐ │        │
-│  │  │  Order   │  │  Service Connect Proxy       │ │        │
-│  │  │   App    │──│  (Envoy sidecar, AWS-managed)│ │        │
-│  │  │          │  │  • DNS: user-service:8080    │ │        │
-│  │  │ call:    │  │  • Load balancing            │ │        │
-│  │  │ http://  │  │  • Retry (configurable)      │ │        │
-│  │  │ user-svc │  │  • Timeout                   │ │        │
-│  │  │ :8080/   │  │  • Health check              │ │        │
-│  │  └──────────┘  └──────────────────────────────┘ │        │
-│  └─────────────────────────────────────────────────┘        │
-│                                                             │
-│  ┌─── User Service Task ───────────────────────────┐        │
-│  │  ┌──────────┐  ┌──────────────────────────────┐ │        │
-│  │  │  User    │  │  Service Connect Proxy       │ │        │
-│  │  │   App    │──│  (Envoy sidecar)             │ │        │
-│  │  └──────────┘  └──────────────────────────────┘ │        │
-│  └─────────────────────────────────────────────────┘        │
-│                                                             │
-│  Cloud Map Namespace: shopvn.local                          │
-│  Service A gọi B: http://user-service:8080/users/123        │
-│  → Proxy tự resolve, load balance, retry                    │
-└─────────────────────────────────────────────────────────────┘
-```
+
+Order gọi `http://user-service:8080/users/123`; proxy được ECS quản lý, thực hiện load balancing và supported timeout/retry behavior. Không giả định mọi Envoy option đều có thể cấu hình trực tiếp qua Service Connect.
 
 **Cách hoạt động:**
 
@@ -357,26 +310,22 @@ Cách **đơn giản nhất** — mỗi service hoặc nhóm services expose qua
 
 **Cloud Map** — managed service registry (DNS-based hoặc API-based discovery).
 
+```d2 title="3.3. AWS Cloud Map"
+direction: right
+map: Cloud Map — shopvn.local {
+ user: user-service {
+  one: 10.0.11.45 8080 — healthy
+  two: 10.0.12.67 8080 — healthy
+  three: 10.0.11.89 8080 — unhealthy
+ }
+ order: order-service { one: 10.0.11.22 8080; two: 10.0.12.33 8080 }
+ payment: payment-service { one: 10.0.11.77 8443 }
+}
+client: Consumer
+client -> map: DNS user-service.shopvn.local / DiscoverInstances API
 ```
-┌────────────────────────────────────────────────────────┐
-│                   AWS Cloud Map                        │
-│                                                        │
-│  Namespace: shopvn.local (Private DNS)                 │
-│  ├── user-service                                      │
-│  │   ├── instance-1: 10.0.11.45:8080 (healthy)         │
-│  │   ├── instance-2: 10.0.12.67:8080 (healthy)         │
-│  │   └── instance-3: 10.0.11.89:8080 (unhealthy)       │
-│  ├── order-service                                     │
-│  │   ├── instance-1: 10.0.11.22:8080                   │
-│  │   └── instance-2: 10.0.12.33:8080                   │
-│  └── payment-service                                   │
-│      └── instance-1: 10.0.11.77:8443                   │
-│                                                        │
-│  Discovery methods:                                    │
-│  • DNS: dig user-service.shopvn.local → 10.0.11.45     │
-│  • API: aws servicediscovery discover-instances        │
-└────────────────────────────────────────────────────────┘
-```
+
+Ví dụ DNS trả10.0.11.45. DNS routing policy, health behavior và cache TTL quyết định kết quả discovery; không mặc định DNS query và API query có semantics hoàn toàn giống nhau.
 
 **Cloud Map vs Service Connect:**
 - Service Connect **dùng** Cloud Map underneath (auto register)
@@ -388,38 +337,18 @@ Cách **đơn giản nhất** — mỗi service hoặc nhóm services expose qua
 
 **VPC Lattice** (GA 2023) — thế hệ mới cho application networking, thay thế dần ALB + Service Connect cho cross-VPC, cross-account.
 
+```d2 title="3.4. VPC Lattice"
+direction: right
+lattice: VPC Lattice Service Network {
+ a: VPC A — Team User { user: User Service — user-svc.lattice.local }
+ b: VPC B — Team Order { order: Order Service }
+ c: Account B — Team Payment { payment: Payment Service }
+ b.order -> a.user: Cross-VPC service access
+ b.order -> c.payment: Cross-account access / IAM auth policy
+}
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                     VPC Lattice                               │
-│                                                               │
-│  ┌── Service Network ───────────────────────────────────┐     │
-│  │  (Shared across VPCs and accounts)                   │     │
-│  │                                                      │     │
-│  │  ┌─── VPC A (Team User) ──────────┐                  │     │
-│  │  │  Lattice Target: User Service  │                  │     │
-│  │  │  URL: user-svc.lattice.local   │                  │     │
-│  │  └────────────────────────────────┘                  │     │
-│  │                                                      │     │
-│  │  ┌─── VPC B (Team Order) ─────────┐                  │     │
-│  │  │  Lattice Target: Order Service │                  │     │
-│  │  │  → Gọi user-svc.lattice.local  │                  │     │
-│  │  │    Cross-VPC, zero peering!    │                  │     │
-│  │  └────────────────────────────────┘                  │     │
-│  │                                                      │     │
-│  │  ┌─── Account B (Team Payment) ───┐                  │     │
-│  │  │  Lattice Target: Payment Svc   │                  │     │
-│  │  │  Cross-account, IAM auth!      │                  │     │
-│  │  └────────────────────────────────┘                  │     │
-│  │                                                      │     │
-│  │  Features:                                           │     │
-│  │  • Weighted routing (canary)                         │     │
-│  │  • IAM-based auth (service-to-service)               │     │
-│  │  • Built-in monitoring (access logs, metrics)        │     │
-│  │  • No VPC Peering/Transit GW needed                  │     │
-│  └──────────────────────────────────────────────────────┘     │
-│                                                               │
-└───────────────────────────────────────────────────────────────┘
-```
+
+Service Network có thể liên kết nhiều VPC/accounts mà không cần VPC peering/Transit GW cho service access này. Có weighted routing, access logs/metrics và IAM auth khi được cấu hình; URL trong hình là tên minh họa, không phải suffix bắt buộc.
 
 **Khi nào dùng VPC Lattice?**
 
@@ -434,34 +363,20 @@ Cách **đơn giản nhất** — mỗi service hoặc nhóm services expose qua
 
 > ⚠️ **Lưu ý quan trọng (mốc thời gian cụ thể):** Theo tài liệu AWS, **AWS App Mesh sẽ End of Support vào ngày 30/09/2026**. Không nên chọn App Mesh cho workload mới (greenfield). Ưu tiên **ECS Service Connect** hoặc **VPC Lattice** tùy use case.
 
+```d2 title="3.5. App Mesh (Legacy, EoS 30/09/2026)"
+direction: down
+legacy: App Mesh — Legacy Reference {
+ virtual: Virtual Service — user-service
+ router: Virtual Router
+ v1: Virtual Node v1 { app: User App v1; envoy: Envoy Proxy; app -- envoy }
+ v2: Virtual Node v2 { app: User App v2; envoy: Envoy Proxy; app -- envoy }
+ virtual -> router
+ router -> v1: 90%
+ router -> v2: 10% Canary
+}
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                App Mesh (legacy)                             │
-│                                                              │
-│  ┌─── Virtual Service: user-service ───────────────────┐     │
-│  │                                                     │     │
-│  │  Virtual Router:                                    │     │
-│  │  ├── Route: 90% → Virtual Node v1 (user-svc-v1)     │     │
-│  │  └── Route: 10% → Virtual Node v2 (user-svc-v2)     │     │
-│  │                       ↑ Canary deployment!          │     │
-│  │                                                     │     │
-│  │  Virtual Node v1:                                   │     │
-│  │  ┌──────────┐  ┌───────┐                            │     │
-│  │  │ User App │──│ Envoy │  ← mTLS, circuit breaker   │     │
-│  │  │ (v1)     │  │ Proxy │    retry, timeout, tracing │     │
-│  │  └──────────┘  └───────┘                            │     │
-│  └─────────────────────────────────────────────────────┘     │
-│                                                              │
-│  Features:                                                   │
-│  • mTLS (mutual TLS) — service-to-service encryption         │
-│  • Traffic shifting — canary, blue/green                     │ 
-│  • Circuit breaker                                           │
-│  • Retry policies                                            │
-│  • Timeout policies                                          │
-│  • Access logging                                            │
-│  • Distributed tracing (X-Ray integration)                   │
-└──────────────────────────────────────────────────────────────┘
-```
+
+Tham khảo kiến trúc cũ: mTLS, traffic shifting, circuit-breaking/resource limits, retry/timeout, access logging và tracing theo proxy policy. Không chọn App Mesh cho triển khai mới; đối chiếu phần lifecycle/alternatives của bài.
 
 ### 3.6. So sánh các phương pháp Sync
 
@@ -604,41 +519,28 @@ n5 -> n8
 
 **EventBridge** = serverless event bus — routing events theo **rules** (content-based filtering).
 
+```d2 title="4.4. Amazon EventBridge — Event Bus"
+direction: right
+order: "Order Service"
+user: "User Service"
+payment: "Payment Service"
+aws: "AWS Services — ECS / S3 / ..."
+bus: "EventBridge Event Bus"
+inventory: "SQS — Inventory"
+saga: "Step Functions"
+welcome: "Lambda — Welcome"
+alert: "SNS — Alert"
+order -> bus: "Publish"
+user -> bus: "Publish"
+payment -> bus: "Publish"
+aws -> bus: "Service event integration"
+bus -> inventory: "Rule source=order / created"
+bus -> saga: "Rule source=order / paid"
+bus -> welcome: "Rule source=user / signup"
+bus -> alert: "Rule ECS task STOPPED"
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                    EventBridge Event Bus                           │
-│                                                                    │
-│  Event Sources              Event Bus            Targets           │
-│  ┌──────────┐               ┌──────┐                               │
-│  │ Order    │──publish────▶ │      │                               │
-│  │ Service  │               │      │  Rule 1: source=order,        │
-│  └──────────┘               │      │          detail-type=created  │
-│  ┌──────────┐               │ Event│  → Target: SQS (Inventory)    │
-│  │ User     │──publish────▶ │  Bus │                               │
-│  │ Service  │               │      │  Rule 2: source=order,        │
-│  └──────────┘               │      │          detail-type=paid     │
-│  ┌──────────┐               │      │  → Target: Step Functions     │
-│  │ Payment  │──publish────▶ │      │                               │
-│  │ Service  │               │      │  Rule 3: source=user,         │
-│  └──────────┘               │      │          detail-type=signup   │
-│                             │      │  → Target: Lambda (Welcome)   │
-│  ┌──────────┐               │      │                               │
-│  │ AWS Svcs │──auto────────▶│      │  Rule 4: source=aws.ecs,      │
-│  │(ECS,S3..)│               │      │          = TASK_STOPPED       │
-│  └──────────┘               └──────┘  → Target: SNS (Alert)        │
-│                                                                    │
-│  Event format (CloudEvents-like):                                  │
-│  {                                                                 │
-│    "source": "com.shopvn.order",                                   │
-│    "detail-type": "OrderCreated",                                  │
-│    "detail": {                                                     │
-│      "orderId": "ORD-123",                                         │
-│      "userId": "USR-456",                                          │
-│      "totalAmount": 500000                                         │
-│    }                                                               │
-│  }                                                                 │
-└────────────────────────────────────────────────────────────────────┘
-```
+
+Custom event ví dụ: `source=com.shopvn.order`, `detail-type=OrderCreated`, `detail={orderId:ORD-123,userId:USR-456,totalAmount:500000}`. Rule patterns phải match đúng source/detail-type thực tế; `TASK_STOPPED` là ý nghĩa minh họa, không mặc định một field hợp lệ cho mọi AWS event.
 
 **EventBridge vs SNS:**
 
@@ -664,29 +566,24 @@ n5 -> n8
 
 **MSK** = managed Apache Kafka trên AWS — **event streaming** (persistent log, replay, ordering).
 
+```d2 title="4.5. Amazon MSK (Managed Kafka)"
+direction: down
+order: Order Producer
+msk: MSK — Topic order-events {
+ p0: Partition0 — msg1 / msg2 / msg3 / msg4
+ p1: Partition1 — msg5 / msg6 / msg7
+ p2: Partition2 — msg8 / msg9
+}
+inventory: Group Inventory — ví dụ offset1042
+analytics: Group Analytics — ví dụ offset987
+search: Group Search Indexer — ví dụ offset1042
+order -> msk
+msk -> inventory
+msk -> analytics
+msk -> search
 ```
-┌───────────────────────────────────────────────────────────┐
-│                    MSK Cluster                            │
-│                                                           │
-│  ┌─── Topic: order-events ─────────────────────────┐      │
-│  │  Partition 0: [msg1][msg2][msg3][msg4]...       │      │
-│  │  Partition 1: [msg5][msg6][msg7]...             │      │
-│  │  Partition 2: [msg8][msg9]...                   │      │
-│  │                                                 │      │
-│  │  Retention: 7 days (configurable)               │      │
-│  │  → Consumers có thể replay từ bất kỳ offset     │      │
-│  └─────────────────────────────────────────────────┘      │
-│                                                           │
-│  Producer: Order Service → topic: order-events            │
-│  Consumer Group 1: Inventory Service (offset: 1042)       │
-│  Consumer Group 2: Analytics Service (offset: 987)        │
-│  Consumer Group 3: Search Indexer (offset: 1042)          │
-│                                                           │
-│  → Mỗi consumer group đọc ĐỘC LẬP, tiến độ riêng          │
-│  → Messages KHÔNG bị xóa khi đọc (log-based)              │
-│                                                           │
-└───────────────────────────────────────────────────────────┘
-```
+
+Retention ví dụ7ngày; reading không xóa messages ngay, groups có progress độc lập. Offsets thực tế là theo partition, không phải một scalar global offset của cả topic. Có thể replay trong retention window.
 
 **Khi nào dùng MSK thay SQS/SNS/EventBridge?**
 
@@ -780,51 +677,26 @@ shape: sequence_diagram
 
 **Step Functions** = managed workflow orchestration — define flow bằng state machine.
 
+```d2 title="5.2. Orchestration với Step Functions"
+direction: down
+start: "Start"
+reserve: "Reserve Stock — Inventory Lambda/ECS"
+charge: "Charge Payment"
+confirm: "Confirm Order"
+success: "Notify Success"
+fail: "Order Failed / Notify Customer"
+release: "Release Stock — Compensation"
+notifyfail: "Notify Failure"
+start -> reserve
+reserve -> charge: "Success"
+reserve -> fail: "Failure"
+charge -> confirm: "Success"
+charge -> release: "Failure"
+release -> notifyfail
+confirm -> success
 ```
-┌───────────────────────────────────────────────────────────────┐
-│              Step Functions: Order Workflow                   │
-│                                                               │
-│  ┌──────────┐                                                 │
-│  │  Start   │                                                 │
-│  └─────┬────┘                                                 │
-│        ▼                                                      │
-│  ┌──────────────┐                                             │
-│  │ Reserve Stock│──▶ Invoke: Inventory Lambda/ECS             │
-│  └──────┬───────┘                                             │
-│         │                                                     │
-│    ┌────▼────┐                                                │
-│    │ Success?│                                                │
-│    └┬───────┬┘                                                │
-│     │Yes    │No                                               │
-│     ▼       ▼                                                 │
-│  ┌──────┐ ┌─────────────┐                                     │
-│  │Charge│ │ Order Failed│──▶ Notify customer                  │
-│  │ Pay  │ └─────────────┘                                     │
-│  └──┬───┘                                                     │
-│     │                                                         │
-│  ┌──▼──────┐                                                  │
-│  │ Success?│                                                  │
-│  └┬───────┬┘                                                  │
-│   │Yes    │No                                                 │
-│   ▼       ▼                                                   │
-│ ┌───────┐ ┌─────────────────┐                                 │
-│ │Confirm│ │Release Stock    │ ← Compensation!                 │
-│ │ Order │ │(undo reserve)   │                                 │
-│ └──┬────┘ └────────┬────────┘                                 │
-│    ▼               ▼                                          │
-│ ┌──────┐    ┌───────────┐                                     │
-│ │Notify│    │Notify Fail│                                     │
-│ └──────┘    └───────────┘                                     │
-│                                                               │
-│  Features:                                                    │
-│  • Visual workflow editor                                     │
-│  • Built-in retry, catch, timeout per step                    │
-│  • Parallel execution                                         │
-│  • Wait states (human approval)                               │
-│  • Express mode: high throughput, lower cost                  │
-│  • Standard mode: exactly-once, audit trail                   │
-└──────────────────────────────────────────────────────────────┘
-```
+
+Step Functions hỗ trợ workflow editor, retry/catch/timeout, parallel/wait states. Standard/Express có execution/delivery semantics và costs khác nhau; Standard execution semantics không làm external payment side effect exactly-once. Tasks/compensation vẫn cần idempotency.
 
 **Step Functions: Standard vs Express:**
 
@@ -853,40 +725,20 @@ shape: sequence_diagram
 
 Vấn đề: Service cần **write DB** và **publish event** — cả 2 phải thành công hoặc cả 2 fail. Nhưng DB + SQS/EventBridge là 2 hệ thống khác nhau → không thể dùng transaction.
 
+```d2 title="5.3. Outbox Pattern trên AWS"
+direction: down
+order: Order Service — local transaction ghi orders + outbox
+options: Outbox Relay Alternatives {
+ dynamo: DynamoDB Streams → Lambda → EventBridge / SQS
+ polling: RDS Outbox → Polling Worker → Publish → Mark done
+ debezium: RDS WAL / Binlog → Debezium MSK Connect → Kafka
+}
+order -> options.dynamo: DynamoDB transaction variant
+order -> options.polling: RDS transaction variant
+order -> options.debezium: RDS CDC variant
 ```
-┌────────────────────────────────────────────────────────────────┐
-│           Outbox Pattern trên AWS                              │
-│                                                                │
-│  ┌─── Order Service ──────────────────────────────────┐        │
-│  │                                                    │        │
-│  │  1. BEGIN TRANSACTION                              │        │
-│  │     INSERT INTO orders (...)                       │        │
-│  │     INSERT INTO outbox (event_type, payload, ...)  │        │
-│  │  2. COMMIT                                         │        │
-│  │                                                    │        │
-│  └────────────────────────────────────────────────────┘        │
-│                                                                │
-│  ┌─── CDC (Change Data Capture) ──────────────────────┐        │
-│  │                                                    │        │
-│  │  Option A: DynamoDB Streams                        │        │
-│  │  outbox table (DynamoDB) → Stream → Lambda         │        │
-│  │  → Lambda publish to EventBridge/SQS               │        │
-│  │                                                    │        │
-│  │  Option B: RDS + Polling                           │        │
-│  │  Scheduled Lambda poll outbox table every 5s       │        │
-│  │  → Read unpublished events → publish → mark done   │        │
-│  │                                                    │        │
-│  │  Option C: MSK Connect (Debezium)                  │        │
-│  │  RDS binlog → Debezium connector → Kafka topic     │        │
-│  │  (Production-grade CDC)                            │        │
-│  │                                                    │        │
-│  └────────────────────────────────────────────────────┘        │
-│                                                                │
-│  → Event đảm bảo được publish nếu DB write thành công          │
-│  → Consumer phải handle idempotency (at-least-once)            │
-│                                                                │
-└────────────────────────────────────────────────────────────────┘
-```
+
+Relay cần retry/recovery và consumer idempotency vì at-least-once. Poll mỗi5giây là interval worker minh họa, không phải một EventBridge Scheduler cron precision bảo đảm5giây.
 
 ### 5.4. Dead Letter Queue (DLQ)
 
@@ -947,52 +799,55 @@ Message Group: "order-789"  → [created] → [paid]                (ordered)
 
 ### Tổng quan giao tiếp giữa các services
 
+```d2 title="Tổng quan giao tiếp giữa các services"
+direction: down
+ingress: CloudFront → API Gateway HTTP API → VPC Link
+sync: Service Connect — Sync {
+ order: Order
+ user: User
+ product: Product
+ inventory: Inventory
+ cart: Cart
+ promotion: Promotion
+ order -> user: Validate user
+ order -> product: Get price / Validate
+ order -> inventory: Check stock
+ cart -> product: Details
+ cart -> promotion: Apply voucher
+}
+async: EventBridge + SQS / SNS {
+ order: Order
+ payment: Payment
+ inventory: Inventory
+ bus: EventBridge
+ stock: SQS → Inventory reserve
+ noti: SQS → Notification email
+ confirm: SQS → Order confirm
+ ship: SQS → Shipping create
+ ops: SNS → Ops Team
+ order -> bus: OrderCreated
+ payment -> bus: PaymentCompleted
+ inventory -> bus: LowStock
+ bus -> stock: OrderCreated
+ bus -> noti: OrderCreated
+ bus -> confirm: PaymentCompleted
+ bus -> ship: PaymentCompleted
+ bus -> ops: LowStock
+}
+saga: Step Functions — Orchestration alternative {
+ create: Create Order
+ reserve: Reserve Stock
+ charge: Charge Payment
+ confirm: Confirm
+ compensation: Compensation theo các bước đã commit
+ create -> reserve -> charge -> confirm
+ reserve -> compensation: Failure
+ charge -> compensation: Failure
+}
+ingress -> sync.order
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                E-COMMERCE COMMUNICATION MAP                          │
-│                                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐     │
-│  │ INGRESS: CloudFront → API Gateway (HTTP API) → VPC Link     │     │
-│  └──────────────────────────┬──────────────────────────────────┘     │
-│                             │                                        │
-│  ┌──── SYNC (Service Connect) ──────────────────────────────────┐    │
-│  │                                                              │    │
-│  │  Order ──sync──▶ User (validate user)                        │    │
-│  │  Order ──sync──▶ Product (get price, validate)               │    │
-│  │  Order ──sync──▶ Inventory (check stock)                     │    │
-│  │  Cart  ──sync──▶ Product (get product details)               │    │
-│  │  Cart  ──sync──▶ Promotion (apply voucher)                   │    │
-│  │                                                              │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-│                                                                      │
-│  ┌──── ASYNC (EventBridge + SQS) ───────────────────────────────┐    │
-│  │                                                              │    │
-│  │  Order ──event──▶ EventBridge ──rule──▶ SQS → Inventory      │    │
-│  │         "OrderCreated"                  (reserve stock)      │    │
-│  │                             ──rule──▶ SQS → Notification     │    │
-│  │                                        (confirmation email)  │    │
-│  │                                                              │    │
-│  │  Payment ──event──▶ EventBridge ──rule──▶ SQS → Order        │    │
-│  │           "PaymentCompleted"             (confirm order)     │    │
-│  │                               ──rule──▶ SQS → Shipping       │    │
-│  │                                         (create shipment)    │    │
-│  │                                                              │    │
-│  │  Inventory ──event──▶ EventBridge ──rule──▶ SNS → Ops Team   │    │
-│  │             "LowStock"                     (alert)           │    │
-│  │                                                              │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-│                                                                      │
-│  ┌──── ORCHESTRATION (Step Functions) ──────────────────────────┐    │
-│  │                                                              │    │
-│  │  Order Saga:                                                 │    │
-│  │  Create Order → Reserve Stock → Charge Payment → Confirm     │    │
-│  │       ↓ (fail)      ↓ (fail)       ↓ (fail)                  │    │
-│  │  [Cancel Order] [Release Stock] [Refund Payment]             │    │
-│  │                                                              │    │
-│  └──────────────────────────────────────────────────────────────┘    │
-│                                                                      │
-└──────────────────────────────────────────────────────────────────────┘
-```
+
+Các khối minh họa sync, event fan-out và orchestration; không phải luôn chạy cả choreography lẫn coordinator cho cùng một command. Compensation phải đảo đúng các bước đã thành công (release reserve, refund nếu đã charge, cancel order), không phải mọi fail đều gọi cùng một undo.
 
 ### Bảng tổng hợp — Service nào giao tiếp thế nào?
 

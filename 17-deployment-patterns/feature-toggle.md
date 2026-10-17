@@ -208,10 +208,19 @@ Telemetry nên có ít nhất `flag key`, variant hoặc trạng thái `ON/OFF`,
 
 Một flag không chỉ là một biến boolean. Nó có vòng đời từ lúc được thiết kế, đưa lên production, mở rộng, rồi được gỡ bỏ hoặc chuyển sang chế độ quản trị lâu dài.
 
-```text
-Planned → Implemented → Deployed OFF → Rolling out
-                                      ↓
-                         Fully enabled → Retired / Removed
+```d2 title="Vòng đời của flag"
+direction: right
+planned: "Planned"
+implemented: "Implemented"
+off: "Deployed OFF"
+rollout: "Rolling Out"
+on: "Fully Enabled"
+retired: "Retired / Removed"
+planned -> implemented
+implemented -> off
+off -> rollout
+rollout -> on
+on -> retired
 ```
 
 ### Định nghĩa flag trước khi viết code

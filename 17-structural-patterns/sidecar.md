@@ -127,17 +127,24 @@ Trong Kubernetes, **DaemonSet** thường phù hợp cho việc thu gom log chun
 
 Lifecycle của sidecar phải được thiết kế cùng lifecycle của application. Một lỗi phổ biến là chỉ kiểm tra lúc Pod đang chạy ổn định mà bỏ qua giai đoạn khởi động, drain và thay thế Pod.
 
-```mermaid
-stateDiagram-v2
-    [*] --> Starting
-    Starting --> Ready: config và probe đạt
-    Starting --> Terminated: startup failure
-    Ready --> Degraded: sidecar lỗi theo failure policy
-    Degraded --> Ready: sidecar hồi phục
-    Ready --> Draining: Pod nhận tín hiệu terminate
-    Degraded --> Draining: Pod nhận tín hiệu terminate
-    Draining --> Terminated: flush và connection drain xong
-    Terminated --> [*]
+```d2 title="Lifecycle và đơn vị triển khai"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+Starting: "Starting"
+initial1 -> Starting
+Ready: "Ready"
+Starting -> Ready: "config và probe đạt"
+Terminated: "Terminated"
+Starting -> Terminated: "startup failure"
+Degraded: "Degraded"
+Ready -> Degraded: "sidecar lỗi theo failure policy"
+Degraded -> Ready: "sidecar hồi phục"
+Draining: "Draining"
+Ready -> Draining: "Pod nhận tín hiệu terminate"
+Degraded -> Draining: "Pod nhận tín hiệu terminate"
+Draining -> Terminated: "flush và connection drain xong"
+final2: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+Terminated -> final2
 ```
 
 ### Khởi động và readiness

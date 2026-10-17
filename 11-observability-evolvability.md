@@ -64,20 +64,26 @@ Trong các doc trước, chúng ta đã tìm hiểu cách thiết kế hệ th�
 
 Trong monolith, khi có lỗi → kiểm tra 1 log file, debug 1 process. Trong microservice, một request có thể đi qua **10-20 service** khác nhau:
 
+```d2 title="1.1. Tại sao Observability quan trọng?"
+direction: right
+user: "User"
+gateway: "API Gateway"
+order: "Order"
+inventory: "Inventory"
+payment: "Payment"
+notification: "Notification"
+warehouse: "Warehouse"
+bank: "Bank API"
+user -> gateway
+gateway -> order
+order -> inventory
+inventory -> payment
+order -> notification
+inventory -> warehouse
+payment -> bank
 ```
-┌─────────────────────────────────────────────────────────────┐
-│          MỘT REQUEST ĐI QUA NHIỀU SERVICES                  │
-│                                                             │
-│   User ──▶ API GW ──▶ Order ──▶ Inventory ──▶ Payment       │
-│                          │          │            │          │
-│                          ▼          ▼            ▼          │
-│                       Notification  Warehouse   Bank API    │
-│                                                             │
-│   ❓ Request chậm → Lỗi ở đâu? Service nào?                 │
-│   ❓ Latency tăng → Bottleneck ở service nào?               │
-│   ❓ Error rate tăng → Ảnh hưởng bao nhiêu user?            │
-└─────────────────────────────────────────────────────────────┘
-```
+
+Observability giúp xác định service lỗi/chậm, bottleneck và phạm vi users bị ảnh hưởng.
 
 Không có Observability, việc debug trong microservice giống như **tìm kim trong đống rơm — trong bóng tối**.
 
@@ -494,26 +500,14 @@ Hai phương pháp phổ biến để chọn metrics cần theo dõi:
 
 Google SRE (Site Reliability Engineering) đề xuất **4 tín hiệu vàng** cần theo dõi:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│              FOUR GOLDEN SIGNALS (Google SRE)               │
-│                                                             │
-│   ┌──────────────┐    ┌──────────────┐                      │
-│   │   LATENCY    │    │   TRAFFIC    │                      │
-│   │              │    │              │                      │
-│   │  Thời gian   │    │  Lưu lượng   │                      │
-│   │  phản hồi    │    │  request     │                      │
-│   │  P50 / P99   │    │  req/sec     │                      │
-│   └──────────────┘    └──────────────┘                      │
-│                                                             │
-│   ┌──────────────┐    ┌──────────────┐                      │
-│   │    ERRORS    │    │  SATURATION  │                      │
-│   │              │    │              │                      │
-│   │  Tỷ lệ lỗi   │    │  Mức độ      │                      │
-│   │  5xx / total │    │  quá tải     │                      │
-│   │  error rate  │    │  % resource  │                      │
-│   └──────────────┘    └──────────────┘                      │
-└─────────────────────────────────────────────────────────────┘
+```d2 title="3.4. Four Golden Signals (Google SRE)"
+direction: right
+signals: Four Golden Signals {
+ latency: Latency — Thời gian phản hồi P50 / P99
+ traffic: Traffic — Request/giây
+ errors: Errors — Tỷ lệ lỗi 5xx / total
+ saturation: Saturation — Mức sử dụng / Quá tải tài nguyên
+}
 ```
 
 | Signal | Mô tả | Metric ví dụ |
@@ -676,20 +670,19 @@ groups:
 
 **Alert routing (AlertManager):**
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                  ALERT ROUTING                           │
-│                                                          │
-│   Prometheus ──▶ AlertManager ──┬──▶ Slack (#alerts)     │
-│                                 ├──▶ PagerDuty (on-call) │
-│                                 ├──▶ Email (team lead)   │
-│                                 └──▶ Webhook (auto-fix)  │
-│                                                          │
-│   Routing rules:                                         │
-│   ├── severity: critical → PagerDuty + Slack             │
-│   ├── severity: warning  → Slack only                    │
-│   └── severity: info     → Email digest                  │
-└──────────────────────────────────────────────────────────┘
+```d2 title="3.7. Alerting — Cảnh báo"
+direction: right
+prom: "Prometheus"
+am: "Alertmanager"
+slack: "Slack — #alerts"
+pager: "PagerDuty — on-call"
+email: "Email — team lead / digest"
+hook: "Webhook — auto-fix"
+prom -> am
+am -> slack: "Critical / Warning"
+am -> pager: "Critical"
+am -> email: "Info"
+am -> hook: "Automation rule"
 ```
 
 ### 3.8. Ví dụ thực tế — Dashboard cho Order Service
@@ -759,27 +752,22 @@ Notification         Send email                                                 
 
 **Có.** Một trace không chỉ theo dõi HTTP/gRPC synchronous calls mà còn bao gồm cả **asynchronous messaging** qua Kafka, RabbitMQ, SQS,... Khi service A publish message lên Kafka và service B consume message đó, cả hai đều thuộc **cùng một trace**.
 
+```d2 title="Trace có bao gồm Async Messaging (Kafka, RabbitMQ,...) không?"
+direction: right
+user: "User"
+order: "Order Service"
+payment: "Payment Service"
+kafka: "Kafka Topic"
+notification: "Notification Service"
+email: "Email Service"
+user -> order
+order -> payment: "Sync HTTP"
+order -> kafka: "Publish + trace context"
+kafka -> notification: "Consume — có thể sau giây/phút"
+notification -> email: "Sync gRPC"
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│         TRACE BAO GỒM CẢ SYNC + ASYNC                           │
-│                                                                 │
-│  User ──▶ Order Service ──▶ Payment Service    (Sync: HTTP)     │
-│                │                                                │
-│                │ publish                                        │
-│                ▼                                                │
-│           ┌─────────┐                                           │
-│           │  Kafka  │                                           │
-│           │  Topic  │                                           │
-│           └────┬────┘                                           │
-│                │ consume (có thể SAU vài giây/phút)             │
-│                ▼                                                │
-│           Notification Service ──▶ Email Service  (Sync: gRPC)  │
-│                                                                 │
-│  ──────────────────────────────────────────────────             │
-│  Tất cả đều thuộc CÙNG 1 TRACE (cùng Trace ID)                  │
-│  Nhưng spans cho async sẽ có GAP về thời gian                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Ví dụ propagate cùng Trace ID qua sync và async nên spans có thể có gap chờ queue. Với batch/fan-in hoặc xử lý async dài, có thể dùng span links và traces riêng theo observability policy.
 
 **Cách hoạt động với async messaging:**
 
@@ -865,31 +853,22 @@ Theo chuẩn [W3C Trace Context](https://www.w3.org/TR/trace-context/), trace co
 
 #### Quá trình tạo Trace và Span — Từng bước
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant A as API Gateway
-    participant B as Order Service
-    participant K as Kafka
-    participant C as Notification Service
-
-    U->>A: POST /orders (không có traceparent)
-
-    Note over A: 1️⃣ Tạo Trace ID: abc123<br/>2️⃣ Tạo Span ID: span-A<br/>3️⃣ Ghi nhận: start_time = now()
-
-    A->>B: Forward request<br/>traceparent: 00-abc123-spanA-01
-
-    Note over B: 4️⃣ Parse traceparent header<br/>→ Trace ID = abc123 (giữ nguyên)<br/>→ Parent Span = span-A<br/>5️⃣ Tạo Span ID mới: span-B<br/>6️⃣ Ghi nhận: start_time = now()
-
-    B->>K: Publish message<br/>Header: traceparent = 00-abc123-spanB-01
-
-    Note over K: Message nằm trong queue<br/>traceparent được lưu<br/>trong Kafka message headers
-
-    K->>C: Consume message<br/>Header: traceparent = 00-abc123-spanB-01
-
-    Note over C: 7️⃣ Parse traceparent từ message header<br/>→ Trace ID = abc123 (giữ nguyên)<br/>→ Parent Span = span-B<br/>8️⃣ Tạo Span ID mới: span-C<br/>9️⃣ Ghi nhận: start_time = now()
-
-    Note over A,C: Tất cả spans có CÙNG Trace ID = abc123<br/>→ Ghép lại thành 1 trace hoàn chỉnh
+```d2 title="Quá trình tạo Trace và Span — Từng bước"
+shape: sequence_diagram
+"U": "User"
+"A": "API Gateway"
+"B": "Order Service"
+"K": "Kafka"
+"C": "Notification Service"
+"U" -> "A": "POST /orders (không có traceparent)"
+"A".note1: "1️⃣ Tạo Trace ID: abc123\n2️⃣ Tạo Span ID: span-A\n3️⃣ Ghi nhận: start_time = now()"
+"A" -> "B": "Forward request\ntraceparent: 00-abc123-spanA-01"
+"B".note2: "4️⃣ Parse traceparent header\n→ Trace ID = abc123 (giữ nguyên)\n→ Parent Span = span-A\n5️⃣ Tạo Span ID mới: span-B\n6️⃣ Ghi nhận: start_time = now()"
+"B" -> "K": "Publish message\nHeader: traceparent = 00-abc123-spanB-01"
+"K".note3: "Message nằm trong queue\ntraceparent được lưu\ntrong Kafka message headers"
+"K" -> "C": "Consume message\nHeader: traceparent = 00-abc123-spanB-01"
+"C".note4: "7️⃣ Parse traceparent từ message header\n→ Trace ID = abc123 (giữ nguyên)\n→ Parent Span = span-B\n8️⃣ Tạo Span ID mới: span-C\n9️⃣ Ghi nhận: start_time = now()"
+"A".note5: "[API Gateway — Notification Service]\nTất cả spans có CÙNG Trace ID = abc123\n→ Ghép lại thành 1 trace hoàn chỉnh"
 ```
 
 **Chi tiết từng bước:**
@@ -1069,25 +1048,27 @@ Tracing mọi request sẽ tạo ra **rất nhiều data** và ảnh hưởng pe
 | **Adaptive Sampling** | Tự động điều chỉnh tỷ lệ | Production lớn, traffic thay đổi |
 | **Always Sample Errors** | Luôn trace khi có lỗi | Đảm bảo không miss lỗi |
 
-```
-┌─────────────────────────────────────────────────────────┐
-│              SAMPLING STRATEGIES                        │
-│                                                         │
-│  Head-based (1% sample):                                │
-│  Request ──▶ [Sample?] ──▶ YES ──▶ Trace đầy đủ         │
-│                 │                                       │
-│                 └──▶ NO ──▶ Không trace                 │
-│                                                         │
-│  Tail-based:                                            │
-│  Request ──▶ Trace tạm ──▶ [Hoàn thành] ──▶ Đánh giá    │
-│                                    │                    │
-│                              ┌─────┴─────┐              │
-│                              │ Chậm/Lỗi? │              │
-│                              └─────┬─────┘              │
-│                             YES    │    NO              │
-│                              ▼     │     ▼              │
-│                           Lưu lại  │  Bỏ đi             │
-└─────────────────────────────────────────────────────────┘
+```d2 title="4.7. Sampling Strategies"
+direction: down
+head: Head-based — ví dụ 1% {
+ request: Request
+ decide: Sample?
+ trace: Record trace
+ no: Không record
+ request -> decide
+ decide -> trace: Yes
+ decide -> no: No
+}
+tail: Tail-based {
+ request: Request
+ buffer: Buffer trace tạm
+ complete: Hoàn thành — đánh giá chậm / lỗi?
+ keep: Giữ lại
+ drop: Bỏ
+ request -> buffer -> complete
+ complete -> keep: Yes
+ complete -> drop: No
+}
 ```
 
 ### 4.8. Ví dụ thực tế — Trace một request đặt hàng
@@ -1131,43 +1112,28 @@ api-gateway         POST /api/orders         8.2s      OK
 
 ### 5.1. Kiến trúc tổng quan
 
+```d2 title="5.1. Kiến trúc tổng quan"
+direction: down
+services: Instrumented Services — OTel { a: Service A; b: Service B; c: Service C; d: Service D }
+logs: Loki / ELK — Logs
+metrics: Prometheus — Metrics
+traces: Jaeger — Traces
+grafana: Grafana — Unified UI {
+ logs: Logs Panel
+ traces: Trace Panel
+ metrics: Metrics Panel
+ alerts: Alert Panel
+}
+services -> logs: Logs
+services -> metrics: Metrics
+services -> traces: Traces
+logs -> grafana.logs
+metrics -> grafana.metrics
+traces -> grafana.traces
+metrics -> grafana.alerts
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                   OBSERVABILITY STACK TỔNG HỢP                       │
-│                                                                      │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐              │
-│  │ Service A│  │ Service B│  │ Service C│  │ Service D│              │
-│  │ (OTel)   │  │ (OTel)   │  │ (OTel)   │  │ (OTel)   │              │
-│  └──┬──┬──┬─┘  └──┬──┬──┬─┘  └──┬──┬──┬─┘  └──┬──┬──┬─┘              │
-│     │  │  │       │  │  │       │  │  │       │  │  │                │
-│     │  │  └───────┼──┼──┼───────┼──┼──┼───────┼──┼──┘                │
-│     │  └──────────┼──┼──┼───────┼──┼──┘       │  │   Logs            │
-│     └─────────────┼──┼──┘       │  │          │  │   Metrics         │
-│                   │  │          │  │          │  │   Traces          │
-│         ┌─────────┘  └──────┐   │  │    ┌─────┘  │                   │
-│         ▼                   ▼   ▼  ▼    ▼        ▼                   │
-│  ┌──────────────┐  ┌────────────────┐  ┌──────────────┐              │
-│  │  Loki / ELK  │  │  Prometheus    │  │    Jaeger    │              │
-│  │   (Logs)     │  │  (Metrics)     │  │  (Traces)    │              │
-│  └──────┬───────┘  └───────┬────────┘  └──────┬───────┘              │
-│         │                  │                  │                      │
-│         └──────────────────┼──────────────────┘                      │
-│                            ▼                                         │
-│                   ┌─────────────────┐                                │
-│                   │     GRAFANA     │                                │
-│                   │  (Unified UI)   │                                │
-│                   │                 │                                │
-│                   │ ┌─────┐┌─────┐  │                                │
-│                   │ │Logs ││Trace│  │                                │
-│                   │ │Panel││Panel│  │                                │
-│                   │ └─────┘└─────┘  │                                │
-│                   │ ┌──────┐┌─────┐ │                                │
-│                   │ │Metric││Alert│ │                                │
-│                   │ │Panel ││Panel│ │                                │
-│                   │ └──────┘└─────┘ │                                │
-│                   └─────────────────┘                                │
-└──────────────────────────────────────────────────────────────────────┘
-```
+
+Các đường telemetry là logical pipelines; collector/exporter cụ thể phụ thuộc deployment và backend integration.
 
 ### 5.2. Correlating Logs, Metrics, Traces
 
@@ -1253,16 +1219,23 @@ Trong Kubernetes, có 3 loại probe để kiểm tra trạng thái service:
 | **Readiness** | Service có **sẵn sàng** nhận traffic không? | K8s ngừng gửi traffic |
 | **Startup** | Service đã **khởi động xong** chưa? | K8s chờ thêm hoặc restart |
 
-```mermaid
-stateDiagram-v2
-    [*] --> Starting: Container created
-    Starting --> Ready: Startup probe ✅<br/>Readiness probe ✅
-    Starting --> CrashLoop: Startup probe ❌<br/>(quá số lần retry)
-    Ready --> Serving: Liveness ✅ + Readiness ✅
-    Serving --> NotReady: Readiness ❌<br/>(DB connection lost)
-    NotReady --> Serving: Readiness ✅<br/>(DB reconnected)
-    Serving --> Restarting: Liveness ❌<br/>(deadlock detected)
-    Restarting --> Starting: Container restarted
+```d2 title="6.1. Liveness vs Readiness vs Startup Probes"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+Starting: "Starting"
+initial1 -> Starting: "Container created"
+Ready: "Ready"
+Starting -> Ready: "Startup probe ✅\nReadiness probe ✅"
+CrashLoop: "CrashLoop"
+Starting -> CrashLoop: "Startup probe ❌\n(quá số lần retry)"
+Serving: "Serving"
+Ready -> Serving: "Liveness ✅ + Readiness ✅"
+NotReady: "NotReady"
+Serving -> NotReady: "Readiness ❌\n(DB connection lost)"
+NotReady -> Serving: "Readiness ✅\n(DB reconnected)"
+Restarting: "Restarting"
+Serving -> Restarting: "Liveness ❌\n(deadlock detected)"
+Restarting -> Starting: "Container restarted"
 ```
 
 ### 6.2. Health Check Endpoint Design
@@ -1323,21 +1296,14 @@ GET /health          → Tổng hợp (chi tiết)
 
 Evolvability là khả năng hệ thống **thay đổi và phát triển** theo thời gian mà không phá vỡ những gì đang hoạt động. Trong microservice, mỗi service có lifecycle riêng → cần cơ chế để **phát triển độc lập**.
 
+```d2 title="7.1. Evolvability là gì?"
+direction: right
+a: "Service A — v2.0"
+b: "Service B — v1.5"
+a -> b: "API call"
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                  EVOLVABILITY CHALLENGES                    │
-│                                                             │
-│   ┌──────────┐         ┌──────────┐                         │
-│   │ Service A│────────▶│ Service B│                         │
-│   │ v2.0     │  API    │ v1.5     │                         │
-│   └──────────┘  call   └──────────┘                         │
-│                                                             │
-│   ❓ A muốn thêm field mới → B có bị ảnh hưởng?             │
-│   ❓ A muốn đổi API format → Làm sao không break B?         │
-│   ❓ A muốn deploy tính năng mới → Rollback nếu lỗi?        │
-│   ❓ B muốn upgrade → Consumer contracts có đảm bảo?        │
-└─────────────────────────────────────────────────────────────┘
-```
+
+Cần kiểm chứng: thêm field/đổi format có break consumer không; feature mới có rollback được không; khi provider upgrade, consumer contracts còn pass không.
 
 ### 7.2. API Versioning
 
@@ -1406,26 +1372,19 @@ Response: {
 
 Contract Testing đảm bảo **provider** không break **consumer** khi thay đổi API:
 
-```mermaid
-sequenceDiagram
-    participant C as Consumer<br/>(Order Service)
-    participant P as Provider<br/>(Payment Service)
-    participant B as Contract Broker<br/>(Pact Broker)
-
-    Note over C: Consumer viết contract test
-    C->>B: Publish contract<br/>"Tôi cần field: id, amount, status"
-
-    Note over P: Provider verify contract
-    B->>P: Download contract
-    P->>P: Run verification<br/>"API của tôi có trả đúng<br/>id, amount, status không?"
-
-    alt Contract pass ✅
-        P->>B: Verification passed
-        Note over P: Safe to deploy
-    else Contract fail ❌
-        P->>B: Verification failed
-        Note over P: Fix trước khi deploy!
-    end
+```d2 title="7.4. Consumer-Driven Contract Testing"
+direction: right
+consumer: "Consumer — Order Service\nViết contract: id, amount, status"
+broker: "Pact Broker\nPublish contract"
+provider: "Provider — Payment Service\nDownload contract"
+verify: "Run verification\nAPI có trả đúng id, amount, status?"
+pass: "Publish Verification passed\nSafe to deploy"
+fail: "Publish Verification failed\nFix trước khi deploy"
+consumer -> broker
+broker -> provider
+provider -> verify
+verify -> pass: "Contract pass"
+verify -> fail: "Contract fail"
 ```
 
 **Công cụ phổ biến:**
@@ -1437,36 +1396,15 @@ sequenceDiagram
 
 Feature Flags (hay Feature Toggles) cho phép **bật/tắt tính năng** mà không cần deploy lại:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    FEATURE FLAGS                            │
-│                                                             │
-│   ┌──────────────────────────────────────────┐              │
-│   │           Feature Flag Service           │              │
-│   │                                          │              │
-│   │  new_checkout_flow:                      │              │
-│   │    enabled: true                         │              │
-│   │    rollout: 25%        ← 25% users       │              │
-│   │    whitelist: [beta_users]               │              │
-│   │                                          │              │
-│   │  payment_v2:                             │              │
-│   │    enabled: true                         │              │
-│   │    rollout: 100%       ← All users       │              │
-│   │                                          │              │
-│   │  dark_mode:                              │              │
-│   │    enabled: false      ← Off             │              │
-│   └─────────────────┬────────────────────────┘              │
-│                     │                                       │
-│            ┌────────┼────────┐                              │
-│            ▼        ▼        ▼                              │
-│       ┌────────┐┌────────┐┌────────┐                        │
-│       │ Svc A  ││ Svc B  ││ Svc C  │                        │
-│       │if flag ││if flag ││if flag │                        │
-│       │→ new   ││→ new   ││→ new   │                        │
-│       │else    ││else    ││else    │                        │
-│       │→ old   ││→ old   ││→ old   │                        │
-│       └────────┘└────────┘└────────┘                        │
-└─────────────────────────────────────────────────────────────┘
+```d2 title="7.5. Feature Flags"
+direction: right
+flags: "Feature Flag Service\nnew_checkout_flow: enabled, rollout25%, beta_users\npayment_v2: enabled, rollout100%\ndark_mode: disabled"
+a: "Service A — if flag new, else old"
+b: "Service B — if flag new, else old"
+c: "Service C — if flag new, else old"
+flags -> a
+flags -> b
+flags -> c
 ```
 
 **Các loại Feature Flags:**
@@ -1542,41 +1480,20 @@ n3.n13 -> n3.n15: "100%"
 
 ### 7.7. Ví dụ thực tế — Phát triển Payment Service v2
 
+```d2 title="7.7. Ví dụ thực tế — Phát triển Payment Service v2"
+direction: down
+prepare: "Tuần 1–2 — Chuẩn bị\nConsumer contracts v1 • Inventory consumers\nFlag payment_v2_enabled • Build v2 parallel v1"
+canary: "Tuần 3 — Canary5%\nDeploy v2 cạnh v1 • Monitor errors/latency/business\nCompare traces • Fix bugs"
+rollout: "Tuần 4–5 — 5→25→50→75→100%\nMonitor24–48h mỗi bước\nRollback metrics xấu • Update contracts"
+deprecate: "Tuần6 — Deprecate v1\nThông báo consumers • Sunset header\nWarning requests v1"
+remove: "Tuần10 — Decommission\nVerify zero traffic v1\nRemove code/infra • Update docs"
+prepare -> canary
+canary -> rollout
+rollout -> deprecate
+deprecate -> remove
 ```
-Scenario: Payment Service cần upgrade từ v1 (REST) → v2 (gRPC + thêm features)
 
-Timeline:
-
-Week 1-2: CHUẨN BỊ
-├── Viết Consumer-Driven Contract tests cho v1
-├── Xác định tất cả consumers của Payment API
-├── Thiết lập Feature Flag "payment_v2_enabled"
-└── Build Payment Service v2 (parallel với v1)
-
-Week 3: CANARY RELEASE
-├── Deploy v2 bên cạnh v1
-├── Route 5% traffic → v2 (via Feature Flag)
-├── Monitor: error rate, latency, business metrics
-├── So sánh traces v1 vs v2
-└── Fix bugs phát hiện được
-
-Week 4-5: GRADUAL ROLLOUT
-├── 5% → 25% → 50% → 75% → 100%
-├── Mỗi bước: monitor 24-48h
-├── Rollback nếu metrics xấu
-└── Cập nhật contract tests
-
-Week 6: DEPRECATION
-├── Đánh dấu v1 deprecated
-├── Thông báo consumers chuyển sang v2
-├── Deprecated header: Sunset: Sat, 01 Mar 2025
-└── Log warning cho requests tới v1
-
-Week 10: DECOMMISSION
-├── Verify không còn traffic tới v1
-├── Remove v1 code và infrastructure
-└── Cập nhật documentation
-```
+Migration minh họa Payment REST v1 sang gRPC v2. Sunset date phải là HTTP-date hợp lệ theo lịch thực tế; không dùng cứng ngày trong ví dụ cũ cho production.
 
 ---
 

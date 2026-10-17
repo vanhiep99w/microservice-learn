@@ -60,22 +60,26 @@ EDA giải quyết chủ yếu hai dạng phụ thuộc:
 
 Với direct call qua REST hoặc gRPC, caller thường phải giữ kết nối và chờ callee phản hồi:
 
-```text
-Order Service ──sync──▶ Payment Service
-      │                       │
-      │                       └─ Payment Service down
-      └─ request thất bại hoặc bị timeout
+```d2 title="Temporal coupling"
+direction: right
+order: "Order Service"
+payment: "Payment Service DOWN"
+error: "Caller request fail / Timeout"
+order -> payment: "Sync"
+payment -> error
 ```
 
 Đây là **temporal coupling** — coupling về thời gian. Payment Service có thể không liên quan đến lỗi của Order Service, nhưng Order vẫn không thể hoàn tất request nếu payment là bước bắt buộc.
 
 Với một event cho tác vụ có thể xử lý nền:
 
-```text
-Order Service ──publish──▶ Broker ──deliver──▶ Payment Service
-       │                      │                    │
-       └─ có thể trả về        └─ giữ event         └─ xử lý khi sẵn sàng
-          trạng thái pending      theo policy
+```d2 title="Temporal coupling"
+direction: right
+order: "Order — có thể trả pending"
+broker: "Broker — giữ event theo retention/retry policy"
+payment: "Payment — xử lý khi sẵn sàng"
+order -> broker: "Publish"
+broker -> payment: "Deliver"
 ```
 
 Broker tạo một vùng đệm giữa producer và consumer. Vùng đệm này không làm mất yêu cầu retry, timeout hoặc theo dõi trạng thái; nó chỉ tách thời điểm hai service phải hoạt động.
@@ -84,28 +88,39 @@ Broker tạo một vùng đệm giữa producer và consumer. Vùng đệm này 
 
 Nếu Order Service gọi trực tiếp nhiều service, mỗi consumer mới làm producer phải biết thêm một dependency:
 
-```text
-❌ Direct fan-out:
-
-Order ──▶ Payment
-      ├─▶ Inventory
-      ├─▶ Notification
-      └─▶ Analytics
-
-Thêm Fraud Service → phải sửa và deploy lại Order Service.
+```d2 title="Fan-out và sync chain"
+direction: right
+order: "Order"
+payment: "Payment"
+inventory: "Inventory"
+notification: "Notification"
+analytics: "Analytics"
+order -> payment
+order -> inventory
+order -> notification
+order -> analytics
 ```
+
+Direct fan-out: thêm Fraud consumer thường phải đổi và deploy lại Order caller.
 
 Trong EDA, một event có thể được nhiều consumer nhận:
 
-```text
-✅ Event fan-out:
-
-Order ──publish OrderCreated──▶ Broker
-                                  ├─▶ Payment
-                                  ├─▶ Inventory
-                                  ├─▶ Notification
-                                  └─▶ Analytics
+```d2 title="Fan-out và sync chain"
+direction: right
+order: "Order"
+payment: "Payment"
+inventory: "Inventory"
+notification: "Notification"
+analytics: "Analytics"
+broker: "Event Broker"
+order -> broker: "Publish OrderCreated"
+broker -> payment
+broker -> inventory
+broker -> notification
+broker -> analytics
 ```
+
+Event fan-out cho phép thêm subscriber không đổi producer.
 
 EDA cũng giảm các **sync chain** dài như `A → B → C → D`. Tuy nhiên, không phải bước nào cũng nên chuyển thành event. Nếu caller cần kết quả ngay để quyết định bước tiếp theo, direct call có thể rõ ràng và phù hợp hơn.
 

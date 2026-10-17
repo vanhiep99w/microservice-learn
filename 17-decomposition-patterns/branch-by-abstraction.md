@@ -51,9 +51,15 @@ Pattern này đặc biệt hữu ích khi phần cần thay thế nằm sâu tro
 
 Từ **branch** trong tên pattern chỉ nhánh rẽ của implementation nằm sau abstraction. Nó không chỉ một Git branch.
 
-```text
-Caller ──▶ Abstraction layer ──┬──▶ Implementation cũ
-                               └──▶ Implementation mới
+```d2 title="Branch không phải Git branch"
+direction: right
+caller: "Caller"
+abstraction: "Abstraction Layer"
+old: "Old Implementation"
+new: "New Implementation"
+caller -> abstraction
+abstraction -> old
+abstraction -> new
 ```
 
 Các thay đổi vẫn được merge vào `main` theo từng bước nhỏ. Feature flag hoặc cấu hình runtime điều khiển nhánh thực thi. Đây là cách tiếp cận phù hợp với **trunk-based development** và Continuous Delivery.
@@ -99,10 +105,15 @@ Trong sơ đồ này, `PaymentProcessor` không nói caller phải dùng SDK nà
 
 Trước migration, nhiều caller thường giữ dependency trực tiếp tới implementation cụ thể:
 
-```text
-OrderController ────────┐
-RefundJob ──────────────┼──▶ LegacyPaymentGateway
-SubscriptionRenewal  ───┘
+```d2 title="Trạng thái trước khi tách"
+direction: right
+order: "OrderController"
+refund: "RefundJob"
+renew: "SubscriptionRenewal"
+legacy: "LegacyPaymentGateway"
+order -> legacy
+refund -> legacy
+renew -> legacy
 ```
 
 Mỗi caller biết quá nhiều chi tiết của component cũ. Vì vậy, thay component đồng nghĩa với việc sửa nhiều call site cùng lúc. Nếu một caller bị bỏ sót, hệ thống vẫn có thể đi qua implementation cũ sau khi team tưởng rằng migration đã hoàn tất.
@@ -111,10 +122,17 @@ Mỗi caller biết quá nhiều chi tiết của component cũ. Vì vậy, thay
 
 Bước đầu tiên là bọc component cũ sau contract mới. Hành vi runtime chưa thay đổi:
 
-```text
-OrderController ────────┐
-RefundJob ──────────────┼──▶ PaymentProcessor ──▶ LegacyPaymentAdapter
-SubscriptionRenewal  ───┘
+```d2 title="Trạng thái sau khi thêm abstraction layer"
+direction: right
+order: "OrderController"
+refund: "RefundJob"
+renew: "SubscriptionRenewal"
+legacy: "LegacyPaymentAdapter"
+abstraction: "PaymentProcessor"
+order -> abstraction
+refund -> abstraction
+renew -> abstraction
+abstraction -> legacy
 ```
 
 Ở trạng thái này, abstraction chưa tạo ra service mới. Nó chỉ tạo seam — điểm nối có thể kiểm soát — để các bước sau được triển khai mà không sửa toàn bộ caller trong một lần.
@@ -311,11 +329,13 @@ public final class OrderController {
 
 Một factory hoặc router ở composition root có thể chọn implementation theo flag:
 
-```text
-payment.use_new_service = false
-        │
-        ├── false → LegacyPaymentAdapter
-        └── true  → PaymentServiceClient
+```d2 title="Thiết kế abstraction"
+direction: right
+flag: "payment.use_new_service — default false"
+old: "LegacyPaymentAdapter"
+new: "PaymentServiceClient"
+flag -> old: "false"
+flag -> new: "true"
 ```
 
 ### Trình tự triển khai

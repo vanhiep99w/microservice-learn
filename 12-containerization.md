@@ -54,53 +54,33 @@ Câu hỏi tiếp theo: **Làm sao đóng gói và chạy các service một cá
 
 ### 2.1. VM vs Container
 
+```d2 title="2.1. VM vs Container"
+direction: down
+vm: Physical Server — VMs {
+ host: Host OS — Linux
+ hypervisor: VMware / KVM
+ a: VM A — App + Libs / Ubuntu Guest OS ~1–2GB
+ b: VM B — App + Libs / CentOS Guest OS ~1–2GB
+ c: VM C — App + Libs / Alpine Guest OS ~500MB
+ host -- hypervisor
+ hypervisor -- a
+ hypervisor -- b
+ hypervisor -- c
+}
+container: Physical Server — Containers {
+ host: Host OS — Linux Kernel dùng chung
+ runtime: Docker / containerd
+ a: App A + Libs — ~50–200MB
+ b: App B + Libs — ~50–200MB
+ c: App C + Libs — ~30–100MB
+ host -- runtime
+ runtime -- a
+ runtime -- b
+ runtime -- c
+}
 ```
-VM (Virtual Machine):
-─────────────────────
 
-  ┌─────────────────────────────────────────────────┐
-  │  Physical Server                                │
-  │                                                 │
-  │  ┌───────────┐  ┌───────────┐  ┌───────────┐    │
-  │  │   App A   │  │   App B   │  │   App C   │    │
-  │  │  Libs/Deps│  │  Libs/Deps│  │  Libs/Deps│    │
-  │  │───────────│  │───────────│  │───────────│    │
-  │  │  Guest OS │  │  Guest OS │  │  Guest OS │    │
-  │  │  (Ubuntu) │  │  (CentOS) │  │  (Alpine) │    │
-  │  │  ~1-2 GB  │  │  ~1-2 GB  │  │  ~500 MB  │    │
-  │  └───────────┘  └───────────┘  └───────────┘    │
-  │  ┌─────────────────────────────────────────┐    │
-  │  │           Hypervisor (VMware/KVM)       │    │
-  │  └─────────────────────────────────────────┘    │
-  │  ┌─────────────────────────────────────────┐    │
-  │  │           Host OS (Linux)               │    │
-  │  └─────────────────────────────────────────┘    │
-  └─────────────────────────────────────────────────┘
-
-  Mỗi VM chạy 1 Guest OS riêng → nặng, khởi động chậm (phút)
-
-
-Container:
-──────────
-
-  ┌─────────────────────────────────────────────────┐
-  │  Physical Server                                │
-  │                                                 │
-  │  ┌───────────┐  ┌───────────┐  ┌───────────┐    │
-  │  │   App A   │  │   App B   │  │   App C   │    │
-  │  │  Libs/Deps│  │  Libs/Deps│  │  Libs/Deps│    │
-  │  │  ~50-200MB│  │  ~50-200MB│  │  ~30-100MB│    │
-  │  └───────────┘  └───────────┘  └───────────┘    │
-  │  ┌─────────────────────────────────────────┐    │
-  │  │      Container Runtime (Docker/containerd)│  │
-  │  └─────────────────────────────────────────┘    │
-  │  ┌─────────────────────────────────────────┐    │
-  │  │           Host OS (Linux Kernel)        │    │
-  │  └─────────────────────────────────────────┘    │
-  └─────────────────────────────────────────────────┘
-
-  Containers CHIA SẺ kernel → nhẹ, khởi động nhanh (giây)
-```
+VM có guest kernel/OS riêng, container chia sẻ host kernel. Kích thước/startup ở hình là minh họa: VMs thường nặng/chậm hơn, containers thường nhẹ/nhanh hơn; không phải quy tắc mọi workload.
 
 | Tiêu chí | VM | Container |
 |----------|-----|-----------|
@@ -166,110 +146,53 @@ CONTAINER GIẢI QUYẾT:
 
 Container Runtime là phần mềm **chạy containers** trên host OS. Nó được chia thành **3 tầng** với vai trò khác nhau:
 
-```
-CONTAINER RUNTIME — 3 TẦNG:
-────────────────────────────
-
-  ┌──────────────────────────────────────────────────────────┐
-  │                                                          │
-  │  Tầng 1 — Container Engine (High-Level):                 │
-  │  ┌────────────┐  ┌────────────┐  ┌────────────┐          │
-  │  │   Docker   │  │   Podman   │  │   nerdctl  │          │
-  │  │  Engine    │  │ (daemonless│  │ (containerd│          │
-  │  │            │  │  rootless) │  │   CLI)     │          │
-  │  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘          │
-  │        │               │               │                 │
-  │  Tầng 2 — Container Runtime (Low-Level):                 │
-  │  ┌─────▼───────────────▼───────────────▼──────┐          │
-  │  │            containerd / CRI-O              │          │
-  │  │     (manage container lifecycle:           │          │
-  │  │      pull image, create/start/stop/delete  │          │
-  │  │      container, manage storage & network)  │          │
-  │  └─────────────────────┬──────────────────────┘          │
-  │                        │                                 │
-  │  Tầng 3 — OCI Runtime (Lowest-Level):                    │
-  │  ┌─────────────────────▼──────────────────────┐          │
-  │  │              runc / crun                   │          │
-  │  │    (tạo container process thực sự          │          │
-  │  │     sử dụng Linux namespaces + cgroups)    │          │
-  │  └────────────────────────────────────────────┘          │
-  │                                                          │
-  └──────────────────────────────────────────────────────────┘
-
-  Docker Engine bên trong gồm:
-    Docker CLI → Docker Daemon (dockerd) → containerd → runc
-    │              │                        │            │
-    │              │                        │            └─ Tạo process
-    │              │                        └─ Quản lý lifecycle
-    │              └─ Build images, manage networks, volumes
-    └─ Giao diện command line cho user
+```d2 title="2.3. Container Runtime"
+direction: down
+high: Engine / CLI — High-level {
+ docker: Docker CLI
+ daemon: dockerd — Build / Network / Volumes
+ podman: Podman — Daemonless / Rootless
+ nerdctl: nerdctl — containerd CLI
+ docker -> daemon
+}
+lifecycle: Runtime — Lifecycle {
+ containerd: containerd — Pull / Create / Start / Stop / Storage
+ crio: CRI-O — Kubernetes CRI runtime
+}
+oci: OCI Runtime — runc / crun
+process: Container Process — Linux namespaces / cgroups
+high.daemon -> lifecycle.containerd
+high.nerdctl -> lifecycle.containerd
+lifecycle.containerd -> oci
+lifecycle.crio -> oci
+high.podman -> oci: Qua container libraries / monitor, không cần dockerd
+oci -> process
 ```
 
 #### Tại sao Kubernetes bỏ Docker, chuyển sang containerd?
 
+```d2 title="Tại sao Kubernetes bỏ Docker, chuyển sang containerd?"
+direction: down
+old: K8s trước v1.24 — đường Docker cũ {
+ kubelet: kubelet
+ shim: dockershim — adapter K8s maintain
+ dockerd: Docker Daemon
+ containerd: containerd
+ runc: runc
+ process: Container Process
+ kubelet -> shim -> dockerd -> containerd -> runc -> process
+}
+new: K8s — CRI trực tiếp tới runtime {
+ kubelet: kubelet
+ containerd: containerd CRI plugin
+ runc: runc
+ process: Container Process
+ kubelet -> containerd: CRI
+ containerd -> runc -> process
+}
 ```
-VẤN ĐỀ: DOCKER TRONG KUBERNETES — QUÁ NHIỀU LAYERS:
-─────────────────────────────────────────────────────
 
-  K8s trước v1.24 — dùng Docker:
-  ┌──────────────────────────────────────────────────────────┐
-  │                                                          │
-  │  kubelet                                                 │
-  │    │                                                     │
-  │    ▼                                                     │
-  │  dockershim (adapter do K8s team maintain)               │
-  │    │                                                     │
-  │    ▼                                                     │
-  │  Docker Daemon (dockerd)                                 │
-  │    │  ← Docker có rất nhiều thứ K8s KHÔNG CẦN:          │
-  │    │     • Docker CLI, Docker API                        │
-  │    │     • Docker Compose, Docker Swarm                  │
-  │    │     • Docker volumes, Docker networks               │
-  │    │     • Image build                                   │
-  │    ▼                                                     │
-  │  containerd                                              │
-  │    │                                                     │
-  │    ▼                                                     │
-  │  runc → Container process                                │
-  │                                                          │
-  │  Vấn đề:                                                 │
-  │  1. dockershim = code adapter mà K8s team phải maintain  │
-  │     → Mỗi bản Docker update → phải update dockershim     │
-  │     → Gánh nặng maintenance cho K8s team                 │
-  │                                                          │
-  │  2. Docker Daemon = single point of failure              │
-  │     → dockerd crash → TẤT CẢ containers trên node bị     │
-  │       ảnh hưởng                                          │
-  │                                                          │
-  │  3. Overhead: kubelet → dockershim → dockerd → containerd│
-  │     → Thừa 2 layers (dockershim + dockerd)               │
-  │     → K8s chỉ cần containerd, không cần Docker           │
-  │                                                          │
-  │  4. CRI (Container Runtime Interface):                   │
-  │     K8s định nghĩa chuẩn CRI để giao tiếp với runtime    │
-  │     → containerd hỗ trợ CRI native                       │
-  │     → Docker KHÔNG hỗ trợ CRI → cần dockershim           │
-  └──────────────────────────────────────────────────────────┘
-
-
-  K8s từ v1.24+ — dùng containerd trực tiếp:
-  ┌──────────────────────────────────────────────────────────┐
-  │                                                          │
-  │  kubelet                                                 │
-  │    │                                                     │
-  │    ▼ (CRI — giao tiếp trực tiếp, không cần adapter)      │
-  │  containerd                                              │
-  │    │                                                     │
-  │    ▼                                                     │
-  │  runc → Container process                                │
-  │                                                          │
-  │  ✅ Bỏ 2 layers (dockershim + dockerd)                   │
-  │  ✅ Ít overhead hơn → khởi động container nhanh hơn      │
-  │  ✅ containerd daemon-per-container → crash 1 container  │
-  │     không ảnh hưởng container khác                       │
-  │  ✅ K8s team không cần maintain dockershim nữa           │
-  └──────────────────────────────────────────────────────────┘
-```
+K8s v1.24 bỏ dockershim tích hợp để giảm maintenance/adapter layers; vẫn có thể chạy Docker qua external CRI adapter nếu cần. K8s không cần toàn bộ Docker build/CLI/Compose/Swarm stack. containerd là daemon, còn per-container shims giúp tách lifecycle khỏi daemon; không gọi containerd là daemon-per-container hay bảo đảm daemon crash không có ảnh hưởng.
 
 ```
 CÂU HỎI THƯỜNG GẶP:
@@ -309,56 +232,25 @@ Docker không phải lựa chọn duy nhất. Có nhiều công cụ thay thế 
 
 #### Podman — Drop-in Docker Replacement
 
+```d2 title="Podman — Drop-in Docker Replacement"
+direction: down
+docker: Docker — mô hình daemon {
+ cli: docker CLI
+ daemon: dockerd
+ containerd: containerd
+ runtime: runc
+ cli -> daemon -> containerd -> runtime
+}
+podman: Podman — mô hình daemonless {
+ cli: podman CLI
+ monitor: conmon — monitor từng container
+ runtime: runc / crun
+ cli -> runtime: Create container
+ cli -- monitor: Setup monitor
+}
 ```
-PODMAN:
-───────
 
-  Bản chất: Container engine tương thích Docker CLI
-  Phát triển bởi: Red Hat
-  Đặc điểm nổi bật: DAEMONLESS + ROOTLESS
-
-  Docker:
-  ┌────────────────────────────────────────────┐
-  │  docker CLI → Docker Daemon (root)         │
-  │         → containerd → runc                │
-  │                    │                       │
-  │         Daemon chạy background, quyền ROOT │
-  │         → Single point of failure          │
-  │         → Security risk (root daemon)      │
-  └────────────────────────────────────────────┘
-
-  Podman:
-  ┌────────────────────────────────────────────────────────────┐
-  │podman CLI → conmon (per-container) → runc                  │
-  │                                                            │
-  │  ✅ Không có daemon (daemonless)                           │
-  │     → Không có single point of failure                     │
-  │     → Mỗi container có process monitor riêng (conmon)      │
-  │                                                            │
-  │  ✅ Chạy rootless (không cần quyền root)                   │
-  │     → User thường chạy container → an toàn hơn             │
-  │     → Container bị hack → chỉ có quyền user, không root    │
-  │                                                            │
-  │  ✅ Docker CLI compatible                                  │
-  │     → alias docker=podman                                  │
-  │     → Chạy Dockerfile, docker-compose* không đổi           │
-  │     (*podman-compose hoặc podman với docker-compose v2)    │
-  └────────────────────────────────────────────────────────────┘
-
-  So sánh nhanh:
-  ┌──────────────────────┬─────────────────┬────────────────────┐
-  │                      │   Docker        │   Podman           │
-  │──────────────────────│─────────────────│────────────────────│
-  │ Daemon               │ ✅ Có (dockerd) │ ❌ Không           │
-  │ Rootless             │ ⚠️ Có (hạn chế) │ ✅ Native          │
-  │ CLI compatible       │ —               │ ✅ 99% giống       │
-  │ Compose              │ ✅ Native       │ ✅ podman-compose  │
-  │ Pod (group containers)│ ❌             │ ✅ (giống K8s pod) │
-  │ Systemd integration  │ ⚠️ Hạn chế      │ ✅ Native          │
-  │ Build images         │ ✅ docker build │ ✅ podman build    │
-  │ OS                   │ Linux/Mac/Win   │ Linux (Mac qua VM) │
-  └──────────────────────┴─────────────────┴────────────────────┘
-```
+Podman do Red Hat khởi xướng, hỗ trợ rootless, Pods, systemd và CLI tương thích nhiều Docker commands (`alias docker=podman`). Compose cần provider như podman-compose/docker-compose integration; không bảo đảm mọi behavior giống 100%. Docker cũng có rootless mode. Daemonless giảm phụ thuộc central daemon, không loại bỏ mọi failure/security risks. Cả hai hỗ trợ build images; Mac/Windows thường qua Linux VM.
 
 #### Buildah & Kaniko — Build Images không cần Docker
 
@@ -496,37 +388,24 @@ host.daemon -> registry: Pull nếu image chưa có local
 
 Image là **template read-only** chứa mọi thứ cần để chạy application.
 
+```d2 title="3.2. Docker Image"
+direction: down
+image: Image user-service 1.2.0 — Read-only {
+ copy: COPY app.jar — 10MB / hay đổi
+ install: RUN apt-get install — 50MB
+ env: ENV JAVA_HOME — metadata / 0 filesystem bytes
+ update: RUN apt-get update — 30MB
+ base: Base Alpine — 5MB / ít đổi
+ copy -- install -- env -- update -- base
+}
+container: Container {
+ writable: Writable Layer — container data
+ image: Image Layers 1–5 — Read-only
+ writable -- image
+}
 ```
-DOCKER IMAGE STRUCTURE:
-───────────────────────
 
-  Image: user-service:1.2.0
-  ┌─────────────────────────────────────┐
-  │  Layer 5: COPY app.jar (10 MB)      │  ← Thay đổi thường xuyên
-  │  Layer 4: RUN apt-get install (50MB)│
-  │  Layer 3: ENV JAVA_HOME=/usr/lib..  │  ← Metadata (0 bytes)
-  │  Layer 2: RUN apt-get update (30MB) │
-  │  Layer 1: Base image - Alpine (5MB) │  ← Ít thay đổi
-  └─────────────────────────────────────┘
-
-  Đặc điểm:
-  • Mỗi instruction trong Dockerfile = 1 layer
-  • Layers được CACHE → build lần 2 nhanh hơn
-  • Layers được CHIA SẺ giữa images
-    (100 images dùng Alpine → chỉ tải Alpine 1 lần)
-  • Image = read-only; container = image + writable layer
-
-  Container:
-  ┌─────────────────────────────────────┐
-  │  Writable Layer (container data)    │  ← Mất khi container bị xóa
-  │─────────────────────────────────────│
-  │  Layer 5: app.jar                   │
-  │  Layer 4: apt-get install           │  ← Read-only
-  │  Layer 3: ENV                       │  ← (từ Image)
-  │  Layer 2: apt-get update            │
-  │  Layer 1: Alpine                    │
-  └─────────────────────────────────────┘
-```
+Layers được cache/reuse giữa images; không phải mọi Dockerfile instruction đều tạo filesystem layer (`ENV` là metadata). Container dùng image read-only cộng writable layer; writable data mất khi container bị xóa. Các MB là minh họa, không dùng `apt-get` thật trên Alpine (dùng apk hoặc chọn Debian/Ubuntu base).
 
 ### 3.3. Dockerfile
 
@@ -688,36 +567,20 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-5-multi-stage-build.dockerfile)
 
+```d2 title="3.5. Multi-stage Build"
+direction: right
+single: "Single-stage — minh họa 790MB" {
+ tools: Maven3.9 200MB / JDK21 350MB
+ source: Source10MB / Dependencies150MB
+ jar: app.jar50MB / git30MB
+}
+multi: "Multi-stage Runtime — minh họa 150MB" {
+ jre: JRE21 Alpine 100MB
+ jar: app.jar50MB
+}
 ```
-TẠI SAO MULTI-STAGE?
-─────────────────────
 
-  Single-stage:
-  ┌──────────────────────────────┐
-  │  Maven 3.9        (200 MB)   │
-  │  JDK 21           (350 MB)   │
-  │  Source code       (10 MB)   │
-  │  Dependencies      (150 MB)  │
-  │  app.jar           (50 MB)   │
-  │  .git/             (30 MB)   │
-  │                              │
-  │  TOTAL: ~790 MB 😱           │
-  └──────────────────────────────┘
-
-  Multi-stage:
-  ┌──────────────────────────────┐
-  │  JRE 21 (Alpine)   (100 MB)  │  ← Chỉ JRE, không cần JDK
-  │  app.jar           (50 MB)   │  ← Chỉ artifact cuối
-  │                              │
-  │  TOTAL: ~150 MB ✅           │
-  │  Không có: Maven, source,    │
-  │  .git, build tools           │
-  └──────────────────────────────┘
-
-  → 5x nhỏ hơn
-  → Ít attack surface hơn (không có build tools trong production)
-  → Pull/deploy nhanh hơn
-```
+Runtime image không giữ Maven, source, `.git` hay build tools. Ví dụ giảm khoảng 5×, giảm attack surface và thời gian pull/deploy; kết quả thực tế phụ thuộc app/base image.
 
 ```dockerfile source="snippets/3-5-multi-stage-build-2.dockerfile"
 # ===== Multi-stage Build — Node.js =====
@@ -793,97 +656,60 @@ ENTRYPOINT ["/server"]
 
 ### 3.6. Docker Networking
 
+```d2 title="3.6. Docker Networking"
+direction: down
+bridge: Docker Host — Bridge {
+ user: user-svc — 172.17.0.2
+ order: order-svc — 172.17.0.3
+ network: docker0 — 172.17.0.1
+ user -- network
+ order -- network
+}
+host: Host Network — dùng trực tiếp network namespace / ports của host
+none: None — không có external network, vẫn có loopback
 ```
-DOCKER NETWORKING:
-──────────────────
 
-  Docker tạo virtual networks để containers giao tiếp:
+User-defined bridge hỗ trợ DNS theo container name, khác default bridge. Ví dụ:
 
-  1. BRIDGE (default) — Containers trên cùng host:
-  ─────────────────────────────────────────────────
-  ┌──────────────────────────────────────────────┐
-  │  Docker Host                                 │
-  │                                              │
-  │  ┌───────────┐       ┌───────────┐           │
-  │  │ Container │       │ Container │           │
-  │  │ user-svc  │       │ order-svc │           │
-  │  │ 172.17.0.2│       │ 172.17.0.3│           │
-  │  └─────┬─────┘       └─────┬─────┘           │
-  │        │                   │                 │
-  │  ┌─────┴───────────────────┴─────┐           │
-  │  │     docker0 (bridge)          │           │
-  │  │     172.17.0.1                │           │
-  │  └───────────────────────────────┘           │
-  └──────────────────────────────────────────────┘
-
-  # Tạo custom bridge network (khuyến nghị):
-  docker network create my-app
-  docker run --network my-app --name user-svc user-service:1.0
-  docker run --network my-app --name order-svc order-service:1.0
-
-  # order-svc gọi user-svc bằng TÊN container:
-  http://user-svc:8081/users/123
-  → Docker DNS tự resolve → 172.17.0.2
-
-
-  2. HOST — Container dùng network của host:
-  ──────────────────────────────────────────
-  docker run --network host nginx
-  # Container dùng trực tiếp port của host
-  # Không có network isolation
-  # Performance tốt nhất (no NAT overhead)
-  # Chỉ dùng trên Linux
-
-
-  3. NONE — Không có network:
-  ──────────────────────────
-  docker run --network none alpine
-  # Hoàn toàn isolated, không giao tiếp được
-  # Dùng cho batch jobs, data processing
+```bash
+docker network create my-app
+docker run --network my-app --name user-svc user-service:1.0
+docker run --network my-app --name order-svc order-service:1.0
+# order-svc có thể gọi http://user-svc:8081/users/123
+# Host network (Linux, hoặc nền tảng hỗ trợ/config tương ứng):
+docker run --network host nginx
+# Isolated batch processing:
+docker run --network none alpine
 ```
+
+Host network giảm network isolation/NAT, không mặc định là tốt nhất cho mọi môi trường. None phù hợp workloads không cần giao tiếp mạng.
 
 ### 3.7. Docker Volumes
 
+```d2 title="3.7. Docker Volumes"
+direction: right
+host: Docker Host {
+ old: PostgreSQL Container v15 — bị xóa
+ new: PostgreSQL Container v16 — thay thế sau migration
+ volume: postgres-data — Named Volume {shape: cylinder}
+ old -> volume: Persist data
+ new -> volume: Mount sau migration / compatibility check
+ old -> new: Thay container — không xóa volume
+}
 ```
-DOCKER VOLUMES — Persistent Data:
-──────────────────────────────────
 
-  Container xóa → data trong container MẤT.
-  Volume giải quyết: lưu data BÊN NGOÀI container.
+Volume sống ngoài writable layer. **Giữ volume không có nghĩa mount data directory PostgreSQL 15 trực tiếp vào 16 là hợp lệ**: major upgrade cần backup/restore hoặc quy trình `pg_upgrade` phù hợp.
 
-  ┌──────────────────────────────────────────────────┐
-  │  Docker Host                                     │
-  │                                                  │
-  │  ┌───────────┐         ┌───────────┐             │
-  │  │ PostgreSQL│         │ PostgreSQL│             │
-  │  │ Container │         │ Container │             │
-  │  │ (v15)     │ delete  │ (v16)     │  ← Upgrade  │
-  │  └─────┬─────┘ ──────▶ └─────┬─────┘    version  │
-  │        │                     │                   │
-  │        │     CÙNG VOLUME     │                   │
-  │        │         │           │                   │
-  │  ┌─────▼─────────▼───────────▼─────┐             │
-  │  │  Volume: postgres-data          │             │
-  │  │  /var/lib/docker/volumes/...    │             │
-  │  │  DATA VẪN CÒN NGUYÊN ✅         │             │
-  │  └─────────────────────────────────┘             │
-  └──────────────────────────────────────────────────┘
-
-  3 loại mount:
-
-  1. Named Volume (khuyến nghị cho production):
-     docker volume create postgres-data
-     docker run -v postgres-data:/var/lib/postgresql/data postgres
-
-  2. Bind Mount (dev — mount code từ host):
-     docker run -v $(pwd)/src:/app/src node:20
-     → Sửa code trên host → container thấy ngay (hot reload)
-
-  3. tmpfs Mount (temporary, in-memory):
-     docker run --tmpfs /tmp my-app
-     → Data chỉ ở RAM, mất khi container stop
-     → Dùng cho: cache, temp files, sensitive data
+```bash
+docker volume create postgres-data
+docker run -v postgres-data:/var/lib/postgresql/data postgres
+# Bind mount cho dev / hot reload:
+docker run -v $(pwd)/src:/app/src node:20
+# Temporary RAM-backed mount:
+docker run --tmpfs /tmp my-app
 ```
+
+Named Volume: data persistent; Bind Mount: dùng host path; tmpfs: temporary in-memory, mất khi container dừng, có thể dùng cache/temp/sensitive files với security policy phù hợp.
 
 ---
 
@@ -1003,47 +829,22 @@ networks:
 
 ### 4.3. Networking trong Compose
 
+```d2 title="4.3. Networking trong Compose"
+direction: right
+compose: docker-compose.yml — services user / order / postgres / redis
+network: myproject_default — Compose network {
+ user: user-service — DNS user-service
+ order: order-service — DNS order-service
+ pg: postgres
+ redis: redis
+ user <-> order
+ user -> pg
+ order -> redis
+}
+compose -> network: Auto-created network / Service-name DNS
 ```
-COMPOSE NETWORKING:
-───────────────────
 
-  Docker Compose tự tạo network cho project.
-  Containers gọi nhau bằng SERVICE NAME (không phải container_name).
-
-  docker-compose.yml:
-  ┌────────────────────────────────────────────────────┐
-  │  services:                                         │
-  │    user-service:    ...                            │
-  │    order-service:   ...                            │
-  │    postgres:        ...                            │
-  │    redis:           ...                            │
-  └────────────────────────────────────────────────────┘
-                        │
-                        ▼
-  ┌────────────────────────────────────────────────────┐
-  │  Network: myproject_default (auto-created)         │
-  │                                                    │
-  │  ┌──────────────┐        ┌──────────────┐          │
-  │  │ user-service │◄──────▶│ order-service│          │
-  │  │ DNS: user-   │        │ DNS: order-  │          │
-  │  │   service    │        │   service    │          │
-  │  └──────────────┘        └──────────────┘          │
-  │         │                       │                  │
-  │         ▼                       ▼                  │
-  │  ┌──────────────┐        ┌──────────────┐          │
-  │  │   postgres   │        │    redis     │          │
-  │  └──────────────┘        └──────────────┘          │
-  └────────────────────────────────────────────────────┘
-
-  Trong code Order Service:
-    DB_HOST=postgres            ← service name, KHÔNG phải IP
-    USER_SERVICE=http://user-service:8081/api
-    REDIS_HOST=redis
-
-  Compose DNS tự resolve:
-    user-service → 172.18.0.2
-    postgres     → 172.18.0.4
-```
+Order dùng `DB_HOST=postgres`, `USER_SERVICE=http://user-service:8081/api`, `REDIS_HOST=redis`. Ví dụ DNS resolve user-service tới 172.18.0.2, postgres tới 172.18.0.4; code không hardcode IP hay phụ thuộc `container_name`.
 
 ### 4.4. Ví dụ — E-Commerce stack
 
@@ -1551,7 +1352,24 @@ CONTAINER LOGGING:
 
 ## 7. Ví dụ thực tế — E-Commerce
 
+```d2 title="7. Ví dụ thực tế — E-Commerce"
+direction: right
+push: "Push code"
+build: "Build Image — Multi-stage"
+test: "Unit + Integration tests"
+scan: "Trivy Scan"
+ecr: "Push to ECR"
+deploy: "Deploy to Kubernetes"
+push -> build
+build -> test
+test -> scan
+scan -> ecr
+ecr -> deploy
 ```
+
+Cấu trúc repository và bảng kích thước minh họa giữ ở dạng text vì không phải topology:
+
+```text
 E-COMMERCE — CONTAINERIZATION ARCHITECTURE:
 ────────────────────────────────────────────
 
@@ -1611,25 +1429,12 @@ E-COMMERCE — CONTAINERIZATION ARCHITECTURE:
   │ payment-service      │ Go 1.22  │ scratch                   │ 12 MB   │
   │ notification-service │ Python   │ python:3.12-alpine        │ 80 MB   │
   │ api-gateway          │ Java 21  │ eclipse-temurin:21-jre-alp│ 170 MB  │
+```
 
+Build command minh họa:
 
-  CI/CD Pipeline (per service):
-  ─────────────────────────────
-
-  ┌──────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-  │ Push │───▶│  Build   │───▶│  Test    │───▶│  Scan    │───▶│  Push    │
-  │ code │    │  image   │    │  (unit + │    │  (Trivy) │    │  to ECR  │
-  │      │    │  (multi- │    │  integra-│    │          │    │          │
-  │      │    │  stage)  │    │  tion)   │    │          │    │          │
-  └──────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
-                                                                  │
-                                                           ┌──────▼──────┐
-                                                           │   Deploy    │
-                                                           │   to K8s    │
-                                                           └─────────────┘
-
-  # CI/CD build command (ví dụ GitHub Actions):
-  docker build \
+```bash
+docker build \
     --build-arg VERSION=1.2.3 \
     --tag 123456789.dkr.ecr.ap-southeast-1.amazonaws.com/user-service:${GIT_SHA} \
     --tag 123456789.dkr.ecr.ap-southeast-1.amazonaws.com/user-service:1.2.3 \

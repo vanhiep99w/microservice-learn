@@ -76,13 +76,18 @@ Khi tách thành microservices, điều đó biến mất. Order Service, Invent
 
 > 📖 Tài liệu này xem xét **góc nhìn pattern**: mỗi pattern là một quyết định kiến trúc, có tiêu chí chọn, trade-off, và **cách chúng tương tác với nhau**. Chi tiết nền tảng (CAP theorem, 2PC, CDC, polyglot persistence...) xem [doc 09 — Data Management](09-data-management.md); giao tiếp sync/async và event-driven xem [doc 06 — Inter-Service Communication](06-inter-service-communication.md).
 
-```
-Phụ thuộc giữa các Data Patterns (học theo thứ tự này):
-
-  Database per Service ──tạo ra vấn đề──▶ Saga ──────cần events đáng tin──▶ Transactional Outbox
-           │                                     │
-           │                                     └──kết hợp──▶ CQRS ◀──giải quyết query── Event Sourcing
-           └──tạo ra vấn đề query/read──▶ CQRS
+```d2 title="1. Giới thiệu — Data Patterns giải quyết vấn đề gì?"
+direction: right
+db: "Database per Service"
+saga: "Saga"
+outbox: "Transactional Outbox"
+cqrs: "CQRS"
+es: "Event Sourcing"
+db -> saga: "Cross-service transaction problem"
+saga -> outbox: "Cần reliable event intent"
+saga -> cqrs: "Có thể kết hợp"
+db -> cqrs: "Cross-store query problem"
+es -> cqrs: "Projection / Query models"
 ```
 
 ---
@@ -145,25 +150,20 @@ Nguyên tắc chọn: **bắt đầu ở cấp độ thấp nhất mà team vẫ
 
 Database per Service là quyết định đúng (xem [04 — Autonomy & Independence](04-autonomy-independence.md)), nhưng nó **trả giá bằng bốn vấn đề mới**. Đây chính là lý do tồn tại của bốn pattern còn lại trong tài liệu:
 
+```d2 title="2.3. Bốn hệ quả trực tiếp — và các pattern ra đời từ đó"
+direction: right
+db: "Database per Service"
+tx: "Cross-DB business operation → Saga"
+dual: "DB write + Publish gap → Outbox"
+join: "Cross-service JOIN khó → CQRS / API Composition"
+history: "Nếu cần authoritative history → Event Sourcing"
+db -> tx
+db -> dual
+db -> join
+db -> history
 ```
-Database per Service
-        │
-        ├──▶ (1) Một nghiệp vụ chạm nhiều DB
-        │        → không có transaction chung
-        │        → Saga Pattern (mục 4)
-        │
-        ├──▶ (2) Ghi DB + publish event là 2 thao tác riêng biệt
-        │        → event có thể mất (dual write)
-        │        → Transactional Outbox (mục 3)
-        │
-        ├──▶ (3) Không JOIN được giữa các DB
-        │        → query xuyên service khó
-        │        → CQRS + API Composition (mục 5)
-        │
-        └──▶ (4) Chỉ còn state hiện tại, mất lịch sử
-                 → audit, debugging khó
-                 → Event Sourcing (mục 6)
-```
+
+Tách DB không tự làm mất history: có thể dùng audit/history trong state-based persistence. Event Sourcing là lựa chọn khi domain cần event history làm source of truth, không phải hệ quả bắt buộc.
 
 ### 2.4. Khi nào chọn / không nên chọn
 
@@ -220,25 +220,21 @@ Dual Write — 2 thao tác, KHÔNG atomic:
 
 **Transactional Outbox Pattern** giải quyết bằng cách đưa event vào **cùng local transaction** với business data: ghi event vào một bảng `outbox` trong database của service, rồi một process riêng (**Outbox Relay**) đọc bảng này và publish ra broker.
 
-```mermaid
-sequenceDiagram
-    participant App as Order Service
-    participant DB as Order DB
-    participant R as Outbox Relay
-    participant MQ as Message Broker
-
-    App->>DB: BEGIN
-    App->>DB: INSERT INTO orders (...)
-    App->>DB: INSERT INTO outbox (id, type, payload)
-    App->>DB: COMMIT
-    Note over DB: Cả 2 ghi atomic — order tồn tại<br/>⟺ event tồn tại trong outbox
-
-    loop Đọc outbox
-        R->>DB: Đọc rows chưa published (hoặc CDC)
-        R->>MQ: Publish event
-        R->>DB: Đánh dấu đã published / xóa row
-    end
+```d2 title="3.2. Cơ chế hoạt động"
+direction: right
+app: "Order Service"
+tx: "Order DB — một transaction\nBEGIN → INSERT orders → INSERT outbox → COMMIT"
+relay: "Outbox Relay\nĐọc rows chưa published hoặc CDC"
+broker: "Message Broker\nPublish event"
+mark: "Order DB\nĐánh dấu published / xóa row"
+app -> tx
+tx -> relay: "Order tồn tại ⇔ event tồn tại trong Outbox"
+relay -> broker
+broker -> mark: "Publish thành công"
+mark -> relay: "LOOP — đọc tiếp Outbox"
 ```
+
+Hai lần ghi trong Order DB là atomic. Relay lặp lại; publish rồi mark không phải một distributed transaction, nên consumer vẫn cần idempotency.
 
 Cấu trúc bảng outbox điển hình:
 
@@ -328,22 +324,21 @@ Saga có hai kiểu triển khai: **Choreography** (phối hợp qua events, kh�
 
 Mỗi service thực hiện việc của mình rồi publish event; service khác lắng nghe và tiếp tục. Không ai nắm "bức tranh toàn cảnh" — flow là hành vi nổi (emergent) của các subscriptions.
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Payment Service
-    participant I as Inventory Service
-
-    O->>O: Tạo order (PENDING) + outbox
-    O-->>P: OrderCreated (event)
-    P->>P: Charge thẻ + outbox
-    P-->>I: PaymentCompleted (event)
-    I->>I: Reserve stock —❌ THẤT BẠI (hết hàng)
-    I-->>P: StockReservationFailed (event)
-    Note over P,O: Chuỗi compensating chạy ngược
-    P->>P: Refund thẻ (C2)
-    P-->>O: PaymentRefunded (event)
-    O->>O: Update order → CANCELLED (C1)
+```d2 title="4.2. Choreography Saga — phối qua events"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Payment Service"
+"I": "Inventory Service"
+"O" -> "O": "Tạo order (PENDING) + outbox"
+"O" -> "P": "OrderCreated (event)" { style.stroke-dash: 5 }
+"P" -> "P": "Charge thẻ + outbox"
+"P" -> "I": "PaymentCompleted (event)" { style.stroke-dash: 5 }
+"I" -> "I": "Reserve stock —❌ THẤT BẠI (hết hàng)"
+"I" -> "P": "StockReservationFailed (event)" { style.stroke-dash: 5 }
+"P".note1: "[Payment Service — Order Service]\nChuỗi compensating chạy ngược"
+"P" -> "P": "Refund thẻ (C2)"
+"P" -> "O": "PaymentRefunded (event)" { style.stroke-dash: 5 }
+"O" -> "O": "Update order → CANCELLED (C1)"
 ```
 
 Điểm mạnh: không single point of failure, không coupling trực tiếp giữa các services (chỉ qua events). Điểm yếu: nhìn vào code của từng service **không ai biết saga toàn cục trông thế nào** — flow nằm rải rác trong các event handlers.
@@ -441,14 +436,21 @@ CQRS không phải công tắc bật/tắt — có ba mức độ tăng dần đ
 | **2. Tách model** | Write model normalized + read model denormalized (view/materialized view), vẫn chung DB | Read pattern phức tạp hơn write nhiều |
 | **3. Tách DB** | Write DB riêng (PostgreSQL), Read DB riêng (Elasticsearch, Redis, read replica...), đồng bộ qua events/CDC | Read/write cần scale độc lập, hoặc read model là công nghệ khác hẳn |
 
-```
-Mức 3 — hai DB, đồng bộ async:
-
-  Command ──▶ Write Model ──▶ Write DB (PostgreSQL)
-                                   │
-                                   │ events / CDC  (qua Outbox!)
-                                   ▼
-  Query  ──▶ Read Model  ──▶ Read DB (Elasticsearch / Redis / replica)
+```d2 title="5.2. Ba mức độ áp dụng"
+direction: right
+command: "Command"
+write: "Write Model"
+pg: "Write DB — PostgreSQL"
+projector: "Projector — Events / CDC / Outbox relay"
+read: "Read DB — Elasticsearch / Redis / MongoDB / Replica theo use case"
+query: "Query"
+model: "Read Model"
+command -> write
+write -> pg
+pg -> projector: "Reliable change stream"
+projector -> read
+query -> model
+model -> read
 ```
 
 > 📖 Chi tiết ba mức kèm ví dụ Product Service: [09 — Data Management, mục 7.3–7.4](09-data-management.md#73-các-mức-độ-áp-dụng-cqrs).
@@ -673,36 +675,29 @@ Nguyên tắc chọn: bắt đầu với API Composition; chuyển sang CQRS-fro
 
 Sơ đồ dưới đây ghép cả năm patterns vào một hệ đặt hàng điển hình (mỗi service chỉ minh họa phần liên quan):
 
+```d2 title="7.5. Kiến trúc tham chiếu — E-commerce"
+direction: down
+commands: Commands
+queries: Queries
+gateway: API Gateway
+order: Order Service — Write Side { db: PostgreSQL orders + outbox {shape: cylinder} }
+query: Order Query Service — CQRS { db: Denormalized Order History DB {shape: cylinder} }
+relay: Debezium / CDC Relay
+kafka: Kafka
+projector: Order Event Projector
+payment: Payment Service — PG + Outbox
+inventory: Inventory Service — MongoDB + Outbox
+commands -> gateway -> order
+queries -> gateway -> query
+order.db -> relay -> kafka
+kafka -> projector -> query.db: Order events
+kafka -> payment: OrderCreated
+payment -> kafka: PaymentCompleted
+kafka -> inventory: Saga trigger event
+inventory -> kafka: StockReservationFailed / Reserve result
 ```
-                        ┌──────────────────┐
-        Commands ──────▶│   API Gateway    │◀────── Queries
-                        └────┬────────┬────┘
-                             │        │
-              ┌──────────────▼──┐  ┌──▼──────────────────────┐
-              │  Order Service  │  │ Order Query Service      │
-              │  (write side)   │  │ (read side — CQRS)       │
-              │                 │  │                          │
-              │ PostgreSQL:     │  │ Read DB denormalized     │
-              │  orders +       │  │ (order history view)     │
-              │  outbox table   │  │            ▲             │
-              └───────┬─────────┘  └────────────┼─────────────┘
-                      │ relay (Debezium/CDC)    │ projector
-                      ▼                         │
-               ┌────────────┐  Order* events    │
-               │   Kafka    ├───────────────────┘
-               │ (broker)   │
-               └─┬────────┬─┘
-     OrderCreated│        │PaymentCompleted, StockReservationFailed ...
-        ┌────────▼───┐ ┌──▼─────────────┐
-        │  Payment   │ │   Inventory    │
-        │  Service   │ │   Service      │
-        │ PG + outbox│ │ Mongo + outbox │
-        └────────────┘ └────────────────┘
 
-  Nghiệp vụ "PlaceOrder" = SAGA (choreography hoặc orchestration)
-  Mỗi bước saga: ghi DB + outbox (một transaction) → publish → bước tiếp
-  View "Lịch sử đơn hàng" = CQRS read model từ Order* events
-```
+PlaceOrder dùng choreography hoặc orchestration Saga. Từng local step ghi business data+outbox atomically rồi relay; Order history là read model từ events phù hợp, không cần JOIN trực tiếp private stores.
 
 Đọc kiến trúc theo mẫu số: **DB per Service** (mỗi service một store riêng), **Outbox** (mọi publish đều atomic với ghi), **Saga** (nghiệp vụ xuyên service có compensation), **CQRS** (view đọc nhanh không chạm write side). Event Sourcing chưa xuất hiện — chỉ thêm khi một service thật sự cần audit/time-travel (ví dụ Payment Service có thể nâng cấp lên event store, khi đó outbox của service đó tự biến mất — mục 7.3).
 

@@ -44,16 +44,16 @@
 
 Adapter không được xác định bởi việc nó chạy ở đâu. Nó có thể là một module trong application, một integration service độc lập hoặc một container cạnh application. Nó được gọi là Adapter vì trách nhiệm chính là **contract translation** — chuyển đổi contract — chứ không phải vì topology triển khai.
 
-```text
-Domain của Checkout                  Hệ thống bên ngoài
-┌──────────────────────┐             ┌──────────────────────────┐
-│ PaymentPort          │             │ Legacy Bank SOAP         │
-│ authorize(command)   │  Adapter    │ submitTransaction(xml)   │
-│ → PaymentResult      │────────────►│ status: A / D / R        │
-└──────────────────────┘             └──────────────────────────┘
-       Không để XML, mã A/D/R, tên field vendor
-       lan vào Order Aggregate hoặc API nội bộ.
+```d2 title="1.1. Adapter là gì?"
+direction: right
+domain: "Checkout Domain\nPaymentPort.authorize command → PaymentResult"
+adapter: "Adapter — Contract mapping"
+bank: "Legacy Bank SOAP\nsubmitTransaction XML / status A,D,R"
+domain -> adapter
+adapter -> bank
 ```
+
+Giữ XML, mã trạng thái A/D/R và tên field vendor bên ngoài Order Aggregate / internal API.
 
 ### 1.2. Vấn đề Adapter giải quyết
 
@@ -187,10 +187,17 @@ Ví dụ, `BankSoapPaymentAdapter implements PaymentPort` phù hợp khi chỉ C
 
 Dùng một service riêng khi nhiều service cần cùng một vendor contract, hoặc integration cần scale, credential, rate limit và lifecycle độc lập. Service này nhận contract đã chuẩn hóa rồi làm nhiệm vụ gọi provider.
 
-```text
-Order Service  ──┐
-Refund Service ──┼──► Payment Integration Service ──► Bank / Vendor
-Billing Service ─┘             Adapter boundary
+```d2 title="4.2. Integration service độc lập"
+direction: right
+order: "Order Service"
+refund: "Refund Service"
+billing: "Billing Service"
+integration: "Payment Integration Service — Adapter Boundary"
+bank: "Bank / Vendor"
+order -> integration
+refund -> integration
+billing -> integration
+integration -> bank
 ```
 
 Ưu điểm là có thể centralize vendor client và cô lập dependency. Chi phí là thêm network hop, thêm một điểm lỗi và nguy cơ trở thành shared bottleneck. Chỉ dùng service dùng chung khi external boundary thực sự chung và ownership vẫn rõ; không gom mọi integration vào một “central adapter” duy nhất.

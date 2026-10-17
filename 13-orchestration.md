@@ -251,50 +251,22 @@ Các controller, scheduler và kubelet quan sát/cập nhật trạng thái qua 
 
 Pod là **đơn vị nhỏ nhất** trong Kubernetes — chứa 1 hoặc nhiều containers chia sẻ network và storage.
 
+```d2 title="4.1. Pod"
+direction: down
+single: "Pod order-service-7d4f8b-x2k\nIP 10.244.1.15" {
+ app: "Container order-service\nImage order-service:2.0 • Port8082"
+}
+sidecar: "Multi-container Pod\nIP 10.244.1.15" {
+ app: Main App — order-service Port8082
+ logs: Log Sidecar — Fluent Bit
+ volume: Shared Volume — /var/log {shape: cylinder}
+ app -- logs: Localhost / Shared network
+ app -> volume: Write
+ volume -> logs: Read / Ship
+}
 ```
-POD:
-────
 
-  Thông thường: 1 Pod = 1 Container (main application)
-
-  ┌──────────────────────────────────┐
-  │  Pod: order-service-7d4f8b-x2k   │
-  │                                  │
-  │  ┌────────────────────────────┐  │
-  │  │  Container: order-service  │  │
-  │  │  Image: order-service:2.0  │  │
-  │  │  Port: 8082                │  │
-  │  └────────────────────────────┘  │
-  │                                  │
-  │  IP: 10.244.1.15                 │
-  │  (mỗi Pod có 1 IP riêng)         │
-  └──────────────────────────────────┘
-
-
-  Multi-container Pod (Sidecar pattern):
-
-  ┌──────────────────────────────────────────┐
-  │  Pod: order-service-7d4f8b-x2k           │
-  │                                          │
-  │  ┌──────────────────┐ ┌───────────────┐  │
-  │  │  Container:      │ │  Sidecar:     │  │
-  │  │  order-service   │ │  log-shipper  │  │
-  │  │  (main app)      │ │  (Fluent Bit) │  │
-  │  │  Port: 8082      │ │               │  │
-  │  └──────────────────┘ └───────────────┘  │
-  │           │                   │          │
-  │           └───── shared ──────┘          │
-  │            network (localhost)           │
-  │            volumes (/var/log)            │
-  │                                          │
-  │  IP: 10.244.1.15                         │
-  └──────────────────────────────────────────┘
-
-  Containers trong cùng Pod:
-  • Chia sẻ network → gọi nhau qua localhost
-  • Chia sẻ volumes → đọc/ghi cùng files
-  • Cùng lifecycle → start/stop cùng nhau
-```
+Containers trong một Pod chia sẻ network namespace và có thể mount volumes chung. Pod là scheduling unit/lifecycle boundary; từng container vẫn có restart/startup/shutdown behavior riêng, không bảo đảm mọi container start/stop đúng cùng thời điểm.
 
 ```yaml source="snippets/4-1-pod.yaml"
 # pod.yaml — Ít khi tạo Pod trực tiếp, thường dùng Deployment
@@ -329,48 +301,18 @@ spec:
 
 ReplicaSet đảm bảo **luôn có đúng N pods** đang chạy.
 
+```d2 title="4.2. ReplicaSet"
+direction: right
+initial: "ReplicaSet order-service-rs\nDesired3 • Actual3\nPod1 / Pod2 / Pod3 — order:2.0"
+crash: "Pod2 crash\nDesired3 • Actual2 — Mismatch"
+create: "Controller tạo replacement Pod4"
+restored: "Pod1 / Pod3 / Pod4\nDesired3 • Actual3"
+initial -> crash
+crash -> create
+create -> restored
 ```
-REPLICASET:
-───────────
 
-  ReplicaSet: order-service-rs  (replicas: 3)
-  ┌──────────────────────────────────────────────────────┐
-  │                                                      │
-  │  Desired: 3 pods      Actual: 3 pods     ✅ OK       │
-  │                                                      │
-  │  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-  │  │  Pod 1   │  │  Pod 2   │  │  Pod 3   │            │
-  │  │  order   │  │  order   │  │  order   │            │
-  │  │  :2.0    │  │  :2.0    │  │  :2.0    │            │
-  │  └──────────┘  └──────────┘  └──────────┘            │
-  │                                                      │
-  └──────────────────────────────────────────────────────┘
-
-  Pod 2 crash:
-  ┌──────────────────────────────────────────────────────┐
-  │                                                      │
-  │  Desired: 3 pods      Actual: 2 pods     ❌ Mismatch │
-  │                                                      │
-  │  ┌──────────┐  ┌──────────┐                          │
-  │  │  Pod 1   │  │  Pod 3   │  Pod 2 crashed!          │
-  │  │  order   │  │  order   │                          │
-  │  │  :2.0    │  │  :2.0    │                          │
-  │  └──────────┘  └──────────┘                          │
-  │                                                      │
-  │  → ReplicaSet tạo Pod 4 ngay lập tức:                │
-  │                                                      │
-  │  ┌──────────┐  ┌──────────┐  ┌──────────┐            │
-  │  │  Pod 1   │  │  Pod 3   │  │  Pod 4   │  ← MỚI     │
-  │  │  order   │  │  order   │  │  order   │            │
-  │  │  :2.0    │  │  :2.0    │  │  :2.0    │            │
-  │  └──────────┘  └──────────┘  └──────────┘            │
-  │                                                      │
-  │  Desired: 3       Actual: 3             ✅ OK        │
-  └──────────────────────────────────────────────────────┘
-
-  ⚠️ Thực tế: KHÔNG tạo ReplicaSet trực tiếp.
-     Dùng Deployment → Deployment tạo ReplicaSet cho bạn.
-```
+Thường dùng Deployment để quản lý ReplicaSets, không tạo RS thủ công. Reconcile/replacement có độ trễ; container crash có thể được kubelet restart trong cùng Pod trước khi cần tạo Pod khác.
 
 ### 4.3. Deployment
 
@@ -440,80 +382,43 @@ spec:
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-3-deployment.yaml)
 
+```d2 title="4.3. Deployment"
+direction: right
+initial: "Ban đầu — v1 / v1 / v1"
+surge: "Step1 — v1 / v1 / v1 + v2 starting"
+ready: "Step2 — v2 ready, bỏ1 v1\nv1 / v1 / v2"
+next: "Step3 — v1 / v2 / v2"
+done: "Step4 — v2 / v2 / v2"
+rollback: "Nếu bug — kubectl rollout undo deployment/order-service"
+initial -> surge
+surge -> ready
+ready -> next
+next -> done
+done -> rollback: "Nếu lỗi"
 ```
-ROLLING UPDATE — Zero Downtime Deploy:
-───────────────────────────────────────
 
-  Hiện tại: order-service:1.0 (3 pods)
-  Mục tiêu: order-service:2.0
-
-  kubectl set image deployment/order-service order-service=order-service:2.0
-
-  Step 1: Tạo pod mới v2.0
-  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐
-  │ v1.0 │  │ v1.0 │  │ v1.0 │  │ v2.0 │ ← mới, chờ healthy
-  │  ✅  │  │  ✅  │  │  ✅  │  │  ⏳  │
-  └──────┘  └──────┘  └──────┘  └──────┘
-
-  Step 2: v2.0 healthy → xóa 1 v1.0
-  ┌──────┐  ┌──────┐  ┌──────┐
-  │ v1.0 │  │ v1.0 │  │ v2.0 │
-  │  ✅  │  │  ✅  │  │  ✅  │
-  └──────┘  └──────┘  └──────┘
-
-  Step 3: Tạo thêm v2.0, xóa v1.0
-  ┌──────┐  ┌──────┐  ┌──────┐
-  │ v1.0 │  │ v2.0 │  │ v2.0 │
-  │  ✅  │  │  ✅  │  │  ✅  │
-  └──────┘  └──────┘  └──────┘
-
-  Step 4: Hoàn thành
-  ┌──────┐  ┌──────┐  ┌──────┐
-  │ v2.0 │  │ v2.0 │  │ v2.0 │
-  │  ✅  │  │  ✅  │  │  ✅  │
-  └──────┘  └──────┘  └──────┘
-
-  → Luôn có pods serving → ZERO DOWNTIME ✅
-
-  Rollback nếu v2.0 có bug:
-  kubectl rollout undo deployment/order-service
-  → K8s tự revert về v1.0
-```
+Update image bằng `kubectl set image deployment/order-service order-service=order-service:2.0`. Zero downtime còn cần readiness, graceful termination, đủ capacity và compatibility giữa versions; rolling tự nó không bảo đảm mọi request đều thành công.
 
 ### 4.4. Service
 
 Service cung cấp **stable endpoint** để truy cập pods. Pods có thể bị tạo/xóa liên tục (IP thay đổi), nhưng Service IP và DNS name **không đổi**.
 
+```d2 title="4.4. Service"
+direction: right
+client: "Client — http://order-service:8082"
+service: "Service order-service\nClusterIP 10.96.32.100\nDNS order-service.production.svc.cluster.local"
+selector: "Selector / EndpointSlices\napp=order-service"
+p1: "Pod1 — 10.244.1.15"
+p2: "Pod2 — 10.244.2.20"
+p3: "Pod3 — 10.244.1.30"
+client -> service
+service -> selector
+selector -> p1
+selector -> p2
+selector -> p3
 ```
-KUBERNETES SERVICE:
-───────────────────
 
-  Pods thay đổi liên tục:
-    Pod order-abc (IP 10.244.1.5)  → bị xóa
-    Pod order-def (IP 10.244.2.8)  → được tạo mới
-    → IP thay đổi liên tục → client không thể hardcode IP
-
-  Service giải quyết:
-  ┌──────────────────────────────────────────────────────┐
-  │  Service: order-service                              │
-  │  ClusterIP: 10.96.32.100  (KHÔNG ĐỔI)                │
-  │  DNS: order-service.production.svc.cluster.local     │
-  │                                                      │
-  │  selector: app=order-service                         │
-  │                                                      │
-  │  ┌────────────┐  ┌────────────┐  ┌────────────┐      │
-  │  │  Pod 1     │  │  Pod 2     │  │  Pod 3     │      │
-  │  │ 10.244.1.15│  │ 10.244.2.20│  │ 10.244.1.30│      │
-  │  │            │  │            │  │            │      │
-  │  │ app:       │  │ app:       │  │ app:       │      │
-  │  │ order-svc  │  │ order-svc  │  │ order-svc  │      │
-  │  └────────────┘  └────────────┘  └────────────┘      │
-  │                                                      │
-  │  Client gọi: http://order-service:8082               │
-  │  → ClusterIP 10.96.32.100                            │
-  │  → kube-proxy route → 1 trong 3 pods                 │
-  └──────────────────────────────────────────────────────┘
-```
+Pod IP đổi khi Pod bị thay thế (ví dụ order-abc10.244.1.5 → order-def10.244.2.8). Service DNS/ClusterIP ổn định trong lifetime của Service; selector phải khớp Pod labels, không dùng `app=order-svc` nếu selector là `app=order-service`.
 
 ```yaml source="snippets/4-4-service.yaml"
 # service.yaml
@@ -561,33 +466,33 @@ SERVICE TYPES:
 
 Ingress quản lý **HTTP/HTTPS routing** từ bên ngoài vào cluster — thay vì tạo LoadBalancer cho mỗi service.
 
+```d2 title="4.5. Ingress"
+direction: down
+without: Không shared Ingress {
+ alb1: ALB1
+ alb2: ALB2
+ alb3: ALB3
+ user: User Service
+ order: Order Service
+ product: Product Service
+ alb1 -> user
+ alb2 -> order
+ alb3 -> product
+}
+with: Shared Ingress {
+ alb: Shared Load Balancer
+ controller: NGINX / Kong Ingress Controller
+ user: User Service
+ order: Order Service
+ product: Product Service
+ alb -> controller
+ controller -> user: /users
+ controller -> order: /orders
+ controller -> product: /products
+}
 ```
-INGRESS:
-────────
 
-  Không có Ingress — 1 LoadBalancer per service ($$$$):
-  ┌──────────────────────────────────────────────────────┐
-  │                                                      │
-  │  ALB ($18/mo) → user-service (ClusterIP)             │
-  │  ALB ($18/mo) → order-service (ClusterIP)            │
-  │  ALB ($18/mo) → product-service (ClusterIP)          │
-  │                                                      │
-  │  3 services = 3 ALBs = $54/month + data transfer     │
-  │  10 services = $180/month 😱                         │
-  └──────────────────────────────────────────────────────┘
-
-  Có Ingress — 1 LoadBalancer, routing theo path:
-  ┌──────────────────────────────────────────────────────┐
-  │                                                      │
-  │  ALB ($18/mo) → Ingress Controller (NGINX/Kong)      │
-  │                       │                              │
-  │                  /users   → user-service             │
-  │                  /orders  → order-service            │
-  │                  /products→ product-service          │
-  │                                                      │
-  │  10 services = 1 ALB = $18/month ✅                  │
-  └──────────────────────────────────────────────────────┘
-```
+Ví dụ cũ dùng mức 18 USD/LB/tháng để minh họa giảm 3 LB (54 USD) hay 10 LB (180 USD) xuống 1 LB (18 USD), chưa kể usage/data transfer. Đây không phải báo giá hiện hành; loại LB thực tế và controller/integration quyết định topology.
 
 ```yaml source="snippets/4-5-ingress.yaml"
 # ingress.yaml
@@ -719,38 +624,26 @@ spec:
 
 Namespace phân **chia tài nguyên** trong cluster — giống như "thư mục" cho resources.
 
+```d2 title="4.7. Namespace"
+direction: right
+cluster: Kubernetes Cluster {
+ prod: "Namespace production\nQuota20 CPU / 40Gi" {
+  order: Order ×3
+  user: User ×3
+  payment: Payment ×3
+ }
+ staging: "Namespace staging\nQuota4 CPU / 8Gi" {
+  order: Order ×1
+  user: User ×1
+  payment: Payment ×1
+ }
+ infra: Namespace infra { postgres: PostgreSQL; redis: Redis; kafka: Kafka }
+ monitoring: Namespace monitoring { prometheus: Prometheus; grafana: Grafana; jaeger: Jaeger }
+ prod.order -> infra.postgres: postgres.infra.svc.cluster.local — TCP5432
+}
 ```
-NAMESPACE:
-──────────
 
-  ┌──────────────────────────────────────────────────────┐
-  │  Kubernetes Cluster                                  │
-  │                                                      │
-  │  ┌──────────────────────┐  ┌──────────────────────┐  │
-  │  │  Namespace: production│ │  Namespace: staging  │  │
-  │  │                      │  │                      │  │
-  │  │  order-service (×3)  │  │  order-service (×1)  │  │
-  │  │  user-service  (×3)  │  │  user-service  (×1)  │  │
-  │  │  payment-svc   (×3)  │  │  payment-svc   (×1)  │  │
-  │  │                      │  │                      │  │
-  │  │  ResourceQuota:      │  │  ResourceQuota:      │  │
-  │  │  CPU: 20 cores       │  │  CPU: 4 cores        │  │
-  │  │  RAM: 40 Gi          │  │  RAM: 8 Gi           │  │
-  │  └──────────────────────┘  └──────────────────────┘  │
-  │                                                      │
-  │  ┌──────────────────────┐  ┌──────────────────────┐  │
-  │  │  Namespace: infra    │  │  Namespace: monitoring│ │
-  │  │                      │  │                      │  │
-  │  │  postgres            │  │  prometheus          │  │
-  │  │  redis               │  │  grafana             │  │
-  │  │  kafka               │  │  jaeger              │  │
-  │  └──────────────────────┘  └──────────────────────┘  │
-  └──────────────────────────────────────────────────────┘
-
-  Cross-namespace communication:
-  order-service (production) → postgres (infra):
-  http://postgres.infra.svc.cluster.local:5432
-```
+PostgreSQL dùng PostgreSQL/TCP protocol, không phải URL `http://...:5432`. Namespace không tự chặn network cross-namespace; dùng RBAC/NetworkPolicy để enforce isolation.
 
 ### 4.8. Tổng hợp quan hệ giữa các Objects
 
@@ -884,24 +777,19 @@ VPA:
 
 Cluster Autoscaler tự động **thêm/bớt nodes** (máy chủ) trong cluster.
 
-```
-CLUSTER AUTOSCALER:
-───────────────────
-
-  1. HPA muốn scale order-service 3 → 20 pods
-  2. Cluster hiện tại chỉ có 3 nodes, không đủ resources
-  3. Scheduler: "Pods pending — không có node phù hợp"
-  4. Cluster Autoscaler phát hiện → thêm nodes:
-
-  Trước:                          Sau:
-  ┌──────┐ ┌──────┐ ┌──────┐     ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
-  │Node 1│ │Node 2│ │Node 3│     │Node 1│ │Node 2│ │Node 3│ │Node 4│ │Node 5│
-  │ FULL │ │ FULL │ │ FULL │     │ FULL │ │ FULL │ │ FULL │ │ pods │ │ pods │
-  └──────┘ └──────┘ └──────┘     └──────┘ └──────┘ └──────┘ └──────┘ └──────┘
-                                                              ↑ NEW    ↑ NEW
-
-  Khi traffic giảm → HPA scale down pods → nodes trống
-  → Cluster Autoscaler xóa nodes trống → tiết kiệm tiền 💰
+```d2 title="5.4. Cluster Autoscaler"
+direction: right
+hpa: "HPA muốn Order từ3 lên20 Pods"
+capacity: "3 Nodes FULL — thiếu resources"
+pending: "Scheduler để Pods Pending"
+ca: "Cluster Autoscaler thêm Node4/5"
+schedule: "Pods được schedule lên Nodes mới"
+down: "Traffic giảm → HPA giảm Pods\nCA consolidate/remove Nodes khi đủ điều kiện"
+hpa -> capacity
+capacity -> pending
+pending -> ca
+ca -> schedule
+schedule -> down
 ```
 
 ### 5.5. KEDA — Event-Driven Autoscaling
@@ -1014,27 +902,20 @@ Tại sao cần Startup Probe?
 | **Liveness** | "App còn sống không?" | **Restart** container | Phát hiện deadlock, unrecoverable state |
 | **Readiness** | "App sẵn sàng nhận traffic?" | **Loại khỏi** Service endpoints | DB chưa sẵn sàng, đang overloaded |
 
-```
-Probe Timeline:
-────────────────
-
-  Container start
-      │
-      ▼
-  ┌──────────────────┐
-  │  Startup Probe   │  "Đã start xong chưa?"
-  │  Check mỗi 10s   │
-  │  Tối đa 5 phút   │
-  └────────┬─────────┘
-           │ PASS ✅
-           ▼
-  ┌──────────────────┐  ┌──────────────────┐
-  │  Liveness Probe  │  │  Readiness Probe │
-  │  Check mỗi 10s   │  │  Check mỗi 5s    │
-  │  "Còn sống?"     │  │  "Sẵn sàng?"     │
-  │                  │  │                  │
-  │  Fail → RESTART  │  │ Fail → NO TRAFFIC│
-  └──────────────────┘  └──────────────────┘
+```d2 title="6.4. So sánh 3 loại Probe"
+direction: down
+start: "Container start"
+startup: "Startup Probe\nMỗi10s • Tối đa5phút theo ví dụ"
+liveness: "Liveness Probe\nMỗi10s • Còn sống?"
+readiness: "Readiness Probe\nMỗi5s • Sẵn sàng?"
+restart: "Fail threshold → Restart container"
+exclude: "Fail → Không nhận traffic"
+start -> startup
+startup -> liveness: "PASS — bắt đầu kiểm tra"
+startup -> readiness: "PASS — bắt đầu kiểm tra"
+startup -> restart: "Quá failure threshold"
+liveness -> restart: "Fail"
+readiness -> exclude: "Fail"
 ```
 
 ---
@@ -1631,80 +1512,34 @@ SELF-MANAGED vs MANAGED KUBERNETES:
 
 ## 11. Ví dụ thực tế — E-Commerce trên Kubernetes
 
+```d2 title="11. Ví dụ thực tế — E-Commerce trên Kubernetes"
+direction: down
+alb: Cloud Load Balancer
+cluster: "AWS EKS\nWorkers5 × m5.xlarge 4vCPU/16GB\nCluster Autoscaler3–10 Nodes" {
+ control: AWS-managed Control Plane — API / etcd / Scheduler / Controllers
+ ingress: Namespace ingress { nginx: NGINX Controller — 3 Pods }
+ production: Namespace production {
+  user: User — Java21 / Pods3 / HPA3–10
+  order: Order — Java21 / Pods5 / HPA5–20
+  product: Product — Node20 / Pods3 / HPA3–10
+  payment: Payment — Go1.22 / Pods3 / HPA3–10
+  notification: Notification — Python3.12 / Pods2 / KEDA0–5
+  inventory: Inventory — Java21 / Pods3 / HPA3–10
+ }
+ data: Namespace data {
+  pg: PostgreSQL StatefulSet — Replicas3 / PVC100Gi
+  redis: Redis StatefulSet — Replicas3 / PVC10Gi
+  kafka: Kafka StatefulSet — Brokers3 / PVC50Gi
+ }
+ monitoring: Prometheus / Grafana / Jaeger / Fluent Bit
+ ingress.nginx -> production.user: /users
+ ingress.nginx -> production.order: /orders
+ ingress.nginx -> production.product: /products
+}
+alb -> cluster.ingress.nginx
 ```
-E-COMMERCE ON KUBERNETES:
-─────────────────────────
 
-  Scenario: 6 microservices trên AWS EKS
-
-  ┌────────────────────────────────────────────────────────────┐
-  │  AWS EKS Cluster (Managed Kubernetes)                      │
-  │                                                            │
-  │  ┌──────────────────────────────────────────────────────┐  │
-  │  │  Control Plane (AWS managed)                         │  │
-  │  │  API Server, etcd, Scheduler, Controller Manager     │  │
-  │  └──────────────────────────────────────────────────────┘  │
-  │                                                            │
-  │  ┌──────────────────────────────────────────────────────┐  │
-  │  │  Namespace: ingress                                  │  │
-  │  │                                                      │  │
-  │  │  ALB (AWS) → NGINX Ingress Controller (3 pods)       │  │
-  │  │              /users   → user-service                 │  │
-  │  │              /orders  → order-service                │  │
-  │  │              /products→ product-service              │  │
-  │  └──────────────────────────────────────────────────────┘  │
-  │                                                            │
-  │  ┌──────────────────────────────────────────────────────┐  │
-  │  │  Namespace: production                               │  │
-  │  │                                                      │  │
-  │  │  ┌────────────┐ ┌────────────┐ ┌────────────┐        │  │
-  │  │  │user-service│ │order-service││product-svc │        │  │
-  │  │  │ Deployment │ │ Deployment │ │ Deployment │        │  │
-  │  │  │ 3 pods     │ │ 5 pods     │ │ 3 pods     │        │  │
-  │  │  │ HPA: 3-10  │ │ HPA: 5-20  │ │ HPA: 3-10  │        │  │
-  │  │  │ Java 21    │ │ Java 21    │ │ Node.js 20 │        │  │
-  │  │  └────────────┘ └────────────┘ └────────────┘        │  │
-  │  │                                                      │  │
-  │  │  ┌────────────┐ ┌────────────┐ ┌────────────┐        │  │
-  │  │  │payment-svc │ │notification│ │inventory   │        │  │
-  │  │  │ Deployment │ │ Deployment │ │ Deployment │        │  │
-  │  │  │ 3 pods     │ │ 2 pods     │ │ 3 pods     │        │  │
-  │  │  │ HPA: 3-10  │ │ KEDA:0-5   │ │ HPA: 3-10  │        │  │
-  │  │  │ Go 1.22    │ │ Python 3.12│ │ Java 21    │        │  │
-  │  │  └────────────┘ └────────────┘ └────────────┘        │  │
-  │  └──────────────────────────────────────────────────────┘  │
-  │                                                            │
-  │  ┌──────────────────────────────────────────────────────┐  │
-  │  │  Namespace: data                                     │  │
-  │  │                                                      │  │
-  │  │  ┌────────────┐ ┌────────────┐ ┌────────────┐        │  │
-  │  │  │ PostgreSQL │ │   Redis    │ │   Kafka    │        │  │
-  │  │  │ StatefulSet│ │ StatefulSet│ │ StatefulSet│        │  │
-  │  │  │ 3 replicas │ │ 3 replicas │ │ 3 brokers  │        │  │
-  │  │  │ PVC: 100Gi │ │ PVC: 10Gi  │ │ PVC: 50Gi  │        │  │
-  │  │  └────────────┘ └────────────┘ └────────────┘        │  │
-  │  └──────────────────────────────────────────────────────┘  │
-  │                                                            │
-  │  ┌──────────────────────────────────────────────────────┐  │
-  │  │  Namespace: monitoring                               │  │
-  │  │                                                      │  │
-  │  │  Prometheus + Grafana + Jaeger + Fluent Bit          │  │
-  │  └──────────────────────────────────────────────────────┘  │
-  │                                                            │
-  │  Worker Nodes: 5 × m5.xlarge (4 vCPU, 16 GB RAM)           │
-  │  Cluster Autoscaler: 3 → 10 nodes                          │
-  └────────────────────────────────────────────────────────────┘
-
-  Deploy Flow:
-  ─────────────
-  Developer → git push → GitHub Actions:
-    1. docker build (multi-stage)
-    2. docker push → ECR
-    3. helm upgrade order-service \
-         --set image.tag=${GIT_SHA} \
-         -f values-production.yaml
-    4. K8s rolling update → zero downtime
-```
+Deploy flow: developer git push → GitHub Actions build multi-stage image → push ECR → `helm upgrade order-service --set image.tag=${GIT_SHA} -f values-production.yaml` → Kubernetes rolling update. Database StatefulSets cần replication/backup/operator riêng; chỉ đặt replicas=3 không tự có HA database. Kiểm tra LB/controller integration thực tế; topology là minh họa.
 
 ---
 

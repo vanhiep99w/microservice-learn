@@ -95,21 +95,23 @@ Một số thuật ngữ sẽ dùng xuyên suốt:
 
 Trong Monolith, một tiến trình lỗi thì cả ứng dụng dừng — đơn giản. Trong Microservice, nguy hiểm hơn: **lỗi lan truyền** qua các cuộc gọi đồng bộ (synchronous calls):
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                  CASCADING FAILURE                          │
-│                                                             │
-│  User ──▶ API Gateway ──▶ Order Service ──▶ Payment ❌ DOWN │
-│                             │                               │
-│                             ▼                               │
-│                    Threads chờ Payment vô hạn              │
-│                             │                               │
-│                             ▼                               │
-│                    Order Service ❌ DOWN                    │
-│                             │                               │
-│                             ▼                               │
-│                    API Gateway ❌ DOWN ──▶ TOÀN HỆ THỐNG SẬP│
-└─────────────────────────────────────────────────────────────┘
+```d2 title="1.2. Cascading Failure — vì sao một service lỗi kéo sập cả hệ thống"
+direction: right
+user: "User"
+gateway: "API Gateway"
+order: "Order Service"
+payment: "Payment DOWN"
+wait: "Order threads chờ vô hạn"
+orderdown: "Order DOWN"
+gatewaydown: "Gateway resource cạn"
+system: "Cascading failure toàn hệ thống"
+user -> gateway
+gateway -> order
+order -> payment
+payment -> wait
+wait -> orderdown
+orderdown -> gatewaydown
+gatewaydown -> system
 ```
 
 Có 3 con đường chính để lỗi lan truyền — và mỗi pattern trong tài liệu này chặn một con đường:
@@ -173,24 +175,27 @@ Mọi lúc                   Bulkhead              (giới hạn thiệt hại t
 
 ### 2.3. Bản đồ phòng thủ theo lớp
 
-```
-┌───────────────────────────────────────────────────────────────────────┐
-│                        RELIABILITY DEFENSE MAP                        │
-│                                                                       │
-│  TẦNG PHÁT HIỆN (góc nhìn hạ tầng)                                   │
-│  Health Check / Heartbeat ──▶ Discovery / Load Balancer / K8s         │
-│        ▲ probe hoặc heartbeat        │ ngừng route tới instance hỏng  │
-│        │                              ▼                               │
-│  ─────────────────────────────────────────────────────────────────    │
-│  TẦNG PHÒNG THỦ CỤC BỘ (bên trong MỖI caller, cho MỖI dependency)    │
-│                                                                       │
-│  Request ─▶ Bulkhead ─▶ Circuit Breaker ─▶ Retry ─▶ Timeout ─▶ Call  │
-│             (còn slot?)   (mạch đóng?)      (lỗi    (chờ quá  │      │
-│                                                      tạm?)    lâu?) │
-│                                                                       │
-│  Sau cùng: Fallback / fail fast khi mọi lớp phòng thủ đã từ chối      │
-│  (Fallback chi tiết: xem doc 10)                                     │
-└───────────────────────────────────────────────────────────────────────┘
+```d2 title="2.3. Bản đồ phòng thủ theo lớp"
+direction: down
+infra: Phát hiện / Hạ tầng {
+ health: Health Check / Heartbeat
+ routing: Discovery / LB / Kubernetes
+ health -> routing: Probe hoặc Heartbeat
+}
+local: Caller — Phòng thủ cho từng dependency {
+ request: Request
+ bulkhead: Bulkhead — Còn slot
+ breaker: Circuit Breaker — Cho phép gọi
+ retry: Retry — Lỗi tạm / Attempts / Deadline
+ timeout: Per-try Timeout
+ call: Dependency Call
+ fallback: Fallback / Fail fast
+ request -> bulkhead -> breaker -> retry -> timeout -> call
+ bulkhead -> fallback: Hết capacity
+ breaker -> fallback: OPEN
+ retry -> fallback: Hết retry budget
+}
+infra.routing -> local.call: Không route instance unhealthy
 ```
 
 > 💡 **Điểm mấu chốt**: các pattern không thay thế nhau mà **xếp lớp**. Mỗi lớp chỉ kích hoạt khi lớp trong hơn không giải quyết được. Phần phối hợp chi tiết ở [mục 8](#8-phối-hợp-các-pattern--thứ-tự-tương-tác-và-retry-storm).
@@ -420,13 +425,17 @@ Retry trả lời "thử lại một chút". Nhưng khi dependency lỗi **kéo 
 
 ### 5.2. Cách hoạt động
 
-```mermaid
-stateDiagram-v2
-    [*] --> Closed
-    Closed --> Open: Tỉ lệ lỗi vượt ngưỡng
-    Open --> HalfOpen: Hết thời gian chờ
-    HalfOpen --> Closed: Request thăm dò thành công
-    HalfOpen --> Open: Request thăm dò thất bại
+```d2 title="5.2. Cách hoạt động"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+Closed: "Closed"
+initial1 -> Closed
+Open: "Open"
+Closed -> Open: "Tỉ lệ lỗi vượt ngưỡng"
+HalfOpen: "HalfOpen"
+Open -> HalfOpen: "Hết thời gian chờ"
+HalfOpen -> Closed: "Request thăm dò thành công"
+HalfOpen -> Open: "Request thăm dò thất bại"
 ```
 
 | Trạng thái | Hành vi | Chuyển tiếp |
@@ -494,19 +503,25 @@ Tên pattern lấy từ **vách ngăn chống chìm của tàu thủy** (bulkhea
 
 Trong Microservice, vấn đề tương tự: các dependency **dùng chung một kho tài nguyên** của caller (thread pool, connection pool). Một dependency chậm sẽ **rút cạn kho chung**, khiến các dependency khỏe cũng bị "ngập" theo:
 
+```d2 title="6.1. Vấn đề cần giải quyết"
+direction: down
+shared: Không Bulkhead — Shared Pool200 {
+ payment: Payment chậm30s — chiếm190 threads
+ inventory: Inventory nhanh nhưng thiếu thread
+ notification: Notification nhanh nhưng thiếu thread
+ down: Order Service cạn tài nguyên
+ payment -> down
+ inventory -> down
+ notification -> down
+}
+isolated: Bulkhead — Pool theo dependency {
+ payment: Payment max100 — Chỉ pool này đầy
+ inventory: Inventory max60 — Còn capacity
+ notification: Notification max40 — Còn capacity
+}
 ```
-KHÔNG có Bulkhead — Order Service dùng chung 200 threads:
-  ├── Payment Service chậm (30s/call) ──▶ chiếm 190 threads
-  ├── Inventory Service (nhanh)        ──▶ không còn thread để gọi ❌
-  └── Notification Service (nhanh)     ──▶ không còn thread để gọi ❌
-  → Toàn bộ Order Service tê liệt vì MỘT dependency chậm
 
-CÓ Bulkhead — chia kho riêng cho từng dependency:
-  ├── Payment Pool:      max 100 threads → Payment chậm chỉ đầy pool này
-  ├── Inventory Pool:    max 60 threads  → vẫn chạy ✅
-  └── Notification Pool: max 40 threads  → vẫn chạy ✅
-  → Chỉ tính năng thanh toán bị ảnh hưởng, phần còn lại của service sống
-```
+Pool/queue phải có giới hạn và wait deadline. Cô lập dependency không tự bảo đảm shared request-handler pool sẽ không cạn.
 
 Điểm khác biệt với Timeout/CB: hai pattern kia xử lý **một cuộc gọi** (chờ bao lâu, thử lại bao nhiêu, chặn lúc nào); Bulkhead xử lý **phân bổ tài nguyên** — giới hạn **mức tối đa thiệt hại**.
 
@@ -537,29 +552,30 @@ Hai cách cài đặt phổ biến nhất trong ứng dụng:
 
 Use case: **Order Service gọi 3 dependency với mức độ quan trọng khác nhau**:
 
+```d2 title="6.3. Ví dụ thực tế"
+direction: down
+order: Order Service {
+ handlers: Request Handlers —200 threads
+ payment: Payment Pool —100 / Critical
+ inventory: Inventory Pool —60 / Critical
+ shipping: Shipping Pool —40 / Medium
+ notification: Notification Pool —20 / Low
+ handlers -> payment
+ handlers -> inventory
+ handlers -> shipping
+ handlers -> notification
+}
+payment: Payment Service — Chậm30s/call
+inventory: Inventory Service
+shipping: Shipping Service
+notification: Notification Service
+order.payment -> payment
+order.inventory -> inventory
+order.shipping -> shipping
+order.notification -> notification
 ```
-┌────────────────────────────────────────────────────────────┐
-│                     ORDER SERVICE                          │
-│                                                            │
-│   Request handler (200 threads)                           │
-│        │                                                   │
-│   ┌────┴─────────┬──────────────┬───────────────┐          │
-│   ▼              ▼              ▼               ▼          │
-│ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐    │
-│ │ Payment  │ │Inventory│ │ Shipping │ │ Notification │    │
-│ │ pool     │ │ pool    │ │ pool     │ │ pool         │    │
-│ │ 100 thrd │ │ 60 thrd │ │ 40 thrd  │ │ 20 thrd      │    │
-│ │ CRITICAL │ │ CRITICAL│ │ MEDIUM   │ │ LOW          │    │
-│ └────┬─────┘ └────┬─────┘ └────┬─────┘ └──────┬───────┘    │
-│      ▼            ▼           ▼               ▼            │
-│  Payment Svc  Inventory Svc  Shipping Svc  Notif Svc       │
-└────────────────────────────────────────────────────────────┘
 
-Sự cố: Payment Service chậm 30s/call
-→ Payment pool đầy → request thanh toán bị từ chối/treo trong pool
-→ Inventory (60), Shipping (40), Notif (20) pool không hề hấn gì
-→ User vẫn xem hàng, thêm giỏ hàng, nhận mail — chỉ checkout bị chặn
-```
+Dependency pools có giới hạn riêng, không phải phép chia cứng tổng200 request threads. Payment chậm chỉ nên làm đầy khoang Payment; vẫn cần bounded queue, timeout và bảo vệ shared handler capacity.
 
 Và một ví dụ Bulkhead ở tầng hạ tầng (Kubernetes) — cô lập bằng resource limits:
 
@@ -678,22 +694,26 @@ startupProbe:             # trả lời: boot xong chưa?
 
 Vòng phản hồi khi một instance hỏng:
 
+```d2 title="7.3. Ví dụ thực tế"
+direction: right
+hung: "Payment Instance3 treo"
+readyfail: "Readiness fail2 lần"
+remove: "Kubernetes gỡ Instance3 khỏi Service Endpoints"
+healthy: "Traffic sang healthy Instances1,2"
+livefail: "Liveness fail3 lần — Process không phản hồi"
+restart: "Kubelet restart Container3"
+startup: "Startup + Readiness pass"
+return: "Instance3 trở lại Endpoints"
+hung -> readyfail
+readyfail -> remove
+remove -> healthy
+healthy -> livefail
+livefail -> restart
+restart -> startup
+startup -> return
 ```
-Instance #3 của Payment Service rơi vào trạng thái treo
-   │
-   ▼ readiness probe fail (2 lần)
-K8s rút instance #3 khỏi Service Endpoints
-   │
-   ▼
-Traffic chỉ còn vào instance #1, #2 (healthy)
-   │
-   ▼ liveness probe fail (3 lần) — process thật sự treo
-Kubelet restart container #3
-   │
-   ▼ startup + readiness pass
-Instance #3 quay lại Endpoints, nhận traffic lại
-→ Toàn bộ tự động, không ai phải vào can thiệp lúc 3h sáng
-```
+
+Đây là kịch bản minh họa, không phải thứ tự đồng bộ bắt buộc: readiness và liveness được đánh giá độc lập theo cấu hình probes.
 
 > 📖 Thiết kế health endpoint chi tiết hơn (nên check gì, không nên check gì): [11 — Observability, mục 6.2](11-observability-evolvability.md#62-health-check-endpoint-design).
 
@@ -782,22 +802,26 @@ Lý do của từng vị trí:
 
 Đây là quy tắc phối hợp **phạm phải nhiều nhất**: Retry phải nằm **bên trong** Circuit Breaker (CB bọc ngoài), không phải ngược lại.
 
+```d2 title="8.2. Circuit Breaker bọc ngoài Retry — quy tắc số 1"
+direction: right
+attempts: Retry ngoài CB — Đếm từng attempt {
+ request: Một logical request
+ a1: Attempt1 — CB failure1
+ a2: Attempt2 — CB failure2
+ a3: Attempt3 — CB failure3
+ result: CB thấy3 failures
+ request -> a1 -> a2 -> a3 -> result
+}
+logical: CB ngoài Retry — Đếm kết quả logical request {
+ request: Một logical request
+ cb: Circuit Breaker cho qua
+ retry: Retry attempts1/2/3 đều fail
+ result: CB ghi một failure
+ request -> cb -> retry -> result
+}
 ```
-❌ SAI — Retry bọc ngoài Circuit Breaker:
-  Request
-   └─ Retry lần 1 ─▶ CB ghi nhận 1 failure
-   └─ Retry lần 2 ─▶ CB ghi nhận thêm 1 failure
-   └─ Retry lần 3 ─▶ CB ghi nhận thêm 1 failure
-  → MỘT request thật bị CB đếm thành 3 failures!
-  → Tỉ lệ lỗi bị thổi phồng → mạch mở SỚM và OAN
-  → Request khác bị reject dù service chưa thực sự tệ
 
-✅ ĐÚNG — Circuit Breaker bọc ngoài Retry:
-  Request ─▶ CB (mạch đóng, cho qua)
-              └─ Retry lần 1, 2, 3 ... đều thất bại
-           ─▶ CB ghi nhận 1 failure (cả chuỗi retry = 1 kết quả)
-  → Số liệu phản ánh đúng số request thật sự thất bại
-```
+Thứ tự decorator quyết định đơn vị đo. Ví dụ này chọn đếm logical requests; đếm từng attempt không tự động sai, nhưng phải thiết kế threshold, retry policy và loại trừ CallNotPermitted tương ứng.
 
 Ngoài việc đếm đúng, thứ tự này còn tạo ra hành vi hợp lý: khi mạch **OPEN**, request bị chặn **trước khi** Retry kịp chạy — hệ thống không tốn công retry vào một dependency đã bị tuyên bố ngừng phục vụ.
 
@@ -809,17 +833,20 @@ Ba quy tắc về timeout khi các service gọi nhau theo chuỗi:
 
 **Quy tắc 1 — Timeout giảm dần theo chiều sâu gọi** (tầng ngoài ≥ tổng tầng trong):
 
+```d2 title="8.3. Timeout propagation và Deadline budget"
+direction: right
+client: "Client30s"
+gateway: "Gateway10s"
+order: "Order5s"
+payment: "Payment3s"
+bank: "Bank API2s"
+client -> gateway
+gateway -> order
+order -> payment
+payment -> bank
 ```
-Client (timeout 30s)
-  └─▶ API Gateway (10s)
-        └─▶ Order Service (5s)
-              └─▶ Payment Service (3s)
-                    └─▶ Bank API (2s)
 
-Mọi tầng bên trong Bank API làm việc vô nghĩa nếu tổng vượt 30s của Client.
-Nếu đặt ngược (Client 5s nhưng Bank 8s) → Client đã bỏ cuộc,
-Order/Payment vẫn đang ngẫm cứu gọi Bank: lãng phí tài nguyên + kết quả rơi vô.
-```
+Timeout budget giảm vào trong, có chừa network overhead và phần xử lý còn lại. Propagate deadline/cancellation để caller hết hạn không để downstream tiếp tục công việc vô ích.
 
 **Quy tắc 2 — Chuỗi retry phải nằm trong overall deadline**:
 
@@ -843,31 +870,35 @@ Nếu KHÔNG có overall deadline:
 - **gRPC** hỗ trợ **deadline propagation** chuẩn: deadline được truyền trong metadata của mọi call, tầng trong biết chính xác "còn bao nhiêu thời gian của request gốc" và **tự hủy** khi hết hạn — tránh làm việc vô ích.
 - Với REST, chưa có chuẩn chung được áp dụng rộng rãi — team thường tự truyền deadline qua header và các tầng trong tôn trọng nó.
 
-```
-Deadline propagation (gRPC-style):
-Client gửi lúc t=0, deadline = t+5s
-  └─▶ Service A (nhận t+0.2s, còn 4.8s) — thấy deadline thấp, chỉ làm phần việc cần thiết
-        └─▶ Service B (nhận t+3.5s, còn 1.5s)
-              └─▶ Còn 1.5s cho cả DB query → B set DB timeout 1.4s thay vì 3s mặc định
+```d2 title="8.3. Timeout propagation và Deadline budget"
+direction: right
+client: "Client t0 — Deadline t+5s"
+a: "Service A nhận t+0.2s — Còn4.8s"
+b: "Service B nhận t+3.5s — Còn1.5s"
+db: "DB timeout1.4s thay default3s"
+client -> a
+a -> b
+b -> db
 ```
 
 ### 8.4. Retry Storm — nguyên nhân và cách tránh
 
 **Retry Storm** (bão retry): khi nhiều tầng trong chuỗi gọi **đều bật retry**, lưu lượng tăng theo **cấp số nhân** đúng lúc hệ thống đang yếu nhất — retry vốn là phản ứng tự vệ, nhưng dùng sai lại thành đòn kết liễu.
 
+```d2 title="8.4. Retry Storm — nguyên nhân và cách tránh"
+direction: right
+user: "1 logical request"
+gateway: "Gateway — Max3 attempts"
+order: "Order — Max3 attempts"
+payment: "Payment — Max3 attempts"
+db: "DB — Tối đa27 calls"
+user -> gateway
+gateway -> order
+order -> payment
+payment -> db
 ```
-Chuỗi 3 tầng, mỗi tầng retry tối đa 3 lần:
 
-  1 request từ user
-    └─ Gateway retry 3 ─▶ Order
-          └─ Order retry 3 ─▶ Payment
-                └─ Payment retry 3 ─▶ Database
-
-  Lưu lượng đổ vào Database = 3 × 3 × 3 = 27 requests / 1 request thật (×27)
-
-  1.000 users đồng thời giỏ hàng → 27.000 requests dồn vào DB
-  — đúng khoảnh khắc DB đang quá tải và mọi tầng đang "tự cứu".
-```
+3 attempts mỗi tầng (gồm lần đầu) → 3×3×3=27 DB calls, không phải 3 retries cộng lần đầu. 1.000 logical requests có thể tạo 27.000 DB calls đúng lúc dependency đang quá tải.
 
 Công thức khuếch đại: mỗi tầng gửi tối đa `r + 1` cuộc gọi cho một request thật (1 lần đầu + `r` lần retry), nên đáy chuỗi nhận tối đa `(r + 1)^depth` cuộc gọi. Với 3 tầng, mỗi tầng retry 3 lần: `4³ = 64` cuộc gọi cho một request thật — sơ đồ trên chỉ đếm phần retry nên ra 27, còn tính cả lần gọi đầu thì là 64. Dù đếm theo cách nào, tải vẫn **nhân lên hàng chục lần**, và tất cả dồn vào đúng khoảnh khắc hệ thống đang yếu nhất — đó mới là kẻ thù.
 

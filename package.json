@@ -12,6 +12,7 @@
     "deploy": "npm run build && wrangler pages deploy dist",
     "test": "node --test scripts/*.test.mjs",
     "check-diagrams": "node scripts/check-diagrams.mjs",
+    "diagrams:inventory": "node scripts/diagram-inventory.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -88,20 +88,23 @@ Hai tài liệu bổ trợ nhau: trước khi áp dụng bất kỳ pattern nào
 
 **Big Bang Rewrite** — viết lại toàn bộ hệ thống mới rồi switch một lần — là phương án đối lập mà mọi Decomposition Pattern đều cố tránh:
 
-```
-Big Bang Rewrite                    Incremental Migration (các pattern)
-────────────────────                ─────────────────────────────────────
-Viết hệ mới 100%                    Tách từng phần, mỗi phần chạy thật
-    │                               ─────────────────────────────
-    │ (tháng, năm...)               Part 1 live → verify → Part 2 live
-    ▼                                   → verify → ...
-Switch một lần                          │
-    │                                   ▼
-    ├── Thất bại = mất tất cả       Luôn có giá trị giao sau từng phần
-    ├── Hệ cũ vẫn phải sửa bug      Fail nhỏ, rollback được từng phần
-    │   (double work)               Hệ cũ nhỏ dần theo thời gian
-    └── Requirements thay đổi
-        trong lúc viết lại
+```d2 title="1.3. Vì sao không Big Bang Rewrite"
+direction: down
+big: Big Bang Rewrite {
+ rewrite: Viết hệ mới100%
+ switch: Switch một lần
+ risk: Thất bại lớn / Double work sửa hệ cũ / Requirements thay đổi
+ rewrite -> switch: Tháng hoặc năm
+ switch -> risk
+}
+incremental: Incremental Migration {
+ p1: Part1 live
+ verify1: Verify
+ p2: Part2 live
+ verify2: Verify và lặp lại
+ result: Giao giá trị từng phần / Rollback nhỏ / Hệ cũ nhỏ dần
+ p1 -> verify1 -> p2 -> verify2 -> result
+}
 ```
 
 Các lý do cốt lõi khiến big bang rewrite nguy hiểm:
@@ -117,34 +120,33 @@ Các lý do cốt lõi khiến big bang rewrite nguy hiểm:
 
 Mỗi pattern can thiệp vào **một tầng khác nhau** của hệ thống — đây chính là chìa khóa để chọn đúng pattern (chi tiết ở [mục 5](#5-bảng-chọn-chiến-lược-migration)):
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    DECOMPOSITION PATTERNS MAP                       │
-│                                                                     │
-│  TẦNG CAN THIỆP        PATTERN              TRÁCH nhiệm chính       │
-│  ──────────────        ────────              ────────────────       │
-│                                                                     │
-│  Routing (edge)        Strangler Fig        Điều hướng traffic      │
-│  ─────────────         ─────────────        giữa monolith và        │
-│  Client → [Proxy/API Gateway]              service mới              │
-│              ├──▶ Microservice ✨                                   │
-│              └──▶ Monolith (còn lại)                                 │
-│                                                                     │
-│  Code (bên trong       Branch by            Thay implementation     │
-│  monolith)             Abstraction          sau một interface,      │
-│  ─────────────         ──────────           caller không cần biết   │
-│  Caller → [Interface] ──┬─▶ Old Impl                               │
-│                         └─▶ New Impl → Service mới ✨               │
-│                                                                     │
-│  Song song             Vine Pattern          Viết mới hoàn toàn     │
-│  (codebase mới)        ────────────          chạy cạnh hệ cũ,       │
-│  ───────────           Monolith (frozen) ⟷   compare rồi cutover    │
-│                        New Service ✨ (parallel run)                 │
-│                                                                     │
-│  KỸ THUẬT HỖ TRỢ (dùng kèm bất kỳ pattern nào):                     │
-│  Feature Toggle · Canary · Dark Launching · Parallel Run            │
-│  Event Interception · Asset Capture · Anti-corruption Layer         │
-└─────────────────────────────────────────────────────────────────────┘
+```d2 title="1.4. Bản đồ các Decomposition Patterns"
+direction: right
+routing: Strangler Fig — Tầng routing {
+ client: Client
+ proxy: Proxy / API Gateway
+ old: Monolith còn lại
+ new: New Microservice
+ client -> proxy
+ proxy -> old
+ proxy -> new
+}
+code: Branch by Abstraction — Bên trong code {
+ caller: Caller
+ abstraction: Interface
+ old: Old Implementation
+ new: New Implementation
+ service: New Service
+ caller -> abstraction
+ abstraction -> old
+ abstraction -> new -> service
+}
+parallel: Vine — Codebase song song {
+ old: Monolith frozen
+ new: New Service
+ old <-> new: Parallel run / Compare trước cutover
+}
+support: Feature Toggle / Canary / Dark Launch / Parallel Run / Event Interception / Asset Capture / ACL
 ```
 
 Ba pattern này **không loại trừ nhau** — một chương trình migration thực tế gần như luôn kết hợp nhiều pattern cùng lúc (xem [mục 6](#6-kết-hợp-các-decomposition-patterns)).
@@ -332,54 +334,23 @@ Strangler Fig thao tác ở **tầng routing bên ngoài** (HTTP, proxy). Branch
 
 ### 3.2. Cách hoạt động từng bước
 
-```
-Phase 0 — Trước: caller gọi trực tiếp implementation cũ
-┌────────────────────────────────────────────┐
-│ Caller A ──┐                               │
-│ Caller B ──┼──▶ ┌───────────────────────┐  │
-│ Caller C ──┘    │ LegacyPaymentModule   │  │
-│                 │ (code cũ, cần thay)   │  │
-│                 └───────────────────────┘  │
-└────────────────────────────────────────────┘
-
-Phase 1 — Tạo abstraction, implementation cũ đứng sau nó
-┌────────────────────────────────────────────┐
-│ Caller A ──┐                               │
-│ Caller B ──┼──▶ ┌───────────────────────┐  │
-│ Caller C ──┘    │ «interface»           │  │
-│                 │ PaymentProcessor      │  │
-│                 └──────────┬────────────┘  │
-│                            ▼               │
-│                 ┌───────────────────────┐  │
-│                 │ LegacyPaymentModule   │  │
-│                 └───────────────────────┘  │
-└────────────────────────────────────────────┘
-
-Phase 2 — Refactor từng caller qua abstraction (mỗi bước đều deploy được)
-┌────────────────────────────────────────────┐
-│ Caller A ──▶ PaymentProcessor ◀── Caller B  │
-│ Caller C ──▶ PaymentProcessor (đang dở)     │
-└────────────────────────────────────────────┘
-
-Phase 3 — Thêm implementation mới; feature flag quyết định chạy impl nào
-┌────────────────────────────────────────────┐
-│             PaymentProcessor               │
-│                 ┌──────┴──────┐            │
-│        flag = old     flag = new           │
-│                 ▼            ▼             │
-│      ┌──────────────┐  ┌────────────────┐  │
-│      │ Legacy Impl  │  │ New Impl       │  │
-│      │              │  │ → gọi Payment  │  │
-│      │              │  │   Service ✨    │  │
-│      └──────────────┘  └────────────────┘  │
-└────────────────────────────────────────────┘
-
-Phase 4 — Chuyển flag dần (theo %, theo cohort), verify từng bước
-
-Phase 5 — Dọn dẹp: xóa Legacy Impl, xóa luôn abstraction nếu không còn cần
-┌────────────────────────────────────────────┐
-│ Caller A/B/C ──▶ New Impl ──▶ Payment Svc  │
-└────────────────────────────────────────────┘
+```d2 title="3.2. Cách hoạt động từng bước"
+direction: down
+p0: Phase0 — Caller A/B/C gọi Legacy trực tiếp
+p1: Phase1 — Thêm PaymentProcessor interface trước LegacyPaymentModule
+p2: Phase2 — Refactor từng caller sang interface; mỗi bước deploy được
+p3: Phase3 — Feature flag chọn implementation {
+ abstraction: PaymentProcessor
+ old: Legacy Implementation
+ new: New Implementation
+ service: Payment Service
+ abstraction -> old: flag old
+ abstraction -> new: flag new
+ new -> service
+}
+p4: Phase4 — Tăng cohort / Percentage và verify
+p5: Phase5 — Callers → New Implementation → Payment Service; xóa Legacy và abstraction nếu thừa
+p0 -> p1 -> p2 -> p3 -> p4 -> p5
 ```
 
 Các nguyên tắc quan trọng:
@@ -523,21 +494,29 @@ Một hệ thống quản lý khách sạn có module Billing viết trên nền
 - Branch by Abstraction? — phải refactor được code cũ qua interface; nhưng code cũ không có test, sửa một chỗ gãy ba chỗ, rủi ro refactoring cao.
 - **Vine** — viết Billing service mới với data model và pricing engine mới; hệ cũ đóng băng.
 
+```d2 title="4.3. Ví dụ use case — viết lại Billing service song song"
+direction: right
+reservation: "Reservation"
+old: "Monolith Billing FROZEN"
+new: "New Billing Service"
+a: "Invoice A"
+report: "Report"
+b: "Invoice B"
+compare: "Comparer — So sánh mỗi ngày"
+investigate: "Diff khác0 → điều tra bug / Hidden legacy behavior"
+cutover: "Diff0 trong N ngày → xem xét cutover"
+reservation -> old
+reservation -> new: "Mirror input"
+old -> a
+old -> report
+new -> b
+a -> compare
+b -> compare
+compare -> investigate: "Có diff"
+compare -> cutover: "Đạt tiêu chí"
 ```
-┌───────────────────────────────────────────────────────────────┐
-│ GIAI ĐOẠN PARALLEL RUN                                        │
-│                                                               │
-│   Reservation ──▶ Monolith Billing (FROZEN) ──▶ Invoice A     │
-│        │                                    ──▶ Report        │
-│        │                                                      │
-│        └────▶ (mirror input) ──▶ Billing Service ✨           │
-│                                    └──▶ Invoice B             │
-│                                                               │
-│   Comparer: so sánh A vs B từng ngày                          │
-│   ├── Diff ≠ 0 → điều tra: bug mới? hay behavior ẩn của cũ?   │
-│   └── Diff = 0 trong N ngày liên tiếp → đủ điều kiện cutover  │
-└───────────────────────────────────────────────────────────────┘
-```
+
+Parallel run phải cô lập side effects: không gửi hai hóa đơn hoặc charge hai lần. Diff bằng0 là một tiêu chí, không thay thế kiểm tra completeness và operational readiness.
 
 Điều thú vị thường xảy ra: các khác biệt giữa A và B không luôn là bug của hệ mới — một phần là **behavior ẩn của hệ cũ** (rounding riêng, miễn phí đặc biệt cho khách VIP cũ...) mà không ai còn nhớ. Parallel run chính là công cụ **khai quật requirements bị lãng quên**. Sau khi cutover, mô hình pricing mới chỉ code trong Billing Service — monolith không bao giờ phải biết.
 
@@ -670,21 +649,21 @@ Ba lưu ý khi đọc flow:
 
 Tình huống điển hình — tách Order module:
 
-```
-Bước 1 — Proxy route /orders/** → Order Service (Strangler, tầng ngoài)
-
-Bước 2 — Nhưng bên trong monolith, các module khác (Report, Marketing...)
-        vẫn gọi trực tiếp OrderService class (gọi nội bộ, không qua HTTP!)
-
-        Report module ──▶ OrderService class ──▶ cùng DB
-
-Bước 3 — Branch by Abstraction cho phần nội bộ này:
-
-        Report module ──▶ IOrderService ──┬─▶ OldOrderService (legacy)
-                                         └─▶ OrderServiceClient
-                                              → gọi Order Service qua API ✨
-
-Bước 4 — Xóa OldOrderService + bảng orders khỏi monolith
+```d2 title="6.1. Strangler Fig kết hợp Branch by Abstraction"
+direction: right
+proxy: "1. Proxy /orders/** → New Order Service"
+internal: "2. Report / Marketing vẫn gọi OrderService class → Legacy DB"
+interface: "3. IOrderService abstraction"
+old: "OldOrderService — Legacy"
+client: "OrderServiceClient"
+service: "New Order Service API"
+cleanup: "4. Xóa Old implementation / orders sau migration và rollback window"
+proxy -> internal: "Chỉ routing chưa đủ"
+internal -> interface: "Refactor callers"
+interface -> old: "Old flag"
+interface -> client: "New flag"
+client -> service
+service -> cleanup
 ```
 
 > 💡 Nguyên tắc: **một khi module đã được tách thành service, mọi truy cập còn lại trong monolith phải đi qua abstraction (rồi dần qua API/event của service)** — không để hai đường tiếp cận dữ liệu cùng sống mãi.

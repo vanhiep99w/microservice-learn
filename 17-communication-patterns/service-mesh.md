@@ -338,14 +338,17 @@ API Gateway và Service Mesh thường cùng xuất hiện trong một hệ th�
 
 Gateway trả lời câu hỏi: **client bên ngoài đi vào hệ thống bằng contract nào?** Mesh trả lời câu hỏi: **các workload bên trong gọi nhau an toàn và có kiểm soát ra sao?**
 
-```text
-Client ── North-South ──▶ API Gateway ──▶ Service A
-                                            │
-                         East-West          ▼
-                                      Service Mesh
-                                            │
-                                            ▼
-                                         Service B
+```d2 title="Vì sao không thay thế nhau"
+direction: right
+client: Client
+gateway: API Gateway
+mesh: Service Mesh — East-West {
+ a: Service A
+ b: Service B
+ a -> b
+}
+client -> gateway: North-South
+gateway -> mesh.a
 ```
 
 Dùng Service Mesh không tự cung cấp public API aggregation, user Authentication hoặc Rate Limiting theo tenant. Dùng API Gateway cũng không tự bảo vệ mọi call trực tiếp giữa `Service A` và `Service B`. Hai pattern bổ sung cho nhau, nhưng policy của mỗi lớp nên được giữ đúng boundary.

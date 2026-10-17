@@ -104,16 +104,22 @@ Mỗi hop đồng bộ có thời gian truyền request, serialization hoặc de
 
 Nếu các call chạy song song, latency không cộng toàn bộ như chain nối tiếp. Tuy vậy, response vẫn phải chờ dependency chậm nhất trong nhóm bắt buộc. Fan-out cũng tạo thêm connection, CPU và các điểm timeout.
 
-```text
-Request deadline của client
-  └─ Gateway
-       └─ Order Service
-            └─ Payment Service
-                 └─ Fraud Service
-                      └─ Bank API
-
-Mỗi tầng chỉ còn phần budget còn lại của request gốc.
+```d2 title="Latency chồng dồn"
+direction: right
+client: "Client Request Deadline"
+gateway: "Gateway"
+order: "Order"
+payment: "Payment"
+fraud: "Fraud"
+bank: "Bank API"
+client -> gateway
+gateway -> order
+order -> payment
+payment -> fraud
+fraud -> bank
 ```
+
+Mỗi tầng chỉ còn deadline budget còn lại của request gốc.
 
 Không nên chọn timeout riêng cho từng tầng rồi giả định tổng thời gian vẫn nằm trong SLA. Một lần retry hoặc một khoảng backoff cũng tiêu vào budget của request ngoài cùng.
 
@@ -127,13 +133,19 @@ Ví dụ, Order Service có thể không có lỗi nhưng vẫn không hoàn th�
 
 **Cascading failure** là lỗi lan truyền dây chuyền từ một dependency sang các caller và chức năng khác. Khi downstream chậm hoặc không trả response, upstream tiếp tục giữ thread, connection hoặc slot xử lý trong thời gian chờ. Nhiều request như vậy có thể làm pool cạn kiệt và khiến upstream cũng không nhận được request mới.
 
-```text
-Payment hoặc Fraud Service chậm
-        │
-        ├── Order Service giữ connection và thread lâu hơn
-        ├── Request mới xếp hàng hoặc chờ pool
-        ├── Retry ở nhiều tầng tạo thêm request
-        └── Tài nguyên caller cạn kiệt → lỗi lan sang flow khác
+```d2 title="Cascading failure và cạn kiệt tài nguyên"
+direction: right
+slow: "Payment / Fraud chậm"
+holding: "Order giữ connection / Thread lâu hơn"
+queue: "Request chờ queue / Pool"
+retry: "Nhiều tầng retry tăng load"
+exhausted: "Caller resource cạn → Lỗi lan flow khác"
+slow -> holding
+slow -> queue
+slow -> retry
+holding -> exhausted
+queue -> exhausted
+retry -> exhausted
 ```
 
 Retry không có giới hạn làm failure nặng hơn. Nếu Gateway, Order và Payment đều tự retry mà không có budget chung, một request logic có thể tạo nhiều request vật lý tới dependency đã quá tải. Đây là **retry storm** (bão retry), không phải cơ chế phục hồi an toàn.
@@ -236,13 +248,21 @@ Notification và Analytics thường không cần response của checkout để 
 
 Một cách tách đường đi là:
 
-```text
-Checkout request
-  └─ Sync: Gateway → Order → các bước bắt buộc của payment
-
-Sau khi OrderCreated
-  └─ Async: Broker → Notification
-                    └─ Analytics
+```d2 title="Phần không cần nằm trên critical path"
+direction: right
+checkout: "Checkout Request"
+gateway: "Gateway"
+order: "Order"
+payment: "Required Payment Steps"
+broker: "Broker"
+notification: "Notification"
+analytics: "Analytics"
+checkout -> gateway: "Sync"
+gateway -> order: "Sync"
+order -> payment: "Sync"
+order -> broker: "OrderCreated — Sau local commit"
+broker -> notification: "Async"
+broker -> analytics: "Async"
 ```
 
 Việc chuyển sang async không có nghĩa consumer xử lý ngay lập tức hoặc producer không còn dependency nào. Hệ thống cần mô hình hóa trạng thái xử lý, retry, duplicate và eventual consistency theo contract của từng event.

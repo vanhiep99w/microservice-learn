@@ -48,19 +48,25 @@ Bulkhead không làm dependency khỏe lại. Nó giới hạn **blast radius** 
 
 Giả sử Order Service có một thread pool dùng chung với 200 threads. Payment Service bị chậm và mỗi call mất khoảng 30 giây. Các request gọi Payment sẽ giữ worker lâu hơn bình thường. Nếu chúng chiếm gần hết pool, các request gọi Inventory hoặc Notification cũng không còn worker để chạy.
 
-```text
-KHÔNG có Bulkhead — dùng chung 200 threads:
-  ├── Payment Service chậm (30s/call) ──▶ chiếm 190 threads
-  ├── Inventory Service (nhanh)        ──▶ không còn thread để gọi ❌
-  └── Notification Service (nhanh)     ──▶ không còn thread để gọi ❌
-  → Toàn bộ Order Service tê liệt vì một dependency chậm
-
-CÓ Bulkhead — chia pool theo dependency:
-  ├── Payment Pool:      tối đa 100 threads → chỉ khoang Payment đầy
-  ├── Inventory Pool:    tối đa 60 threads  → vẫn có tài nguyên ✅
-  └── Notification Pool: tối đa 40 threads  → vẫn có tài nguyên ✅
-  → Thiệt hại tập trung ở Payment; các luồng khác vẫn có cơ hội hoạt động
+```d2 title="Failure mode cần ngăn chặn"
+direction: down
+shared: Không Bulkhead — Shared Pool200 {
+ payment: Payment chậm30s — chiếm190 threads
+ inventory: Inventory nhanh nhưng thiếu thread
+ notification: Notification nhanh nhưng thiếu thread
+ down: Order Service cạn tài nguyên
+ payment -> down
+ inventory -> down
+ notification -> down
+}
+isolated: Bulkhead — Pool theo dependency {
+ payment: Payment max100 — Chỉ pool này đầy
+ inventory: Inventory max60 — Còn capacity
+ notification: Notification max40 — Còn capacity
+}
 ```
+
+Pool/queue phải có giới hạn và wait deadline. Cô lập dependency không tự bảo đảm shared request-handler pool sẽ không cạn.
 
 | Cách tổ chức tài nguyên | Khi Payment chậm | Ảnh hưởng tới dependency khác |
 |---|---|---|

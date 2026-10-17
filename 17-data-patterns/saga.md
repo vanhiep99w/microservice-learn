@@ -306,17 +306,27 @@ Nếu Inventory Service không đủ hàng ở bước 3, Payment đã có thể
 3. Order Service chạy `CancelOrder` và giữ audit trail của order.
 4. Nếu refund hoặc cancel thất bại, Saga chuyển sang trạng thái đang compensation hoặc cần xử lý, thay vì báo `CONFIRMED` hay coi workflow đã kết thúc thành công.
 
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING: CreateOrder
-    PENDING --> PAYMENT_COMPLETED: ChargePayment OK
-    PAYMENT_COMPLETED --> CONFIRMED: ReserveStock OK
-    PAYMENT_COMPLETED --> COMPENSATING: ReserveStock failed
-    COMPENSATING --> CANCELLED: Refund và cancel OK
-    COMPENSATING --> COMPENSATION_FAILED: Compensation lỗi
-    CONFIRMED --> [*]
-    CANCELLED --> [*]
-    COMPENSATION_FAILED --> [*]
+```d2 title="Khi Inventory Service từ chối"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+PENDING: "PENDING"
+initial1 -> PENDING: "CreateOrder"
+PAYMENT_COMPLETED: "PAYMENT_COMPLETED"
+PENDING -> PAYMENT_COMPLETED: "ChargePayment OK"
+CONFIRMED: "CONFIRMED"
+PAYMENT_COMPLETED -> CONFIRMED: "ReserveStock OK"
+COMPENSATING: "COMPENSATING"
+PAYMENT_COMPLETED -> COMPENSATING: "ReserveStock failed"
+CANCELLED: "CANCELLED"
+COMPENSATING -> CANCELLED: "Refund và cancel OK"
+COMPENSATION_FAILED: "COMPENSATION_FAILED"
+COMPENSATING -> COMPENSATION_FAILED: "Compensation lỗi"
+final2: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+CONFIRMED -> final2
+final3: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+CANCELLED -> final3
+final4: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+COMPENSATION_FAILED -> final4
 ```
 
 Điểm quan trọng là `CANCELLED` không có nghĩa các transaction trước đó chưa từng xảy ra. Payment charge và refund vẫn cần được đối soát bằng các identity tương ứng.

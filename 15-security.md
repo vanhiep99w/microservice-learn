@@ -67,27 +67,24 @@
 
 Trong kiến trúc Monolith, bảo mật tập trung tại một điểm — một ứng dụng, một database, một firewall. Nhưng khi chuyển sang Microservice, **bề mặt tấn công (attack surface) tăng lên gấp nhiều lần**: hàng chục service giao tiếp với nhau qua network, mỗi service có database riêng, mỗi API endpoint là một điểm có thể bị khai thác.
 
+```d2 title="1. Giới thiệu"
+direction: down
+monolith: "Monolith — mô hình đơn giản\nMột entry / auth module / DB / firewall" { app: Application; db: DB; app -- db }
+micro: "Microservices — N entry/deployment/database boundaries" {
+ a: Service A
+ b: Service B
+ c: Service C
+ da: DB A
+ db: DB B
+ dc: DB C
+ a -- b -- c
+ a -- da
+ b -- db
+ c -- dc
+}
 ```
-BẢO MẬT TRONG MICROSERVICE — TẠI SAO KHÓ HƠN?
-─────────────────────────────────────────────────
 
-  MONOLITH:                          MICROSERVICE:
-  ┌─────────────────────┐            ┌─────┐  ┌─────┐  ┌─────┐
-  │   🔒 1 entry point  │            │ Svc │──│ Svc │──│ Svc │
-  │   1 auth module     │            │  A  │  │  B  │  │  C  │
-  │   1 DB              │            └──┬──┘  └──┬──┘  └──┬──┘
-  │   1 firewall        │               │        │        │
-  └─────────────────────┘            ┌──┴──┐  ┌──┴──┐  ┌──┴──┐
-                                     │ DB  │  │ DB  │  │ DB  │
-  Bảo mật: Đơn giản                  └─────┘  └─────┘  └─────┘
-  Quản lý: 1 chỗ
-                                     🔒 N entry points
-                                     🔒 N×(N-1) connections
-                                     🔒 N databases
-                                     🔒 N deployment units
-
-                                     Bảo mật: PHỨC TẠP
-```
+Attack surface tăng với nhiều trust boundaries; topology fully connected có thể tới N×(N−1) directed service relationships, không phải mọi hệ thống đều có tất cả kết nối đó.
 
 Tài liệu này bao gồm toàn bộ các khía cạnh bảo mật trong kiến trúc Microservice — từ Authentication, Authorization, mTLS cho đến Zero Trust và Container Security.
 
@@ -145,64 +142,57 @@ payment -- internal
 
 **Authentication** (AuthN) là quá trình xác minh danh tính — trả lời câu hỏi **"Bạn là ai?"**
 
-```
-AUTHENTICATION FLOW CƠ BẢN
-───────────────────────────
-
-  User              Identity Provider         Service
-   │                      │                      │
-   │──── Credentials ────▶│                      │
-   │     (user/pass)      │                      │
-   │                      │── Verify ──▶         │
-   │◄──── Token ──────────│                      │
-   │     (JWT/OAuth)      │                      │
-   │                      │                      │
-   │──────────── Request + Token ───────────────▶│
-   │                      │                      │── Validate Token
-   │◄────────────── Response ─────────────────── │
+```d2 title="3.1. Authentication là gì?"
+shape: sequence_diagram
+user: User
+idp: Identity Provider
+service: Service
+user -> idp: Credentials — user/password
+idp.note: Verify identity
+idp -> user: Token {style.stroke-dash: 5}
+user -> service: Request + Token
+service.note: Validate token / Authorization
+service -> user: Response {style.stroke-dash: 5}
 ```
 
 ### 3.2. Centralized Authentication
 
 Trong Microservice, **KHÔNG nên** để mỗi service tự xử lý authentication. Thay vào đó, sử dụng **Identity Provider (IdP)** tập trung.
 
+```d2 title="3.2. Centralized Authentication"
+direction: down
+bad: Duplicated Authentication {
+ client: Client
+ a: Service A
+ b: Service B
+ c: Service C
+ da: Users Table A
+ db: Users Table B
+ dc: Users Table C
+ client -> a: User / Password
+ client -> b: User / Password
+ client -> c: User / Password
+ a -> da
+ b -> db
+ c -> dc
+}
+good: Centralized Identity {
+ client: Client
+ idp: IdP — Keycloak / Auth0
+ gateway: API Gateway — Verify token / Forward identity
+ a: Service A
+ b: Service B
+ c: Service C
+ client -> idp: Credentials
+ idp -> client: Token
+ client -> gateway: Token
+ gateway -> a
+ gateway -> b
+ gateway -> c
+}
 ```
-❌ ANTI-PATTERN: Mỗi service tự authenticate
-─────────────────────────────────────────────
 
-  ┌──────────┐  user/pass   ┌──────────┐
-  │  Client  │─────────────▶│ Service A│──▶ Users Table A
-  │          │─────────────▶│ Service B│──▶ Users Table B
-  │          │─────────────▶│ Service C│──▶ Users Table C
-  └──────────┘              └──────────┘
-
-  → Duplicate user data
-  → Inconsistent auth logic
-  → Khó maintain, dễ có lỗ hổng
-
-
-✅ BEST PRACTICE: Centralized Identity Provider
-────────────────────────────────────────────────
-
-  ┌──────────┐  credentials  ┌──────────────┐
-  │  Client  │──────────────▶│   Identity   │
-  │          │◄──── token ───│   Provider   │
-  └────┬─────┘               │ (Keycloak,   │
-       │                     │  Auth0, etc) │
-       │ token               └──────────────┘
-       │
-  ┌────▼─────────────────────────────────┐
-  │            API Gateway               │
-  │  → Validate token                    │
-  │  → Forward request + user context    │
-  └────┬────────────┬───────────┬────────┘
-       │            │           │
-  ┌────▼───┐   ┌────▼───┐   ┌───▼────┐
-  │ Svc A  │   │ Svc B  │   │ Svc C  │
-  │ (trust │   │ (trust │   │ (trust │
-  │  token)│   │  token)│   │  token)│
-  └────────┘   └────────┘   └────────┘
-```
+Centralized IdP tránh duplicate user data/inconsistent authentication. Resource services vẫn phải enforce business/resource authorization và chỉ tin identity/context qua trusted, authenticated channels.
 
 **Identity Provider phổ biến:**
 
@@ -218,22 +208,16 @@ Trong Microservice, **KHÔNG nên** để mỗi service tự xử lý authentica
 
 **OAuth 2.0** là authorization framework cho phép ứng dụng bên thứ ba truy cập tài nguyên của user mà không cần biết password.
 
-```
-CÁC THÀNH PHẦN OAUTH 2.0
-──────────────────────────
-
-  ┌──────────────┐     ┌──────────────────────┐
-  │ Resource     │     │ Authorization Server │
-  │ Owner (User) │     │ (Keycloak/Auth0)     │
-  └──────┬───────┘     └───────────┬──────────┘
-         │                         │
-         │  "Cho phép App A        │
-         │   đọc profile?"         │
-         │                         │
-  ┌──────▼───────┐     ┌───────────▼─────────┐
-  │ Client       │     │ Resource Server     │
-  │ (App/SPA)    │     │ (API/Microservice)  │
-  └──────────────┘     └─────────────────────┘
+```d2 title="3.3. OAuth 2.0"
+direction: right
+owner: "Resource Owner — User"
+client: "Client — App / SPA"
+auth: "Authorization Server — Keycloak / Auth0"
+resource: "Resource Server — API / Microservice"
+owner -> client: "Cho phép app truy cập resource"
+client -> auth: "Authorization flow"
+auth -> client: "Access Token"
+client -> resource: "Request + Access Token"
 ```
 
 **4 roles trong OAuth 2.0:**
@@ -251,39 +235,20 @@ CÁC THÀNH PHẦN OAUTH 2.0
 
 OAuth 2.0 gốc được thiết kế cho bài toán **ủy quyền bên thứ ba (delegated authorization)** — "App A muốn truy cập dữ liệu user trên Server B". Ví dụ thực tế:
 
+```d2 title="3.4. OpenID Connect (OIDC)"
+shape: sequence_diagram
+user: User
+canva: Canva — Client App
+google: Google — Authorization / Resource Server
+user -> canva: Đăng nhập / Cấp quyền Google Photos
+canva -> google: Redirect authorization request
+google -> user: Login / Consent page {style.stroke-dash: 5}
+user -> google: Credentials trực tiếp vào Google / Consent đọc photos
+google -> canva: Code / Token theo OAuth flow đã chọn {style.stroke-dash: 5}
+canva.note: Access token minh họa opaque ya29.a0ARr... — quyền đọc photos
 ```
-VÍ DỤ: Canva muốn đọc ảnh Google Photos của bạn
-─────────────────────────────────────────────────
 
-  You           Canva (Client App)       Google (Auth + Resource Server)
-   │                  │                           │
-   │ "Đăng nhập       │                           │
-   │  bằng Google"    │                           │
-   │─────────────────▶│                           │
-   │                  │── redirect ──────────────▶│
-   │                  │                           │
-   │◄──────────── Login page (Google) ────────────│
-   │  Nhập email/password (vào Google,            │
-   │  KHÔNG phải vào Canva!)                      │
-   │                                              │
-   │  "Cho phép Canva đọc Google Photos?" ───────▶│
-   │  [Đồng ý]                                    │
-   │                  │                           │
-   │                  │◄── access_token ──────────│
-   │                  │                           │
-   │                  │  Canva có token, biết rằng│
-   │                  │  "token này cho phép      │
-   │                  │   đọc photos"             │
-   │                  │                           │
-   │                  │  NHƯNG Canva KHÔNG biết:  │
-   │                  │  • User tên gì?           │
-   │                  │  • Email là gì?           │
-   │                  │  • User ID là gì?         │
-   │                  │                           │
-   │                  │  Token chỉ là 1 chuỗi     │
-   │                  │  opaque: "ya29.a0ARr..."  │
-   │                  │  → Không decode được!     │
-```
+Đây là flow rút gọn để phân biệt delegated access với login. OAuth access token không mặc định chứng minh danh tính cho client; token có thể opaque hoặc JWT theo issuer. Dùng OIDC/ID Token và validate claims khi cần authentication, không tự decode một opaque token để đoán tên/email/user ID.
 
 Tóm lại:
 - **Authorization Server (Google)** biết user là ai — vì user đăng nhập vào Google
@@ -521,32 +486,25 @@ TẠI SAO KHÔNG TRẢ TOKEN THẲNG?
 
 **Flow từng bước — ví dụ "Đăng nhập Shopee bằng Google":**
 
-```mermaid
-sequenceDiagram
-    actor User as 👤 User (Browser)
-    participant App as 🖥️ Shopee Backend
-    participant Auth as 🔐 Google (Auth Server)
-
-    User->>App: 1. Click "Đăng nhập bằng Google"
-    App-->>User: 2. Redirect sang Google
-    Note right of User: Trình duyệt mở trang Google Login
-
-    User->>Auth: 3. Nhập email/password VÀO GOOGLE
-    Note right of Auth: Google xác nhận đúng user
-
-    Auth->>Auth: 4. Tạo authorization code (phiếu hẹn)
-    Auth-->>User: 5. Redirect về Shopee kèm CODE<br/>shopee.vn/callback?code=abc123
-
-    User->>App: 6. Trình duyệt gọi Shopee với code
-    Note left of App: Shopee nhận được code
-
-    App->>Auth: 7. Shopee gửi CODE + SECRET cho Google<br/>(server-to-server, không qua browser)
-    Note right of Auth: Google verify: đúng code + đúng secret
-
-    Auth->>App: 8. Google trả ACCESS TOKEN cho Shopee
-    Note left of App: Token nằm ở backend<br/>KHÔNG lộ trên trình duyệt!
-
-    App-->>User: 9. Login thành công!<br/>Set cookie session
+```d2 title="3.5. Các OAuth 2.0 Grant Types"
+shape: sequence_diagram
+"User": "👤 User (Browser)" {shape: person}
+"App": "🖥️ Shopee Backend"
+"Auth": "🔐 Google (Auth Server)"
+"User" -> "App": "1. Click \"Đăng nhập bằng Google\""
+"App" -> "User": "2. Redirect sang Google" { style.stroke-dash: 5 }
+"User".note1: "Trình duyệt mở trang Google Login"
+"User" -> "Auth": "3. Nhập email/password VÀO GOOGLE"
+"Auth".note2: "Google xác nhận đúng user"
+"Auth" -> "Auth": "4. Tạo authorization code (phiếu hẹn)"
+"Auth" -> "User": "5. Redirect về Shopee kèm CODE\nshopee.vn/callback?code=abc123" { style.stroke-dash: 5 }
+"User" -> "App": "6. Trình duyệt gọi Shopee với code"
+"App".note3: "Shopee nhận được code"
+"App" -> "Auth": "7. Shopee gửi CODE + SECRET cho Google\n(server-to-server, không qua browser)"
+"Auth".note4: "Google verify: đúng code + đúng secret"
+"Auth" -> "App": "8. Google trả ACCESS TOKEN cho Shopee"
+"App".note5: "Token nằm ở backend\nKHÔNG lộ trên trình duyệt!"
+"App" -> "User": "9. Login thành công!\nSet cookie session" { style.stroke-dash: 5 }
 ```
 
 ```
@@ -594,83 +552,38 @@ GIẢI THÍCH TỪNG BƯỚC — NGÔN NGỮ DỄ HIỂU
 
 SPA/Mobile app không giữ được `client_secret` (vì code chạy trên thiết bị user, ai cũng đọc được). **PKCE** (Proof Key for Code Exchange) thay thế secret bằng một "bài toán" mà chỉ client gốc mới giải được.
 
+```d2 title="3.5. Các OAuth 2.0 Grant Types"
+shape: sequence_diagram
+client: Browser / Mobile Client
+auth: Authorization Server
+client.note: 1. Random code_verifier dBjf...; code_challenge = BASE64URL(SHA256(verifier))
+client -> auth: 2. /authorize — code_challenge E9Me... / code_challenge_method S256
+auth.note: Bind authorization code ABC với challenge E9Me...
+auth -> client: 3. Authorization code ABC {style.stroke-dash: 5}
+client -> auth: 4. POST /token — code ABC + code_verifier dBjf...
+auth.note: Verify hash challenge / Code binding / Redirect URI / Client theo policy
+auth -> client: 5. Access token nếu hợp lệ {style.stroke-dash: 5}
 ```
-PKCE HOẠT ĐỘNG NHƯ THẾ NÀO?
-──────────────────────────────
 
-  Ý tưởng: Client tạo 1 "bài toán" trước khi xin code,
-  khi đổi code → token thì phải "giải bài toán" đó.
-  Attacker dù có trộm được code cũng không giải được!
-
-  Browser/Mobile                                         Auth Server
-       │                                                     │
-       │ 1. Tạo ngẫu nhiên:                                  │
-       │    code_verifier = "dBjf..."  (chuỗi random dài)    │
-       │    code_challenge = SHA256("dBjf...") = "E9Me..."   │
-       │                                                     │
-       │ 2. Xin code + gửi kèm                               │
-       │    "BÀI TOÁN":                                      │
-       │    /authorize?                                      │
-       │    code_challenge=E9Me...                           │
-       │    &method=S256                                     │
-       │  ───────────────────────────────────────────────▶   │  Auth Server lưu:
-       │                                                     │  "code ABC đi kèm
-       │                                                     │   challenge E9Me..."
-       │                                                     │
-       │ ◀── 3. code=ABC ────────────────────────────────────│
-       │                                                     │
-       │ 4. Đổi code → token                                 │
-       │    Gửi "LỜI GIẢI":                                  │
-       │    POST /token                                      │
-       │    code=ABC                                         │
-       │   code_verifier=dBjf.. ─▶                           │
-       │   ───────────────────────────────────────────────▶  │
-       │                                                     │  Auth Server verify:
-       │                                                     │  SHA256("dBjf...") == "E9Me..."?
-       │                                                     │  ✅ Khớp! → Đúng client gốc
-       │                                                     │
-       │ ◀── 5. access_token ─────────────────────────────── │
-       │                                                     │
-
-  🕵️ Attacker trộm được code=ABC nhưng:
-     → Không biết code_verifier (chỉ client gốc biết)
-     → Không thể đổi code → token
-     → VÔ DỤNG! ✅
-```
+Kẻ chỉ trộm code mà không có verifier không thể redeem code theo PKCE; vẫn phải bảo vệ verifier, redirect URI, `state`/CSRF và client environment. PKCE không phải bảo đảm chống mọi loại token theft.
 
 **Client Credentials Flow — Service-to-Service (không có user):**
 
 Khi 2 microservice gọi nhau, không có user nào đăng nhập cả — chỉ là máy gọi máy. Service dùng `client_id` + `client_secret` (đã đăng ký trước) để xin token.
 
+```d2 title="3.5. Các OAuth 2.0 Grant Types"
+shape: sequence_diagram
+a: Service A
+auth: Authorization Server
+b: Service B
+a -> auth: POST /token — grant_type client_credentials; client_id svc-a; client authentication
+auth -> a: Access Token cho Service A {style.stroke-dash: 5}
+a -> b: GET /api/orders — Authorization Bearer token
+b.note: Validate token / Audience / Scope / Permissions
+b -> a: Response {style.stroke-dash: 5}
 ```
-CLIENT CREDENTIALS FLOW
-────────────────────────
 
-  Service A                  Auth Server              Service B
-      │                          │                        │
-      │  "Tôi là Service A,      │                        │
-      │   đây là giấy tờ của tôi"│                        │
-      │                          │                        │
-      │  POST /token             │                        │
-      │  grant_type=             │                        │
-      │   client_credentials     │                        │
-      │  client_id=svc-a         │                        │
-      │  client_secret=xxx     ─▶│                        │
-      │                          │                        │
-      │  "OK, đây là token       │                        │
-      │   cho Service A"         │                        │
-      │ ◀── access_token ────────│                        │
-      │                          │                        │
-      │  GET /api/orders ────────────────────────────────▶│
-      │  Authorization: Bearer <token>                    │
-      │                          │                   Validate
-      │ ◀──────────────────────────────────── Response ── │
-
-  → Không có user login
-  → Không có redirect
-  → Chỉ cần client_id + client_secret
-  → Dùng cho: cronjob, background worker, service-to-service
-```
+Không có user login hoặc redirect; dùng cho cron/background/service-to-service. Client authentication có thể dùng secret, private_key_jwt hoặc mTLS theo server support; secret phải được quản lý/rotate an toàn.
 
 ---
 
@@ -682,31 +595,25 @@ CLIENT CREDENTIALS FLOW
 
 **Tại sao JWT phù hợp với Microservice?**
 
+```d2 title="4.1. JWT là gì?"
+direction: down
+session: Session-based {
+ client: Client
+ server: Server
+ store: Shared Session Store — Redis
+ client -> server: Session ID
+ server -> store: Lookup
+}
+jwt: Self-contained Token {
+ client: Client
+ service: Service
+ verify: Verify signature / Issuer / Audience / Expiry local
+ client -> service: JWT token
+ service -> verify
+}
 ```
-SESSION-BASED vs TOKEN-BASED AUTHENTICATION
-─────────────────────────────────────────────
 
-  SESSION-BASED (Monolith):
-  ┌──────┐    session_id    ┌──────────┐    lookup    ┌──────────┐
-  │Client│─────────────────▶│  Server  │─────────────▶│  Session │
-  │      │                  │          │              │  Store   │
-  └──────┘                  └──────────┘              │ (Redis)  │
-                                                      └──────────┘
-  → Cần shared session store
-  → Single point of failure
-  → Khó scale horizontally
-
-
-  TOKEN-BASED (Microservice):
-  ┌──────┐    JWT token     ┌──────────┐
-  │Client│─────────────────▶│ Service  │──▶ Verify signature locally
-  │      │                  │ (any)    │    (không cần call external)
-  └──────┘                  └──────────┘
-
-  → Stateless — mỗi service tự verify
-  → Không cần shared store
-  → Scale dễ dàng
-```
+Session store có thể được HA/scale nên session-based không đồng nghĩa không scale horizontal được. JWT local verification giảm lookup nhưng cần key rotation/revocation strategy; authorization vẫn là trách nhiệm của resource service.
 
 ### 4.2. Cấu trúc JWT
 
@@ -764,35 +671,29 @@ abc123signature...
 | **Phù hợp** | Internal, 1 service | Microservice (nhiều service verify) |
 | **Rủi ro** | Lộ secret = toàn bộ bị compromised | Lộ public key = không sao |
 
+```d2 title="4.3. JWT Signing — Symmetric vs Asymmetric"
+direction: down
+symmetric: HS256 {
+ auth: Auth Server — HMAC sign
+ a: Service A — Shared secret
+ b: Service B — Shared secret
+ c: Service C — Shared secret
+ auth -- a
+ auth -- b
+ auth -- c
+}
+asymmetric: RS256 / ES256 {
+ auth: Auth Server — Private key sign
+ a: Service A — Public key verify
+ b: Service B — Public key verify
+ c: Service C — Public key verify
+ auth -> a: Public key / JWKS
+ auth -> b: Public key / JWKS
+ auth -> c: Public key / JWKS
+}
 ```
-SYMMETRIC vs ASYMMETRIC TRONG MICROSERVICE
-────────────────────────────────────────────
 
-  ❌ Symmetric (HS256):
-  ┌────────────┐     shared_secret     ┌──────────┐
-  │ Auth Server│◄─────────────────────▶│ Service A│ ← biết secret
-  │ (sign)     │     shared_secret     ├──────────┤
-  │            │◄─────────────────────▶│ Service B│ ← biết secret
-  └────────────┘     shared_secret     ├──────────┤
-                ◄─────────────────────▶│ Service C│ ← biết secret
-                                       └──────────┘
-  → Mọi service đều biết secret
-  → 1 service bị hack = tất cả bị compromised
-  → Bất kỳ service nào cũng có thể FORGE token
-
-
-  ✅ Asymmetric (RS256):
-  ┌────────────┐                       ┌──────────┐
-  │ Auth Server│     public_key  ────▶ │ Service A│ ← chỉ verify
-  │ (sign with │     public_key  ────▶ ├──────────┤
-  │  PRIVATE   │     public_key  ────▶ │ Service B│ ← chỉ verify
-  │  key)      │                       ├──────────┤
-  └────────────┘                       │ Service C│ ← chỉ verify
-                                       └──────────┘
-  → Chỉ Auth Server biết private key
-  → Services chỉ có public key → chỉ verify, KHÔNG forge được
-  → 1 service bị hack = không ảnh hưởng
-```
+Mọi verifier giữ HMAC secret cũng có thể forge token; chia sẻ secret mở rộng blast radius. Public-key verifiers không có signing key nên không forge được bằng public key. Service compromise vẫn có thể lộ data/tokens/quyền service đó, không có nghĩa hoàn toàn không ảnh hưởng hệ thống.
 
 **→ Trong Microservice, luôn dùng Asymmetric (RS256 hoặc ES256).**
 
@@ -842,27 +743,15 @@ n8 -> n10: "Denied"
 
 ### 4.5. Token Refresh & Revocation
 
-```
-TOKEN LIFECYCLE
-────────────────
-
-  ┌──────────┐    login     ┌────────────┐
-  │  Client  │─────────────▶│ Auth Server│
-  │          │◄─────────────│            │
-  │          │  access_token│            │
-  │          │  (15 min)    │            │
-  │          │ refresh_token│            │
-  │          │  (7 days)    │            │
-  │          │              │            │
-  │          │ ... 15 min...│            │
-  │          │              │            │
-  │          │  POST /token │            │
-  │          │ refresh_token│            │
-  │          │─────────────▶│            │
-  │          │◄─────────────│            │
-  │          │ NEW access   │            │
-  │          │ NEW refresh  │            │
-  └──────────┘ (rotate!)    └────────────┘
+```d2 title="4.5. Token Refresh & Revocation"
+shape: sequence_diagram
+client: Client
+auth: Auth Server
+client -> auth: Login
+auth -> client: Access Token ví dụ15phút + Refresh Token ví dụ7ngày {style.stroke-dash: 5}
+client.note: Access Token hết hạn theo issuer policy
+client -> auth: POST /token — Refresh Token
+auth -> client: New Access Token / Rotate Refresh Token theo policy {style.stroke-dash: 5}
 ```
 
 **Token Revocation strategies:**
@@ -935,28 +824,20 @@ AUTHENTICATION vs AUTHORIZATION
 
 **RBAC** phân quyền dựa trên **vai trò (role)** của user.
 
+```d2 title="5.2. RBAC — Role-Based Access Control"
+direction: right
+user: "User nguyen.van.a"
+admin: "Role admin"
+manager: "Role order-manager"
+adminpermissions: "user:read/write/delete\norder:read/write\nproduct:read/write"
+orderpermissions: "order:read/write/refund"
+user -> admin: "Assigned"
+user -> manager: "Assigned"
+admin -> adminpermissions: "Granted"
+manager -> orderpermissions: "Granted"
 ```
-RBAC MODEL
-───────────
 
-  Users ──── assigned to ──── Roles ──── granted ──── Permissions
-
-  ┌────────────────────────────────────────────────────┐
-  │  User: "nguyen.van.a"                              │
-  │  Roles: [admin, order-manager]                     │
-  │                                                    │
-  │  Role "admin":                                     │
-  │    → user:read, user:write, user:delete            │
-  │    → order:read, order:write                       │
-  │    → product:read, product:write                   │
-  │                                                    │
-  │  Role "order-manager":                             │
-  │    → order:read, order:write, order:refund         │
-  │                                                    │
-  │  Effective Permissions:                            │
-  │    → user:*, order:*, product:read, product:write  │
-  └────────────────────────────────────────────────────┘
-```
+Effective permissions là hợp các permissions đã grant, không tự mở rộng `order:*` hay `user:*` thành những hành động chưa khai báo.
 
 **JWT chứa roles:**
 
@@ -994,46 +875,31 @@ def create_order(request):
 
 **ABAC** phân quyền dựa trên **thuộc tính (attributes)** — linh hoạt hơn RBAC.
 
+```d2 title="5.3. ABAC — Attribute-Based Access Control"
+direction: right
+subject: "Subject\nrole doctor • department ICU • clearance L3"
+resource: "Resource\ntype medical • sensitivity high • owner user-456"
+action: "Action — read"
+environment: "Environment\n09:00–17:00 • IP10.0.0.0/8 • VN"
+decision: "ABAC policy evaluation\nAllow / Deny"
+subject -> decision
+resource -> decision
+action -> decision
+environment -> decision
 ```
-ABAC MODEL — PHÂN QUYỀN DỰA TRÊN ATTRIBUTES
-──────────────────────────────────────────────
 
-  Decision = f(Subject, Resource, Action, Environment)
-
-  Subject Attributes:          Resource Attributes:
-  ┌────────────────────┐      ┌────────────────────┐
-  │ role: "doctor"     │      │ type: "medical"    │
-  │ department: "ICU"  │      │ sensitivity: "high"│
-  │ clearance: "L3"    │      │ owner: "user-456"  │
-  └────────────────────┘      └────────────────────┘
-
-  Action Attributes:           Environment Attributes:
-  ┌────────────────────┐      ┌────────────────────┐
-  │ action: "read"     │      │ time: "09:00-17:00"│
-  │                    │      │ ip: "10.0.0.0/8"   │
-  │                    │      │ location: "VN"     │
-  └────────────────────┘      └────────────────────┘
-
-  Policy: "Doctors in ICU can read high-sensitivity
-           medical records during work hours from
-           internal network only"
-```
+Policy ví dụ: bác sĩ ICU đọc high-sensitivity medical records trong giờ làm việc từ internal network. Decision kết hợp Subject, Resource, Action và Environment; ownership/clearance cần điều kiện cụ thể nếu policy sử dụng.
 
 ### 5.4. Policy Engine — OPA (Open Policy Agent)
 
 **OPA (Open Policy Agent)** là policy engine phổ biến nhất cho Microservice, sử dụng ngôn ngữ **Rego** để viết policy.
 
-```
-OPA TRONG MICROSERVICE
-───────────────────────
-
-  ┌──────────┐  "Can user X do action Y    ┌──────────┐
-  │ Service  │  on resource Z?"            │   OPA    │
-  │          │ ────────────────────────▶   │  Server  │
-  │          │                             │          │
-  │          │ ◀──── allow: true/false ────│  Rego    │
-  │          │                             │  Policies│
-  └──────────┘                             └──────────┘
+```d2 title="5.4. Policy Engine — OPA (Open Policy Agent)"
+shape: sequence_diagram
+service: Service
+opa: OPA — Rego Policies
+service -> opa: User X được action Y trên resource Z với context này không?
+opa -> service: allow true / false {style.stroke-dash: 5}
 ```
 
 **Ví dụ Rego policy:**
@@ -1084,100 +950,59 @@ allow if {
 
 Trong Microservice, các service giao tiếp qua network — **mặc định là KHÔNG an toàn**.
 
+```d2 title="6.1. Tại sao cần bảo mật giữa các service?"
+direction: down
+plain: Không bảo vệ transport {
+ a: Service A
+ b: Service B
+ attacker: Attacker — đọc / sửa / giả mạo trên network path
+ a -> b: HTTP plaintext
+ attacker -- b: Man-in-the-Middle risk
+}
+mtls: mTLS {
+ a: Service A
+ b: Service B
+ a -> b: Encryption / Integrity / Mutual authentication
+}
 ```
-TẤN CÔNG GIỮA CÁC SERVICE
-────────────────────────────
 
-  ❌ Không có bảo mật service-to-service:
-
-  Service A ──── HTTP (plaintext) ────▶ Service B
-                     │
-                     │ 🕵️ Attacker
-                     │ Man-in-the-Middle
-                     │ • Đọc được request/response
-                     │ • Sửa đổi dữ liệu
-                     │ • Giả mạo Service A
-
-
-  ✅ Có mTLS:
-
-  Service A ════ mTLS (encrypted) ═════▶ Service B
-                     │
-                     │ 🕵️ Attacker
-                     │ ❌ Không đọc được (encrypted)
-                     │ ❌ Không sửa được (integrity)
-                     │ ❌ Không giả mạo được (mutual auth)
-```
+mTLS cần validate certificates/trust chain/identity đúng; bảo vệ network channel không thay thế authorization hay xử lý endpoint đã bị compromise.
 
 ### 6.2. mTLS — Mutual TLS
 
 **mTLS (Mutual TLS)** là phiên bản nâng cao của TLS, trong đó **cả client VÀ server đều phải chứng minh danh tính** bằng certificate.
 
+```d2 title="6.2. mTLS — Mutual TLS"
+direction: down
+tls: TLS one-way authentication {
+ client: Client
+ server: Server
+ server -> client: Server certificate
+ client -> server: Verify server / Establish encrypted channel
+}
+mtls: Mutual TLS {
+ client: Client
+ server: Server
+ server -> client: Server certificate — client verify
+ client -> server: Client certificate — server verify
+ client <-> server: Hai bên có authenticated transport identity
+}
 ```
-TLS vs mTLS
-─────────────
 
-  TLS (one-way):
-  ┌────────┐                    ┌────────┐
-  │ Client │ ── "Server ơi,     │ Server │
-  │        │    chứng minh      │        │
-  │        │    mày là ai!" ──▶ │        │
-  │        │                    │        │
-  │        │ ◀── Server cert ── │        │
-  │        │    "Đây, cert      │        │
-  │        │     của tao"       │        │
-  │        │                    │        │
-  │  ✅    │ verify cert OK     │        │
-  └────────┘                    └────────┘
-  → Chỉ client verify server
-  → Server KHÔNG biết client là ai
-
-
-  mTLS (mutual):
-  ┌────────┐                    ┌────────┐
-  │ Client │ ── "Server ơi,     │ Server │
-  │        │    chứng minh      │        │
-  │        │    mày là ai!" ──▶ │        │
-  │        │                    │        │
-  │        │ ◀── Server cert ── │        │
-  │        │                    │        │
-  │        │ ── "OK, giờ tới  ▶ │        │
-  │        │    lượt tao"       │        │
-  │        │ ── Client cert ──▶ │        │
-  │        │                    │        │
-  │  ✅    │                    │  ✅    │
-  │ verify │                    │ verify │
-  └────────┘                    └────────┘
-  → CẢ HAI bên verify lẫn nhau
-  → Server BIẾT client là ai
-```
+TLS một chiều không có client-certificate authentication; server vẫn có thể xác thực client ở application layer bằng token/cookie. mTLS không tự quyết định resource permissions.
 
 ### 6.3. Service Mesh và mTLS tự động
 
 Triển khai mTLS thủ công cho 20+ services rất phức tạp. **Service Mesh** (Istio, Linkerd) tự động hóa mTLS cho tất cả communication.
 
+```d2 title="6.3. Service Mesh và mTLS tự động"
+direction: right
+a: Pod A { service: Service A; envoy: Envoy — TLS / Cert / Rotate; service -- envoy }
+b: Pod B { envoy: Envoy — TLS / Cert / Rotate; service: Service B; envoy -- service }
+a.envoy <-> b.envoy: mTLS — encrypted / Mutual authentication
 ```
-SERVICE MESH + mTLS TỰ ĐỘNG
-─────────────────────────────
 
-  ┌─ Pod A ──────────────────┐    mTLS     ┌─ Pod B ──────────────────┐
-  │ ┌──────────┐ ┌─────────┐ │◄═══════════▶│┌─────────┐ ┌──────────┐  │
-  │ │ Service A│ │ Envoy   │ │  encrypted  ││ Envoy   │ │ Service B│  │
-  │ │          │─│ Sidecar │ │  + mutual   ││ Sidecar │─│          │  │
-  │ │ (không   │ │         │ │  auth       ││         │ │ (không   │  │
-  │ │  biết    │ │ • TLS   │ │             ││ • TLS   │ │  biết    │  │
-  │ │  mTLS)   │ │ • Cert  │ │             ││ • Cert  │ │  mTLS)   │  │
-  │ └──────────┘ │ • Rotate│ │             ││ • Rotate│ └──────────┘  │
-  │              └─────────┘ │             │└─────────┘               │
-  └──────────────────────────┘             └──────────────────────────┘
-
-  → Service code KHÔNG cần thay đổi
-  → Sidecar proxy tự động:
-    • Inject certificate
-    • Encrypt/decrypt traffic
-    • Rotate certificate
-    • Enforce authorization policies
-```
+Khi mesh được cấu hình đúng, proxies nhận/rotate certificates, encrypt/decrypt traffic và enforce policies; app không cần tự implement handshake. Cần chặn bypass paths và cấu hình authorization, không chỉ bật sidecar.
 
 **Istio mTLS config:**
 
@@ -1329,36 +1154,18 @@ plugins:
 
 ### 7.3. Input Validation
 
+```d2 title="7.3. Input Validation"
+direction: right
+client: "Client"
+gw: "Layer1 — API Gateway\nRequest size ví dụ10MB\nContent-Type • Rate limits • WAF"
+service: "Layer2 — Service\nSchema / Type / Business validation\nParameterized DB queries\nContext-appropriate output encoding / Sanitization"
+db: "Layer3 — Database\nColumn constraints • Foreign Keys"
+client -> gw
+gw -> service
+service -> db
 ```
-INPUT VALIDATION LAYERS
-────────────────────────
 
-  Client ──▶ API Gateway ──▶ Service ──▶ Database
-
-  Layer 1: API Gateway
-  ┌──────────────────────────────────┐
-  │  • Request size limit (10MB)     │
-  │  • Content-Type validation       │
-  │  • Rate limiting                 │
-  │  • WAF rules                     │
-  └──────────────────────────────────┘
-
-  Layer 2: Service
-  ┌──────────────────────────────────┐
-  │  • Schema validation (JSON)      │
-  │  • Business rule validation      │
-  │  • SQL injection prevention      │
-  │  • XSS sanitization              │
-  │  • Type checking                 │
-  └──────────────────────────────────┘
-
-  Layer 3: Database
-  ┌──────────────────────────────────┐
-  │  • Parameterized queries         │
-  │  • Column constraints            │
-  │  • Foreign key validation        │
-  └──────────────────────────────────┘
-```
+Parameterized queries thuộc DB client/query layer tại service, không phải database tự biến raw SQL nối chuỗi thành an toàn. XSS cần xử lý theo output context, không chỉ một bước sanitize chung.
 
 **Ví dụ — Input validation trong service:**
 
@@ -1472,41 +1279,24 @@ API VERSIONING — SECURITY CONCERNS
 
 **Zero Trust** là mô hình bảo mật dựa trên nguyên tắc: **"Never trust, always verify"** — không bao giờ tin tưởng mặc định, luôn xác minh mọi request.
 
+```d2 title="8.1. Zero Trust là gì?"
+direction: down
+traditional: Corporate Network — tin theo vị trí mạng {
+ a: Service A
+ b: Service B
+ db: DB
+ a -- b -- db: Internal traffic được tin mặc định
+}
+zero: Network — không tin mặc định {
+ a: Service A
+ b: Service B
+ db: DB
+ a -> b: mTLS / AuthN / AuthZ / Logs
+ b -> db: TLS / Identity / AuthZ / Logs
+}
 ```
-TRADITIONAL vs ZERO TRUST
-──────────────────────────
 
-  Traditional (Castle-and-Moat):
-  ┌─────────────────────────────────────────┐
-  │  🏰 Corporate Network (TRUSTED)         │
-  │                                         │
-  │  Service A ──── Service B ──── DB       │
-  │     │              │            │       │
-  │     └──────────────┴────────────┘       │
-  │  "Đã vào network = TRUSTED"             │
-  │  "Không cần auth giữa các service"      │
-  │                                         │
-  │  ❌ Attacker vào được network           │
-  │     = truy cập TOÀN BỘ                  │
-  └─────────────────────────────────────────┘
-
-  Zero Trust:
-  ┌─────────────────────────────────────────┐
-  │  🔒 Network (UNTRUSTED)                 │
-  │                                         │
-  │  Service A ═mTLS═ Service B ═mTLS═ DB   │
-  │     │    auth+authz    │   auth+authz   │
-  │     │    encrypted     │   encrypted    │
-  │     │    logged        │   logged       │
-  │                                         │
-  │  "KHÔNG AI được trust mặc định"         │
-  │  "Mọi request phải verify"              │
-  │                                         │
-  │  ✅ Attacker vào network                │
-  │     → vẫn KHÔNG truy cập được           │
-  │     → mỗi service đều verify            │
-  └─────────────────────────────────────────┘
-```
+Zero Trust giảm khả năng lateral movement nhờ verify identity và least privilege cho từng resource access; không bảo đảm attacker trong network không bao giờ truy cập được nếu credentials/policy/endpoints bị compromise.
 
 ### 8.2. Nguyên tắc Zero Trust
 
@@ -1631,37 +1421,20 @@ ROADMAP TRIỂN KHAI ZERO TRUST
 - **Encryption as a service**: Encrypt/decrypt không cần quản lý key
 - **Leasing & Renewal**: Secrets có thời hạn
 
+```d2 title="9.2. HashiCorp Vault"
+shape: sequence_diagram
+service: Service
+vault: Vault
+db: Database
+service -> vault: 1. Authenticate — Kubernetes ServiceAccount token
+vault -> service: 2. Vault Token theo policy {style.stroke-dash: 5}
+service -> vault: 3. Read secret/db-pass hoặc database/creds role
+vault -> db: Dynamic secret — tạo temporary DB user nếu dùng DB engine
+vault -> service: 4. Secret / Dynamic credentials — lease ví dụ1h {style.stroke-dash: 5}
+vault -> db: Hết lease / Revoke → revoke dynamic user
 ```
-VAULT TRONG MICROSERVICE
-──────────────────────────
 
-  ┌──────────┐                         ┌──────────────┐
-  │ Service  │ 1. Auth (K8s SA Token)  │              │
-  │          │────────────────────────▶│              │
-  │          │                         │    Vault     │
-  │          │◀── 2. Vault Token ──────│              │
-  │          │                         │              │
-  │          │ 3. GET /secret/db-pass  │  ┌────────┐  │
-  │          │────────────────────────▶│  │Secrets │  │
-  │          │                         │  │ Store  │  │
-  │          │◀── 4. password ─────────│  └────────┘  │
-  │          │    (lease: 1h)          │              │
-  └──────────┘                         └──────────────┘
-
-  Dynamic Secret Flow:
-  ┌──────────┐                ┌────────┐       ┌──────┐
-  │ Service  │── "need DB     │ Vault  │──────▶│  DB  │
-  │          │   creds" ────▶ │        │create │      │
-  │          │                │        │temp   │      │
-  │          │◀── user:xyz    │        │user   │      │
-  │          │   pass:abc     │        │       │      │
-  │          │   lease:1h     │        │       │      │
-  │          │                │        │       │      │
-  │          │── (1h later)   │        │──────▶│      │
-  │          │                │        │revoke │      │
-  │          │                │        │temp   │      │
-  └──────────┘                └────────┘user   └──────┘
-```
+Dynamic credentials có lease/renewal/revocation. KV static secret không mặc định có DB-user lease/revoke như dynamic secrets; auth/token TTL và secret-engine behavior là các cơ chế khác nhau.
 
 **Vault với Kubernetes:**
 
@@ -1837,37 +1610,21 @@ spec:
 
 ### 10.2. Network Segmentation
 
+```d2 title="10.2. Network Segmentation"
+direction: down
+dmz: DMZ — Public { gateway: API Gateway; cdn: CDN }
+app: Application Zone — Private { user: User Service; order: Order Service; product: Product Service }
+data: Data Zone — Restricted { user: User DB; order: Order DB; product: Product DB }
+dmz.gateway -> app.user: Firewall rule
+dmz.gateway -> app.order: Firewall rule
+dmz.gateway -> app.product: Firewall rule
+app.user -> data.user: Chỉ owner được truy cập
+app.order -> data.order: Chỉ owner được truy cập
+app.product -> data.product: Chỉ owner được truy cập
+app.user <-> app.order: mTLS + NetworkPolicy
 ```
-NETWORK SEGMENTATION TRONG MICROSERVICE
-─────────────────────────────────────────
 
-  ┌─────────────────────────────────────────────────────┐
-  │  DMZ (Public)                                       │
-  │  ┌─────────────┐  ┌─────────────┐                   │
-  │  │ API Gateway │  │    CDN      │                   │
-  │  └──────┬──────┘  └─────────────┘                   │
-  └─────────┼───────────────────────────────────────────┘
-            │ (firewall)
-  ┌─────────▼───────────────────────────────────────────┐
-  │  Application Zone (Private)                         │
-  │  ┌──────────┐  ┌──────────┐  ┌───────────┐          │
-  │  │ User Svc │  │Order Svc │  │Product Svc│          │
-  │  └──────────┘  └──────────┘  └───────────┘          │
-  └─────────┼───────────────────────────────────────────┘
-            │ (firewall)
-  ┌─────────▼───────────────────────────────────────────┐
-  │  Data Zone (Restricted)                             │
-  │  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-  │  │ User DB  │  │ Order DB │  │Product DB│           │
-  │  └──────────┘  └──────────┘  └──────────┘           │
-  └─────────────────────────────────────────────────────┘
-
-  Rules:
-  • DMZ → Application: chỉ qua API Gateway
-  • Application → Data: chỉ service tương ứng → DB tương ứng
-  • Data → External: KHÔNG BAO GIỜ
-  • Application ↔ Application: qua mTLS, có NetworkPolicy
-```
+DMZ tới Application chỉ qua ingress được phép; Data không có direct external egress theo policy ví dụ. Application-to-application cần identity/policy; network segmentation không thay thế AuthZ.
 
 ### 10.3. WAF — Web Application Firewall
 
@@ -2007,49 +1764,39 @@ spec:
 
 ## 12. Ví dụ thực tế — E-Commerce Security Architecture
 
-```
-E-COMMERCE MICROSERVICE — SECURITY ARCHITECTURE
-──────────────────────────────────────────────────
-
-                        ┌──────────┐
-                        │   WAF    │
-                        │(AWS WAF) │
-                        └────┬─────┘
-                             │
-                        ┌────▼──────┐
-                        │   CDN     │
-                        │(CloudFront)
-                        └────┬──────┘
-                             │
-  ┌──────────┐          ┌────▼─────────┐         ┌──────────────┐
-  │  SPA /   │──HTTPS──▶│ API Gateway  │◄──OIDC──│  Keycloak    │
-  │  Mobile  │          │ (Kong/APIGW) │         │  (Identity   │
-  │          │          │              │         │   Provider)  │
-  └──────────┘          │ • JWT verify │         └──────────────┘
-                        │ • Rate limit │
-                        │ • CORS       │
-                        └──┬───┬───┬───┘
-                    mTLS   │   │   │   mTLS
-              ┌────────────┘   │   └────────────┐
-              │                │                │
-         ┌────▼────┐     ┌────▼────┐      ┌────▼─────┐
-         │  User   │     │  Order  │      │ Payment  │
-         │ Service │     │ Service │      │ Service  │
-         │         │     │         │      │          │
-         │ RBAC    │     │ RBAC +  │      │ PCI DSS  │
-         │ OPA     │     │ OPA     │      │ Encrypt  │
-         └────┬────┘     └────┬────┘      └────┬─────┘
-              │mTLS           │mTLS            │mTLS
-         ┌────▼────┐     ┌────▼────┐      ┌────▼─────┐
-         │ User DB │     │Order DB │      │Payment DB│
-         │ (encrypt│     │(encrypt │      │(encrypt  │
-         │  at rest)│    │ at rest)│      │ at rest) │
-         └─────────┘     └─────────┘      └──────────┘
-
-  Vault ──── Dynamic Secrets ──── All Services
-  Istio ──── mTLS + AuthzPolicy ── Service Mesh
-  K8s   ──── NetworkPolicy ─────── Network Segmentation
-  ELK   ──── Audit Logs ──────────  Monitoring
+```d2 title="12. Ví dụ thực tế — E-Commerce Security Architecture"
+direction: down
+client: SPA / Mobile
+edge: CloudFront / AWS WAF
+idp: Keycloak — Identity Provider
+gateway: Kong / API Gateway — JWT verify / Rate limits / CORS
+services: Private Services {
+ user: User — RBAC / OPA
+ order: Order — RBAC / OPA
+ payment: Payment — PCI-DSS controls / Encryption
+}
+data: Encrypted at-rest Databases {
+ user: User DB
+ order: Order DB
+ payment: Payment DB
+}
+vault: Vault — Dynamic Secrets
+mesh: Istio — mTLS / AuthorizationPolicy
+network: Kubernetes NetworkPolicy
+audit: ELK — Audit monitoring
+client -> edge -> gateway: HTTPS
+client <-> idp: OIDC login
+gateway -> idp: Trusted issuer keys / Metadata
+ gateway -> services.user: mTLS
+ gateway -> services.order: mTLS
+ gateway -> services.payment: mTLS
+services.user -> data.user: Authenticated encrypted DB channel
+services.order -> data.order: Authenticated encrypted DB channel
+services.payment -> data.payment: Authenticated encrypted DB channel
+vault -> services: Credentials
+mesh -- services: Transport / AuthZ policies
+network -- services: Network segmentation
+services -> audit: Audit logs
 ```
 
 **Security flow khi user tạo order:**

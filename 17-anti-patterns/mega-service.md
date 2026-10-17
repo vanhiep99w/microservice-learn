@@ -144,18 +144,17 @@ Nói ngắn gọn, Mega Service làm giảm **high cohesion** bên trong service
 
 Giả sử `CommerceService` đảm nhiệm toàn bộ luồng thương mại:
 
-```text
-┌────────────────────────────────────────────────────┐
-│                  CommerceService                   │
-│                                                    │
-│  Order        → tạo và quản lý đơn hàng            │
-│  Promotion    → tính khuyến mãi                    │
-│  Payment      → charge thẻ và refund               │
-│  Inventory    → giữ hàng                           │
-│  Shipping     → gọi hãng vận chuyển                │
-│  Reporting    → tạo báo cáo                        │
-│  Notification → gửi email                          │
-└────────────────────────────────────────────────────┘
+```d2 title="Topology và trách nhiệm bị trộn"
+direction: right
+mega: CommerceService — Trộn trách nhiệm {
+ order: Order — Tạo và quản lý đơn
+ promotion: Promotion — Khuyến mãi
+ payment: Payment — Charge / Refund
+ inventory: Inventory — Giữ hàng
+ shipping: Shipping — Hãng vận chuyển
+ report: Reporting — Báo cáo
+ notification: Notification — Email
+}
 ```
 
 Các trách nhiệm trên đều có thể xuất hiện trong một user journey, nhưng chúng không tự động có cùng boundary. Bảng dưới đây cho thấy các **change driver** khác nhau:
@@ -173,16 +172,19 @@ Các trách nhiệm trên đều có thể xuất hiện trong một user journe
 
 Ví dụ, quy tắc hoàn tiền thay đổi. Về nghiệp vụ, thay đổi này thuộc Payment. Nhưng vì mọi capability nằm trong `CommerceService`, team có thể phải regression test cả tính phí vận chuyển và template email.
 
-```text
-Thay đổi quy tắc refund
-          │
-          ▼
-  CommerceService phải build và release
-          │
-          ├── Regression: Order
-          ├── Regression: Shipping
-          ├── Regression: Reporting
-          └── Regression: Notification
+```d2 title="Tác động của một thay đổi"
+direction: right
+change: "Thay đổi refund rule"
+release: "CommerceService build / Release"
+order: "Order regression"
+shipping: "Shipping regression"
+report: "Reporting regression"
+notification: "Notification regression"
+change -> release
+release -> order
+release -> shipping
+release -> report
+release -> notification
 ```
 
 Đây là dấu hiệu của blast radius lớn. Không phải mọi regression đều sai; một workflow có thể thật sự liên quan nhiều capability. Vấn đề nằm ở việc các phần không liên quan bị kéo vào cùng phạm vi thay đổi chỉ vì boundary không phản ánh change driver.

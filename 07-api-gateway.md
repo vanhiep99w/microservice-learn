@@ -63,28 +63,22 @@ Nếu client gọi trực tiếp từng service → phát sinh nhiều vấn đ�
 
 ### 2.1. Vấn đề khi không có API Gateway
 
+```d2 title="2.1. Vấn đề khi không có API Gateway"
+direction: right
+app: "Mobile App"
+user: "user-service:8081\nGET /api/users/123"
+order: "order-service:8082\nGET /api/orders?userId=123"
+product: "product-service:8083\nGET /api/products/456"
+review: "review-service:8084\nGET /api/reviews?productId=456"
+recommend: "recommend-service:8085\nGET /api/recommendations/123"
+app -> user: "HTTPS"
+app -> order: "HTTPS"
+app -> product: "HTTPS"
+app -> review: "HTTPS"
+app -> recommend: "HTTPS"
 ```
-❌ Client gọi trực tiếp từng service:
-──────────────────────────────────────
 
-  Mobile App
-      │
-      ├── GET https://user-service:8081/api/users/123
-      ├── GET https://order-service:8082/api/orders?userId=123
-      ├── GET https://product-service:8083/api/products/456
-      ├── GET https://review-service:8084/api/reviews?productId=456
-      └── GET https://recommend-service:8085/api/recommendations/123
-
-  Vấn đề:
-  ─────────
-  1. Client phải biết URL của TỪNG service → tight coupling
-  2. Mỗi trang cần 5 API calls → chậm (nhất là mobile, mạng yếu)
-  3. Mỗi service phải tự xử lý auth → duplicate logic
-  4. Client nào cũng cần rate limiting → ai quản lý?
-  5. Service đổi URL / port → phải update TẤT CẢ clients
-  6. CORS, SSL cho TỪNG service → phức tạp
-  7. Không có điểm chung để monitor, log, trace
-```
+Client biết URL từng service, mỗi trang cần 5 calls; đổi URL/port phải cập nhật clients. Auth/rate limiting/CORS/SSL bị lặp, thiếu điểm monitor/log/trace chung.
 
 ### 2.2. API Gateway giải quyết gì?
 
@@ -154,76 +148,59 @@ Nâng cao — Route theo header / query:
 
 Gateway gọi **nhiều services** rồi **gộp** response trả về cho client trong **1 request duy nhất**.
 
+```d2 title="3.2. API Composition / Aggregation"
+direction: down
+before: "Không aggregation — 3 client round-trips" {
+ client: Client
+ order: Order Service
+ user: User Service
+ product: Product Service
+ client -> order: GET /orders/456
+ client -> user: GET /users/123
+ client -> product: GET /products/789
+}
+after: "Aggregation — 1 client round-trip" {
+ client: Client
+ gateway: "API Gateway\nGET /order-detail/456"
+ order: Order Service
+ user: User Service
+ product: Product Service
+ merge: "JOIN — gộp 3 responses\norder {id:456}\ncustomer {name:Hiep}\nproduct {name:iPhone}"
+ client -> gateway
+ gateway -> order: PAR — GET /orders/456
+ gateway -> user: PAR — GET /users/123
+ gateway -> product: PAR — GET /products/789
+ order -> merge
+ user -> merge
+ product -> merge
+ merge -> client
+}
 ```
-Vấn đề: Trang "Order Detail" cần data từ 3 services
-────────────────────────────────────────────────────
 
-Không có aggregation (3 round-trips):
-  Client → GET /orders/456           → Order Service
-  Client → GET /users/123            → User Service
-  Client → GET /products/789         → Product Service
-
-Có aggregation (1 round-trip):
-  Client → GET /order-detail/456     → API Gateway
-
-  API Gateway:
-    ┌────────────────────────────────────────┐
-    │  1. GET /orders/456 → Order Service    │ ─┐
-    │  2. GET /users/123  → User Service     │  │ Song song
-    │  3. GET /products/789 → Product Service│ ─┘
-    │                                        │
-    │  4. Gộp 3 responses:                   │
-    │     {                                  │
-    │       "order": { id: 456, ... },       │
-    │       "customer": { name: "Hiep", ...},│
-    │       "product": { name: "iPhone", ...}│
-    │     }                                  │
-    └────────────────────────────────────────┘
-
-  Ưu điểm: Giảm latency cho mobile (1 call thay vì 3)
-  Nhược: Gateway phức tạp hơn, có thể thành bottleneck
-```
+Giảm số round-trips cho mobile; đổi lại Gateway phức tạp hơn và có thể thành bottleneck. Fan-out chỉ song song khi các ID cần thiết đã có.
 
 ### 3.3. Authentication & Authorization
 
 Gateway xác thực **1 lần** → internal services không cần xác thực lại.
 
+```d2 title="3.3. Authentication & Authorization"
+direction: right
+client: "Client — Bearer Token"
+gw: "API Gateway\nValidate JWT • Check expiration\nExtract user info"
+reject: "401 Unauthorized"
+forward: "Forward request\nX-User-Id=123 • X-Roles=admin"
+user: "User Service"
+order: "Order Service"
+product: "Product Service"
+client -> gw
+gw -> reject: "INVALID"
+gw -> forward: "VALID"
+forward -> user
+forward -> order
+forward -> product
 ```
-Auth tại Gateway:
-─────────────────
 
-  Client ──Bearer Token──▶ API Gateway
-                               │
-                          1. Validate JWT token
-                          2. Check expiration
-                          3. Extract user info
-                               │
-                          ┌────▼─────────────────┐
-                          │ Nếu INVALID:         │
-                          │ → 401 Unauthorized   │
-                          └──────────────────────┘
-                               │
-                          ┌────▼─────────────────┐
-                          │ Nếu VALID:           │
-                          │ Forward request +    │
-                          │ Header: X-User-Id=123│
-                          │ Header: X-Roles=admin│
-                          └────┬─────────────────┘
-                               │
-              ┌────────────────┼────────────────┐
-              ▼                ▼                ▼
-        ┌─────────┐     ┌─────────┐      ┌─────────┐
-        │  User   │     │  Order  │      │ Product │
-        │ Service │     │ Service │      │ Service │
-        │         │     │         │      │         │
-        │ Trust   │     │ Trust   │      │ Trust   │
-        │ X-User  │     │ X-User  │      │ X-User  │
-        │ header  │     │ header  │      │ header  │
-        └─────────┘     └─────────┘      └─────────┘
-
-  Internal services TRUST gateway → không cần validate
-  JWT lại → giảm latency, giảm duplicate logic
-```
+Services chỉ được tin identity headers khi ingress loại header do client tự gửi, Gateway ghi lại từ token đã verify, và internal hop/identity được bảo vệ. Offload JWT validation không loại bỏ authorization theo resource tại service.
 
 > **Lưu ý**: Internal services vẫn cần kiểm tra **authorization** (user có quyền truy cập resource này không), nhưng **authentication** (user là ai) đã được gateway xử lý.
 
@@ -281,73 +258,49 @@ X-RateLimit-Reset: 1708700000
 
 Gateway phân phối traffic đến **nhiều instances** của cùng 1 service.
 
+```d2 title="3.5. Load Balancing"
+direction: right
+client: "Client"
+gw: "API Gateway"
+a: "Order — Instance 1"
+b: "Order — Instance 2"
+c: "Order — Instance 3"
+client -> gw
+gw -> a
+gw -> b
+gw -> c
 ```
-Load Balancing tại Gateway:
-───────────────────────────
 
-  Client ──▶ API Gateway ──┬──▶ Order Service (instance 1)
-                           ├──▶ Order Service (instance 2)
-                           └──▶ Order Service (instance 3)
-
-Thuật toán:
-  • Round Robin:     1 → 2 → 3 → 1 → 2 → 3 (luân phiên)
-  • Least Connections: gửi đến instance ít connection nhất
-  • Weighted:        instance mạnh nhận nhiều hơn
-  • IP Hash:         cùng IP → cùng instance (sticky session)
-  • Random:          chọn ngẫu nhiên
-
-  Thường dùng: Round Robin (đơn giản, hiệu quả)
-  Khi service stateful: IP Hash hoặc cookie-based sticky
-```
+Thuật toán: Round Robin luân phiên; Least Connections chọn ít connections; Weighted theo trọng số; IP Hash giữ cùng IP vào cùng instance; Random ngẫu nhiên. Thường dùng Round Robin; stateful workload có thể cần IP/cookie sticky session.
 
 #### Gateway có thể LB — vậy còn cần Load Balancer riêng không?
 
 **Có**. Vì bản thân Gateway cũng chạy nhiều instances → cần **LB phía trước Gateway**. Thực tế là có **nhiều tầng LB chồng nhau**, mỗi tầng vai trò khác nhau:
 
+```d2 title="Gateway có thể LB — vậy còn cần Load Balancer riêng không?"
+direction: down
+user: "User"
+external: "Layer 1 — External LB\nALB / NLB / CLB\nLB & health check Gateway\nTLS termination theo loại LB • HA"
+g1: "Gateway 1"
+g2: "Gateway 2"
+g3: "Gateway 3"
+lb: "Layer 2 — Gateway LB / Kubernetes Service\nRoute service • LB giữa replicas\nAuth • Rate limit • Aggregate tại Gateway"
+o1: "Order 1"
+o2: "Order 2"
+o3: "Order 3"
+user -> external
+external -> g1
+external -> g2
+external -> g3
+g1 -> lb
+g2 -> lb
+g3 -> lb
+lb -> o1
+lb -> o2
+lb -> o3
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│              MULTI-LAYER LOAD BALANCING (AWS)                    │
-│                                                                  │
-│  User                                                            │
-│   │                                                              │
-│   ▼                                                              │
-│  ┌──────────────────────────────────────────┐                    │
-│  │ Layer 1: EXTERNAL LB (ALB / NLB / CLB)   │                    │
-│  │                                          │                    │
-│  │ Vai trò:                                 │                    │
-│  │ • LB cho chính Gateway instances         │                    │
-│  │ • SSL termination                        │                    │
-│  │ • Health check Gateway                   │                    │
-│  │ • HA cho Gateway (Gateway chết 1 → ok)   │                    │
-│  └────────────────┬─────────────────────────┘                    │
-│                   │                                              │
-│      ┌────────────┼────────────┐                                 │
-│      ▼            ▼            ▼                                 │
-│  ┌────────┐  ┌────────┐  ┌────────┐                              │
-│  │Gateway │  │Gateway │  │Gateway │  ← 3 instances               │
-│  │  #1    │  │  #2    │  │  #3    │                              │
-│  └───┬────┘  └───┬────┘  └───┬────┘                              │
-│      │           │           │                                   │
-│  ┌───▼───────────▼───────────▼────┐                              │
-│  │ Layer 2: GATEWAY LB            │                              │
-│  │                                │                              │
-│  │ Vai trò:                       │                              │
-│  │ • Route đến đúng service       │                              │
-│  │ • LB giữa instances của service│                              │
-│  │ • Auth, rate limit, aggregate  │                              │
-│  └───────────────┬────────────────┘                              │
-│                  │                                               │
-│     ┌────────────┼────────────┐                                  │
-│     ▼            ▼            ▼                                  │
-│  ┌──────┐    ┌──────┐    ┌──────┐                                │
-│  │Order │    │Order │    │Order │  ← Service instances           │
-│  │ #1   │    │ #2   │    │ #3   │                                │
-│  └──────┘    └──────┘    └──────┘                                │
-│                                                                  │
-│  Trong K8s: Layer 2 có thể là K8s Service (kube-proxy)           │
-│  thay vì Gateway tự LB                                           │
-└──────────────────────────────────────────────────────────────────┘
-```
+
+Layer 2 là chức năng của Gateway hoặc K8s Service/kube-proxy, không bắt buộc có thêm một Gateway tier độc lập.
 
 **Ví dụ cụ thể trong AWS:**
 
@@ -358,43 +311,22 @@ Thuật toán:
 | **Gateway trên EKS (Kubernetes)** | User → ALB (Ingress) → Gateway pods → K8s Service → Service pods | ALB (Ingress) + K8s Service (internal LB) |
 | **CloudFront + API GW** | User → CloudFront (Edge) → API GW → NLB → Services | CloudFront LB (edge) + NLB (internal) |
 
+```d2 title="Gateway có thể LB — vậy còn cần Load Balancer riêng không?"
+direction: right
+internet: "Internet"
+public: "Public ALB — :443 HTTPS\nSSL termination • LB Kong"
+kong: "ECS Kong ×3\nAuto-scaling 2–10"
+internal: "Internal ALB — :80 HTTP\nNative health checks • ECS targets"
+user: "ECS User Service ×2"
+order: "ECS Order Service ×3"
+internet -> public
+public -> kong
+kong -> internal
+internal -> user: "/users — User target group"
+internal -> order: "/orders — Order target group"
 ```
-Ví dụ: Self-hosted Kong trên AWS ECS
-─────────────────────────────────────
 
-  Internet
-      │
-  ┌───▼──────────────┐
-  │ ALB (public)     │  ← LB cho Kong containers
-  │ Port 443 (HTTPS) │  ← SSL termination
-  └───┬──────────────┘
-      │
-  ┌───▼──────────────┐
-  │ ECS: Kong × 3    │  ← 3 Kong containers
-  │ (API Gateway)    │     Auto-scaling 2-10
-  └───┬──────────────┘
-      │
-  ┌───▼──────────────┐
-  │ ALB (internal)   │  ← LB cho service containers
-  │ Port 80 (HTTP)   │     Path-based routing:
-  │                  │     /users → User target group
-  │                  │     /orders → Order target group
-  └───┬──────────────┘
-      │
-  ┌───┼─────────────────────┐
-  │   │                     │
-  ▼   ▼                     ▼
-  ECS: User Svc × 2    ECS: Order Svc × 3
-
-Câu hỏi: "Có cần ALB internal không? Kong cũng LB được mà?"
-
-Trả lời: CÓ THỂ bỏ ALB internal nếu Kong tự LB.
-Nhưng giữ ALB internal vì:
-  • ALB có health check native (tự loại instance chết)
-  • ALB tích hợp ECS service discovery (tự cập nhật target)
-  • Kong không cần biết có bao nhiêu instances
-  • Tách concern: Kong lo routing + auth, ALB lo LB + health
-```
+Có thể bỏ Internal ALB nếu Kong tự LB. Giữ ALB để tự cập nhật ECS targets, loại unhealthy instances và tách concern: Kong routing/auth, ALB LB/health. Kong không cần biết số replicas.
 
 > **Tóm lại**: Gateway CÓ THỂ LB, nhưng **không thay thế** dedicated Load Balancer. Lý do: (1) Gateway cũng cần được LB, (2) Cloud LB (ALB/NLB) có health check, auto-scaling integration tốt hơn, (3) Tách concern — Gateway lo routing/auth, LB lo phân phối traffic và HA.
 
@@ -402,63 +334,43 @@ Nhưng giữ ALB internal vì:
 
 Gateway cache response để **giảm tải** cho backend services.
 
+```d2 title="3.6. Caching"
+direction: right
+client: "Client\nGET /products/123"
+gw: "Gateway — Cache lookup"
+product: "Product Service"
+store: "Store cache + trả response"
+cached: "Trả cache, không gọi Product Service"
+client -> gw
+gw -> product: "Request 1 — Miss"
+product -> store
+store -> client
+gw -> cached: "Request 2 — Hit trong TTL"
+cached -> client
 ```
-Caching tại Gateway:
-────────────────────
 
-  Request 1: GET /products/123
-  ┌──────────┐     ┌──────────┐     ┌──────────┐
-  │  Client  │────▶│ Gateway  │────▶│ Product  │
-  │          │◀────│ Cache: ✗ │◀────│ Service  │
-  └──────────┘     │ Store ✓  │     └──────────┘
-                   └──────────┘
-                   
-  Request 2: GET /products/123 (trong vòng TTL)
-  ┌──────────┐     ┌──────────┐
-  │  Client  │────▶│ Gateway  │  ← Trả từ cache, KHÔNG gọi service
-  │          │◀────│ Cache: ✓ │
-  └──────────┘     └──────────┘
-
-  Cache Headers:
-    Cache-Control: public, max-age=300    (cache 5 phút)
-    Cache-Control: private, no-cache       (không cache)
-    ETag: "abc123"                         (conditional request)
-
-  Nên cache:
-    ✅ GET requests (read-only, idempotent)
-    ✅ Data ít thay đổi (product catalog, config)
-    
-  KHÔNG cache:
-    ❌ POST/PUT/DELETE (mutating)
-    ❌ User-specific data (giỏ hàng, profile — trừ khi cache per-user)
-    ❌ Real-time data (stock price, live scores)
-```
+Headers: `Cache-Control: public, max-age=300` cache 5 phút; `private, no-cache` yêu cầu revalidation và không cho shared cache (khác `no-store`); `ETag: "abc123"` dùng conditional request. Cache GET/read-only, dữ liệu ít đổi; không cache mutating requests hay real-time data theo mặc định. User-specific data chỉ cache khi key/scope được cô lập đúng.
 
 ### 3.7. Request/Response Transformation
 
 Gateway **chuyển đổi** format request/response cho phù hợp với từng client.
 
+```d2 title="3.7. Request/Response Transformation"
+direction: right
+client: "Client — REST / JSON\nGET /orders"
+gw: "Gateway\nProtocol translation\nInject X-Request-Id uuid\nX-User-Id 123 từ JWT\nX-Trace-Id trace-abc"
+service: "Service — gRPC / Protobuf\nResponse: id, name, email, ssn, internalId"
+filter: "Filter sensitive fields\nid, name, email"
+desktop: "Desktop — full 50 fields theo contract"
+mobile: "Mobile — compact 15 fields"
+client -> gw
+gw -> service
+service -> filter
+filter -> desktop
+filter -> mobile
 ```
-Transformation ví dụ:
-─────────────────────
 
-1. Protocol Translation:
-   Client (REST/JSON) ──▶ Gateway ──▶ Service (gRPC/Protobuf)
-
-2. Response Filtering:
-   Service response: { id, name, email, ssn, internalId }
-   Gateway filter:   { id, name, email }  ← ẩn sensitive fields
-
-3. Header Injection:
-   Client request: GET /orders
-   Gateway thêm:   X-Request-Id: uuid
-                   X-User-Id: 123 (từ JWT)
-                   X-Trace-Id: trace-abc
-
-4. Response Reshaping (cho mobile):
-   Desktop: nhận full response (50 fields)
-   Mobile:  nhận compact response (15 fields) ← tiết kiệm bandwidth
-```
+Protocol translation, filtering, identity/header injection và reshaping là các ví dụ transformation độc lập; không mặc định mọi endpoint áp dụng tất cả bước.
 
 ### 3.8. Tổng hợp chức năng
 
@@ -615,65 +527,51 @@ Public API response (3rd party):
 
 ### 5.1. Single Gateway vs Multiple Gateways
 
-```
-Single Gateway:                     Multiple Gateways:
-───────────────                     ──────────────────
-
-  All Clients                         Web    Mobile   Admin
-      │                                │       │       │
-      ▼                                ▼       ▼       ▼
-  ┌────────┐                       ┌──────┐┌──────┐┌──────┐
-  │  API   │                       │ Web  ││Mobile││Admin │
-  │Gateway │                       │  GW  ││  GW  ││  GW  │
-  └────────┘                       └──────┘└──────┘└──────┘
-      │                                │       │       │
-  ┌───┼───┐                        ┌───┼───────┼───────┼───┐
-  │   │   │                        │   │       │       │   │
-  S1  S2  S3                       S1  S2     S3      S4
-
-  ✅ Đơn giản                      ✅ Tối ưu per-client
-  ✅ 1 chỗ quản lý                 ✅ Team riêng maintain
-  ❌ Bottleneck tiềm năng          ✅ Fault isolation
-  ❌ 1 size fits all               ❌ Duplicate logic
-                                   ❌ Nhiều hơn để vận hành
+```d2 title="5.1. Single Gateway vs Multiple Gateways"
+direction: down
+single: "Single Gateway — đơn giản, một chỗ quản lý\nNguy cơ bottleneck / one-size-fits-all" {
+ clients: All Clients
+ gw: API Gateway
+ services: S1 / S2 / S3
+ clients -> gw -> services
+}
+multi_gateway: "Multiple Gateways — tối ưu client, ownership, fault isolation\nĐổi lại lặp logic và tăng vận hành" {
+ web: Web
+ mobile: Mobile
+ admin: Admin
+ wg: Web Gateway
+ mg: Mobile Gateway
+ ag: Admin Gateway
+ services: Backend Services — S1 / S2 / S3 / S4
+ web -> wg -> services
+ mobile -> mg -> services
+ admin -> ag -> services
+}
 ```
 
 ### 5.2. Gateway Offloading
 
 **Offloading** — chuyển các cross-cutting concerns từ services sang gateway:
 
+```d2 title="5.2. Gateway Offloading"
+direction: down
+before: "Trước — duplicate cross-cutting logic ×N" {
+ user: "User Service\nSSL • Auth • Rate limit\nCORS • Logging • Business logic"
+ order: "Order Service\nSSL • Auth • Rate limit\nCORS • Logging • Business logic"
+ product: "Product Service\nSSL • Auth • Rate limit\nCORS • Logging • Business logic"
+}
+after: "Sau — offload cross-cutting concerns" {
+ gw: "API Gateway\nSSL • Auth • Rate limit • CORS • Logging"
+ user: User — Business Logic
+ order: Order — Business Logic
+ product: Product — Business Logic
+ gw -> user
+ gw -> order
+ gw -> product
+}
 ```
-Trước (mỗi service tự xử lý):
-──────────────────────────────
-  ┌───────────────┐  ┌───────────────┐  ┌───────────────┐
-  │ User Service  │  │ Order Service │  │ Product Svc   │
-  │               │  │               │  │               │
-  │ ✓ SSL         │  │ ✓ SSL         │  │ ✓ SSL         │
-  │ ✓ Auth        │  │ ✓ Auth        │  │ ✓ Auth        │
-  │ ✓ Rate Limit  │  │ ✓ Rate Limit  │  │ ✓ Rate Limit  │
-  │ ✓ CORS        │  │ ✓ CORS        │  │ ✓ CORS        │
-  │ ✓ Logging     │  │ ✓ Logging     │  │ ✓ Logging     │
-  │ ─────────     │  │ ─────────     │  │ ─────────     │
-  │ Business Logic│  │ Business Logic│  │ Business Logic│
-  └───────────────┘  └───────────────┘  └───────────────┘
-  → Duplicate logic × N services
 
-Sau (offload sang gateway):
-───────────────────────────
-  ┌──────────────────────────────────────┐
-  │            API Gateway               │
-  │ ✓ SSL   ✓ Auth   ✓ Rate Limit        │
-  │ ✓ CORS  ✓ Logging                    │
-  └──────────────────┬───────────────────┘
-                     │
-  ┌──────────────┐ ┌─┴────────────┐ ┌──────────────┐
-  │ User Service │ │ Order Service│ │ Product Svc  │
-  │              │ │              │ │              │
-  │ Business     │ │ Business     │ │ Business     │
-  │ Logic ONLY   │ │ Logic ONLY   │ │ Logic ONLY   │
-  └──────────────┘ └──────────────┘ └──────────────┘
-  → Services chỉ tập trung business logic
-```
+Service vẫn cần authorization theo business/resource, input validation và telemetry nội bộ; Gateway không thay thế các trách nhiệm đó.
 
 ### 5.3. Gateway Routing vs Gateway Aggregation
 
@@ -685,15 +583,30 @@ Sau (offload sang gateway):
 | **Khi nào dùng** | 1 request map đến 1 service | 1 request cần data từ nhiều services |
 | **Ví dụ** | `GET /users/123` → User Service | `GET /dashboard` → User + Order + Analytics |
 
-```
-Routing:                          Aggregation:
-─────────                         ────────────
-
-  Client → GW → Service A          Client → GW ─┬→ Service A
-  (1:1, pass-through)                            ├→ Service B
-                                                 └→ Service C
-                                                 GW gộp → Client
-                                                 (1:N, fan-out)
+```d2 title="5.3. Gateway Routing vs Gateway Aggregation"
+direction: down
+routing: "Routing — 1:1 pass-through" {
+ client: Client
+ gw: Gateway
+ a: Service A
+ client -> gw -> a
+}
+aggregation: "Aggregation — 1:N fan-out" {
+ client: Client
+ gw: Gateway
+ a: Service A
+ b: Service B
+ c: Service C
+ merge: Gộp responses
+ client -> gw
+ gw -> a
+ gw -> b
+ gw -> c
+ a -> merge
+ b -> merge
+ c -> merge
+ merge -> client
+}
 ```
 
 ---
@@ -901,27 +814,16 @@ Khuyến nghị:
 
 ### 7.1. SSL Termination
 
+```d2 title="7.1. SSL Termination"
+direction: right
+client: "Client"
+gw: "API Gateway\nDecrypt / SSL termination"
+service: "Services — Internal Network"
+client -> gw: "HTTPS — encrypted"
+gw -> service: "HTTP — plaintext trong mô hình này"
 ```
-SSL Termination tại Gateway:
-────────────────────────────
 
-  Client ═══HTTPS═══▶ API Gateway ───HTTP───▶ Services
-  (encrypted)          (decrypt tại đây)      (plain HTTP)
-                                               (internal network)
-
-  Ưu điểm:
-  • Services không cần xử lý SSL → đơn giản, nhanh hơn
-  • Quản lý certificate 1 chỗ (gateway)
-  • Giảm CPU overhead cho services
-
-  Nhược điểm:
-  • Traffic internal là HTTP (không encrypted)
-  • Nếu network internal bị compromised → data lộ
-
-  Giải pháp cho high-security:
-  • mTLS (mutual TLS) giữa gateway và services
-  • Service Mesh (Istio) tự động encrypt internal traffic
-```
+Ưu điểm: quản lý certificates tập trung, giảm SSL/CPU work tại service. Nhược: internal traffic plaintext có thể lộ khi network bị xâm nhập. Yêu cầu security cao dùng TLS/mTLS giữa Gateway và services, có thể qua Service Mesh.
 
 ### 7.2. CORS
 
@@ -945,22 +847,18 @@ CORS tại Gateway:
 
 Gateway **chỉ là điểm khởi tạo** Trace ID — nó generate ID rồi forward cho service đầu tiên. Nhưng service-to-service **không đi qua gateway**, nên mỗi service phải **tự forward** trace headers khi gọi service khác.
 
+```d2 title="7.3. Request ID & Distributed Tracing"
+direction: right
+client: "Client"
+gw: "API Gateway\nGenerate trace-xyz-789"
+order: "Order Service\nForward trace-xyz-789"
+payment: "Payment Service\nForward trace-xyz-789"
+client -> gw
+gw -> order: "Trace headers"
+order -> payment: "Trực tiếp REST/gRPC + trace headers"
 ```
-Luồng thực tế — Gateway KHÔNG nằm giữa service-to-service:
-───────────────────────────────────────────────────────────
 
-  Client ──▶ API Gateway ──▶ Order Service ──▶ Payment Service
-                 │                 │                  │
-            Generate:         Forward:            Forward:
-            X-Trace-Id:       X-Trace-Id:         X-Trace-Id:
-            trace-xyz-789     trace-xyz-789       trace-xyz-789
-                              (tự forward,        (tự forward)
-                               KHÔNG qua GW)
-
-  ⚠️ Lưu ý: Order → Payment đi TRỰC TIẾP (gRPC/REST)
-     KHÔNG đi qua API Gateway
-     → Order Service PHẢI tự forward trace headers
-```
+Gateway không đứng giữa Order và Payment; mỗi service phải tự propagate context. `X-Trace-Id` ở đây là header minh họa; hệ thống dùng OTel thường propagate W3C `traceparent`/`tracestate`.
 
 ```
 Ai chịu trách nhiệm gì?
@@ -1144,63 +1042,45 @@ Ví dụ — Kafka Consumer nhận event:
   → Cho phép trace END-TO-END từ client đến consumer cuối cùng
 ```
 
+```d2 title="Còn request KHÔNG đi qua Gateway thì sao?"
+direction: down
+http: Client Request Flow {
+ client: Client
+ gw: Gateway — tạo Trace nếu chưa có
+ s1: Service 1
+ s2: Service 2
+ client -> gw -> s1 -> s2
+}
+async: Async Event Flow {
+ producer: Service — publish + inject Trace
+ broker: Broker
+ consumer: Consumer — extract Trace
+ next: Service
+ producer -> broker -> consumer -> next
+}
+background: Cron / Background Flow {
+ scheduler: Scheduler — tạo Trace mới
+ s1: Service 1
+ s2: Service 2
+ scheduler -> s1 -> s2
+}
 ```
-Tổng hợp — Trace ID lifecycle đầy đủ:
-──────────────────────────────────────
 
-  ┌──────────────────────────────────────────────────────────────┐
-  │                                                              │
-  │  Client Request Flow:                                        │
-  │  Client → Gateway(tạo Trace) → Service → Service → ...       │
-  │                                                              │
-  │  Async Event Flow:                                           │
-  │  ... → Service(publish + inject Trace) → Broker              │
-  │       → Consumer(extract Trace) → Service → ...              │
-  │                                                              │
-  │  Cron / Background Flow:                                     │
-  │  Scheduler(tạo Trace MỚI) → Service → Service → ...          │
-  │                                                              │
-  │  Quy tắc vàng:                                               │
-  │  ─────────────                                               │
-  │  1. Mọi operation PHẢI có Trace ID                           │
-  │  2. Nếu có context sẵn (từ GW hoặc message) → propagate      │
-  │  3. Nếu KHÔNG có context → tự tạo mới                        │
-  │  4. Dùng OpenTelemetry SDK → tự động xử lý cả 3 trường hợp   │
-  └──────────────────────────────────────────────────────────────┘
-```
+Mỗi operation nên được trace theo policy/sampling. Có context thì propagate; chưa có thì tạo mới. OTel SDK/instrumentation hỗ trợ nhưng vẫn cần cấu hình phù hợp cho HTTP, messaging và background jobs.
 
 > **Thực tế**: OpenTelemetry SDK xử lý tốt cả 3 entry points (HTTP, Message, Cron). Chỉ cần setup instrumentation đúng — SDK tự biết khi nào extract context có sẵn, khi nào tạo context mới. Không cần xử lý thủ công.
 
 ### 7.4. Circuit Breaker tại Gateway
 
-```
-Circuit Breaker tại Gateway:
-────────────────────────────
-
-  Khi backend service lỗi liên tục:
-
-  CLOSED (bình thường):
-    Client → GW → Service ✅
-
-  OPEN (service đang lỗi, ngưng gọi):
-    Client → GW → 503 Service Unavailable
-    (KHÔNG gọi service → tránh overload service đang bệnh)
-
-  HALF-OPEN (thử lại):
-    Client → GW → Service (thử 1 request)
-    → OK → chuyển về CLOSED
-    → Fail → giữ OPEN thêm 30s
-
-  ┌────────┐     lỗi > 50%     ┌────────┐
-  │ CLOSED │────────────────▶  │  OPEN  │
-  │(normal)│                   │(block) │
-  └────┬───┘                   └───┬────┘
-       ▲                           │ sau 30s
-       │    thử OK                 ▼
-       └──────────────────── ┌──────────┐
-                             │HALF-OPEN │
-                             │ (thử lại)│
-                             └──────────┘
+```d2 title="7.4. Circuit Breaker tại Gateway"
+direction: right
+closed: "CLOSED\nGateway gọi service bình thường"
+open: "OPEN\nGateway trả 503, không gọi service"
+half: "HALF-OPEN\nThử request giới hạn"
+closed -> open: "Lỗi >50% theo ví dụ"
+open -> half: "Sau 30s"
+half -> closed: "Thử OK"
+half -> open: "Thử fail — chờ thêm 30s"
 ```
 
 #### Circuit Breaker tại Gateway CHỈ bảo vệ luồng Client → Gateway → Service
@@ -1255,33 +1135,42 @@ Giải pháp: Circuit Breaker tại MỖI SERVICE
   }
 ```
 
+```d2 title="Circuit Breaker tại Gateway CHỈ bảo vệ luồng Client → Gateway → Service"
+direction: down
+app_cb: Application-level CB {
+ client: Client
+ gw: Gateway CB
+ order: Order Service
+ cron: Cron Job
+ payment_cb: App CB — Payment
+ payment: Payment Service
+ product_cb: App CB — Product
+ product: Product Service
+ kafka: Kafka
+ inventory: Inventory Service
+ inventory_cb: App CB — Product
+ client -> gw -> order
+ cron -> order
+ order -> payment_cb -> payment
+ order -> product_cb -> product
+ kafka -> inventory -> inventory_cb -> product
+}
+mesh: Service Mesh {
+ order: Pod — Order {
+  app: App
+  envoy: Envoy Sidecar — CB
+  app -> envoy
+ }
+ payment: Pod — Payment {
+  envoy: Envoy Sidecar
+  app: App
+  envoy -> app
+ }
+ order.envoy -> payment.envoy: Outgoing request
+}
 ```
-Tổng hợp — CB hoạt động ở nhiều lớp:
-─────────────────────────────────────
 
-  Client → [GW CB] → Order Service → [App CB] → Payment Service
-                           │
-                      [App CB] → Product Service
-
-  Cron Job → Order Service → [App CB] → Payment Service
-
-  Kafka → Inventory Service → [App CB] → Product Service
-
-  Hoặc dùng Service Mesh — Envoy sidecar tự CB cho MỌI outgoing call:
-
-  ┌──────────────────────────┐     ┌─────────────────────────┐
-  │ Pod: Order Service       │     │ Pod: Payment Service    │
-  │ ┌───────┐  ┌───────────┐ │     │┌──────────┐  ┌────────┐ │
-  │ │  App  │→ │  Envoy    │ │────▶││  Envoy   │→ │  App   │ │
-  │ │       │  │ Sidecar   │ │     ││ Sidecar  │  │        │ │
-  │ │       │  │ (CB ở đây)│ │     ││          │  │        │ │
-  │ └───────┘  └───────────┘ │     │└──────────┘  └────────┘ │
-  └──────────────────────────┘     └─────────────────────────┘
-  
-  Envoy sidecar CB hoạt động cho MỌI outgoing request
-  — dù từ client flow, cron job, hay event consumer
-  → App code không cần implement CB
-```
+CB tại Gateway chỉ bảo vệ client ingress; application CB bảo vệ outbound từ HTTP, cron hay event consumer. Envoy có thể áp dụng policy cho outgoing traffic khi được cấu hình, không tự thay thế mọi loại application-level CB hoặc fallback.
 
 > **Tóm lại**: Gateway CB chỉ là **lớp đầu tiên**. Để bảo vệ toàn diện, cần CB tại **application level** (Resilience4j, Polly) hoặc **service mesh** (Istio/Envoy sidecar) — cover cả service-to-service, cron, event consumer.
 
@@ -1295,60 +1184,38 @@ Tổng hợp — CB hoạt động ở nhiều lớp:
 
 **Edge Service** là lớp xử lý nằm ở **rìa mạng** (edge of the network), **gần user nhất** về mặt vật lý — chạy trên các **CDN PoP** (Point of Presence) phân tán toàn cầu, thay vì chạy tại data center trung tâm.
 
+```d2 title="8.1. Edge Service là gì?"
+direction: down
+without: "Không Edge — latency minh họa 200ms" {
+ user: User Việt Nam
+ dc: API Gateway — US Data Center
+ user -> dc: Mọi request qua Thái Bình Dương
+}
+with: "Có Edge — latency minh họa 10ms tới PoP" {
+ user: User Việt Nam
+ edge: Edge Service — Singapore PoP
+ dc: API Gateway — US Data Center
+ user -> edge: 10ms
+ edge -> user: Trả ngay nếu xử lý tại Edge
+ edge -> dc: Chỉ forward khi cần — khoảng 200ms về origin
+}
 ```
-Không có Edge Service:
-──────────────────────
 
-  User (Việt Nam) ────── 200ms ──────▶ Data Center (US)
-                                        ┌──────────┐
-                                        │ API      │
-                                        │ Gateway  │
-                                        └──────────┘
-
-  Mọi request đều phải bay qua Thái Bình Dương → latency cao
-
-Có Edge Service:
-────────────────
-
-  User (Việt Nam) ──── 10ms ────▶ Edge PoP (Singapore)
-                                   ┌──────────┐
-                                   │  Edge    │
-                                   │ Service  │
-                                   └────┬─────┘
-                                        │
-                            Chỉ forward khi cần
-                                        │
-                                        ▼
-                               Data Center (US)
-                                   ┌──────────┐
-                                   │ API      │
-                                   │ Gateway  │
-                                   └──────────┘
-
-  Edge xử lý được gì → trả ngay (10ms)
-  Edge không xử lý được → forward về origin (200ms)
-```
+Latency phụ thuộc mạng/vị trí/cache; các số là minh họa, không phải cam kết.
 
 ### 8.2. Edge Service vs API Gateway
 
 Hai thứ này **KHÁC NHAU** và **bổ sung cho nhau** — không thay thế nhau:
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                   VỊ TRÍ TRONG KIẾN TRÚC                        │
-│                                                                 │
-│  User ──▶ Edge Service ──▶ API Gateway ──▶ Microservices        │
-│           (CDN PoP,        (Data Center,   (Data Center,        │
-│            gần user)        centralized)    internal)            │
-│                                                                 │
-│  Layer 1: EDGE             Layer 2: GATEWAY   Layer 3: SERVICES │
-│  ─────────────             ────────────────   ───────────────── │
-│  • Phân tán toàn cầu      • Tập trung 1-2    • Internal        │
-│  • Xử lý đơn giản,          data centers      network          │
-│    stateless              • Business routing  • Business logic  │
-│  • Cache, WAF, geo-route  • Auth, aggregate                     │
-│  • Giảm latency            • Rate limit                         │
-└─────────────────────────────────────────────────────────────────┘
+```d2 title="8.2. Edge Service vs API Gateway"
+direction: right
+user: "User"
+edge: "Layer 1 — Edge / CDN PoP\nPhân tán toàn cầu • Gần user\nStateless • Cache • WAF • Geo-route"
+gw: "Layer 2 — Gateway / Data Center\nTập trung 1–2 DC trong ví dụ\nBusiness routing • Auth • Aggregate • Rate limit"
+svc: "Layer 3 — Microservices\nInternal Network • Business Logic"
+user -> edge
+edge -> gw
+gw -> svc
 ```
 
 | Tiêu chí | Edge Service | API Gateway |
@@ -1496,50 +1363,27 @@ Chọn nhanh:
 
 ### 8.5. Ví dụ thực tế — E-Commerce toàn cầu
 
+```d2 title="8.5. Ví dụ thực tế — E-Commerce toàn cầu"
+direction: down
+user: "User — HCM"
+edge: "Cloudflare Worker / Edge PoP Singapore\nWAF SQL injection • Bot blocking\nAuth JWT • X-Country • A/B checkout v2"
+cache: "GET /products cache hit?"
+cached: "Cached response — 5ms minh họa"
+gw: "API Gateway — Singapore DC\nRate limiting • Routing\nAggregation • Circuit Breaker"
+product: "Product Service"
+order: "Order Service"
+payment: "Payment Service"
+user -> edge: "5ms minh họa"
+edge -> cache
+cache -> cached: "Hit"
+cached -> user
+cache -> gw: "Miss — thêm 40ms minh họa"
+gw -> product
+gw -> order
+gw -> payment
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│         E-COMMERCE GLOBAL — EDGE + GATEWAY ARCHITECTURE          │
-│                                                                 │
-│  User (HCM) ──── 5ms ────▶ Edge PoP (Singapore)                │
-│                              │                                  │
-│                         ┌────▼──────────────────────┐           │
-│                         │  Cloudflare Worker         │           │
-│                         │                            │           │
-│                         │  1. WAF: chặn SQL inject   │           │
-│                         │  2. Bot: block scraper     │           │
-│                         │  3. Cache: GET /products   │           │
-│                         │     → HIT? Trả ngay 5ms   │           │
-│                         │     → MISS? Forward ↓       │           │
-│                         │  4. Auth: validate JWT     │           │
-│                         │  5. Geo: inject X-Country  │           │
-│                         │  6. A/B: route checkout v2 │           │
-│                         └────┬──────────────────────┘           │
-│                              │                                  │
-│                         ──── 40ms ────                          │
-│                              │                                  │
-│                         ┌────▼──────────────────────┐           │
-│                         │  API Gateway (Singapore DC)│           │
-│                         │                            │           │
-│                         │  1. Rate limiting           │           │
-│                         │  2. Route → services       │           │
-│                         │  3. Aggregate (nếu cần)    │           │
-│                         │  4. Circuit breaker         │           │
-│                         └────┬──────────────────────┘           │
-│                              │                                  │
-│                     ┌────────┼────────┐                         │
-│                     ▼        ▼        ▼                         │
-│               ┌─────────┐┌────────┐┌─────────┐                  │
-│               │ Product ││ Order  ││ Payment │                  │
-│               │ Service ││Service ││ Service │                  │
-│               └─────────┘└────────┘└─────────┘                  │
-│                                                                 │
-│  Kết quả:                                                       │
-│  • Cached request:  5ms (chỉ đến edge)                          │
-│  • Normal request:  45ms (edge → gateway → service)             │
-│  • Malicious request: blocked tại edge, origin KHÔNG biết       │
-│  • Không có edge:  200ms+ (user → US DC trực tiếp)              │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Malicious requests bị block tại Edge, origin không nhận. Ví dụ cached 5ms, normal 45ms, không Edge tới US 200ms+; đây là số minh họa và không gồm mọi thời gian xử lý. WAF/Bot protection cần cấu hình dịch vụ phù hợp, không mặc định có chỉ vì dùng Worker.
 
 ### 8.6. Khi nào cần Edge Service?
 

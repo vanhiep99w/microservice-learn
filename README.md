@@ -234,9 +234,11 @@ client -> order -> db
 ````
 
 - Ưu tiên D2 cho kiến trúc, dependency graph, flowchart và sequence đơn giản. SVG light/dark được render lúc build; browser không phải tải D2/WASM.
-- Giữ Mermaid khi cần các semantics chuyên biệt như activation, parallel/alternative fragments, state machine, ER hoặc Gantt. Giữ text cho cây thư mục, logs, payloads, công thức và ví dụ phụ thuộc căn cột; sơ đồ đầu README giữ ASCII để đọc trực tiếp trên GitHub.
+- Chuyển sang D2 khi thể hiện tương đương được: state transition có điều kiện rõ ràng; ER dùng `sql_table` giữ fields, constraints và cardinality; flow rẽ nhánh/fan-out có điều kiện và điểm hợp nhất tường minh. Không đổi một `par` thành chuỗi gọi tuần tự chỉ để bỏ Mermaid.
+- Giữ Mermaid khi cần semantics chuyên biệt chưa chuyển tương đương: Gantt migration trong hai case study và Multipart Upload có `loop` + `par` trong bài Dropbox. Giữ text cho cây thư mục, logs, payloads, công thức, bảng căn cột và ví dụ theo trục thời gian; sơ đồ đầu README giữ ASCII để đọc trực tiếp trên GitHub.
 - D2 fenced blocks được render trên website; GitHub chỉ hiển thị source D2. Dùng nhãn ngắn, tách sơ đồ lớn thành các phần. Escape ký tự `$` thành `\$` trong nhãn D2 để không bị hiểu là substitution.
 - `npm run check-diagrams` render và kiểm tra tất cả D2 trong tài liệu gốc, kể cả các bài tổng hợp không publish riêng. Cache dùng `.next/cache/docs-kit/d2`, không commit vào Git.
+- `npm run diagrams:inventory` liệt kê các block Mermaid / ASCII candidate theo file, dòng và heading; `npm run diagrams:inventory -- --json` xuất toàn bộ inventory kèm source hash. Candidate chỉ là gợi ý rà soát: cây thư mục, bảng và prose có mũi tên cũng có thể được nhận diện, không nên tự động chuyển hàng loạt.
 
 ### SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài
 

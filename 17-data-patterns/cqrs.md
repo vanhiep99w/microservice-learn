@@ -163,13 +163,21 @@ Materialized view có thể cần refresh theo lịch hoặc theo cơ chế củ
 
 Ở mức 3, write side lưu vào write database, còn query side đọc read database chuyên dụng. Ví dụ, PostgreSQL có thể phục vụ transaction và Elasticsearch có thể phục vụ full-text search. Một worker hoặc projector nhận events/CDC, biến đổi dữ liệu rồi cập nhật read database.
 
-```text
-Command ──▶ Write model ──▶ Write DB (PostgreSQL)
-                                  │
-                         Events hoặc CDC
-                                  │
-                                  ▼
-Query   ──▶ Read model  ◀── Projector ──▶ Read DB (Elasticsearch / Redis / MongoDB)
+```d2 title="Mức 3 Tách database"
+direction: right
+command: "Command"
+write: "Write Model"
+pg: "Write DB — PostgreSQL"
+projector: "Projector — Events / CDC / Outbox relay"
+read: "Read DB — Elasticsearch / Redis / MongoDB / Replica theo use case"
+query: "Query"
+model: "Read Model"
+command -> write
+write -> pg
+pg -> projector: "Reliable change stream"
+projector -> read
+query -> model
+model -> read
 ```
 
 Ưu điểm của mức 3 là mỗi phía có thể scale và chọn công nghệ phù hợp với workload của mình. Đổi lại, read database không tự động đồng bộ với write database. Hệ thống phải xử lý lag, duplicate, lỗi projector, rebuild và schema evolution.

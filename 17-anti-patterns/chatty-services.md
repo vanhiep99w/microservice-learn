@@ -165,24 +165,23 @@ Ngược lại, Gateway hoặc BFF có thể làm **API Aggregation** cho một 
 
 **Ví dụ giả định:** `Order Service` cần dựng trang chi tiết một order có ba item với SKU `A`, `B` và `C`. Với mỗi SKU, service gọi một lần để lấy tên và ảnh, rồi gọi thêm một lần để lấy giá.
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Product Service
-
-    Note over O,P: Chatty — 2 lookup cho mỗi SKU
-    O->>P: GET /products/A
-    P-->>O: name, image
-    O->>P: GET /products/A/price
-    P-->>O: price
-    O->>P: GET /products/B
-    P-->>O: name, image
-    O->>P: GET /products/B/price
-    P-->>O: price
-    O->>P: GET /products/C
-    P-->>O: name, image
-    O->>P: GET /products/C/price
-    P-->>O: price
+```d2 title="Luồng chatty"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Product Service"
+"O".note1: "[Order Service — Product Service]\nChatty — 2 lookup cho mỗi SKU"
+"O" -> "P": "GET /products/A"
+"P" -> "O": "name, image" { style.stroke-dash: 5 }
+"O" -> "P": "GET /products/A/price"
+"P" -> "O": "price" { style.stroke-dash: 5 }
+"O" -> "P": "GET /products/B"
+"P" -> "O": "name, image" { style.stroke-dash: 5 }
+"O" -> "P": "GET /products/B/price"
+"P" -> "O": "price" { style.stroke-dash: 5 }
+"O" -> "P": "GET /products/C"
+"P" -> "O": "name, image" { style.stroke-dash: 5 }
+"O" -> "P": "GET /products/C/price"
+"P" -> "O": "price" { style.stroke-dash: 5 }
 ```
 
 Một request ngoài cùng tạo sáu round-trip tới cùng provider. Nếu các call được thực hiện tuần tự, latency có thể chồng dồn. Nếu được thực hiện song song, caller vẫn tạo fan-out và provider vẫn phải xử lý sáu request.
@@ -211,14 +210,13 @@ Content-Type: application/json
 }
 ```
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Product Service
-
-    Note over O,P: Coarse-grained — một batch cho use case
-    O->>P: POST /products:batch {ids:[A,B,C]}
-    P-->>O: projection gồm name, image, price
+```d2 title="Luồng coarse-grained"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Product Service"
+"O".note1: "[Order Service — Product Service]\nCoarse-grained — một batch cho use case"
+"O" -> "P": "POST /products:batch {ids:[A,B,C]}"
+"P" -> "O": "projection gồm name, image, price" { style.stroke-dash: 5 }
 ```
 
 Đây chỉ là contract minh họa. Provider cần quyết định field nào thuộc ownership của mình, cách xử lý ID không tồn tại và giới hạn batch phù hợp với khả năng vận hành.

@@ -53,28 +53,21 @@ Trong các doc trước, chúng ta đã tìm hiểu cách **xác định ranh gi
 
 **Autonomy & Independence** là mục tiêu cốt lõi của kiến trúc Microservice. Nếu các service không thực sự độc lập, bạn chỉ đang có một **Distributed Monolith** — phức tạp hơn monolith gốc mà không được lợi ích gì.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│              CÁC CHIỀU CỦA SERVICE INDEPENDENCE                 │
-│                                                                 │
-│    ┌──────────────┐   ┌──────────────┐   ┌──────────────┐       │
-│    │   Deploy     │   │    Scale     │   │  Technology  │       │
-│    │ Independently│   │ Independently│   │ Independently│       │
-│    └──────┬───────┘   └──────┬───────┘   └──────┬───────┘       │
-│           │                  │                  │               │
-│           └──────────────────┼──────────────────┘               │
-│                              │                                  │
-│                    ┌─────────▼─────────┐                        │
-│                    │  SERVICE AUTONOMY │                        │
-│                    └─────────┬─────────┘                        │
-│                              │                                  │
-│           ┌──────────────────┼──────────────────┐               │
-│           │                  │                  │               │
-│    ┌──────▼───────┐   ┌──────▼───────┐   ┌──────▼───────┐       │
-│    │     Team     │   │    Fault     │   │    Data      │       │
-│    │   Ownership  │   │  Isolation   │   │  Ownership   │       │
-│    └──────────────┘   └──────────────┘   └──────────────┘       │
-└─────────────────────────────────────────────────────────────────┘
+```d2 title="1. Giới thiệu"
+direction: right
+deploy: "Deploy Independently"
+scale: "Scale Independently"
+tech: "Technology Independently"
+autonomy: "Service Autonomy"
+team: "Team Ownership"
+fault: "Fault Isolation"
+data: "Data Ownership"
+deploy -> autonomy
+scale -> autonomy
+tech -> autonomy
+autonomy -> team
+autonomy -> fault
+autonomy -> data
 ```
 
 ---
@@ -120,27 +113,26 @@ n2 -> n1
 
 ### 2.3. Tại sao Autonomy quan trọng?
 
+```d2 title="2.3. Tại sao Autonomy quan trọng?"
+direction: down
+without: "Không Autonomy — lead time 2 tuần, deploy 1 lần/tháng" {
+ a: Team A muốn deploy feature
+ b: Chờ Team B fix bug
+ c: Team C cần update API
+ window: Schedule deploy window chung
+ deploy: Deploy sau 2 tuần chờ
+ a -> b -> c -> window -> deploy
+}
+with: "Có Autonomy — ví dụ 15 phút, deploy 10 lần/ngày" {
+ a: Team A deploy feature
+ b: Không bị chặn bởi team khác
+ ci: CI/CD tự động
+ deploy: Deploy trong 15 phút
+ a -> b -> ci -> deploy
+}
 ```
-Không có Autonomy ❌                     Có Autonomy ✅
-──────────────────                      ─────────────────
 
-Team A muốn deploy feature mới          Team A deploy feature mới
-         │                                       │
-         ▼                                       ▼
-"Chờ Team B fix bug trước"              Deploy ngay lập tức
-         │                                       │
-         ▼                                       ▼
-"Team C cần update API"                 Không ảnh hưởng ai
-         │                                       │
-         ▼                                       ▼
-"Schedule deploy window chung"          CI/CD tự động push
-         │                                       │
-         ▼                                       ▼
-Deploy sau 2 tuần chờ đợi 🐌           Deploy trong 15 phút 🚀
-
-Lead time: 2 tuần                      Lead time: 15 phút
-Deploy frequency: 1 lần/tháng          Deploy frequency: 10 lần/ngày
-```
+Các con số minh họa lead time/deploy frequency; autonomy cần compatible contracts và ownership, không có nghĩa thay đổi không bao giờ tác động consumers.
 
 **Số liệu thực tế** (theo DORA Research):
 
@@ -161,32 +153,24 @@ Autonomy là yếu tố then chốt giúp team đạt **Elite Performer** level.
 
 **Independent Deployment** là khả năng deploy một service vào production mà **không cần deploy bất kỳ service nào khác** cùng lúc.
 
-```
-❌ Coordinated Deployment:
-┌──────────────────────────────────────────────┐
-│ Deploy Window: Thứ 7, 2AM–6AM                │
-│                                              │
-│ 1. Deploy Order Service v2.3        [30 min] │
-│ 2. Deploy Payment Service v1.8      [20 min] │
-│ 3. Deploy Inventory Service v3.1    [15 min] │
-│ 4. Run integration tests            [45 min] │
-│ 5. Nếu lỗi → rollback TẤT CẢ        [60 min] │
-│                                              │
-│ Tổng: 2h50 | Rủi ro: CAO | Stress: 💀        │
-└──────────────────────────────────────────────┘
-
-✅ Independent Deployment:
-┌──────────────────────────────────────────────┐
-│ Order Service v2.3:                          │
-│ 1. Push code → CI chạy test         [10 min] │
-│ 2. Build & push Docker image         [5 min] │
-│ 3. Rolling update to production      [5 min] │
-│ 4. Health check & smoke test         [2 min] │
-│ 5. Nếu lỗi → rollback CHỈ service    [2 min] │
-│    này                                       │
-│                                              │
-│ Tổng: 24 min | Rủi ro: THẤP | Bất kỳ lúc nào │
-└──────────────────────────────────────────────┘
+```d2 title="3.1. Định nghĩa"
+direction: down
+coordinated: "Coordinated — Thứ 7 02:00–06:00\nTổng minh họa 2h50 • Rủi ro cao" {
+ order: Order v2.3 — 30 phút
+ payment: Payment v1.8 — 20 phút
+ inventory: Inventory v3.1 — 15 phút
+ tests: Integration tests — 45 phút
+ rollback: Nếu lỗi — rollback tất cả 60 phút
+ order -> payment -> inventory -> tests -> rollback
+}
+independent: "Independent — Order v2.3\nTổng minh họa 24 phút kể cả rollback • Rủi ro thấp hơn" {
+ push: Push code / CI tests — 10 phút
+ build: Build / push image — 5 phút
+ rolling: Rolling update — 5 phút
+ health: Health / Smoke test — 2 phút
+ rollback: Nếu lỗi — rollback chỉ Order 2 phút
+ push -> build -> rolling -> health -> rollback
+}
 ```
 
 ### 3.2. Yêu cầu để đạt Independent Deployment
@@ -391,34 +375,16 @@ n8 -> n9
 
 **Giải pháp**: Mỗi consumer định nghĩa **contract** (hợp đồng) mô tả những gì nó cần từ provider. Provider chạy test với **tất cả contracts** trước khi deploy.
 
+```d2 title="3.4. Consumer-Driven Contract Testing"
+direction: right
+order: "Order consumer contract\nGET /products/{id}: id, name, price"
+search: "Search consumer contract\nGET /products/{id}: id, name, category"
+product: "Product Provider CI\nUnit tests → Verify tất cả consumer contracts → Deploy"
+order -> product
+search -> product
 ```
-┌──────────────────────────────────────────────────────────┐
-│              Consumer-Driven Contract Testing            │
-│                                                          │
-│  ┌──────────┐     Contract: "Tôi cần field               │
-│  │ Order    │──▶  id, name, price từ                     │
-│  │ Service  │     GET /products/{id}"                    │
-│  └──────────┘           │                                │
-│                         │                                │
-│  ┌──────────┐     Contract: "Tôi cần field               │
-│  │ Search   │──▶  id, name, category từ                  │
-│  │ Service  │     GET /products/{id}"                    │
-│  └──────────┘           │                                │
-│                         ▼                                │
-│                 ┌──────────────┐                         │
-│                 │   Product    │                         │
-│                 │   Service    │                         │
-│                 │              │                         │
-│                 │ CI Pipeline: │                         │
-│                 │ 1. Unit test │                         │
-│                 │ 2. Contract  │                         │
-│                 │    tests ◀── │ Run tất cả contracts    │
-│                 │ 3. Deploy    │ từ consumers            │
-│                 └──────────────┘                         │
-│                                                          │
-│  Tools: Pact, Spring Cloud Contract, Dredd               │
-└──────────────────────────────────────────────────────────┘
-```
+
+Tools: Pact, Spring Cloud Contract, Dredd.
 
 ### 3.5. Ví dụ thực tế — Deploy Pipeline
 
@@ -472,31 +438,23 @@ Nếu là **monolith**, bạn phải scale **toàn bộ ứng dụng** — lãng
 
 ### 4.2. Horizontal vs Vertical Scaling
 
+```d2 title="4.2. Horizontal vs Vertical Scaling"
+direction: down
+vertical: Scale Up {
+ server: "Một BIG SERVER\n32 CPU • 128GB RAM • 2TB SSD"
+}
+horizontal: Scale Out {
+ lb: Load Balancer
+ a: Service Copy 1 — 4 CPU / 8GB
+ b: Service Copy 2 — 4 CPU / 8GB
+ c: Service Copy 3 — 4 CPU / 8GB
+ lb -> a
+ lb -> b
+ lb -> c
+}
 ```
-Vertical Scaling (Scale Up) ⬆️          Horizontal Scaling (Scale Out) ➡️
-─────────────────────────────           ──────────────────────────────
 
-  ┌───────────────┐                     ┌───────┐ ┌───────┐ ┌───────┐
-  │               │                     │Service│ │Service│ │Service│
-  │               │                     │ Copy 1│ │ Copy 2│ │ Copy 3│
-  │   BIG SERVER  │                     └───┬───┘ └───┬───┘ └───┬───┘
-  │               │                         │         │         │
-  │  32 CPU       │                     ┌───▼─────────▼─────────▼───┐
-  │  128GB RAM    │                     │      Load Balancer        │
-  │  2TB SSD      │                     └───────────────────────────┘
-  │               │
-  └───────────────┘                     Mỗi instance: 4 CPU, 8GB RAM
-
-  Ưu điểm:                             Ưu điểm:
-  • Đơn giản                            • Gần như unlimited
-  • Không cần thay đổi code             • Fault tolerant (1 chết, còn lại OK)
-                                        • Cost-effective
-  Nhược điểm:                          
-  • Có giới hạn (không thể              Nhược điểm:
-    mua server vô hạn)                  • Cần stateless design
-  • Single point of failure             • Phức tạp hơn (LB, session, etc.)
-  • Cost tăng exponential
-```
+Scale Up đơn giản, ít đổi code nhưng có giới hạn máy, single point of failure và chi phí tăng. Scale Out có thể chịu lỗi replica và linh hoạt chi phí, nhưng cần stateless/session design, LB và vận hành phức tạp; vẫn bị giới hạn tài nguyên, data và downstream.
 
 **Trong Microservice**: Luôn ưu tiên **Horizontal Scaling** vì tận dụng được fault tolerance và cost efficiency.
 
@@ -589,38 +547,16 @@ Tiết kiệm: ~65% chi phí so với monolith scaling
 
 Mỗi service có thể chọn **ngôn ngữ lập trình** và **framework** phù hợp nhất với bài toán của nó.
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│                   POLYGLOT ARCHITECTURE                       │
-│                                                               │
-│  ┌──────────────┐  ┌───────────────┐  ┌───────────────┐       │
-│  │ User Service │  │ ML/Recommend  │  │ Real-time     │       │
-│  │              │  │   Service     │  │ Chat Service  │       │
-│  │   Java /     │  │               │  │               │       │
-│  │  Spring Boot │  │   Python /    │  │   Go /        │       │
-│  │              │  │  FastAPI      │  │  Goroutines   │       │
-│  │  Lý do:      │  │               │  │               │       │
-│  │  • Ecosystem │  │  Lý do:       │  │  Lý do:       │       │
-│  │    phong phú │  │  • ML libs    │  │  • Concurrency│       │
-│  │  • Team có   │  │    (sklearn,  │  │    xuất sắc   │       │
-│  │    kinh nghiệm│ │    pytorch)   │  │  • Low latency│       │
-│  │  • Enterprise│  │  • Fast       │  │  • Low memory │       │
-│  │    patterns  │  │    prototyping│  │               │       │
-│  └──────────────┘  └───────────────┘  └───────────────┘       │
-│                                                               │
-│  ┌──────────────┐  ┌──────────────┐  ┌────────────────┐       │
-│  │ Admin        │  │ Data Pipeline│  │ Payment        │       │
-│  │ Dashboard    │  │   Service    │  │ Service        │       │
-│  │              │  │              │  │                │       │
-│  │  Node.js /   │  │  Scala /     │  │  Kotlin /      │       │
-│  │  Next.js     │  │  Spark       │  │  Spring Boot   │       │
-│  │              │  │              │  │                │       │
-│  │  Lý do:      │  │  Lý do:      │  │  Lý do:        │       │
-│  │  • Full-stack│  │  • Big data  │  │  • Type-safe   │       │
-│  │  • Rapid dev │  │    processing│  │  • Coroutines  │       │
-│  │  • SSR       │  │  • Streaming │  │  • Java interop│       │
-│  └──────────────┘  └──────────────┘  └────────────────┘       │
-└───────────────────────────────────────────────────────────────┘
+```d2 title="5.1. Polyglot Architecture"
+direction: right
+polyglot: Polyglot Architecture {
+ user: "User — Java / Spring Boot\nEcosystem • Team experience • Enterprise patterns"
+ ml: "ML/Recommendation — Python / FastAPI\nscikit-learn • PyTorch • Rapid prototyping"
+ chat: "Real-time Chat — Go / Goroutines\nConcurrency • Low latency • Low memory"
+ admin: "Admin Dashboard — Node.js / Next.js\nFull-stack • Rapid dev • SSR"
+ pipeline: "Data Pipeline — Scala / Spark\nBig data • Streaming"
+ payment: "Payment — Kotlin / Spring Boot\nType safety • Coroutines • Java interop"
+}
 ```
 
 ### 5.2. Polyglot Persistence
@@ -725,27 +661,30 @@ n1.n10 -> n1.n11
 
 Tức là: **Kiến trúc phần mềm phản ánh cấu trúc tổ chức** của team xây dựng nó.
 
-```
-Conway's Law trong thực tế:
-
-Tổ chức theo layer:                 → Kiến trúc theo layer:
-┌───────────────────┐               ┌───────────────────┐
-│   Frontend Team   │               │   Frontend App    │
-├───────────────────┤               ├───────────────────┤
-│   Backend Team    │               │   Backend API     │
-├───────────────────┤               ├───────────────────┤
-│    DBA Team       │               │    Database       │
-└───────────────────┘               └───────────────────┘
-→ Thay đổi 1 feature = 3 team phối hợp = chậm 🐌
-
-Tổ chức theo domain:                → Kiến trúc theo service:
-┌────────┐ ┌────────┐ ┌────────┐    ┌────────┐ ┌────────┐ ┌────────┐
-│ Order  │ │Payment │ │Catalog │    │ Order  │ │Payment │ │Catalog │
-│  Team  │ │ Team   │ │ Team   │    │Service │ │Service │ │Service │
-│(FE+BE  │ │(FE+BE  │ │(FE+BE  │    │(FE+BE  │ │(FE+BE  │ │(FE+BE  │
-│ +DB)   │ │ +DB)   │ │ +DB)   │    │ +DB)   │ │ +DB)   │ │ +DB)   │
-└────────┘ └────────┘ └────────┘    └────────┘ └────────┘ └────────┘
-→ Thay đổi 1 feature = 1 team = nhanh 🚀
+```d2 title="6.1. Conway's Law"
+direction: down
+by_layer: "Tổ chức theo layer — feature thường cần 3 team" {
+ ft: Frontend Team
+ bt: Backend Team
+ dba: DBA Team
+ fe: Frontend App
+ api: Backend API
+ db: Database
+ ft -> fe
+ bt -> api
+ dba -> db
+}
+domains: "Theo domain — feature có thể nằm trong 1 team" {
+ ot: Order Team — FE + BE + DB
+ pt: Payment Team — FE + BE + DB
+ ct: Catalog Team — FE + BE + DB
+ os: Order Service
+ ps: Payment Service
+ cs: Catalog Service
+ ot -> os
+ pt -> ps
+ ct -> cs
+}
 ```
 
 ### 6.2. Inverse Conway Maneuver
@@ -805,30 +744,20 @@ Mỗi team có **đầy đủ skill** để phát triển, deploy, và vận hà
 
 Hỗ trợ các service team bằng cách cung cấp **shared infrastructure**:
 
+```d2 title="Platform Team (Team nền tảng)"
+direction: right
+platform: "Platform Team\nKubernetes • CI/CD templates\nPrometheus / Grafana / Jaeger\nIstio / Linkerd • Vault • Backstage"
+order: "Order Team"
+payment: "Payment Team"
+catalog: "Catalog Team"
+shipping: "Shipping Team"
+platform -> order: "Cung cấp platform services"
+platform -> payment: "Cung cấp platform services"
+platform -> catalog: "Cung cấp platform services"
+platform -> shipping: "Cung cấp platform services"
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      PLATFORM TEAM                          │
-│                                                             │
-│  Cung cấp:                                                  │
-│  ├── Kubernetes cluster & management                        │
-│  ├── CI/CD platform (Jenkins/GitLab CI templates)           │
-│  ├── Observability stack (Prometheus, Grafana, Jaeger)      │
-│  ├── Service mesh (Istio/Linkerd)                           │
-│  ├── Secret management (Vault)                              │
-│  └── Developer portal (Backstage)                           │
-│                                                             │
-│  KHÔNG sở hữu: business logic, service code, data           │
-│                                                             │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐     │
-│  │  Order   │  │ Payment  │  │ Catalog  │  │Shipping  │     │
-│  │  Team    │  │  Team    │  │  Team    │  │  Team    │     │
-│  │  ↑       │  │  ↑       │  │  ↑       │  │  ↑       │     │
-│  └──┼───────┘  └──┼───────┘  └──┼───────┘  └──┼───────┘     │
-│     │             │             │             │             │
-│     └─────────────┴─────────────┴─────────────┘             │
-│                 Consume platform services                   │
-└─────────────────────────────────────────────────────────────┘
-```
+
+Platform team không sở hữu business logic, service code và business data. Các product teams consume nền tảng, vẫn chịu trách nhiệm end-to-end cho services.
 
 ### 6.4. "You Build It, You Run It"
 
@@ -908,23 +837,21 @@ service: Self-contained Service {
 
 **Giải pháp**: Sao chép (replicate) dữ liệu cần thiết vào local database.
 
-```mermaid
-sequenceDiagram
-    participant PS as Product Service
-    participant EB as Event Bus
-    participant OS as Order Service
-    participant LC as Local Cache<br/>(Order DB)
-
-    Note over PS,LC: Phase 1: Data Sync (Background)
-    PS->>EB: Publish: ProductUpdated<br/>{id:1, name:"iPhone", price:999}
-    EB->>OS: Consume event
-    OS->>LC: Lưu: product_cache<br/>{id:1, name:"iPhone", price:999}
-
-    Note over PS,LC: Phase 2: Handle Request (No sync call!)
-    OS->>LC: Query: product_cache WHERE id=1
-    LC-->>OS: {name:"iPhone", price:999}
-    OS->>OS: Tạo đơn hàng với cached data
-    Note over OS: ✅ Không cần gọi Product Service!
+```d2 title="7.3. Data Locality — Sao chép dữ liệu cần thiết"
+shape: sequence_diagram
+"PS": "Product Service"
+"EB": "Event Bus"
+"OS": "Order Service"
+"LC": "Local Cache\n(Order DB)"
+"PS".note1: "[Product Service — Local Cache\n(Order DB)]\nPhase 1: Data Sync (Background)"
+"PS" -> "EB": "Publish: ProductUpdated\n{id:1, name:\"iPhone\", price:999}"
+"EB" -> "OS": "Consume event"
+"OS" -> "LC": "Lưu: product_cache\n{id:1, name:\"iPhone\", price:999}"
+"PS".note2: "[Product Service — Local Cache\n(Order DB)]\nPhase 2: Handle Request (No sync call!)"
+"OS" -> "LC": "Query: product_cache WHERE id=1"
+"LC" -> "OS": "{name:\"iPhone\", price:999}" { style.stroke-dash: 5 }
+"OS" -> "OS": "Tạo đơn hàng với cached data"
+"OS".note3: "✅ Không cần gọi Product Service!"
 ```
 
 **Trade-off**:
@@ -948,33 +875,25 @@ sequenceDiagram
 
 Trong hệ thống distributed, lỗi là **chắc chắn sẽ xảy ra** (network failure, service crash, disk full...). Vấn đề không phải "có lỗi không?" mà là **"lỗi có lan ra không?"**.
 
-```
-Không có Fault Isolation ❌:
-  ┌────────┐     ┌────────┐     ┌────────┐
-  │Service │────▶│Service │────▶│Service │
-  │   A    │     │   B    │     │   C    │
-  └────────┘     └────┬───┘     └────────┘
-                      │
-                   ⚡ CRASH!
-                      │
-                 Cascade failure:
-                 A bị timeout → A crash
-                 → Tất cả client timeout
-                 → Toàn bộ hệ thống sụp ❌
-
-Có Fault Isolation ✅:
-  ┌────────┐     ┌────────┐     ┌────────┐
-  │Service │────▶│Service │────▶│Service │
-  │   A    │     │   B    │     │   C    │
-  │        │     │┌──────┐│     └────────┘
-  │Circuit │     ││CRASH ││
-  │Breaker │     │└──────┘│
-  └───┬────┘     └────────┘
-      │
-   Fallback!
-   A trả cached response / default value
-   → Client vẫn nhận response ✅
-   → Hệ thống vẫn hoạt động (degraded) ✅
+```d2 title="8.1. Tại sao Fault Isolation quan trọng?"
+direction: down
+without: Không Fault Isolation {
+ a: Service A
+ b: Service B — CRASH
+ c: Service C
+ cascade: A timeout → A crash → Clients timeout → Hệ thống sụp
+ a -> b -> c
+ b -> cascade
+}
+with: Có Fault Isolation {
+ a: Service A — Circuit Breaker
+ b: Service B — CRASH
+ c: Service C
+ fallback: Cached response / Default value
+ a -> b: Call bị giới hạn / fail fast
+ b -> c
+ a -> fallback: Trả degraded response cho client
+}
 ```
 
 ### 8.2. Kỹ thuật Fault Isolation
@@ -1004,31 +923,13 @@ half -> closed: Success
 
 Khi một dependency service lỗi, service chính **vẫn hoạt động** nhưng với **chức năng giảm**.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│         GRACEFUL DEGRADATION — E-Commerce                │
-│                                                          │
-│  Scenario: Recommendation Service bị down                │
-│                                                          │
-│  Trước (không graceful):                                 │
-│  ┌────────────────────────────────────┐                  │
-│  │  Product Page                      │                  │
-│  │  ❌ 500 Internal Server Error      │                  │
-│  │  → Cả trang chết vì không load     │                  │
-│  │    được recommendations            │                  │
-│  └────────────────────────────────────┘                  │
-│                                                          │
-│  Sau (graceful degradation):                             │
-│  ┌────────────────────────────────────┐                  │
-│  │  Product Page                      │                  │
-│  │  ✅ Product info: hiển thị OK      │                  │
-│  │  ✅ Price: hiển thị OK             │                  │
-│  │  ✅ Add to cart: hoạt động OK      │                  │
-│  │  ⚠️ Recommendations: "Sản phẩm     │                  │
-│  │     phổ biến" (cached/default)     │                  │
-│  │  → Trang vẫn hoạt động!            │                  │
-│  └────────────────────────────────────┘                  │
-└──────────────────────────────────────────────────────────┘
+```d2 title="8.3. Graceful Degradation"
+direction: right
+rec: "Recommendation Service DOWN"
+bad: "Không Graceful Degradation\nProduct page trả 500 vì không load recommendations"
+good: "Graceful Degradation\nProduct info / Price / Add to cart vẫn OK\nRecommendations dùng popular items cache/default"
+rec -> bad: "Thiết kế cũ"
+rec -> good: "Thiết kế có fallback"
 ```
 
 **Ví dụ cụ thể — Fallback strategies**:
@@ -1076,46 +977,18 @@ Khi một dependency service lỗi, service chính **vẫn hoạt động** như
 
 ### 9.2. Spotify — Squad Model
 
+```d2 title="9.2. Spotify — Squad Model"
+direction: right
+spotify: Spotify Squad Model {
+ music: Tribe — Music Player {
+  playback: Squad — Playback { player: Player Service; codec: Codec Service }
+  queue: Squad — Queue { queue: Queue Service; shuffle: Shuffle Service }
+ }
+ search: Tribe — Search { core: Squad — Search Core; ux: Squad — Search UX }
+}
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                   SPOTIFY SQUAD MODEL                       │
-│                                                             │
-│  Tribe: Nhóm các Squad cùng domain lớn                      │
-│  Squad: Team nhỏ (6-12 người), cross-functional             │
-│  Chapter: Nhóm cùng specialization xuyên suốt Squads        │
-│  Guild: Cộng đồng quan tâm chung (voluntary)                │
-│                                                             │
-│  ┌─────────────────────────────────────────┐                │
-│  │              TRIBE: Music Player        │                │
-│  │                                         │                │
-│  │  ┌─────────────┐   ┌─────────────┐      │                │
-│  │  │ Squad:      │   │ Squad:      │      │                │
-│  │  │ Playback    │   │ Queue       │      │                │
-│  │  │             │   │             │      │                │
-│  │  │ Owns:       │   │ Owns:       │      │                │
-│  │  │ • Player    │   │ • Queue     │      │                │
-│  │  │   Service   │   │   Service   │      │                │
-│  │  │ • Codec     │   │ • Shuffle   │      │                │
-│  │  │   Service   │   │   Service   │      │                │
-│  │  └─────────────┘   └─────────────┘      │                │
-│  └─────────────────────────────────────────┘                │
-│                                                             │
-│  ┌─────────────────────────────────────────┐                │
-│  │              TRIBE: Search              │                │
-│  │                                         │                │
-│  │  ┌─────────────┐   ┌─────────────┐      │                │
-│  │  │ Squad:      │   │ Squad:      │      │                │
-│  │  │ Search Core │   │ Search UX   │      │                │
-│  │  └─────────────┘   └─────────────┘      │                │
-│  └─────────────────────────────────────────┘                │
-│                                                             │
-│  Key: Mỗi Squad = autonomous mini-startup                   │
-│  • Tự quyết định what to build, how to build                │
-│  • Own service end-to-end                                   │
-│  • Có Product Owner riêng                                   │
-│  • Release independently                                    │
-└─────────────────────────────────────────────────────────────┘
-```
+
+Tribe gom squads cùng domain; Squad 6–12 người cross-functional; Chapter gom specialization xuyên squads; Guild là cộng đồng quan tâm tự nguyện. Squad có Product Owner, quyết định what/how, own service end-to-end, release độc lập. Đây là mô hình minh họa, không phải công thức tổ chức phải sao chép nguyên xi.
 
 ### 9.3. Amazon — Two-Pizza Team
 

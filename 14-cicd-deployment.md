@@ -50,46 +50,28 @@ Trong [doc 12](12-containerization.md) và [doc 13](13-orchestration.md), chúng
 
 Với hệ thống microservice gồm 10-50+ services, mỗi service được deploy độc lập bởi team riêng — **CI/CD** (Continuous Integration / Continuous Deployment) trở thành **hạ tầng bắt buộc**, không phải optional.
 
+```d2 title="1. Giới thiệu"
+direction: down
+manual: Không CI/CD {
+ commit: Commit
+ build: SSH server — Build / Test tay hoặc skip
+ image: Build / Push image thủ công
+ prod: SSH production — Pull / Restart
+ commit -> build -> image -> prod
+}
+auto: CI/CD {
+ push: Push code
+ ci: Lint / Format → Unit / Integration → Security scans
+ image: Build image / Push registry
+ stage: Deploy Staging / Acceptance tests
+ approval: Manual approval hoặc automatic gates
+ prod: Production Blue-Green / Canary
+ verify: Smoke test / Monitor / Auto-rollback theo policy
+ push -> ci -> image -> stage -> approval -> prod -> verify
+}
 ```
-TẠI SAO CI/CD QUAN TRỌNG VỚI MICROSERVICE?
-────────────────────────────────────────────
 
-  Monolith: 1 repo, 1 pipeline, deploy 1 lần / tuần
-  Microservice: 20 repos, 20 pipelines, deploy 50 lần / ngày
-
-  ❌ KHÔNG CÓ CI/CD:
-  ┌──────────────────────────────────────────────────────┐
-  │  Developer commit code                               │
-  │  → SSH vào server build thủ công                     │
-  │  → Chạy test bằng tay (hoặc... skip 😅)              │
-  │  → Build Docker image, push lên registry             │
-  │  → SSH vào production, pull image, restart container │
-  │  → Cầu nguyện 🙏 không có bug                        │
-  │                                                      │
-  │  → 20 services × thủ công = NIGHTMARE                │
-  │  → Mỗi lần deploy mất 2-3 giờ                        │
-  │  → Bugs lọt qua vì test bị skip                      │
-  │  → Rollback? "Uh... image cũ là tag gì nhỉ?" 🤯      │
-  └──────────────────────────────────────────────────────┘
-
-  ✅ CÓ CI/CD:
-  ┌──────────────────────────────────────────────────────┐
-  │  Developer push code                                 │
-  │  → Pipeline TỰ ĐỘNG:                                 │
-  │    1. Lint + format check                            │
-  │    2. Unit test + integration test                   │
-  │    3. Security scan (SAST, dependency check)         │
-  │    4. Build Docker image + push registry             │
-  │    5. Deploy staging → chạy acceptance test          │
-  │    6. Manual approval (hoặc auto)                    │
-  │    7. Deploy production (Blue-Green / Canary)        │
-  │    8. Post-deploy smoke test                         │
-  │    9. Auto rollback nếu error rate tăng              │
-  │                                                      │
-  │  → Mỗi lần deploy: 10-15 phút, HOÀN TOÀN TỰ ĐỘNG     │
-  │  → 50 deploys/ngày? Không vấn đề gì                  │
-  └──────────────────────────────────────────────────────┘
-```
+Ví dụ monolith 1 repo/1 pipeline/deploy tuần; microservices 20 repos/pipelines, 50 deploys/ngày. Manual deployment minh họa 2–3 giờ, khó truy vết image để rollback; automation minh họa 10–15 phút. Không phải cam kết thời gian cho mọi hệ thống.
 
 ---
 
@@ -99,66 +81,42 @@ TẠI SAO CI/CD QUAN TRỌNG VỚI MICROSERVICE?
 
 **Continuous Integration** (Tích hợp liên tục) là practice trong đó developers **thường xuyên merge code vào shared branch** (main/develop), mỗi lần merge đều được **tự động build và test** để phát hiện lỗi sớm.
 
+```d2 title="2.1. CI là gì?"
+direction: right
+s0: "Developer commit"
+s1: "Push Git"
+s2: "CI tự động\nCompile/Build • Unit tests\nLint/Format • Static analysis • Security scan"
+s3: "Feedback Pass / Fail"
+s0 -> s1
+s1 -> s2
+s2 -> s3
 ```
-CI — NGUYÊN TẮC CỐT LÕI:
-──────────────────────────
 
-  1. Commit thường xuyên (nhiều lần / ngày)
-  2. Mỗi commit trigger build + test tự động
-  3. Fix broken build là ưu tiên cao nhất
-  4. Giữ build nhanh (< 10 phút)
-  5. Test trên bản clone của production environment
-
-  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-  │Developer │───▶│  Push    │───▶│  CI      │───▶│ Feedback │
-  │ commit   │    │  to Git  │    │ Pipeline │    │  (pass/  │
-  │          │    │          │    │ (auto)   │    │  fail)   │
-  └──────────┘    └──────────┘    └──────────┘    └──────────┘
-                                       │
-                                       ▼
-                              ┌──────────────────┐
-                              │ • Compile/Build  │
-                              │ • Unit Tests     │
-                              │ • Lint + Format  │
-                              │ • Static Analysis│
-                              │ • Security Scan  │
-                              └──────────────────┘
-```
+Commit thường xuyên; fix broken build là ưu tiên; mục tiêu build nhanh dưới10phút; test trên environment tương đồng production theo mức phù hợp.
 
 ### 2.2. CI Pipeline cho Microservice
 
-```
-CI PIPELINE — CHI TIẾT TỪNG BƯỚC:
-──────────────────────────────────
-
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  TRIGGER: Push to branch / Pull Request                         │
-  └──────┬──────────────────────────────────────────────────────────┘
-         │
-         ▼
-  ┌──────────────┐    ┌─────────────┐    ┌──────────────────┐
-  │ 1. CHECKOUT  │───▶│ 2. INSTALL  │───▶│ 3. LINT +        │
-  │    code      │    │    deps     │    │    FORMAT CHECK  │
-  └──────────────┘    └─────────────┘    └────────┬─────────┘
-                                                  │
-         ┌────────────────────────────────────────┘
-         ▼
-  ┌──────────────┐    ┌─────────────┐    ┌──────────────────┐
-  │ 4. UNIT      │───▶│ 5. INTEG    │───▶│ 6. SECURITY      │
-  │    TESTS     │    │    TESTS    │    │    SCAN          │
-  │  (fast, no   │    │  (DB, API   │    │  (SAST, deps,    │
-  │   external   │    │   testcon-  │    │   secrets leak)  │
-  │   deps)      │    │   tainers)  │    │                  │
-  └──────────────┘    └─────────────┘    └────────┬─────────┘
-                                                  │
-         ┌────────────────────────────────────────┘
-         ▼
-  ┌──────────────┐    ┌─────────────────┐    ┌──────────────┐
-  │ 7. BUILD     │───▶│ 8. PUSH IMAGE   │───▶│ 9. NOTIFY    │
-  │    DOCKER    │    │    TO REGISTRY  │    │    (Slack,   │
-  │    IMAGE     │    │    (ECR, GCR,   │    │    Teams)    │
-  │              │    │    DockerHub)   │    │              │
-  └──────────────┘    └─────────────────┘    └──────────────┘
+```d2 title="2.2. CI Pipeline cho Microservice"
+direction: down
+s0: "Trigger Push branch / Pull Request"
+s1: "1. Checkout code"
+s2: "2. Install dependencies"
+s3: "3. Lint + Format check"
+s4: "4. Unit tests — fast / no external dependencies"
+s5: "5. Integration tests — DB / API / Testcontainers"
+s6: "6. Security scan — SAST / Dependencies / Secret leaks"
+s7: "7. Build Docker image"
+s8: "8. Push Registry — ECR / GCR / Docker Hub"
+s9: "9. Notify Slack / Teams"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
+s5 -> s6
+s6 -> s7
+s7 -> s8
+s8 -> s9
 ```
 
 | Bước | Mục đích | Tools |
@@ -172,42 +130,32 @@ CI PIPELINE — CHI TIẾT TỪNG BƯỚC:
 
 ### 2.3. Mono-repo vs Multi-repo CI
 
+```d2 title="2.3. Mono-repo vs Multi-repo CI"
+direction: down
+multi: Multi-repo {
+ order: Order Repo
+ product: Product Repo
+ payment: Payment Repo
+ oc: Order CI
+ pc: Product CI
+ payc: Payment CI
+ order -> oc
+ product -> pc
+ payment -> payc
+}
+mono: Monorepo e-commerce {
+ services: services — order / product / payment
+ libs: libs — shared-utils
+ infra: infra
+ detect: Git diff — detect changed files / dependencies
+ affected: Trigger affected-service pipelines
+ services -> detect -> affected
+ libs -> detect
+ infra -> detect
+}
 ```
-MONO-REPO vs MULTI-REPO — CI STRATEGY:
-───────────────────────────────────────
 
-  ┌─────────────────────────────────────────────────────────────┐
-  │  MULTI-REPO (Mỗi service = 1 repo riêng)                    │
-  │                                                             │
-  │  order-service/         → CI pipeline riêng                 │
-  │  product-service/       → CI pipeline riêng                 │
-  │  payment-service/       → CI pipeline riêng                 │
-  │                                                             │
-  │  ✅ Ưu: CI đơn giản, service independent                    │
-  │  ❌ Nhược: Khó share code, nhiều repos quản lý              │
-  └─────────────────────────────────────────────────────────────┘
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │  MONO-REPO (Tất cả services trong 1 repo)                   │
-  │                                                             │
-  │  e-commerce/                                                │
-  │  ├── services/                                              │
-  │  │   ├── order-service/                                     │
-  │  │   ├── product-service/                                   │
-  │  │   └── payment-service/                                   │
-  │  ├── libs/                                                  │
-  │  │   └── shared-utils/                                      │
-  │  └── infra/                                                 │
-  │                                                             │
-  │  CI cần SMART — chỉ build service bị thay đổi:              │
-  │  → Detect changed files (git diff)                          │
-  │  → Chỉ trigger pipeline cho affected services               │
-  │                                                             │
-  │  ✅ Ưu: Share code, atomic changes, 1 repo quản lý          │
-  │  ❌ Nhược: CI phức tạp hơn, cần tooling (Nx, Turborepo,     │
-  │           Bazel, Pants)                                     │
-  └─────────────────────────────────────────────────────────────┘
-```
+Multi-repo: CI đơn giản, độc lập nhưng nhiều repos và share code khó. Monorepo: atomic changes/share code/một repo, nhưng cần affected-build tooling như Nx, Turborepo, Bazel, Pants; không đồng nghĩa phải deploy tất cả services cùng lúc.
 
 | Tiêu chí | Multi-repo | Mono-repo |
 |----------|-----------|-----------|
@@ -343,33 +291,29 @@ jobs:
 
 ### 3.1. Phân biệt Delivery vs Deployment
 
+```d2 title="3.1. Phân biệt Delivery vs Deployment"
+direction: down
+delivery: Continuous Delivery {
+ code: Code
+ build: Build
+ test: Test
+ stage: Staging
+ approval: Manual Approval
+ prod: Production
+ code -> build -> test -> stage -> approval -> prod
+}
+deployment: Continuous Deployment {
+ code: Code
+ build: Build
+ test: Test
+ stage: Staging
+ verify: Acceptance / Metrics Gates
+ prod: Production — Automatic
+ code -> build -> test -> stage -> verify -> prod
+}
 ```
-CONTINUOUS DELIVERY vs CONTINUOUS DEPLOYMENT:
-─────────────────────────────────────────────
 
-  ┌───────────────────────────────────────────────────────────────┐
-  │  CONTINUOUS DELIVERY (Phân phối liên tục):                    │
-  │                                                               │
-  │  Code → Build → Test → Stage ──┤ MANUAL APPROVAL ├──▶ Prod    │
-  │                                    (1 click)                  │
-  │                                                               │
-  │  → Code luôn ở trạng thái SẴN SÀNG deploy                     │
-  │  → Nhưng cần người approve trước khi lên production           │
-  │  → Phù hợp: regulated industries, critical systems            │
-  └───────────────────────────────────────────────────────────────┘
-
-  ┌───────────────────────────────────────────────────────────────┐
-  │  CONTINUOUS DEPLOYMENT (Triển khai liên tục):                 │
-  │                                                               │
-  │  Code → Build → Test → Stage → Test ──────────────▶ Prod      │
-  │                                (AUTO)                         │
-  │                                                               │
-  │  → Mọi commit pass tests → TỰ ĐỘNG deploy production          │
-  │  → Không cần manual approval                                  │
-  │  → Phù hợp: SaaS, startup, teams có test coverage cao         │
-  │  → Yêu cầu: test suite mạnh, monitoring tốt, auto-rollback    │
-  └───────────────────────────────────────────────────────────────┘
-```
+Delivery giữ code sẵn sàng deploy nhưng có approval trước prod, thường gặp hệ thống regulated/critical. Deployment tự promote commits đã qua gates, cần test/monitoring/rollback mạnh; lựa chọn còn phụ thuộc risk policy, không chỉ loại doanh nghiệp.
 
 | Tiêu chí | Continuous Delivery | Continuous Deployment |
 |----------|--------------------|-----------------------|
@@ -399,26 +343,16 @@ ci -> staging -> test -> approval -> prod -> verify
 
 ### 4.1. Recreate
 
+```d2 title="4.1. Recreate"
+direction: right
+s0: "Stop tất cả3 v1 instances"
+s1: "DOWNTIME — không instance phục vụ"
+s2: "Start tất cả3 v2 instances"
+s0 -> s1
+s1 -> s2
 ```
-RECREATE STRATEGY — TẮT CŨ, BẬT MỚI:
-──────────────────────────────────────
 
-  Bước 1: Stop ALL v1 instances
-  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │  v1 ❌   │  │  v1 ❌   │  │  v1 ❌   │
-  └──────────┘  └──────────┘  └──────────┘
-       ⬇ DOWNTIME — không có instance nào chạy ⬇
-
-  Bước 2: Start ALL v2 instances
-  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │  v2 ✅   │  │  v2 ✅   │  │  v2 ✅   │
-  └──────────┘  └──────────┘  └──────────┘
-
-  ✅ Đơn giản nhất
-  ✅ Không có vấn đề v1 + v2 chạy đồng thời
-  ❌ DOWNTIME — user bị ảnh hưởng
-  ❌ Chỉ dùng cho: dev/staging, hoặc services không critical
-```
+Recreate đơn giản, tránh mixed app versions nhưng có downtime. Phù hợp dev/staging hoặc workload chấp nhận gián đoạn; database/state compatibility vẫn cần xem xét.
 
 ```yaml source="snippets/4-1-recreate.yaml"
 # Kubernetes — Recreate Strategy
@@ -441,44 +375,20 @@ spec:
 
 ### 4.2. Rolling Update
 
+```d2 title="4.2. Rolling Update"
+direction: right
+s0: "3 × v1 ready"
+s1: "3 × v1 + 1 × v2 starting"
+s2: "v2 ready → 2 × v1 + 1 × v2"
+s3: "Lặp lại → 1 × v1 + 2 × v2"
+s4: "3 × v2 ready"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
 ```
-ROLLING UPDATE — THAY THẾ TỪNG BƯỚC:
-─────────────────────────────────────
 
-  Bước 1: Trạng thái ban đầu (3 × v1)
-  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │  v1 ✅   │  │  v1 ✅   │  │  v1 ✅   │
-  └──────────┘  └──────────┘  └──────────┘
-
-  Bước 2: Tạo 1 × v2, giữ v1
-  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │  v1 ✅   │  │  v1 ✅   │  │  v1 ✅   │  │  v2 🟡   │
-  └──────────┘  └──────────┘  └──────────┘  └──────────┘
-
-  Bước 3: v2 healthy → stop 1 × v1
-  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │  v1 ✅   │  │  v1 ✅   │  │  v2 ✅   │
-  └──────────┘  └──────────┘  └──────────┘
-
-  Bước 4: Lặp lại...
-  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │  v1 ✅   │  │  v2 ✅   │  │  v2 ✅   │
-  └──────────┘  └──────────┘  └──────────┘
-
-  Bước 5: Hoàn thành (3 × v2)
-  ┌──────────┐  ┌──────────┐  ┌──────────┐
-  │  v2 ✅   │  │  v2 ✅   │  │  v2 ✅   │
-  └──────────┘  └──────────┘  └──────────┘
-
-  ✅ ZERO DOWNTIME
-  ✅ Mặc định của Kubernetes
-  ✅ Tiết kiệm resource (chỉ thêm 1-2 pod tạm)
-  ✅ Rollback dễ (kubectl rollout undo)
-  ⚠️ v1 + v2 chạy LẪN LỘN trong quá trình rollout
-     → API phải backward compatible
-     → User A gọi v1, User B gọi v2 cùng lúc
-  ⚠️ Rollback = rolling lại từng pod → CHẬM (vài phút)
-```
+Rolling là default Deployment strategy K8s. Tốn thêm surge capacity ít hơn blue-green; v1/v2 cùng tồn tại nên cần backward compatibility. Rollback rolling có thể mất vài phút; readiness/draining/capacity mới quyết định downtime, không có bảo đảm zero downtime tự động.
 
 ```yaml source="snippets/4-2-rolling-update.yaml"
 # Kubernetes — Rolling Update Strategy (MẶC ĐỊNH)
@@ -523,49 +433,25 @@ kubectl rollout undo deployment/order-service --to-revision=3    # Về revision
 
 ### 4.3. Blue-Green Deployment
 
+```d2 title="4.3. Blue-Green Deployment"
+direction: down
+before: Trước switch {
+ lb: Load Balancer / Ingress
+ blue: BLUE v1 — 3 instances LIVE
+ green: GREEN v2 — 3 instances IDLE / Test
+ lb -> blue: 100%
+ lb -- green: 0% production {style.stroke-dash: 5}
+}
+after: Green test pass {
+ lb: Load Balancer / Ingress
+ blue: BLUE v1 — IDLE giữ rollback
+ green: GREEN v2 — 3 instances LIVE
+ lb -> green: 100%
+ lb -- blue: 0% production {style.stroke-dash: 5}
+}
 ```
-BLUE-GREEN — HAI MÔI TRƯỜNG, SWITCH TRAFFIC:
-─────────────────────────────────────────────
 
-  Bước 1: Blue (v1) đang nhận traffic — Green (v2) deploy xong
-  ┌─────────────────────────────────────────────────────────┐
-  │                                                         │
-  │  Load Balancer / Ingress                                │
-  │       │                                                 │
-  │       ▼ 100% traffic                                    │
-  │  ┌─────────────────┐        ┌─────────────────┐         │
-  │  │  BLUE (v1) ✅   │        │  GREEN (v2) 🟡  │         │
-  │  │  3 instances    │        │  3 instances    │         │
-  │  │  (LIVE)         │        │  (IDLE — test)  │         │
-  │  └─────────────────┘        └─────────────────┘         │
-  │                                                         │
-  └─────────────────────────────────────────────────────────┘
-
-  Bước 2: Test Green OK → Switch traffic
-  ┌─────────────────────────────────────────────────────────┐
-  │                                                         │
-  │  Load Balancer / Ingress                                │
-  │                          │                              │
-  │                          ▼ 100% traffic                 │
-  │  ┌─────────────────┐  ┌─────────────────┐               │
-  │  │  BLUE (v1)      │  │  GREEN (v2) ✅  │               │
-  │  │  (IDLE —        │  │  3 instances    │               │
-  │  │   keep for      │  │  (LIVE)         │               │
-  │  │   rollback)     │  │                 │               │
-  │  └─────────────────┘  └─────────────────┘               │
-  │                                                         │
-  │  Rollback? → Switch traffic về Blue — INSTANT!          │
-  │                                                         │
-  └─────────────────────────────────────────────────────────┘
-
-  ✅ ZERO DOWNTIME
-  ✅ KHÔNG BAO GIỜ lẫn lộn v1 + v2
-     → 100% users luôn trên cùng 1 version
-  ✅ Instant rollback — switch traffic về Blue (vài GIÂY)
-  ✅ Test full trên Green trước khi switch
-  ❌ Cần GẤP ĐÔI resources (Blue + Green chạy song song)
-  ❌ Database migration phải backward compatible
-```
+Rollback bằng switch về Blue thường nhanh, cần giữ khoảng gấp đôi app capacity và DB backward compatibility. Traffic propagation, in-flight requests, caches và connections có thể khiến v1/v2 overlap ngắn; không khẳng định không bao giờ lẫn versions.
 
 ```yaml source="snippets/4-3-blue-green-deployment.yaml"
 # Blue-Green trên Kubernetes bằng Service selector
@@ -648,48 +534,20 @@ kubectl delete deployment order-service-blue
 
 ### 4.4. Canary Deployment
 
+```d2 title="4.4. Canary Deployment"
+direction: right
+s0: "Canary5%: stable v1 95%, v2 5%\nVí dụ9 stable /1 canary instances"
+s1: "Monitor error rate / Latency / Success rate"
+s2: "Metrics OK → stable75%, v2 25%\nVí dụ7 stable /3 canary instances"
+s3: "Metrics OK → 50% → 75% → 100%"
+s4: "100% v2 — ví dụ10 instances, remove v1"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
 ```
-CANARY — TRIỂN KHAI TỪNG PHẦN, THEO DÕI METRICS:
-──────────────────────────────────────────────────
 
-  Bước 1: Deploy v2 cho 5% traffic
-  ┌─────────────────────────────────────────────────────────┐
-  │  Load Balancer / Ingress                                │
-  │       │                                                 │
-  │       ├──── 95% ────▶ ┌─────────────────┐               │
-  │       │               │  v1 (stable)    │               │
-  │       │               │  9 instances    │               │
-  │       │               └─────────────────┘               │
-  │       │                                                 │
-  │       └───── 5% ────▶ ┌─────────────────┐               │
-  │                       │  v2 (canary) 🐤 │               │
-  │                       │  1 instance     │               │
-  │                       └─────────────────┘               │
-  │                                                         │
-  │  📊 Monitor: error rate, latency, success rate          │
-  └─────────────────────────────────────────────────────────┘
-
-  Bước 2: Metrics OK → tăng lên 25%
-  ┌─────────────────────────────────────────────────────────┐
-  │       ├──── 75% ────▶  v1 (7 instances)                 │
-  │       └──── 25% ────▶  v2 (3 instances) 🐤              │
-  └─────────────────────────────────────────────────────────┘
-
-  Bước 3: Tiếp tục OK → 50% → 75% → 100%
-
-  Bước 4: 100% traffic → v2 — Done!
-  ┌─────────────────────────────────────────────────────────┐
-  │       └── 100% ─────▶  v2 (10 instances) ✅             │
-  │                        v1 removed                       │
-  └─────────────────────────────────────────────────────────┘
-
-  ✅ ZERO DOWNTIME
-  ✅ Giảm blast radius — chỉ 5% users ảnh hưởng nếu bug
-  ✅ Data-driven decision (dựa trên metrics thực)
-  ❌ Phức tạp hơn Rolling / Blue-Green
-  ❌ Cần monitoring + alerting tốt
-  ❌ v1 + v2 chạy đồng thời lâu hơn
-```
+Traffic weights và replica counts là hai cấu hình khác nhau; số replicas trong hình không tự tạo đúng tỷ lệ routing. Canary giảm blast radius, cần monitoring/alerting và compatibility dài hơn; auto-abort khi metrics xấu.
 
 ```yaml source="snippets/4-4-canary-deployment.yaml"
 # Canary với Istio VirtualService
@@ -771,25 +629,18 @@ spec:
 
 ### 4.5. A/B Testing
 
+```d2 title="4.5. A/B Testing"
+direction: right
+lb: "LB / Ingress — Targeting Rules"
+beta: "v2 — Beta users"
+us: "v2 — US users"
+stable: "v1 — Default"
+lb -> beta: "X-Beta=true"
+lb -> us: "Cookie region=US"
+lb -> stable: "Còn lại"
 ```
-A/B TESTING — ROUTING DỰA TRÊN ĐIỀU KIỆN:
-──────────────────────────────────────────
 
-  Khác Canary: A/B routing dựa trên ĐIỀU KIỆN (header, cookie,
-  user group), không phải % random.
-
-  ┌─────────────────────────────────────────────────────────┐
-  │  Load Balancer / Ingress                                │
-  │       │                                                 │
-  │       ├── Header: X-Beta=true ──▶  v2 (beta users)      │
-  │       ├── Cookie: region=US   ──▶  v2 (US users)        │
-  │       └── Default             ──▶  v1 (tất cả còn lại)  │
-  │                                                         │
-  │  → Cho phép test feature với nhóm user cụ thể           │
-  │  → Thu thập metrics riêng cho từng group                │
-  │  → Quyết định rollout dựa trên business metrics         │
-  └─────────────────────────────────────────────────────────┘
-```
+A/B/targeted routing tách metrics theo cohort, đánh giá business outcome. Canary cũng có thể dùng deterministic cohorts, không bắt buộc routing ngẫu nhiên.
 
 ```yaml source="snippets/4-5-a-b-testing.yaml"
 # A/B Testing với Istio — Route dựa trên header
@@ -978,29 +829,22 @@ Trước khi hiểu GitOps, hãy xem **vấn đề thực tế** khi không có 
      → diff overlays/staging/ overlays/production/ → rõ ràng
 ```
 
+```d2 title="5.1. GitOps là gì? Tại sao cần?"
+direction: right
+s0: "Developer đổi image order-service:v2.1 trong deployment.yaml"
+s1: "PR → Review / Approve → Merge main"
+s2: "ArgoCD phát hiện Git thay đổi"
+s3: "Compare desired Git state với actual Cluster"
+s4: "Sync / Reconcile Cluster khi policy cho phép"
+s5: "Tiếp tục drift detection / Self-heal theo cấu hình"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
 ```
-CÁCH GITOPS HOẠT ĐỘNG — VÍ DỤ CỤ THỂ:
-───────────────────────────────────────
 
-  Developer muốn deploy order-service v2.1:
-
-  ① Sửa deployment.yaml → image: order-service:v2.1
-  ② Tạo Pull Request → team review, approve
-  ③ Merge PR vào main
-  ④ GitOps Agent (ArgoCD) phát hiện Git thay đổi
-  ⑤ Agent tự động apply thay đổi lên cluster
-  ⑥ Agent liên tục kiểm tra: cluster = Git?
-     Nếu ai sửa tay trên cluster → agent REVERT về Git
-
-  ┌──────────────────────────────────────────────────────────┐
-  │                                                          │
-  │  Git repo ◄─────── ArgoCD pull (mỗi 3 phút) ─── Cluster  │
-  │  (desired state)      so sánh + sync       (actual state)│
-  │                                                          │
-  │  Desired ≠ Actual? → ArgoCD tự sửa cluster cho giống Git │
-  │                                                          │
-  └──────────────────────────────────────────────────────────┘
-```
+Ví dụ polling mỗi3phút, có thể kết hợp webhooks. Auto-sync/self-heal phải được bật theo policy; không mặc định mọi thay đổi tay đều tự revert.
 
 Tóm lại: **"Muốn thay đổi gì trên cluster? Đừng SSH vào sửa — hãy sửa trong Git, có PR review, rồi agent tự deploy."**
 
@@ -1094,39 +938,27 @@ GITOPS — 4 NGUYÊN TẮC:
 
 ### 5.2. Push-based vs Pull-based — 2 cách deploy
 
+```d2 title="5.2. Push-based vs Pull-based — 2 cách deploy"
+direction: down
+push: Push-based {
+ git: Git — Merge PR
+ ci: Jenkins / GitHub Actions
+ apply: kubectl apply — CI credentials
+ cluster: Cluster
+ git -> ci -> apply -> cluster
+}
+pull: Pull-based GitOps {
+ git: Git — desired state
+ cluster: Cluster {
+  agent: ArgoCD / Flux
+  resources: Workloads — actual state
+  agent -> resources: Apply / Reconcile
+ }
+ cluster.agent -> git: Pull / Watch
+}
 ```
-2 CÁCH DEPLOY — PUSH vs PULL:
-─────────────────────────────
 
-  CÁCH 1 — PUSH-BASED (CI/CD truyền thống):
-  ──────────────────────────────────────────
-  Đây là cách BẠN ĐANG NGHĨ — hoàn toàn đúng:
-
-  Merge PR → CI/CD trigger → Pipeline chạy kubectl apply → Cluster
-
-  ┌──────┐    ┌──────────┐    ┌──────────────────┐    ┌─────────┐
-  │ Git  │───▶│ CI/CD    │───▶│ kubectl apply    │───▶│ Cluster │
-  │merge │    │(Jenkins, │    │ (pipeline PUSH   │    │         │
-  │      │    │ Actions) │    │  vào cluster)    │    │         │
-  └──────┘    └──────────┘    └──────────────────┘    └─────────┘
-
-  → Hoạt động tốt! Nhiều team dùng cách này.
-  → KHÔNG cần ArgoCD, Flux gì cả.
-
-
-  CÁCH 2 — PULL-BASED (GitOps):
-  ─────────────────────────────
-  Agent nằm TRONG cluster, tự kéo config từ Git:
-
-  ┌──────┐              ┌─────────────────────────────────────┐
-  │ Git  │              │ Cluster                             │
-  │merge │◀──pull───────│  ArgoCD: "Git thay đổi!" → apply    │
-  │      │   (mỗi 3p)  │                                      │
-  └──────┘              └─────────────────────────────────────┘
-
-  → KHÔNG CÓ CI/CD nào push vào cluster.
-  → Agent tự phát hiện Git thay đổi → tự apply.
-```
+Push-based có thể vận hành tốt, không bắt buộc thêm ArgoCD/Flux. Pull-based chuyển cluster mutation quyền sang agent, CI chỉ cập nhật config repo; vẫn cần bảo vệ agent/repo credentials và rollout gates.
 
 ```
 VẬY TẠI SAO CẦN GITOPS? PUSH-BASED CÓ 3 VẤN ĐỀ:
@@ -1326,38 +1158,21 @@ spec:
 
 ### 6.1. Pipeline tổng quan
 
-```
-END-TO-END PIPELINE — TỪ CODE ĐẾN PRODUCTION:
-──────────────────────────────────────────────
-
-  ┌─────────────────────────────────────────────────────────────────┐
-  │                        CODE REPO                                │
-  │  Developer ──push──▶ Feature Branch ──PR──▶ Main Branch         │
-  └────────┬────────────────────────────────────────────────────────┘
-           │
-           ▼
-  ┌───────────────────────────────────────────────────────────────┐
-  │  CI PIPELINE (per service)                                    │
-  │  ┌────────┐ ┌──────┐ ┌──────────┐ ┌─────────┐ ┌─────────────┐ │
-  │  │ Lint   │→│ Test │→│ Security │→│  Build  │→│ Push Image  │ │
-  │  │        │ │      │ │  Scan    │ │  Docker │ │  to Registry│ │
-  │  └────────┘ └──────┘ └──────────┘ └─────────┘ └──────┬──────┘ │
-  └──────────────────────────────────────────────────────┼────────┘
-                                                         │
-           ┌─────────────────────────────────────────────┘
-           │  image: order-service:a1b2c3d
-           ▼
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  CONFIG REPO (GitOps)                                           │
-  │  Bot/CI updates image tag in K8s manifests                      │
-  │  → Auto PR → merge → ArgoCD sync                                │
-  └────────┬────────────────────────────────────────────────────────┘
-           │
-           ▼
-  ┌─────────────────────────────────────────────────────────────────┐
-  │  STAGING → Acceptance Test → PRODUCTION                         │
-  │  (ArgoCD/Flux auto-sync)                                        │
-  └─────────────────────────────────────────────────────────────────┘
+```d2 title="6.1. Pipeline tổng quan"
+direction: down
+s0: "Developer push Feature Branch → PR → Main"
+s1: "Per-service CI\nLint → Tests → Security Scan → Build Docker → Push Registry"
+s2: "Image order-service:a1b2c3d"
+s3: "Bot/CI cập nhật image tag trong GitOps Config Repo\nAuto PR → Review / Merge"
+s4: "ArgoCD / Flux sync Staging"
+s5: "Acceptance Tests"
+s6: "Promote Production theo gates"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
+s5 -> s6
 ```
 
 ### 6.2. Artifact Management
@@ -1398,22 +1213,21 @@ ARTIFACT MANAGEMENT — IMAGE TAGGING STRATEGY:
 
 ### 6.3. Environment Promotion
 
+```d2 title="6.3. Environment Promotion"
+direction: right
+s0: "DEV — Auto deploy"
+s1: "STAGING — Auto deploy"
+s2: "UAT — Manual approval"
+s3: "PROD — Manual / Auto theo policy"
+s0 -> s1
+s1 -> s2
+s2 -> s3
 ```
-ENVIRONMENT PROMOTION — ĐƯA IMAGE QUA CÁC STAGES:
-───────────────────────────────────────────────────
 
-  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
-  │   DEV    │───▶│ STAGING  │───▶│   UAT    │───▶│   PROD   │
-  │          │    │          │    │          │    │          │
-  │ auto     │    │ auto     │    │ manual   │    │ manual / │
-  │ deploy   │    │ deploy   │    │ approval │    │ auto     │
-  └──────────┘    └──────────┘    └──────────┘    └──────────┘
+Cùng một immutable image qua mọi environment; chỉ config/env/ConfigMaps/Secrets khác nhau. Cấu trúc GitOps giữ dạng text:
 
-  ❗ QUAN TRỌNG: CÙNG 1 IMAGE qua tất cả environments
-     Chỉ KHÁC config (env vars, configmaps, secrets)
-
-  GitOps repo structure:
-  ┌────────────────────────────────────────────┐
+```text
+┌────────────────────────────────────────────┐
   │  k8s-manifests/                            │
   │  └── services/                             │
   │      └── order-service/                    │
@@ -1433,40 +1247,18 @@ ENVIRONMENT PROMOTION — ĐƯA IMAGE QUA CÁC STAGES:
 
 ### 6.4. Database Migration trong CI/CD
 
+```d2 title="6.4. Database Migration trong CI/CD"
+direction: right
+s0: "Expand trước app\nADD full_name nullable\nBackfill từ customer_name"
+s1: "Deploy compatible app v2\nĐọc fallback / Dual-write cũ+mới\nCùng chạy với v1"
+s2: "Verify backfill / Chuyển reads / Hết rollback window"
+s3: "Contract\nApp không còn đọc/ghi cột cũ\nDROP customer_name"
+s0 -> s1
+s1 -> s2
+s2 -> s3
 ```
-DATABASE MIGRATION — THÁCH THỨC LỚN NHẤT:
-──────────────────────────────────────────
 
-  Microservice deploy độc lập, nhưng DB migration
-  phải BACKWARD COMPATIBLE vì:
-  - Rolling update: v1 + v2 chạy đồng thời
-  - Canary: v1 + v2 dùng chung DB
-  - Rollback: v2 → v1 phải vẫn hoạt động
-
-  ❌ SAI — Breaking migration:
-  ┌──────────────────────────────────────────────┐
-  │  ALTER TABLE orders RENAME COLUMN            │
-  │    customer_name TO full_name;               │
-  │                                              │
-  │  → v1 code: SELECT customer_name → CRASH!    │
-  └──────────────────────────────────────────────┘
-
-  ✅ ĐÚNG — Expand-Contract Pattern (3 bước):
-  ┌──────────────────────────────────────────────┐
-  │  Step 1 (Deploy migration TRƯỚC app):        │
-  │  ALTER TABLE orders ADD COLUMN full_name;    │
-  │  UPDATE orders SET full_name = customer_name;│
-  │  → v1 vẫn đọc customer_name — OK ✅          │
-  │                                              │
-  │  Step 2 (Deploy app v2):                     │
-  │  v2 đọc/ghi cả full_name VÀ customer_name    │
-  │  → v1 + v2 đều hoạt động — OK ✅             │
-  │                                              │
-  │  Step 3 (Sau khi v1 đã bị xóa hoàn toàn):    │
-  │  ALTER TABLE orders DROP COLUMN customer_name│
-  │  v2 chỉ dùng full_name — OK ✅               │
-  └──────────────────────────────────────────────┘
-```
+Rename cột ngay sẽ làm v1 `SELECT customer_name` lỗi. Trước khi drop cột, phải chắc chắn không còn app/query/job cũ tham chiếu cột đó; không drop khi v2 vẫn dual-write.
 
 ---
 
@@ -1474,70 +1266,29 @@ DATABASE MIGRATION — THÁCH THỨC LỚN NHẤT:
 
 ### 7.1. Testing Pyramid
 
+```d2 title="7.1. Testing Pyramid"
+direction: up
+unit: "Unit Tests — đáy rộng\nJUnit / Jest / pytest / Go\nNhiều • Nhanh • Rẻ • CI"
+integration: "Integration / Contract\nTestcontainers • Pact • REST-assured\nDB / API / Messaging"
+e2e: "E2E — đỉnh hẹp\nCypress / Playwright\nÍt • Chậm • Đắt • Staging"
+unit -> integration -> e2e: Phạm vi test rộng hơn
 ```
-TESTING PYRAMID CHO MICROSERVICE:
-─────────────────────────────────
 
-          ┌───────┐
-         ╱   E2E   ╲          ← Ít tests, chậm, expensive
-        ╱  (Cypress  ╲           Chạy trên staging
-       ╱  Playwright) ╲
-      ├────────────────┤
-     ╱   Integration    ╲    ← Trung bình, API tests,
-    ╱   (Testcontainers,  ╲      Contract tests
-   ╱     Pact, REST-assured)╲
-  ├───────────────────────────┤
- ╱         Unit Tests          ╲  ← Nhiều tests, nhanh, cheap
-╱    (JUnit, Jest, pytest, Go)  ╲    Chạy trong CI
-└────────────────────────────────┘
-
-  ┌───────────────────────────────────────────────────┐
-  │  Tỷ lệ khuyến nghị:                               │
-  │                                                   │
-  │  Unit:        70% — Logic nghiệp vụ, utils        │
-  │  Integration: 20% — API, DB, messaging            │
-  │  E2E:         10% — Critical user flows           │
-  │                                                   │
-  │  ⏱ Thời gian:                                     │
-  │  Unit:        < 2 phút                            │
-  │  Integration: < 5 phút                            │
-  │  E2E:         < 15 phút                           │
-  └───────────────────────────────────────────────────┘
-```
+Tỷ lệ ví dụ70% unit /20% integration /10% E2E; mục tiêu thời gian tương ứng <2/<5/<15phút. Đây là guideline minh họa, không quota bắt buộc cho mọi codebase.
 
 ### 7.2. Contract Testing
 
-```
-CONTRACT TESTING — ĐẢM BẢO SERVICE COMPATIBILITY:
-──────────────────────────────────────────────────
-
-  Vấn đề: Order Service gọi Product Service
-  → Product Service thay đổi API response
-  → Order Service CRASH trên production
-
-  Contract Testing (Pact):
-  ┌─────────────────────────────────────────────────────────┐
-  │                                                         │
-  │  Consumer (Order Service):                              │
-  │  "Tôi expect Product Service trả về:                    │
-  │   { id: number, name: string, price: number }"          │
-  │  → Tạo CONTRACT (Pact file)                             │
-  │                                                         │
-  │  Provider (Product Service):                            │
-  │  "Tôi verify rằng API của tôi                           │
-  │   match với CONTRACT từ Order Service"                  │
-  │  → Chạy provider tests against contract                 │
-  │                                                         │
-  │  ┌───────────────┐   Contract    ┌──────────────────┐   │
-  │  │ Order Service │──────────────▶│ Product Service  │   │
-  │  │ (Consumer)    │   (Pact       │ (Provider)       │   │
-  │  │               │   Broker)     │                  │   │
-  │  │ Tạo contract  │               │ Verify contract  │   │
-  │  └───────────────┘               └──────────────────┘   │
-  │                                                         │
-  │  → Nếu Provider thay đổi breaking → CI FAIL             │
-  │  → Phát hiện TRƯỚC khi deploy, không phải trên prod     │
-  └─────────────────────────────────────────────────────────┘
+```d2 title="7.2. Contract Testing"
+direction: right
+order: "Order — Consumer\nExpect {id:number, name:string, price:number}"
+broker: "Pact Broker — contract artifact"
+product: "Product — Provider\nVerify API against consumer contract"
+pass: "Pass → đủ điều kiện deploy"
+fail: "Breaking → CI FAIL trước production"
+order -> broker: "Publish contract"
+broker -> product
+product -> pass: "Match"
+product -> fail: "Mismatch"
 ```
 
 ### 7.3. Smoke Test & Acceptance Test sau deploy
@@ -1588,31 +1339,18 @@ POST-DEPLOY TESTING:
 
 **Jenkins** là CI/CD server **self-hosted**, mã nguồn mở, ra đời từ 2011. Dù GitHub Actions / GitLab CI đang phổ biến hơn cho dự án mới, Jenkins vẫn được **rất nhiều enterprise** sử dụng vì tính linh hoạt và hệ sinh thái plugin khổng lồ.
 
+```d2 title="8.1. Jenkins — CI/CD Server lâu đời nhất"
+direction: right
+controller: "Jenkins Controller\nJobs • UI • Scheduling"
+a: "Agent1 — Worker jobs"
+b: "Agent2 — Worker jobs"
+c: "Agent3 — Worker jobs"
+controller -> a
+controller -> b
+controller -> c
 ```
-JENKINS — TỔNG QUAN:
-────────────────────
 
-  ┌──────────────────────────────────────────────────────────┐
-  │  Jenkins Architecture:                                   │
-  │                                                          │
-  │  ┌──────────────────┐                                    │
-  │  │  Jenkins Master  │   ← Quản lý jobs, UI, scheduling   │
-  │  │  (Controller)    │                                    │
-  │  └────────┬─────────┘                                    │
-  │           │                                              │
-  │     ┌─────┼──────┐                                       │
-  │     │     │      │                                       │
-  │     ▼     ▼      ▼                                       │
-  │  ┌─────┐┌─────┐┌─────┐                                   │
-  │  │Agent││Agent││Agent│  ← Worker nodes chạy jobs         │
-  │  │  1  ││  2  ││  3  │    (trước gọi là Slave/Node)      │
-  │  └─────┘└─────┘└─────┘                                   │
-  │                                                          │
-  │  Pipeline viết bằng: Jenkinsfile (Groovy DSL)            │
-  │  Quản lý: Web UI hoặc Configuration as Code (JCasC)      │
-  │  Plugin: 1800+ plugins cho mọi thứ                       │
-  └──────────────────────────────────────────────────────────┘
-```
+Pipeline dùng Jenkinsfile/Groovy DSL; quản trị qua Web UI hoặc JCasC. Plugin ecosystem mở rộng integration, cần quản lý compatibility và security.
 
 ```groovy source="snippets/8-1-jenkins-ci-cd-server-lau-doi-nhat.groovy"
 // Jenkinsfile — Declarative Pipeline cho Order Service
@@ -1756,63 +1494,26 @@ JENKINS vs GITHUB ACTIONS — KHI NÀO DÙNG GÌ?
 
 ## 9. Ví dụ thực tế — E-Commerce CI/CD
 
-```
-E-COMMERCE CI/CD — TỔNG QUAN HỆ THỐNG:
-───────────────────────────────────────
-
-  ┌───────────────────────────────────────────────────────────────┐
-  │                                                               │
-  │  DEVELOPERS                                                   │
-  │  ┌──────┐ ┌───────┐ ┌───────┐                                 │
-  │  │Team A│ │Team B │ │Team C │                                 │
-  │  │Order │ │Product│ │Payment│                                 │
-  │  └──┬───┘ └──┬────┘ └──┬────┘                                 │
-  │     │        │         │                                      │
-  │     ▼        ▼         ▼                                      │
-  │  ┌──────────────────────────────┐                             │
-  │  │  GitHub (Source Code Repos)  │                             │
-  │  │  • order-service             │                             │
-  │  │  • product-service           │                             │
-  │  │  • payment-service           │                             │
-  │  └────────────┬─────────────────┘                             │
-  │               │ webhook                                       │
-  │               ▼                                               │
-  │  ┌──────────────────────────────┐                             │
-  │  │  GitHub Actions (CI)         │                             │
-  │  │  • Lint, Test, Security Scan │                             │
-  │  │  • Build Docker Image        │                             │
-  │  │  • Push to ECR               │                             │
-  │  │  • Update GitOps repo        │                             │
-  │  └────────────┬─────────────────┘                             │
-  │               │ update image tag                              │
-  │               ▼                                               │
-  │  ┌──────────────────────────────┐                             │
-  │  │  GitHub (GitOps Config Repo) │                             │
-  │  │  k8s-manifests/              │                             │
-  │  │  ├── services/               │                             │
-  │  │  │   ├── order-service/      │                             │
-  │  │  │   ├── product-service/    │                             │
-  │  │  │   └── payment-service/    │                             │
-  │  │  └── infrastructure/         │                             │
-  │  └────────────┬─────────────────┘                             │
-  │               │ pull (every 3 min)                            │
-  │               ▼                                               │
-  │  ┌──────────────────────────────────────────────────────────┐ │
-  │  │  Kubernetes Cluster                                      │ │
-  │  │                                                          │ │
-  │  │  ┌──────────┐  ┌───────────┐  ┌───────────────────────┐  │ │
-  │  │  │ ArgoCD   │  │ Staging   │  │ Production            │  │ │
-  │  │  │          ├──▶ namespace ├──▶ namespace             │  │ │
-  │  │  │ (sync)   │  │           │  │ (Canary + Flagger)    │  │ │
-  │  │  └──────────┘  └───────────┘  └───────────────────────┘  │ │
-  │  │                                                          │ │
-  │  │  ┌──────────────────────────────────────────────────┐    │ │
-  │  │  │ Monitoring: Prometheus + Grafana + AlertManager  │    │ │
-  │  │  │ Tracing: Jaeger                                  │    │ │
-  │  │  │ Logging: ELK Stack                               │    │ │
-  │  │  └──────────────────────────────────────────────────┘    │ │
-  │  └──────────────────────────────────────────────────────────┘ │
-  └───────────────────────────────────────────────────────────────┘
+```d2 title="9. Ví dụ thực tế — E-Commerce CI/CD"
+direction: down
+teams: Developer Teams { order: Team A — Order; product: Team B — Product; payment: Team C — Payment }
+source: GitHub Source Repos — order / product / payment
+ci: GitHub Actions — Lint / Test / Scan / Build / Push ECR
+config: GitHub GitOps Repo — manifests / infrastructure
+cluster: Kubernetes {
+ argo: ArgoCD
+ staging: Staging Namespace
+ production: Production — Canary / Flagger
+ monitoring: Prometheus / Grafana / Alertmanager
+ traces: Jaeger
+ logs: ELK
+ argo -> staging
+ staging -> production: Acceptance / Promotion Gates
+}
+teams -> source: Push / PR
+source -> ci: Webhook
+ci -> config: Update image tag qua reviewed PR
+cluster.argo -> config: Pull desired state
 ```
 
 **Luồng deploy chi tiết:**

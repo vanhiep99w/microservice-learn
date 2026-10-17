@@ -74,30 +74,13 @@ Tài liệu này tập trung vào **góc nhìn pattern**: mỗi pattern giải q
 
 Các communication patterns thường gặp chia thành 3 lớp theo vị trí trong hệ thống:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    COMMUNICATION PATTERNS MAP                        │
-│                                                                     │
-│  LỚP EDGE — Client vào / ra hệ thống                                │
-│  ┌─────────────────┐   ┌─────────────────┐                          │
-│  │  API Gateway    │   │       BFF       │                          │
-│  │  (1 cổng chung) │   │ (mỗi client 1   │                          │
-│  │                 │   │  backend riêng) │                          │
-│  └─────────────────┘   └─────────────────┘                          │
-│                                                                     │
-│  LỚP INTERNAL — Service giao tiếp với service                       │
-│  ┌─────────────────┐   ┌──────────────────────┐                     │
-│  │ Event-Driven    │   │ Async Request-Reply  │                     │
-│  │ (publish/       │   │ (202 + status URL    │                     │
-│  │  subscribe)     │   │  cho tác vụ dài)     │                     │
-│  └─────────────────┘   └──────────────────────┘                     │
-│                                                                     │
-│  LỚP INFRASTRUCTURE — Nền tảng bên dưới mọi giao tiếp               │
-│  ┌─────────────────┐                                                │
-│  │  Service Mesh   │  mTLS, load balancing, retry, tracing          │
-│  │                 │  — không đụng vào application code             │
-│  └─────────────────┘                                                │
-└─────────────────────────────────────────────────────────────────────┘
+```d2 title="2. Bản đồ Communication Patterns"
+direction: right
+communication: Communication Patterns {
+ edge: Edge { gateway: API Gateway — single entry; bff: BFF — backend per client }
+ internal: Internal { eda: Event-driven — Publish / Subscribe; request: Async Request-Reply — 202 + Status URL }
+ infra: Infrastructure { mesh: Service Mesh — mTLS / LB / Supported retry / Tracing }
+}
 ```
 
 | Pattern | Vấn đề chính giải quyết | Lớp | Doc chuyên đề |
@@ -118,22 +101,20 @@ Các communication patterns thường gặp chia thành 3 lớp theo vị trí t
 
 Không có gateway, client phải gọi **trực tiếp từng service**:
 
+```d2 title="3.1. Vấn đề giải quyết"
+direction: right
+mobile: "Mobile App"
+user: "User — GET https://user-service:8081/api/users/123"
+order: "Order — GET https://order-service:8082/api/orders?userId=123"
+product: "Product — GET https://product-service:8083/api/products/456"
+review: "Review — GET https://review-service:8084/api/reviews?productId=456"
+mobile -> user
+mobile -> order
+mobile -> product
+mobile -> review
 ```
-❌ Client gọi trực tiếp từng service:
 
-  Mobile App
-      ├── GET https://user-service:8081/api/users/123
-      ├── GET https://order-service:8082/api/orders?userId=123
-      ├── GET https://product-service:8083/api/products/456
-      └── GET https://review-service:8084/api/reviews?productId=456
-
-  Vấn đề:
-  • Client phải biết URL TỪNG service → tight coupling
-  • 4 round-trips cho 1 màn hình → chậm, tốn pin/3G
-  • Mỗi service phải tự xử lý auth, rate limiting → trùng lặp
-  • Service đổi URL/port → phải cập nhật TẤT CẢ clients
-  • Không có điểm chung để log, monitor, trace
-```
+Client biết từng service URL/port, nhiều round-trips, cross-cutting logic dễ lặp và thiếu một điểm monitor; URL thay đổi buộc client cập nhật.
 
 ### 3.2. Cách hoạt động
 
@@ -169,26 +150,26 @@ n2 -> n7
 
 Trang chủ một sàn thương mại điện tử cần: profile user, giỏ hàng, gợi ý sản phẩm, thông báo. Thay vì mobile app gọi 4 API, app gọi **1 API**:
 
-```mermaid
-sequenceDiagram
-    participant App as Mobile App
-    participant GW as API Gateway
-    participant U as User Service
-    participant C as Cart Service
-    participant R as Recommendation Service
-
-    App->>GW: GET /api/home (parallel fan-out)
-    par
-        GW->>U: GET /users/123
-        U-->>GW: profile
-    and
-        GW->>C: GET /cart?userId=123
-        C-->>GW: 3 items
-    and
-        GW->>R: GET /recommendations?userId=123
-        R-->>GW: 10 products
-    end
-    GW-->>App: 200 OK — 1 response gộp
+```d2 title="3.3. Ví dụ thực tế — Trang chủ E-Commerce"
+direction: down
+client: "Mobile App"
+gateway: "API Gateway\nGET /api/home"
+fork: "PAR — fan-out đồng thời"
+user: "User Service\nGET /users/123 → profile"
+cart: "Cart Service\nGET /cart?userId=123 → cart"
+recommend: "Recommendation Service\nGET /recommendations?userId=123 → recommendations"
+join: "JOIN — chờ kết quả các dependency độc lập"
+response: "200 OK — một response gộp: profile, 3 items, 10 products"
+client -> gateway
+gateway -> fork
+fork -> user
+fork -> cart
+fork -> recommend
+user -> join
+cart -> join
+recommend -> join
+join -> response
+response -> client
 ```
 
 Điểm pattern-level cần chú ý: gateway gọi các service **song song** (parallel) thay vì tuần tự để giảm latency, và cần chính sách **partial failure** — nếu Recommendation Service lỗi, trả về phần còn lại kèm trường rỗng thay vì lỗi cả trang chủ:
@@ -245,24 +226,21 @@ Một API Gateway duy nhất phục vụ **mọi loại client** dẫn đến vi
 
 **BFF** (Backend for Frontend — backend dành riêng cho từng frontend): mỗi loại client có **một backend riêng**, do **team frontend đó sở hữu và phát triển**, tối ưu đúng nhu cầu của client mình.
 
-```
-┌─────────────┐  ┌──────────────┐  ┌─────────────┐
-│   Web App   │  │  Mobile App  │  │  IoT Device │
-└──────┬──────┘  └──────┬───────┘  └──────┬──────┘
-       │                │                 │
-┌──────▼──────┐  ┌──────▼───────┐  ┌──────▼──────┐
-│   Web BFF   │  │  Mobile BFF  │  │   IoT BFF   │
-│ (GraphQL)   │  │ (REST, gọn)  │  │ (gRPC/MQTT) │
-│ Team Web    │  │ Team Mobile  │  │ Team IoT    │
-└──────┬──────┘  └──────┬───────┘  └──────┬──────┘
-       │                │                 │
-       └────────────────┼─────────────────┘
-                        │
-            ┌───────────┼───────────┐
-            ▼           ▼           ▼
-      ┌──────────┐ ┌──────────┐ ┌──────────┐
-      │ User Svc │ │Order Svc │ │Product Svc│
-      └──────────┘ └──────────┘ └──────────┘
+```d2 title="4.2. Cách hoạt động"
+direction: right
+web: "Web App"
+mobile: "Mobile App"
+iot: "IoT Device"
+wbff: "Web BFF — GraphQL / Team Web"
+mbff: "Mobile BFF — REST compact / Team Mobile"
+ibff: "IoT BFF — gRPC/MQTT / Team IoT"
+services: "User / Order / Product Services"
+web -> wbff
+mobile -> mbff
+iot -> ibff
+wbff -> services
+mbff -> services
+ibff -> services
 ```
 
 Điểm mấu chốt của BFF không phải là "nhiều gateway" mà là **ownership**: Web BFF do team web viết bằng Node.js, Mobile BFF do team mobile viết bằng Kotlin — mỗi team tự quyết định API hình dạng thế nào cho phù hợp client của mình.
@@ -354,26 +332,21 @@ Không có mesh: mỗi ngôn ngữ một bộ thư viện, mỗi team implement 
 
 **Service Mesh** (lưới service) tách toàn bộ networking concerns ra khỏi application code bằng cách inject (tiêm) một **sidecar proxy** (proxy phụ chạy cạnh service) vào mỗi pod:
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                  CONTROL PLANE                           │
-│              (Istiod / Linkerd control plane)            │
-│   • Cấu hình routing, policy                             │
-│   • Phát hành certificate mTLS                           │
-│   • Service discovery                                    │
-└────────────────────────┬─────────────────────────────────┘
-                         │ push config + certs
-        ┌────────────────┼────────────────┐
-        ▼                ▼                ▼
-  ┌───────────┐    ┌───────────┐    ┌───────────┐
-  │ ┌───────┐ │    │ ┌───────┐ │    │ ┌───────┐ │
-  │ │Order  │ │    │ │Payment│ │    │ │Product│ │     DATA PLANE
-  │ └──┬────┘ │    │ └───┬───┘ │    │ └───┬───┘ │   (sidecar proxies)
-  │ ┌──▼────┐ │    │ ┌───▼───┐ │    │ ┌───▼───┐ │
-  │ │Envoy  │◀├────▶│ Envoy  │◀├────▶│ Envoy  │ │   Mọi traffic đi
-  │ │proxy  │ │mTLS│ │proxy  │ │mTLS│ │proxy  │ │   qua các proxy này
-  │ └───────┘ │    │ └───────┘ │    │ └───────┘ │
-  └───────────┘    └───────────┘    └───────────┘
+```d2 title="5.2. Control Plane vs Data Plane"
+direction: down
+control: Control Plane — Istiod / Linkerd {
+ config: Routing / Policy / Certificates / Service discovery
+}
+data: Data Plane {
+ order: Order Pod { app: Order; proxy: Sidecar Proxy; app -- proxy }
+ payment: Payment Pod { app: Payment; proxy: Sidecar Proxy; app -- proxy }
+ product: Product Pod { app: Product; proxy: Sidecar Proxy; app -- proxy }
+ order.proxy <-> payment.proxy: mTLS
+ payment.proxy <-> product.proxy: mTLS
+}
+control.config -> data.order.proxy: Push config / Identity
+control.config -> data.payment.proxy
+control.config -> data.product.proxy
 ```
 
 - **Data plane** = toàn bộ sidecar proxy, trực tiếp xử lý request: mã hóa mTLS, retry, load balance, thu thập metric.
@@ -414,9 +387,19 @@ Hai pattern này hay bị nhầm là thay thế nhau — thực ra chúng ở **
 | **Số lượng** | Thường 1 (hoặc theo vùng) | Mỗi pod 1 sidecar — hàng trăm, hàng nghìn |
 | **Thay thế nhau?** | ❌ Không — bổ sung cho nhau | ❌ Không — bổ sung cho nhau |
 
-```
-  Client ──▶ API Gateway ──▶ Service A ⇄ Service B ⇄ Service C
-             (north-south)     └──── east-west (mesh) ────┘
+```d2 title="5.4. API Gateway vs Service Mesh"
+direction: right
+client: Client
+gateway: API Gateway
+mesh: Service Mesh — East-West {
+ a: Service A
+ b: Service B
+ c: Service C
+ a <-> b
+ b <-> c
+}
+client -> gateway: North-South
+gateway -> mesh.a
 ```
 
 ### 5.5. Khi nào chọn / không chọn
@@ -701,24 +684,28 @@ n6 -> n8: "Một, kiểu work queue"
 
 ### 8.3. Ví dụ — Kiến trúc lai cho một trang E-Commerce
 
+```d2 title="8.3. Ví dụ — Kiến trúc lai cho một trang E-Commerce"
+direction: right
+user: "User đặt hàng"
+gw: "API Gateway"
+order: "Order Service"
+payment: "Payment Service — trả charge result"
+kafka: "Kafka — OrderCreated"
+inventory: "Inventory — trừ kho"
+notification: "Notification — Email"
+analytics: "Analytics"
+status: "202 + Status URL nếu preparation dài\nGET /orders/9x7/status"
+user -> gw
+gw -> order: "Sync"
+order -> payment: "Sync khi cần kết quả"
+order -> kafka: "Outbox / Publish"
+kafka -> inventory
+kafka -> notification
+kafka -> analytics
+order -> status: "Async Request-Reply variant"
 ```
-User bấm "Đặt hàng"
-   │
-   ▼
-API Gateway ──sync──▶ Order Service ──sync──▶ Payment Service
-   │                     │   │                  (user chờ kết quả
-   │                     │   │                   charge → thành công/thất bại)
-   │                     │   │
-   │                     │   └──publish──▶ Kafka "OrderCreated" ──┬─▶ Inventory (trừ kho)
-   │                     │                                       ├─▶ Notification (email)
-   │                     │                                       └─▶ Analytics
-   │                     │
-   └──202 + status URL───┘   (nếu bước chuẩn bị đơn là tác vụ chậm:
-                              client poll GET /orders/9x7/status)
 
-Phần SYNC  = những gì user chờ thấy kết quả ngay (thanh toán)
-Phần ASYNC = những gì chạy nền, trễ vài giây không sao (email, kho, thống kê)
-```
+Không dùng cached/async inventory như reserve có thẩm quyền nếu business invariant đòi kiểm soát stock đồng bộ. 202 mô tả pending work, không tự đồng nghĩa order đã paid/confirmed.
 
 ---
 
@@ -728,40 +715,32 @@ Phần ASYNC = những gì chạy nền, trễ vài giây không sao (email, kho
 
 Một hệ thống vừa/lớn thường dùng **đồng thời** cả năm patterns, mỗi pattern ở đúng lớp:
 
-```
-                    ┌─────────┐  ┌─────────┐  ┌─────────┐
-                    │ Web App │  │  Mobile │  │ Partner │
-                    └────┬────┘  └────┬────┘  └────┬────┘
-                         │            │            │
-        LỚP EDGE ════════▼════════════▼════════════▼════════
-                      ┌──────────────────────────────┐
-                      │         API GATEWAY          │  auth • rate limit
-                      │  (single entry point, HA)    │  routing
-                      └───────┬──────────────┬───────┘
-                              │              │
-                     ┌────────▼───┐   ┌──────▼─────┐
-                     │  Web BFF   │   │ Mobile BFF │  BFF: mỗi client
-                     └────────┬───┘   └──────┬─────┘  một backend
-                              │              │
-        LỚP INFRASTRUCTURE ═══╪══════════════╪════════ SERVICE MESH
-                       (mỗi pod có sidecar: mTLS • LB • retry • tracing)
-                              │              │
-                    ┌─────────▼──────────────▼─────────┐
-                    │   ┌──────┐  ┌──────┐  ┌──────┐   │
-                    │   │Order │  │Payment│ │Product│  │  domain services
-                    │   └──┬───┘  └──────┘  └──────┘   │
-                    └──────┼───────────────────────────┘
-                           │ outbox → publish
-                           ▼
-                    ┌─────────────┐
-                    │   KAFKA     │──▶ Inventory ──▶ Notification
-                    │ (broker)    │──▶ Analytics
-                    └─────────────┘
-                           ▲
-                           │ job queue (report, media)
-                    ┌──────┴──────┐
-                    │   Workers   │──▶ trạng thái job → status URL
-                    └─────────────┘     (Async Request-Reply)
+```d2 title="9.1. Kiến trúc tham chiếu"
+direction: down
+clients: Web / Mobile / Partner
+gateway: API Gateway HA — Auth / Rate limit / Routing
+bff: Client-specific BFFs { web: Web BFF; mobile: Mobile BFF }
+mesh: Service Mesh — mTLS / LB / Policy / Tracing {
+ order: Order
+ payment: Payment
+ product: Product
+}
+kafka: Kafka Broker
+inventory: Inventory
+notification: Notification
+analytics: Analytics
+workers: Workers — Report / Media jobs
+status: Job Status URL
+clients -> gateway
+gateway -> bff.web
+ gateway -> bff.mobile
+bff.web -> mesh
+bff.mobile -> mesh
+mesh.order -> kafka: Outbox / Publish
+kafka -> inventory -> notification
+kafka -> analytics
+kafka -> workers: Job queue consumer
+workers -> status: Persist status / Result
 ```
 
 Đọc luồng: client → **gateway** (auth, rate limit) → **BFF** (gộp data đúng client) → gọi domain service qua **mesh** (mTLS, retry) → service **publish event** cho consumer chạy nền → tác vụ dài đi **queue + worker**, client nhận **status URL**.

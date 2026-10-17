@@ -92,47 +92,36 @@ Mỗi service sở hữu data của mình. Service khác không được truy c�
 
 ### 2.2. Các mô hình triển khai
 
+```d2 title="2.2. Các mô hình triển khai"
+direction: down
+server: Separate Servers {
+ order: Order Service
+ product: Product Service
+ user: User Service
+ a: PostgreSQL Server A — 5432 {shape: cylinder}
+ b: PostgreSQL Server B — 5433 {shape: cylinder}
+ c: MySQL Server C — 3306 {shape: cylinder}
+ order -> a
+ product -> b
+ user -> c
+}
+schemas: Separate Schemas — cùng PostgreSQL Server {
+ order: Order Service
+ product: Product Service
+ user: User Service
+ db: Shared Server { order: order_svc; product: product_svc; user: user_svc }
+ order -> db.order
+ product -> db.product
+ user -> db.user
+}
+tables: Separate Tables — Schema public {
+ order: order_orders / order_items
+ product: product_products / product_categories
+ user: user_users
+}
 ```
-Mô hình 1: Separate Database Server
-──────────────────────────────────────
-  Mỗi service có DB server riêng hoàn toàn.
 
-  Order Service ──▶ PostgreSQL Server A (port 5432)
-  Product Service ──▶ PostgreSQL Server B (port 5433)
-  User Service ──▶ MySQL Server C (port 3306)
-
-  ✅ Cách ly hoàn toàn, fault isolation tốt nhất
-  ❌ Chi phí cao nhất (nhiều server/instance)
-
-Mô hình 2: Separate Schema (cùng DB server)
-──────────────────────────────────────
-  Các service dùng chung DB server, nhưng mỗi service có schema riêng.
-
-  PostgreSQL Server:
-    ├── schema: order_svc    ← Order Service dùng
-    ├── schema: product_svc  ← Product Service dùng
-    └── schema: user_svc     ← User Service dùng
-
-  ✅ Tiết kiệm chi phí (1 server)
-  ✅ Vẫn tách biệt ở mức schema (mỗi service chỉ có quyền trên schema mình)
-  ❌ Cùng server → chung resource (CPU, RAM, I/O)
-  ❌ Server chết → ảnh hưởng TẤT CẢ services
-
-Mô hình 3: Separate Table (cùng schema)
-──────────────────────────────────────
-  Cùng schema nhưng convention đặt tên table theo service.
-
-  PostgreSQL / Schema public:
-    ├── order_orders
-    ├── order_items
-    ├── product_products
-    ├── product_categories
-    └── user_users
-
-  ✅ Đơn giản nhất, phù hợp team nhỏ / giai đoạn đầu
-  ❌ Không có cơ chế enforce ownership ở mức DB
-  ❌ Dev có thể "lỡ" JOIN bảng service khác → tight coupling
-```
+Separate server cách ly tốt hơn nhưng chi phí cao. Separate schema tiết kiệm và có thể enforce quyền theo schema, nhưng chia sẻ CPU/RAM/I/O và server failure. Separate table theo convention đơn giản cho team nhỏ, nhưng convention một mình không enforce ownership; cần quyền DB phù hợp để ngăn truy cập chéo/JOIN tùy tiện.
 
 ```
 Khuyến nghị:
@@ -148,43 +137,40 @@ Khuyến nghị:
 
 **Polyglot Persistence** (đa dạng công nghệ lưu trữ) = Mỗi service **chọn database phù hợp nhất** với use case của mình, thay vì ép tất cả dùng chung 1 loại DB.
 
+```d2 title="2.3. Polyglot Persistence"
+direction: right
+primary: Primary Databases {
+ order: Order Service
+ pg: PostgreSQL — ACID / relational order-items {shape: cylinder}
+ reviews: Product Reviews
+ mongo: MongoDB — schema linh hoạt / ảnh / video / rating {shape: cylinder}
+ recommend: Recommendation
+ neo: Neo4j — graph traversal mua cùng {shape: cylinder}
+ log: Notification Log
+ cassandra: Cassandra — append-heavy / time-series {shape: cylinder}
+ order -> pg
+ reviews -> mongo
+ recommend -> neo
+ log -> cassandra
+}
+specialized: Specialized / Derived / Ephemeral {
+ catalog: Product Catalog
+ pg: PostgreSQL — primary {shape: cylinder}
+ es: Elasticsearch — search {shape: cylinder}
+ session: User Session
+ redis: Redis — TTL {shape: cylinder}
+ cart: Shopping Cart
+ cartdb: Redis / DynamoDB {shape: cylinder}
+ analytics: Analytics
+ warehouse: ClickHouse / BigQuery — columnar aggregate {shape: cylinder}
+ catalog -> pg -> es: Sync
+ session -> redis
+ cart -> cartdb
+ analytics -> warehouse
+}
 ```
-Ví dụ — E-Commerce system:
-──────────────────────────
 
-  ┌────────────────────────────────────────────────────────────────┐
-  │                                                                │
-  │  🟢 PRIMARY DATABASE (source of truth)                         │
-  │  ─────────────────────────────────────                         │
-  │  Order Service ──▶ PostgreSQL                                  │
-  │     Cần ACID transaction, relational data (order → items)      │
-  │                                                                │
-  │  Product Reviews ──▶ MongoDB                                   │
-  │     Flexible schema (review có thể kèm ảnh, video, rating)     │
-  │                                                                │
-  │  Recommendation ──▶ Neo4j (Graph DB)                           │
-  │     "Users who bought X also bought Y" → graph traversal       │
-  │                                                                │
-  │  Notification Log ──▶ Cassandra                                │
-  │     Append-heavy, time-series, distributed, no single failure  │
-  │                                                                │
-  │                                                                │
-  │  🔵 SPECIALIZED STORE (secondary / derived)                    │
-  │  ──────────────────────────────────────────                    │
-  │ Product Catalog ──▶ PostgreSQL (primary)+Elasticsearch (search)│
-  │     Write vào PostgreSQL → sync sang Elasticsearch cho search  │
-  │                                                                │
-  │  User Session ──▶ Redis                                        │
-  │     Data tạm thời (TTL), mất thì user login lại — OK           │
-  │                                                                │
-  │  Shopping Cart ──▶ Redis / DynamoDB                            │
-  │     Key-value, auto-expire, ephemeral data                     │
-  │                                                                │
-  │  Analytics ──▶ ClickHouse / BigQuery                           │
-  │     Columnar storage, aggregate data từ nhiều source           │
-  │                                                                │
-  └────────────────────────────────────────────────────────────────┘
-```
+Chọn store theo use case: session có thể chấp nhận login lại khi mất, cart cần policy durability rõ. Replica/partitioning không tự bảo đảm không mất dữ liệu hay không có failure; phải thiết kế cấu hình vận hành.
 
 > ⚠️ **Primary DB vs Specialized Store — Phân biệt quan trọng:**
 >
@@ -216,21 +202,22 @@ Specialized Store — Secondary, derived, hoặc ephemeral:
      • Data aggregated từ nhiều source, không phải source of truth
 ```
 
+```d2 title="2.3. Polyglot Persistence"
+direction: right
+admin: "Admin"
+write: "Product Service — Write"
+pg: "PostgreSQL\nPrimary / Source of truth"
+es: "Elasticsearch\nDerived search index"
+user: "User search"
+read: "Product Service — Search"
+admin -> write
+write -> pg: "Chỉ ghi primary"
+pg -> es: "CDC / Event"
+user -> read
+read -> es: "Search read-only"
 ```
-Kiến trúc thực tế — Product Service:
-─────────────────────────────────────
 
-  Admin ──▶ Product Service ──▶ PostgreSQL (primary, source of truth)
-                                     │
-                                  CDC / Event
-                                     │
-                                     ▼
-  User search ──▶ Product Service ──▶ Elasticsearch (search, read-only)
-
-  → PostgreSQL là nơi DUY NHẤT ghi data
-  → Elasticsearch chỉ phục vụ search — rebuild được từ PostgreSQL
-  → ES chết? Search tạm lỗi, nhưng data KHÔNG MẤT
-```
+Index có thể rebuild từ primary. Elasticsearch down làm search tạm lỗi nhưng không mất dữ liệu gốc ở PostgreSQL.
 
 | DB Type | Phù hợp | Ví dụ DB | Làm Primary? |
 |---------|---------|----------|:------------:|
@@ -323,36 +310,19 @@ Có thể chấp nhận Shared Database khi:
 
 **CAP Theorem** (Eric Brewer, 2000) nói rằng: Trong một hệ thống phân tán (distributed system), bạn chỉ có thể **đảm bảo tối đa 2 trong 3** thuộc tính sau:
 
+```d2 title="4.1. Ba thuộc tính CAP"
+direction: down
+cap: CAP trong mô hình distributed system {
+ c: "C — Consistency\nRead quan sát write mới nhất hoặc lỗi\nLinearizability trong định lý CAP"
+ a: "A — Availability\nRequest tới node không lỗi nhận response\nKhông bị buộc phải chờ partition phục hồi"
+ p: "P — Partition\nMessages giữa các nhóm node có thể bị mất / trễ"
+ c -- a: Không thể đảm bảo đồng thời khi partition
+ p -- c: Lựa chọn CP
+ p -- a: Lựa chọn AP
+}
 ```
-                    C
-                   ╱ ╲
-                  ╱   ╲
-          ┌──────╱─────╲──────┐
-          │   Consistency     │
-          │  (Nhất quán)      │
-          │                   │
-          │  Mọi node đều     │
-          │  thấy data        │
-          │  giống nhau       │
-          │  tại cùng thời    │
-          │  điểm             │
-          └───────────────────┘
-                 ╱   ╲
-                ╱     ╲
-               ╱       ╲
-  ┌───────────╱─┐   ┌───╲───────────┐
-  │ Availability│   │ Partition     │
-  │ (Sẵn sàng)  │   │ Tolerance     │
-  │             │   │ (Chịu phân    │
-  │ Mọi request │   │  mảnh mạng)   │
-  │ đều nhận    │   │               │
-  │ response    │   │ Hệ thống vẫn  │
-  │ (không lỗi) │   │ hoạt động khi │
-  │             │   │ mất kết nối   │
-  │             │   │ giữa các node │
-  └─────────────┘   └───────────────┘
-         A                  P
-```
+
+Không phải lúc nào cũng chọn tùy ý hai trong ba. Partition là tình huống mạng cần dự liệu; khi partition thực sự xảy ra, phải đánh đổi C hoặc A theo định nghĩa CAP.
 
 | Thuộc tính | Ý nghĩa | Ví dụ |
 |-----------|---------|-------|
@@ -362,48 +332,25 @@ Có thể chấp nhận Shared Database khi:
 
 ### 4.2. Tại sao chỉ chọn được 2/3?
 
+```d2 title="4.2. Tại sao chỉ chọn được 2/3?"
+direction: down
+normal: Không partition {
+ a: Node A — data 5
+ b: Node B — data 5
+ a <-> b: Sync OK
+}
+partition: Khi mất kết nối {
+ a: Node A — client muốn write 10
+ b: Node B — vẫn data 5
+ a -- b: Network DOWN {style.stroke-dash: 5}
+ cp: "CP\nRefuse write hoặc không cho stale read\nGiữ consistency, giảm availability"
+ ap: "AP\nA nhận write 10, B vẫn có thể trả 5\nGiữ availability, mất strong consistency"
+ a -> cp: Chọn C
+ a -> ap: Chọn A
+}
 ```
-Ví dụ minh họa — 2 node database:
-──────────────────────────────────
 
-  Normal (không partition):
-  ┌────────┐   sync OK   ┌────────┐
-  │ Node A │◄───────────▶│ Node B │
-  │ data=5 │             │ data=5 │
-  └────────┘             └────────┘
-  → Cả C, A, P đều OK — không có vấn đề gì
-
-
-  Khi PARTITION xảy ra (mất kết nối A ↔ B):
-  ┌────────┐    ╳ ╳ ╳     ┌────────┐
-  │ Node A │    network   │ Node B │
-  │ data=? │    down!     │ data=? │
-  └────────┘              └────────┘
-
-  Client ghi data=10 vào Node A:
-  
-  Lựa chọn 1: Ưu tiên Consistency (CP)
-  ───────────────────────────────────────
-    Node A nhận write data=10
-    Node A KHÔNG THỂ sync sang Node B (mất kết nối)
-    → Node A từ chối write (hoặc Node B từ chối read)
-    → Đảm bảo data nhất quán, NHƯNG hệ thống unavailable
-    ✅ Consistent  ❌ Available  ✅ Partition Tolerant
-
-  Lựa chọn 2: Ưu tiên Availability (AP)
-  ───────────────────────────────────────
-    Node A nhận write data=10 → OK, trả thành công
-    Node B vẫn serve read với data=5 (data cũ)
-    → Hệ thống vẫn available, NHƯNG data inconsistent
-    ❌ Consistent  ✅ Available  ✅ Partition Tolerant
-
-  Lựa chọn 3: Không chịu Partition (CA)
-  ───────────────────────────────────────
-    Khi mất kết nối → shutdown toàn bộ hệ thống
-    → Consistent + Available KHI mạng tốt, nhưng CHẾT khi partition
-    ✅ Consistent  ✅ Available  ❌ Partition Tolerant
-    ⚠️ Không thực tế trong distributed system — partition LUÔN xảy ra
-```
+Mô hình CA chỉ phù hợp mô tả điều kiện không partition; shutdown toàn hệ thống khi partition không đáp ứng availability của CAP. Không thể lấy shutdown làm cách vừa C vừa A trong tình huống mất mạng.
 
 ### 4.3. CAP trong thực tế — Không đơn giản là chọn 2
 
@@ -411,30 +358,15 @@ CAP Theorem nói về hệ thống **distributed** (nhiều node kết nối qua
 
 Câu hỏi thực sự chỉ là: **Khi partition xảy ra, hy sinh Consistency hay Availability?**
 
+```d2 title="4.3. CAP trong thực tế — Không đơn giản là chọn 2"
+direction: right
+a: "Node A — Hà Nội"
+b: "Node B — Sài Gòn"
+a -> b: "Network có thể mất kết nối"
+b -> a: "Không thể loại trừ partition"
 ```
-Tại sao Partition Tolerance (P) là bắt buộc?
-─────────────────────────────────────────────
 
-  Distributed system = nhiều node kết nối qua MẠNG
-  Mạng = KHÔNG đáng tin cậy (unreliable)
-
-  ┌─────────────┐     network     ┌─────────────┐
-  │   Node A    │◄──────────────▶ │   Node B    │
-  │  (Hà Nội)   │    có thể lỗi   │  (Sài Gòn)  │
-  └─────────────┘   bất cứ lúc    └─────────────┘
-                     nào!
-
-  Các nguyên nhân partition:
-  • Dây mạng / switch / router hỏng
-  • Data center mất kết nối (thiên tai, mất điện)
-  • Firewall chặn nhầm traffic
-  • Network congestion → timeout → coi như mất kết nối
-  • Cloud provider AZ (Availability Zone) bị cô lập
-
-  → Bạn KHÔNG THỂ ngăn partition xảy ra
-  → Hệ thống PHẢI xử lý được partition (P là bắt buộc)
-  → Vậy chỉ còn chọn: CP (hy sinh Available) hay AP (hy sinh Consistent)?
-```
+Nguyên nhân: dây/switch/router hỏng, DC mất kết nối, firewall chặn nhầm, congestion/timeouts, cô lập AZ. Hệ thống phân tán cần policy cho partition, thay vì giả định mạng luôn tốt.
 
 ```
 Còn single-node database thì sao?
@@ -634,28 +566,23 @@ Ví dụ: User đặt hàng — cần 3 bước atomic:
 
 **Two-Phase Commit** (2PC) là cách truyền thống để đảm bảo distributed transaction:
 
-```
-2PC — Hoạt động thế nào:
-────────────────────────
-
-  Phase 1: PREPARE (Coordinator hỏi)
-  ┌──────────────┐
-  │ Coordinator  │──── "Bạn sẵn sàng commit?" ────▶ Order DB:     YES ✅
-  │ (Transaction │──── "Bạn sẵn sàng commit?" ────▶ Payment DB:   YES ✅
-  │  Manager)    │──── "Bạn sẵn sàng commit?" ────▶ Inventory DB: YES ✅
-  └──────────────┘
-
-  Phase 2: COMMIT (Tất cả nói YES → Coordinator ra lệnh commit)
-  ┌──────────────┐
-  │ Coordinator  │──── "COMMIT!" ────▶ Order DB:     COMMITTED ✅
-  │              │──── "COMMIT!" ────▶ Payment DB:   COMMITTED ✅
-  │              │──── "COMMIT!" ────▶ Inventory DB: COMMITTED ✅
-  └──────────────┘
-
-  Nếu BẤT KỲ AI nói NO:
-  ┌──────────────┐
-  │ Coordinator  │──── "ROLLBACK!" ────▶ Tất cả ROLLBACK
-  └──────────────┘
+```d2 title="5.2. Two-Phase Commit (2PC) — Và tại sao nên tránh"
+direction: down
+coordinator: "Coordinator — Transaction Manager"
+order: "Order DB"
+payment: "Payment DB"
+inventory: "Inventory DB"
+decision: "Thu thập PREPARE votes"
+commit: "Tất cả YES → COMMIT mọi participant"
+rollback: "Bất kỳ NO → ROLLBACK mọi participant"
+coordinator -> order: "Phase 1 — PREPARE"
+coordinator -> payment: "Phase 1 — PREPARE"
+coordinator -> inventory: "Phase 1 — PREPARE"
+order -> decision: "YES / NO"
+payment -> decision: "YES / NO"
+inventory -> decision: "YES / NO"
+decision -> commit: "All YES"
+decision -> rollback: "Có NO"
 ```
 
 ```
@@ -689,28 +616,24 @@ Tại sao TRÁNH 2PC trong Microservice:
 
 **Saga** là pattern thay thế distributed transaction bằng **chuỗi local transaction** — mỗi service thực hiện transaction riêng, và nếu một bước fail thì thực hiện **compensating transaction** (giao dịch bù) để rollback các bước trước.
 
+```d2 title="6.1. Saga là gì?"
+direction: right
+t1: "T1 — Local transaction"
+t2: "T2 — Local transaction"
+t3: "T3 — Local transaction"
+done: "DONE"
+c2: "C2 — Bù T2"
+c1: "C1 — Bù T1"
+rolled: "Compensated / Rolled back theo business"
+t1 -> t2
+t2 -> t3
+t3 -> done: "Success"
+t3 -> c2: "Fail"
+c2 -> c1
+c1 -> rolled
 ```
-Saga = Chuỗi local transactions + Compensating transactions
-────────────────────────────────────────────────────────────
 
-  Thay vì 1 distributed transaction:
-    BEGIN → Step 1 + Step 2 + Step 3 → COMMIT/ROLLBACK
-
-  Saga tách thành:
-    T1 (local) → T2 (local) → T3 (local)
-
-  Nếu T3 fail:
-    C2 (compensate T2) → C1 (compensate T1)
-
-  ┌────────────────────────────────────────────────────────┐
-  │  Happy path:                                           │
-  │  T1 ──✅──▶ T2 ──✅──▶ T3 ──✅──▶ DONE                 │
-  │                                                        │
-  │  Failure at T3:                                        │
-  │  T1 ──✅──▶ T2 ──✅──▶ T3 ──❌──▶ C2 ──▶ C1 ──▶ ROLLED │
-  │                          fail!     undo   undo   BACK  │
-  └────────────────────────────────────────────────────────┘
-```
+Saga là local transactions và compensating actions, không phải một DB transaction atomic xuyên services; compensation có thể cần retry/manual recovery.
 
 Saga có 2 cách triển khai: **Choreography** và **Orchestration**.
 
@@ -737,25 +660,19 @@ shape: sequence_diagram
 "Notification" -> "Notification": "Gửi email xác nhận"
 ```
 
-```
-Choreography — Khi FAIL:
-─────────────────────────
-
-  Order ──▶ event: OrderCreated
-  Payment ──▶ T2: Trừ tiền ✅ ──▶ event: PaymentCompleted
-  Inventory ──▶ T3: Trừ tồn kho ❌ (hết hàng!)
-              ──▶ event: InventoryFailed
-
-  Payment lắng nghe InventoryFailed:
-    → C2: Hoàn tiền (compensating transaction)
-    → event: PaymentRefunded
-
-  Order lắng nghe PaymentRefunded:
-    → C1: Update order → CANCELLED
-    → event: OrderCancelled
-
-  Notification lắng nghe OrderCancelled:
-    → Gửi email "Đơn hàng bị huỷ do hết hàng"
+```d2 title="6.2. Choreography Saga"
+direction: right
+order: "Order\nTạo order"
+payment: "Payment\nT2 trừ tiền OK"
+inventory: "Inventory\nT3 fail — hết hàng"
+refund: "Payment\nC2 hoàn tiền"
+cancel: "Order\nC1 update CANCELLED"
+email: "Notification\nEmail đơn hủy do hết hàng"
+order -> payment: "OrderCreated"
+payment -> inventory: "PaymentCompleted"
+inventory -> refund: "InventoryFailed"
+refund -> cancel: "PaymentRefunded"
+cancel -> email: "OrderCancelled"
 ```
 
 ```
@@ -793,40 +710,31 @@ shape: sequence_diagram
 "Orchestrator" -> "Order": "Update order → CONFIRMED"
 ```
 
+```d2 title="6.3. Orchestration Saga"
+direction: down
+start: "STARTED"
+create: "Order — CreateOrder"
+created: "ORDER_CREATED"
+charge: "Payment — ProcessPayment"
+paid: "PAYMENT_COMPLETED"
+reserve: "Inventory — ReserveInventory"
+confirmed: "CONFIRMED → DONE"
+refund: "Payment — RefundPayment C2"
+cancel: "Order — CancelOrder C1"
+cancelled: "CANCELLED → DONE compensated"
+start -> create
+create -> created: "Success"
+created -> charge
+charge -> paid: "Success"
+charge -> cancel: "Failure"
+paid -> reserve
+reserve -> confirmed: "Success"
+reserve -> refund: "Failure"
+refund -> cancel
+cancel -> cancelled
 ```
-Orchestration — Khi FAIL:
-─────────────────────────
 
-  Orchestrator → Order: Tạo order → ✅
-  Orchestrator → Payment: Trừ tiền → ✅
-  Orchestrator → Inventory: Trừ tồn kho → ❌ Hết hàng!
-
-  Orchestrator biết phải compensate:
-  Orchestrator → Payment: Hoàn tiền (C2) → ✅
-  Orchestrator → Order: Cancel order (C1) → ✅
-
-  ┌────────────────────────────────────────────────────────────────┐
-  │  Orchestrator (Saga State Machine):                            │
-  │                                                                │
-  │  State: STARTED                                                │
-  │    → command: CreateOrder                                      │
-  │    → on success → State: ORDER_CREATED                         │
-  │                                                                │
-  │  State: ORDER_CREATED                                          │
-  │    → command: ProcessPayment                                   │
-  │    → on success → State: PAYMENT_COMPLETED                     │
-  │    → on failure → command: CancelOrder → State: CANCELLED      │
-  │                                                                │
-  │  State: PAYMENT_COMPLETED                                      │
-  │    → command: ReserveInventory                                 │
-  │    → on success → State: CONFIRMED                             │
-  │    → on failure → command: RefundPayment → CancelOrder         │
-  │                  → State: CANCELLED                            │
-  │                                                                │
-  │  State: CONFIRMED → DONE ✅                                    │
-  │  State: CANCELLED → DONE (compensated) ✅                      │
-  └────────────────────────────────────────────────────────────────┘
-```
+Orchestrator giữ Saga state machine. Ví dụ Inventory hết hàng sau khi Payment charge: hoàn tiền trước, rồi cancel order.
 
 ```
 Orchestration — Ưu / Nhược:
@@ -942,168 +850,76 @@ Saga Execution Coordinator — Persistent State:
 
 ### 7.1. Vấn đề với CRUD truyền thống
 
+```d2 title="7.1. Vấn đề với CRUD truyền thống"
+direction: right
+client: "Client"
+service: "Service — một CRUD model\nCreate / Read / Update / Delete"
+db: "Database products\nid • name • price • stock • desc • ..."
+client -> service
+service -> db
 ```
-CRUD truyền thống — 1 model cho cả Read và Write:
-──────────────────────────────────────────────────
 
-  ┌───────────┐
-  │  Client   │
-  └─────┬─────┘
-        │
-  ┌─────▼─────┐       ┌─────────────┐
-  │  Service  │──────▶│  Database   │
-  │           │       │             │
-  │ CREATE    │       │ products    │
-  │ READ      │       │ ┌─────────┐ │
-  │ UPDATE    │       │ │ id      │ │
-  │ DELETE    │       │ │ name    │ │
-  │           │       │ │ price   │ │
-  │ Cùng 1    │       │ │ stock   │ │
-  │ model     │       │ │ desc    │ │
-  │           │       │ │ ...     │ │
-  └───────────┘       │ └─────────┘ │
-                      └─────────────┘
-
-  Vấn đề:
-  ────────
-  1. READ và WRITE có yêu cầu KHÁC NHAU
-     Write: validate, business rules, cần ít fields
-     Read: JOIN nhiều bảng, aggregate, cần nhiều fields
-
-  2. READ nhiều hơn WRITE (thường 90:10)
-     → Optimize cho read → ảnh hưởng write, và ngược lại
-
-  3. Complex queries
-     "Trang chủ cần: top products + user orders + recommendations"
-     → JOIN 5 bảng, aggregate → CHẬM
-     → Không thể index tối ưu cho mọi query pattern
-
-  4. Scaling
-     Muốn scale read → cần read replica
-     Muốn scale write → cần sharding
-     → Khác chiến lược, nhưng chung 1 model → khó tối ưu
-```
+Write cần validation/business rules và ít fields; read có thể JOIN/aggregate nhiều bảng. Với read/write 90:10 trong ví dụ, một model/index khó tối ưu cho mọi query; scale read bằng replicas và write bằng partitioning/sharding có trade-off khác nhau.
 
 ### 7.2. CQRS là gì?
 
 **CQRS** tách hệ thống thành 2 phần: **Command** (ghi) và **Query** (đọc) — mỗi phần có model, logic, và thậm chí database riêng.
 
+```d2 title="7.2. CQRS là gì?"
+direction: right
+command: "Command Side\nCreate / Update / Delete\nBusiness rules • Validation" {
+ model: Write Model
+ db: Write DB — PostgreSQL {shape: cylinder}
+ model -> db
+}
+query: "Query Side\nRead / Search / Filter / Report\nDenormalized • Read-optimized" {
+ model: Read Model
+ db: Read DB — Elasticsearch {shape: cylinder}
+ model -> db
+}
+command.db -> query.db: Async event / CDC — eventual consistency
 ```
-CQRS — Tách Command và Query:
-─────────────────────────────
 
-  ┌──────────────────────────────────────────────────────────────┐
-  │                                                              │
-  │  ┌─────────────────────┐     ┌─────────────────────────┐     │
-  │  │   COMMAND Side      │     │   QUERY Side            │     │
-  │  │   (Write)           │     │   (Read)                │     │
-  │  │                     │     │                         │     │
-  │  │ • Create, Update,   │     │ • Read, Search, Filter  │     │
-  │  │   Delete            │     │ • Aggregate, Report     │     │
-  │  │ • Business rules    │     │ • Denormalized views    │     │
-  │  │ • Validation        │     │ • Optimized for read    │     │
-  │  │                     │     │                         │     │
-  │  │  ┌──────────────┐   │     │  ┌──────────────┐       │     │
-  │  │  │ Write Model  │   │     │  │ Read Model   │       │     │
-  │  │  └──────┬───────┘   │     │  └──────┬───────┘       │     │
-  │  │         │           │     │         │               │     │
-  │  │  ┌──────▼───────┐   │     │  ┌──────▼───────┐       │     │
-  │  │  │  Write DB    │   │ ──▶ │  │  Read DB     │       │     │
-  │  │  │ (PostgreSQL) │   │sync │  │(Elasticsearch)│      │     │
-  │  │  └──────────────┘   │     │  └──────────────┘       │     │
-  │  └─────────────────────┘     └─────────────────────────┘     │
-  │                                                              │
-  │  Write DB ──sync──▶ Read DB (async, eventual consistency)    │
-  └──────────────────────────────────────────────────────────────┘
-```
+Đây là biến thể CQRS tách stores; CQRS cũng có thể chỉ tách logic/read-write models trên cùng một database.
 
 ### 7.3. Các mức độ áp dụng CQRS
 
+```d2 title="7.3. Các mức độ áp dụng CQRS"
+direction: right
+command: "Command Handler"
+write: "Write Logic"
+query: "Query Handler"
+read: "Read Logic"
+db: "Cùng một DB"
+command -> write
+write -> db
+query -> read
+read -> db
 ```
-Level 1: Tách code (cùng DB)
-────────────────────────────
-  Command Handler → Write logic → DB
-  Query Handler   → Read logic  → DB (cùng DB)
 
-  ✅ Đơn giản, code tổ chức tốt hơn
-  ❌ Chưa tối ưu performance
-
-Level 2: Tách model (cùng DB)
-────────────────────────────
-  Command → Write Model (normalized) → DB
-  Query   → Read Model (denormalized view/materialized view) → DB (cùng DB)
-
-  ✅ Read model tối ưu cho query (materialized view)
-  ❌ Vẫn chung DB resource
-
-Level 3: Tách DB (separate databases)
-────────────────────────────────────
-  Command → Write Model → Write DB (PostgreSQL)
-                            │
-                     async sync (CDC/Events)
-                            │
-  Query   → Read Model  → Read DB (Elasticsearch / Redis / MongoDB)
-
-  ✅ Scale read và write độc lập
-  ✅ Mỗi DB tối ưu cho use case riêng
-  ❌ Phức tạp: phải sync data, eventual consistency
-  ❌ Overhead vận hành: 2+ databases
-```
+CQRS mức1: tách code Command/Query, chưa tách datastore; đơn giản, ít overhead.
 
 ### 7.4. Ví dụ thực tế — E-Commerce Product Service
 
+```d2 title="7.4. Ví dụ thực tế — E-Commerce Product Service"
+direction: down
+admin: Admin — POST /products
+validate: Validate name required / price > 0
+pg: PostgreSQL — Write normalized {
+ products: "products\nid PK • name • price • description\nstock • created_at"
+ joins: "product_categories\nproduct_id FK • category_id FK"
+ categories: "categories\nid PK • name"
+}
+worker: Sync Worker — consume ProductCreated / CDC
+transform: Transform / Denormalize
+es: "Elasticsearch — Read Document\nid P-001 • name iPhone 15 Pro • price 999\nstock 50 • categories phone/apple/flagship\navgRating 4.7 • totalReviews 1234\nseller Apple Store / rating 4.9" {shape: cylinder}
+user: "User — GET /products\nq=iphone&category=phone&sort=price"
+admin -> validate -> pg
+pg -> worker -> transform -> es
+user -> es: Full-text / Faceted filtering — không JOIN lúc query
 ```
-Product Service với CQRS Level 3:
-──────────────────────────────────
 
-  COMMAND SIDE (Write):
-  ─────────────────────
-  Admin gọi: POST /products
-    → Validate (name required, price > 0)
-    → Write vào PostgreSQL (normalized)
-    → Publish event: ProductCreated
-
-  PostgreSQL (Write DB — normalized):
-  ┌──────────────────┐    ┌───────────────────┐
-  │ products         │    │ product_categories│
-  │ ──────────       │    │ ──────────────────│
-  │ id          PK   │    │ product_id    FK  │
-  │ name             │    │ category_id   FK  │
-  │ price            │    └───────────────────┘
-  │ description      │    ┌───────────────────┐
-  │ stock            │    │ categories        │
-  │ created_at       │    │ ──────────────────│
-  └──────────────────┘    │ id            PK  │
-                          │ name              │
-                          └───────────────────┘
-
-  SYNC (Event / CDC):
-  ────────────────────
-  ProductCreated event → consumed by sync worker
-  → Transform + denormalize → Write vào Elasticsearch
-
-  QUERY SIDE (Read):
-  ──────────────────
-  User gọi: GET /products?q=iphone&category=phone&sort=price
-    → Query Elasticsearch (denormalized, pre-joined)
-    → Trả về nhanh, full-text search, faceted filtering
-
-  Elasticsearch (Read DB — denormalized):
-  {
-    "id": "P-001",
-    "name": "iPhone 15 Pro",
-    "price": 999,
-    "description": "...",
-    "stock": 50,
-    "categories": ["phone", "apple", "flagship"],
-    "avgRating": 4.7,
-    "totalReviews": 1234,
-    "seller": { "name": "Apple Store", "rating": 4.9 }
-  }
-
-  → Tất cả data cần hiển thị đã được FLATTEN vào 1 document
-  → Không cần JOIN khi query → cực nhanh
-```
+Read document còn có `description`. Tất cả data phục vụ query được flatten/pre-join; publish sau write cần Outbox/CDC để xử lý dual-write gap, không mặc định atomic với DB commit.
 
 ### 7.5. Khi nào nên / không nên dùng CQRS
 
@@ -1386,32 +1202,21 @@ So sánh với cách thông thường:
 
 Nếu 1 entity có **hàng nghìn events** thì replay hết sẽ chậm. Giải pháp: **Snapshot** — lưu "ảnh chụp" state tại 1 thời điểm, chỉ replay events sau snapshot.
 
+```d2 title="8.5. Vấn đề hiệu năng — Snapshot"
+direction: right
+all: "Không Snapshot\nReplay E1 … E10000 để tính số dư"
+snapshot: "Snapshot gần nhất tại E9000\nBalance 5.000.000đ"
+tail: "Replay E9001 … E10000\n1.000 events"
+current: "State / Số dư hiện tại"
+s1: "Snapshot minh họa E1000: 800k"
+s2: "Snapshot minh họa E2000: 1.2M"
+all -> current
+snapshot -> tail
+tail -> current
+s1 -> s2: "Chụp định kỳ mỗi 1.000 events"
 ```
-Ví dụ: Tài khoản có 10.000 giao dịch
-──────────────────────────────────────
 
-  Không có Snapshot:
-    Event 1 → Event 2 → ... → Event 10.000 → Tính số dư
-    Phải replay 10.000 events mỗi lần xem số dư → CHẬM ❌
-
-  Có Snapshot (chụp mỗi 1.000 events):
-    Snapshot tại Event 9.000: {balance: 5.000.000đ}
-    Chỉ replay Event 9.001 → 10.000 (1.000 events) → Số dư hiện tại
-    → Nhanh gấp 10 lần ✅
-
-  Hình dung:
-  ┌────────────────────────────────────────────────────────────┐
-  │  [E1] [E2] ... [E1000] [E1001] ... [E2000] ... [E10000]    │
-  │                   ▲                    ▲                   │
-  │              Snapshot 1           Snapshot 2               │
-  │          {balance: 800k}      {balance: 1.2M}              │
-  │                                                            │
-  │  Muốn biết số dư hiện tại:                                 │
-  │  1. Lấy Snapshot gần nhất (Snapshot tại E9000)             │
-  │  2. Chỉ replay E9001 → E10000                              │
-  │  → Không cần replay từ đầu                                 │
-  └────────────────────────────────────────────────────────────┘
-```
+Giảm từ 10.000 xuống 1.000 events phải replay; không mặc định latency nhanh đúng 10 lần vì còn I/O, kích thước snapshot và chi phí apply events.
 
 ### 8.6. Event Sourcing kết hợp CQRS
 
@@ -1430,49 +1235,20 @@ Vấn đề: Query chậm khi dùng Event Sourcing
   → CỰC CHẬM khi có hàng triệu đơn ❌
 ```
 
+```d2 title="8.6. Event Sourcing kết hợp CQRS"
+direction: right
+write: "Khách đặt hàng — Write"
+store: "Event Store — append only\nOrderCreated O-123\nPaymentReceived O-123\nItemShipped O-123"
+project: "Projection"
+db: "Read DB — orders_view\nO-123 • SHIPPED • total 999 • Hiep"
+read: "Khách xem đơn hàng — Query bảng tính sẵn"
+write -> store
+store -> project: "Mỗi event mới"
+project -> db
+read -> db
 ```
-Giải pháp: Event Sourcing + CQRS
-─────────────────────────────────
 
-  WRITE (Event Sourcing)              READ (CQRS)
-  ──────────────────────              ────────────
-
-  Khách đặt hàng                      Khách xem đơn hàng
-       │                                    │
-       ▼                                    ▼
-  ┌──────────────┐                   ┌──────────────┐
-  │ Ghi EVENT    │                   │ Query bảng   │
-  │ vào Event    │                   │ orders_view  │
-  │ Store        │                   │ (đã tính sẵn)│
-  └──────┬───────┘                   └──────────────┘
-         │                                  ▲
-         │ Mỗi khi có event mới             │
-         │ → tự động cập nhật          ┌────┘
-         │                             │
-         ▼                             │
-  ┌──────────────┐               ┌─────┴────────┐
-  │ Event Store  │──── sync ───▶ │  Read DB     │
-  │ (events)     │   (Projection)│ (bảng thường)│
-  └──────────────┘               └──────────────┘
-
-  Event Store (chỉ INSERT events):
-  ┌─────┬────────────────┬────────────┐
-  │ 1   │ OrderCreated   │ {O-123...} │
-  │ 2   │ PaymentReceived│ {O-123...} │
-  │ 3   │ ItemShipped    │ {O-123...} │
-  └─────┴────────────────┴────────────┘
-
-  Read DB (cập nhật tự động từ events):
-  ┌──────────┬───────────┬───────┬──────────┐
-  │ order_id │ status    │ total │ customer │
-  │──────────│───────────│───────│──────────│
-  │ O-123    │ SHIPPED   │ 999   │ Hiep     │
-  └──────────┴───────────┴───────┴──────────┘
-
-  → Write: ghi events (source of truth, audit trail đầy đủ)
-  → Read: query bảng thường (nhanh, đã denormalize sẵn)
-  → Cả 2 bên đều được tối ưu cho use case của mình ✅
-```
+Events là source of truth/audit trail; read DB denormalized được cập nhật từ events để tối ưu truy vấn.
 
 ```
 "Projection" là gì?
@@ -1500,113 +1276,40 @@ Giải pháp: Event Sourcing + CQRS
 
 Projection thực chất là 1 **consumer** (chương trình chạy nền) lắng nghe events từ Event Store. Mỗi khi có event mới, nó đọc event đó và cập nhật Read DB tương ứng.
 
-```
-Projection — Flow chi tiết:
-───────────────────────────
-
-  ┌──────────────┐     ┌────────────────┐     ┌──────────────┐
-  │ Event Store  │────▶│  Projection    │────▶│  Read DB     │
-  │              │     │  (Consumer)    │     │              │
-  │ events table │     │                │     │ orders_view  │
-  │              │     │ Lắng nghe event│     │ products_view│
-  │              │     │ → xử lý        │     │ dashboard    │
-  │              │     │ → ghi Read DB  │     │              │
-  └──────────────┘     └────────────────┘     └──────────────┘
-
-  Có 2 cách Projection nhận events:
-
-  Cách 1: POLLING (kéo)
-  ─────────────────────
-    Projection chạy loop, mỗi 100ms hỏi:
-    "Có event mới nào sau event #5 không?"
-    → SELECT * FROM events WHERE sequence > 5 ORDER BY sequence
-
-    ✅ Đơn giản, dễ implement
-    ❌ Có độ trễ (100ms polling interval)
-    ❌ Query DB liên tục → tốn resource
-
-  Cách 2: SUBSCRIPTION / STREAMING (đẩy)
-  ───────────────────────────────────────
-    Event Store tự đẩy event mới cho Projection.
-    Thường dùng:
-    • Kafka Consumer — subscribe topic, nhận event real-time
-    • EventStoreDB Subscription — built-in subscription
-    • PostgreSQL LISTEN/NOTIFY — DB tự thông báo khi có row mới
-    • CDC (Debezium) — capture INSERT từ events table → đẩy vào Kafka
-
-    ✅ Gần real-time (ms)
-    ✅ Không cần polling
-    ❌ Cần thêm infrastructure (Kafka, Debezium...)
+```d2 title="Projection hoạt động thế nào?"
+direction: right
+store: "Event Store — events table"
+projection: "Projection Consumer\nNhận event → xử lý → ghi read DB"
+read: "Read DB\norders_view / products_view / dashboard"
+poll: "Polling — ví dụ mỗi 100ms\nSELECT events WHERE sequence > 5 ORDER BY sequence"
+stream: "Subscription / Streaming\nKafka • EventStoreDB • Debezium CDC"
+store -> poll
+store -> stream
+poll -> projection
+stream -> projection
+projection -> read
 ```
 
+Polling đơn giản nhưng thêm latency/query load. Streaming cần infrastructure và checkpoint/replay để reliable. PostgreSQL LISTEN/NOTIFY có thể đánh thức consumer, nhưng không thay thế durable event log hay tự phát thông báo mỗi INSERT nếu chưa cấu hình.
+
+```d2 title="Projection hoạt động thế nào?"
+direction: down
+store: "Cùng một Event Store\n1 OrderCreated O-123 Hiep iPhone total999\n2 PaymentReceived O-123 VISA\n3 ItemShipped O-123 tracking VN123\n4 OrderCreated O-456 Lan AirPods total199\n5 PaymentReceived O-456 MoMo"
+p1: "Projection 1 — Orders View"
+p2: "Projection 2 — Dashboard"
+p3: "Projection 3 — Search"
+orders: "orders_view PostgreSQL / MySQL\nO-123 Hiep SHIPPED 999 VN123\nO-456 Lan PAID 199 null"
+stats: "daily_stats PostgreSQL\n2025-02-24 • orders 2\nrevenue 1198 • top_product iPhone"
+search: "Elasticsearch index\nO-123 • Hiep • iPhone • SHIPPED • VN123"
+store -> p1
+store -> p2
+store -> p3
+p1 -> orders
+p2 -> stats
+p3 -> search
 ```
-Projection — Ví dụ thực tế E-Commerce:
-──────────────────────────────────────
 
-  Từ CÙNG 1 stream events, có thể tạo NHIỀU Read DB khác nhau
-  cho nhiều mục đích khác nhau:
-
-  Event Store (source of truth):
-  ┌─────┬──────────────────┬─────────────────────────────────┐
-  │ #   │ event_type       │ data                            │
-  │─────│──────────────────│─────────────────────────────────│
-  │ 1   │ OrderCreated     │ {O-123, customer:"Hiep",        │
-  │     │                  │  items:["iPhone"], total:999}    │
-  │ 2   │ PaymentReceived  │ {O-123, method:"VISA"}          │
-  │ 3   │ ItemShipped      │ {O-123, tracking:"VN123"}       │
-  │ 4   │ OrderCreated     │ {O-456, customer:"Lan",         │
-  │     │                  │  items:["AirPods"], total:199}   │
-  │ 5   │ PaymentReceived  │ {O-456, method:"MoMo"}          │
-  └─────┴──────────────────┴─────────────────────────────────┘
-                    │
-        ┌───────────┼───────────┐
-        ▼           ▼           ▼
-  Projection 1  Projection 2  Projection 3
-
-
-  📋 Projection 1: "Orders View" — Cho trang quản lý đơn hàng
-  ─────────────────────────────────────────────────────────────
-  Read DB: bảng orders_view (PostgreSQL / MySQL)
-  ┌──────────┬──────────┬───────────┬───────┬──────────┐
-  │ order_id │ customer │ status    │ total │ tracking │
-  │──────────│──────────│───────────│───────│──────────│
-  │ O-123    │ Hiep     │ SHIPPED   │ 999   │ VN123    │
-  │ O-456    │ Lan      │ PAID      │ 199   │ null     │
-  └──────────┴──────────┴───────────┴───────┴──────────┘
-  → Admin query: SELECT * FROM orders_view WHERE status = 'SHIPPED'
-
-
-  📊 Projection 2: "Dashboard" — Cho trang thống kê
-  ──────────────────────────────────────────────────
-  Read DB: bảng daily_stats (PostgreSQL)
-  ┌────────────┬──────────────┬──────────────┬─────────────┐
-  │ date       │ total_orders │ total_revenue│ top_product │
-  │────────────│──────────────│──────────────│─────────────│
-  │ 2025-02-24 │ 2            │ 1198         │ iPhone      │
-  └────────────┴──────────────┴──────────────┴─────────────┘
-  → Dashboard query: SELECT * FROM daily_stats WHERE date = TODAY
-
-
-  🔍 Projection 3: "Search" — Cho trang tìm kiếm đơn hàng
-  ─────────────────────────────────────────────────────────
-  Read DB: Elasticsearch index
-  {
-    "order_id": "O-123",
-    "customer": "Hiep",
-    "items": ["iPhone"],
-    "status": "SHIPPED",
-    "tracking": "VN123"
-  }
-  → User search: GET /search?q=iPhone&status=SHIPPED
-
-
-  🔑 Điểm quan trọng:
-  ────────────────────
-  • 3 Projection đọc CÙNG events nhưng tạo ra 3 Read DB KHÁC NHAU
-  • Mỗi Read DB tối ưu cho 1 use case riêng
-  • Thêm use case mới? → Thêm Projection mới, KHÔNG cần sửa Write side
-  • Read DB hỏng? → Xoá đi, replay lại TẤT CẢ events → rebuild từ đầu ✅
-```
+Admin query `orders_view WHERE status=SHIPPED`; dashboard query `daily_stats` theo ngày; user search `q=iPhone&status=SHIPPED`. Mỗi projection tối ưu một use case. Có thể thêm read model không đổi write side và rebuild từ event history còn đầy đủ.
 
 ```
 Projection bị lỗi / mất data thì sao?
@@ -1768,108 +1471,61 @@ Ví dụ: Trang "Chi tiết đơn hàng"
 
 **CDC** = Bắt **mọi thay đổi** (INSERT, UPDATE, DELETE) từ database nguồn và stream đến consumer — thường qua **database log** (WAL/binlog).
 
+```d2 title="9.2. Change Data Capture (CDC)"
+direction: right
+product: "Product Service — INSERT / UPDATE / DELETE"
+db: "PostgreSQL — products\nGhi WAL"
+debezium: "Debezium Connector\nĐọc WAL / change log"
+kafka: "Kafka topic product.changes"
+order: "Order Service\nUpdate local copy"
+product -> db
+db -> debezium
+debezium -> kafka
+kafka -> order
 ```
-CDC với Debezium + Kafka:
-─────────────────────────
 
-  ┌──────────────┐     ┌──────────┐     ┌─────────┐     ┌──────────────┐
-  │ Product      │     │ Debezium │     │ Kafka   │     │ Order        │
-  │ Service      │     │ Connector│     │         │     │ Service      │
-  │              │     │          │     │         │     │              │
-  │ PostgreSQL   │────▶│ Đọc WAL  │────▶│ Topic:  │────▶│ Local copy   │
-  │ products     │     │ (change  │     │ product │     │ of product   │
-  │ table        │     │  log)    │     │ .changes│     │ data         │
-  └──────────────┘     └──────────┘     └─────────┘     └──────────────┘
-
-  Product Service INSERT/UPDATE/DELETE product
-  → PostgreSQL ghi WAL
-  → Debezium đọc WAL → publish change event vào Kafka
-  → Order Service consume → update local copy
-
-  Ưu điểm:
-  ✅ Product Service KHÔNG CẦN biết ai đang đọc data
-  ✅ Không cần sửa code Product Service (capture ở DB level)
-  ✅ Real-time (near real-time, thường < 1 giây)
-  ✅ Reliable — WAL-based, không mất event
-
-  Nhược điểm:
-  ❌ Schema coupling — consumer phải biết schema DB nguồn
-  ❌ Cần Kafka + Debezium infrastructure
-  ❌ Exposes internal DB structure → tight coupling nếu không cẩn thận
-```
+Producer không cần biết consumer hay sửa business code để CDC. Đổi lại cần vận hành Kafka/Debezium và cẩn thận schema coupling/lộ DB internals. Near-real-time và delivery phụ thuộc WAL retention, offsets, connector recovery và consumer idempotency; không phải bảo đảm tuyệt đối không mất event.
 
 ### 9.3. Event-Carried State Transfer
 
 Service publish **domain event** chứa đủ data — consumer lưu vào **local store** để query mà không cần gọi lại service gốc.
 
+```d2 title="9.3. Event-Carried State Transfer"
+direction: right
+product: "Product Service\nProductUpdated {productId:P-001, name:iPhone 15 Pro, price:999, category:phone}"
+order: "Order Service — consume"
+cache: "order_product_cache\nP-001 | iPhone 15 Pro | 999"
+query: "Order query local Product info"
+product -> order: "Integration event chứa đủ state"
+order -> cache
+query -> cache: "Không gọi Product lúc request"
 ```
-Event-Carried State Transfer:
-─────────────────────────────
 
-  Product Service publish event:
-  {
-    "type": "ProductUpdated",
-    "data": {
-      "productId": "P-001",
-      "name": "iPhone 15 Pro",
-      "price": 999,
-      "category": "phone"
-    }
-  }
-
-  Order Service nhận event:
-  → Lưu vào local table: order_product_cache
-  ┌───────────┬────────────────┬───────┐
-  │ productId │ name           │ price │
-  │───────────│────────────────│───────│
-  │ P-001     │ iPhone 15 Pro  │ 999   │
-  └───────────┴────────────────┴───────┘
-
-  Khi Order Service cần product info:
-  → Query local table → NHANH, không phụ thuộc Product Service
-
-  ✅ Zero runtime dependency — Product Service chết, Order vẫn có data
-  ✅ Cực nhanh — local query
-  ✅ Decoupled — chỉ subscribe event, không biết internal schema
-
-  ❌ Data có thể stale (eventual consistency)
-  ❌ Storage duplication — mỗi consumer lưu 1 bản copy
-  ❌ Phải design event chứa đủ data mà consumer cần
-```
+Không có synchronous runtime dependency cho dữ liệu đã cache; local query nhanh. Trade-off: stale data, storage duplication và cần contract chứa đủ fields cho consumers.
 
 ### 9.4. API Composition
 
 Service gọi **API** của service khác tại **runtime** để lấy data cần thiết.
 
+```d2 title="9.4. API Composition"
+direction: down
+client: "Client — GET /order-details/O-123"
+composer: "Order Service — API Composer"
+local: "Local DB — Order O-123"
+user: "User Service — GET /users/U-456"
+product: "Product Service — GET /products/P-001"
+join: "Combine responses\norderId O-123 • customer Hiep\nproduct iPhone 15 • total 999"
+client -> composer
+composer -> local
+composer -> user: "PAR"
+composer -> product: "PAR"
+local -> join
+user -> join
+product -> join
+join -> client
 ```
-API Composition:
-────────────────
 
-  Client: GET /order-details/O-123
-
-  Order Service (API Composer):
-  ┌──────────────────────────────────────────────┐
-  │  1. Query local DB: order O-123              │
-  │  2. Call User Service: GET /users/U-456      │ ── parallel
-  │  3. Call Product Service: GET /products/P-001│ ── parallel
-  │                                              │
-  │  4. Combine responses:                       │
-  │     {                                        │
-  │       "orderId": "O-123",                    │
-  │       "customer": { "name": "Hiep" },        │
-  │       "product": { "name": "iPhone 15" },    │
-  │       "total": 999                           │
-  │     }                                        │
-  └──────────────────────────────────────────────┘
-
-  ✅ Đơn giản — không cần event infrastructure
-  ✅ Data luôn mới nhất (real-time query)
-  ✅ Không duplicate storage
-
-  ❌ Runtime dependency — User Service chết → Order API cũng lỗi
-  ❌ Latency cao hơn — network call tại query time
-  ❌ Không scale tốt cho high-traffic read
-```
+Đơn giản, không cần event infrastructure hoặc duplicate stores; query lấy data tại request time nhưng không bảo đảm consistent snapshot xuyên services. Trade-off: runtime dependencies, network latency, khó scale high-traffic reads.
 
 ### 9.5. So sánh các cách tiếp cận
 
@@ -1992,76 +1648,45 @@ Khi nào CẦN Outbox Pattern?
 
 **Outbox Pattern** = Ghi event vào **bảng outbox trong cùng database** với business data — trong **cùng 1 local transaction**. Sau đó, một process riêng đọc outbox và publish event ra message broker.
 
+```d2 title="10.2. Outbox Pattern giải quyết thế nào?"
+direction: right
+order: "Order Service"
+tx: "Một DB transaction\nBEGIN → INSERT orders + outbox → COMMIT"
+outbox: "Outbox\nevt-1 OrderCreated O-123 published=false\nevt-2 OrderConfirmed O-124 published=true"
+worker: "Publisher — polling 100ms hoặc CDC\nSELECT unpublished"
+kafka: "Publish to Kafka"
+mark: "UPDATE published=true theo event id"
+order -> tx
+tx -> outbox: "Atomic — cùng commit/rollback"
+outbox -> worker
+worker -> kafka
+kafka -> mark: "Publish success"
+mark -> worker: "Lặp lại"
 ```
-Outbox Pattern:
-───────────────
 
-  ┌────────────────────────────────────────────────────┐
-  │  Order Service                                     │
-  │                                                    │
-  │  BEGIN TRANSACTION                                 │
-  │    INSERT INTO orders (id, ...) VALUES (...)       │
-  │    INSERT INTO outbox (id, event_type, payload)    │
-  │      VALUES ('evt-1', 'OrderCreated', '{...}')     │
-  │  COMMIT                                            │
-  │                                                    │
-  │  → Cùng 1 transaction = ATOMIC ✅                  │
-  │  → Order tạo thành công = Event trong outbox       │
-  │  → Order rollback = Event cũng rollback            │
-  └────────────────────────────────────────────────────┘
-
-  Outbox Table:
-  ┌──────────┬────────────────┬─────────────────────┬───────────┐
-  │ id       │ event_type     │ payload             │ published │
-  │──────────│────────────────│─────────────────────│───────────│
-  │ evt-1    │ OrderCreated   │ {"orderId":"O-123"} │ false     │
-  │ evt-2    │ OrderConfirmed │ {"orderId":"O-124"} │ true      │
-  └──────────┴────────────────┴─────────────────────┴───────────┘
-
-  Outbox Publisher (separate process / polling):
-  ┌──────────────────────────────────────────────────────────────┐
-  │  1. SELECT * FROM outbox WHERE published = false             │
-  │  2. Publish to Kafka                                         │
-  │  3. UPDATE outbox SET published = true WHERE id = 'evt-1'    │
-  │                                                              │
-  │  (Polling mỗi 100ms hoặc dùng CDC để detect new outbox rows) │
-  └──────────────────────────────────────────────────────────────┘
-```
+Business row và outbox row atomic; publish + mark không atomic xuyên DB/broker nên có thể redeliver, consumer phải idempotent.
 
 ### 10.3. Outbox + CDC — Giải pháp hoàn chỉnh
 
 Thay vì polling outbox table, dùng **CDC** (Debezium) để capture INSERT vào outbox table → publish event ngay lập tức:
 
+```d2 title="10.3. Outbox + CDC — Giải pháp hoàn chỉnh"
+direction: right
+order: Order Service {
+ tx: Một local transaction {
+  orders: orders table {shape: cylinder}
+  outbox: outbox table {shape: cylinder}
+ }
+}
+debezium: Debezium — capture outbox INSERT từ WAL
+kafka: Kafka topic order.events
+inventory: Inventory — consume / trừ tồn kho
+cleanup: Optional cleanup outbox sau publish / retention policy
+order.tx.outbox -> debezium -> kafka -> inventory
+order.tx.outbox -> cleanup
 ```
-Outbox + CDC (Debezium):
-────────────────────────
 
-  ┌──────────────┐     ┌──────────┐     ┌─────────┐     ┌──────────────┐
-  │ Order        │     │ Debezium │     │ Kafka   │     │ Inventory    │
-  │ Service      │     │          │     │         │     │ Service      │
-  │              │     │          │     │         │     │              │
-  │ ┌──────────┐ │     │ Capture  │     │ Topic:  │     │ Consumer     │
-  │ │ orders   │ │     │ changes  │     │ order   │     │              │
-  │ │ table    │ │     │ from     │────▶│ .events │────▶│ Process      │
-  │ ├──────────┤ │     │ outbox   │     │         │     │ event        │
-  │ │ outbox   │ │────▶│ table    │     │         │     │              │
-  │ │ table    │ │ WAL │ WAL      │     │         │     │              │
-  │ └──────────┘ │     └──────────┘     └─────────┘     └──────────────┘
-  └──────────────┘
-
-  Ưu điểm so với Polling:
-  ✅ Near real-time (ms thay vì polling interval)
-  ✅ Không cần polling loop → tiết kiệm DB query
-  ✅ Guaranteed delivery — WAL-based
-  ✅ Outbox table có thể cleanup sau khi published
-
-  Flow đầy đủ:
-  1. Order Service: BEGIN → INSERT order + INSERT outbox → COMMIT
-  2. Debezium: Detect INSERT trong outbox (qua WAL)
-  3. Debezium: Publish event vào Kafka topic
-  4. Inventory Service: Consume event → trừ tồn kho
-  5. (Optional) Cleanup: DELETE FROM outbox WHERE published
-```
+Tránh polling loop/DB scans, có thể giảm latency. Độ tin cậy dựa trên WAL retention, connector offsets/recovery và delivery semantics; không gọi đây là exactly-once hay guaranteed delivery vô điều kiện. Cleanup chỉ sau khi đủ điều kiện recovery/retention.
 
 ---
 

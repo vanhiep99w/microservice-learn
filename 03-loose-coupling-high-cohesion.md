@@ -43,26 +43,14 @@ Nếu **Bounded Context** ([xem doc 02](02-single-responsibility-bounded-context
 - Service có **thực sự độc lập** không? → Loose Coupling
 - Service có **tập trung đúng việc** không? → High Cohesion
 
+```d2 title="1. Giới thiệu"
+direction: right
+a: Service A { a: a; b: b; c: c; a -- c: Tight; b -- c: Tight }
+b: Service B { d: d; e: e; f: f; d -- f: Tight; e -- f: Tight }
+a -> b: Loose {style.stroke-dash: 5}
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    THIẾT KẾ MICROSERVICE TỐT                    │
-│                                                                 │
-│  ┌─────────────────┐          ┌─────────────────┐               │
-│  │   Service A     │          │   Service B     │               │
-│  │  ┌───┐ ┌───┐    │  ─ ─ ─▶  │  ┌───┐ ┌───┐    │               │
-│  │  │ a │ │ b │    │ (loose)  │  │ d │ │ e │    │               │
-│  │  └─┬─┘ └─┬─┘    │          │  └─┬─┘ └─┬─┘    │               │
-│  │    └──┬──┘      │          │    └──┬──┘      │               │
-│  │       │(tight)  │          │       │(tight)  │               │
-│  │    ┌──┴──┐      │          │    ┌──┴──┐      │               │
-│  │    │  c  │      │          │    │  f  │      │               │
-│  │    └─────┘      │          │    └─────┘      │               │
-│  └─────────────────┘          └─────────────────┘               │
-│                                                                 │
-│  Bên trong: High Cohesion (gắn kết chặt)                        │
-│  Bên ngoài: Loose Coupling (liên kết lỏng)                      │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Bên trong service: High Cohesion; giữa các service: Loose Coupling.
 
 ---
 
@@ -142,24 +130,22 @@ Khi Inventory Service đổi schema (ví dụ rename `stock` → `quantity`), Or
 
 Service A **yêu cầu** Service B phải **đang hoạt động** tại thời điểm gọi.
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Payment Service
-    participant I as Inventory Service
-
-    Note over O,I: Temporal Coupling ❌
-    O->>P: POST /payments (sync)
-    P-->>O: 200 OK
-    O->>I: PUT /inventory/reserve (sync)
-    Note over I: ⚡ Service bị down!
-    I-->>O: 503 Service Unavailable
-    Note over O: ❌ Toàn bộ order thất bại!
-
-    Note over O,I: Giải pháp ✅
-    O->>O: Publish event: OrderCreated
-    Note over P: Consume async
-    Note over I: Consume async (khi phục hồi)
+```d2 title="2.3.2. Temporal Coupling (🟠 Nguy hiểm)"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Payment Service"
+"I": "Inventory Service"
+"O".note1: "[Order Service — Inventory Service]\nTemporal Coupling ❌"
+"O" -> "P": "POST /payments (sync)"
+"P" -> "O": "200 OK" { style.stroke-dash: 5 }
+"O" -> "I": "PUT /inventory/reserve (sync)"
+"I".note2: "⚡ Service bị down!"
+"I" -> "O": "503 Service Unavailable" { style.stroke-dash: 5 }
+"O".note3: "❌ Toàn bộ order thất bại!"
+"O".note4: "[Order Service — Inventory Service]\nGiải pháp ✅"
+"O" -> "O": "Publish event: OrderCreated"
+"P".note5: "Consume async"
+"I".note6: "Consume async (khi phục hồi)"
 ```
 
 #### 2.3.3. Deployment Coupling (🟠 Nguy hiểm)
@@ -331,60 +317,47 @@ n2.n12 -> n2.n8: "chỉ dùng"
 
 **Tight Coupling ❌**:
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant O as Order Service
-    participant P as Payment Service
-    participant I as Inventory Service
-    participant N as Notification Service
-
-    C->>O: Tạo đơn hàng
-    O->>P: POST /payments/charge (sync)
-    Note over O,P: Order Service chờ Payment
-    P-->>O: Payment OK
-    O->>I: PUT /inventory/reserve (sync)
-    Note over O,I: Order Service chờ Inventory
-    I-->>O: Reserved OK
-    O->>N: POST /notifications/send (sync)
-    Note over O,N: Order Service chờ Notification
-    N-->>O: Sent OK
-    O-->>C: Đơn hàng thành công
-
-    Note over O: ❌ Vấn đề:<br/>1. Nếu 1 service chết → tất cả fail<br/>2. Latency = sum(P + I + N)<br/>3. Order Service biết tất cả downstream services<br/>4. Thêm service mới = sửa Order Service
+```d2 title="Bài toán: Xử lý đơn hàng trong E-Commerce"
+shape: sequence_diagram
+"C": "Client"
+"O": "Order Service"
+"P": "Payment Service"
+"I": "Inventory Service"
+"N": "Notification Service"
+"C" -> "O": "Tạo đơn hàng"
+"O" -> "P": "POST /payments/charge (sync)"
+"O".note1: "[Order Service — Payment Service]\nOrder Service chờ Payment"
+"P" -> "O": "Payment OK" { style.stroke-dash: 5 }
+"O" -> "I": "PUT /inventory/reserve (sync)"
+"O".note2: "[Order Service — Inventory Service]\nOrder Service chờ Inventory"
+"I" -> "O": "Reserved OK" { style.stroke-dash: 5 }
+"O" -> "N": "POST /notifications/send (sync)"
+"O".note3: "[Order Service — Notification Service]\nOrder Service chờ Notification"
+"N" -> "O": "Sent OK" { style.stroke-dash: 5 }
+"O" -> "C": "Đơn hàng thành công" { style.stroke-dash: 5 }
+"O".note4: "❌ Vấn đề:\n1. Nếu 1 service chết → tất cả fail\n2. Latency = sum(P + I + N)\n3. Order Service biết tất cả downstream services\n4. Thêm service mới = sửa Order Service"
 ```
 
 **Loose Coupling ✅**:
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant O as Order Service
-    participant EB as Event Bus (Kafka)
-    participant P as Payment Service
-    participant I as Inventory Service
-    participant N as Notification Service
-
-    C->>O: Tạo đơn hàng
-    O->>O: Lưu đơn hàng vào DB (status: PENDING)
-    O->>EB: Publish: OrderCreated
-    O-->>C: Accepted (202)
-
-    par Xử lý song song
-        EB->>P: Consume: OrderCreated
-        P->>P: Xử lý thanh toán
-        P->>EB: Publish: PaymentCompleted
-    and
-        EB->>I: Consume: OrderCreated
-        I->>I: Reserve hàng
-        I->>EB: Publish: InventoryReserved
-    and
-        EB->>N: Consume: OrderCreated
-        N->>N: Gửi email xác nhận
-    end
-
-    Note over O: ✅ Ưu điểm:<br/>1. Fault isolation<br/>2. Xử lý song song → nhanh hơn<br/>3. Order Service không biết ai consume<br/>4. Thêm service mới = thêm consumer
+```d2 title="Bài toán: Xử lý đơn hàng trong E-Commerce"
+direction: right
+client: "Client — tạo đơn hàng"
+order: "Order Service\nLưu DB: PENDING"
+bus: "Event Bus — Kafka\nPublish OrderCreated"
+accepted: "Client nhận 202 Accepted"
+payment: "Payment consumer\nXử lý thanh toán\nPublish PaymentCompleted"
+inventory: "Inventory consumer\nReserve hàng\nPublish InventoryReserved"
+notification: "Notification consumer\nGửi email xác nhận"
+client -> order
+order -> bus
+order -> accepted
+bus -> payment: "PAR — độc lập"
+bus -> inventory: "PAR — độc lập"
+bus -> notification: "PAR — độc lập"
 ```
+
+Các consumer chạy song song; không có thứ tự bắt buộc giữa Payment, Inventory và Notification. Fault isolation, không cần chờ tất cả consumer để trả `202`; thêm consumer không phải sửa Order Service.
 
 ---
 
@@ -394,36 +367,13 @@ sequenceDiagram
 
 **High Cohesion** (tính gắn kết cao) nghĩa là mọi thành phần bên trong một service đều **liên quan chặt chẽ** đến nhau và cùng phục vụ **một mục đích duy nhất**. Nói cách khác: mọi thứ thay đổi cùng nhau thì **nên ở cùng nhau**.
 
+```d2 title="3.1. High Cohesion là gì?"
+direction: right
+high: "High Cohesion — Payment Service" { model: "processPayment() • refundPayment()\ngetPaymentHistory() • validateCard()\ncalculateFees() • generateReceipt()" }
+low: "Low Cohesion — Utility Service" { model: "processPayment() — Thanh toán\nsendEmail() — Email\nresizeImage() — Xử lý ảnh\ngenerateReport() — Báo cáo\nvalidateAddress() — Địa lý\nconvertCurrency() — Tài chính" }
 ```
-High Cohesion ✅:
-┌─────────────────────────────┐
-│      Payment Service        │
-│  ┌───────────────────────┐  │
-│  │ processPayment()      │  │
-│  │ refundPayment()       │  │
-│  │ getPaymentHistory()   │  │
-│  │ validateCard()        │  │
-│  │ calculateFees()       │  │
-│  │ generateReceipt()     │  │
-│  └───────────────────────┘  │
-│  → Tất cả đều liên quan     │
-│    đến "thanh toán"         │
-└─────────────────────────────┘
 
-Low Cohesion ❌:
-┌─────────────────────────────┐
-│      "Utility" Service      │
-│  ┌───────────────────────┐  │
-│  │ processPayment()      │  │ ← Thanh toán
-│  │ sendEmail()           │  │ ← Email
-│  │ resizeImage()         │  │ ← Xử lý ảnh
-│  │ generateReport()      │  │ ← Báo cáo
-│  │ validateAddress()     │  │ ← Địa lý
-│  │ convertCurrency()     │  │ ← Tài chính
-│  └───────────────────────┘  │
-│  → Không liên quan gì nhau! │
-└─────────────────────────────┘
-```
+Payment gom chức năng liên quan tới thanh toán; Utility gom các lý do thay đổi không liên quan.
 
 ### 3.2. Các mức độ Cohesion
 
@@ -478,21 +428,17 @@ Một service chỉ nên có **1 lý do để thay đổi**.
 
 Service sở hữu **tất cả data** liên quan đến domain của nó, và **chỉ** data đó.
 
-```
-┌─────────────────────────────────────────────────────┐
-│             Product Service                         │
-│                                                     │
-│  Owns:                                              │
-│  ├── products table (name, description, SKU)        │
-│  ├── categories table (name, hierarchy)             │
-│  ├── product_images table (url, alt_text)           │
-│  └── product_attributes table (color, size, etc.)   │
-│                                                     │
-│  Does NOT own:                                      │
-│  ├── ❌ product_reviews → Review Service            │
-│  ├── ❌ product_pricing → Pricing Service           │
-│  └── ❌ product_inventory → Inventory Service       │
-└─────────────────────────────────────────────────────┘
+```d2 title="3.3.3. Cohesive Data Ownership"
+direction: right
+product: Product Service owns {
+ products: "products\nname • description • SKU"
+ categories: "categories\nname • hierarchy"
+ images: "product_images\nurl • alt_text"
+ attributes: "product_attributes\ncolor • size • etc."
+}
+review: Review Service owns product_reviews
+pricing: Pricing Service owns product_pricing
+inventory: Inventory Service owns product_inventory
 ```
 
 #### 3.3.4. "Change Together" Heuristic
@@ -518,76 +464,30 @@ Ví dụ: Khi thay đổi business rule về "discount":
 
 **Low Cohesion ❌ — "Super User Service"**:
 
+```d2 title="Bài toán: Hệ thống quản lý người dùng"
+direction: right
+user: User Service — Monolithic {
+ profile: "User Management\ncreateUser() • updateProfile() • deleteUser()"
+ auth: "Authentication\nlogin() • logout() • refreshToken() • manageMFA()"
+ authz: "Authorization\ncheckPermission() • assignRole() • managePolicies()"
+ notification: "Notification\nsendWelcomeEmail() • sendPasswordReset() • sendLoginAlert()"
+ analytics: "Analytics\ntrackLogin() • generateUserReport() • calculateDAU()"
+}
 ```
-┌─────────────────────────────────────────┐
-│           User Service (Monolithic)     │
-│                                         │
-│  👤 User Management                     │
-│  ├── createUser()                       │
-│  ├── updateProfile()                    │
-│  └── deleteUser()                       │
-│                                         │
-│  🔐 Authentication                      │
-│  ├── login()                            │
-│  ├── logout()                           │
-│  ├── refreshToken()                     │
-│  └── manageMFA()                        │
-│                                         │
-│  🔑 Authorization                       │
-│  ├── checkPermission()                  │
-│  ├── assignRole()                       │
-│  └── managePolicies()                   │
-│                                         │
-│  📧 Notification                        │
-│  ├── sendWelcomeEmail()                 │
-│  ├── sendPasswordReset()                │
-│  └── sendLoginAlert()                   │
-│                                         │
-│  📊 Analytics                           │
-│  ├── trackLogin()                       │
-│  ├── generateUserReport()               │
-│  └── calculateDAU()                     │
-│                                         │
-│  ❌ Vấn đề:                             │
-│  • 5 lý do thay đổi khác nhau           │
-│  • Team quá lớn, khó phối hợp           │
-│  • Deploy rủi ro (thay đổi nhỏ ảnh      │
-│    hưởng toàn bộ)                       │
-│  • Scale toàn bộ khi chỉ cần scale      │
-│    authentication                       │
-└─────────────────────────────────────────┘
-```
+
+Năm lý do thay đổi khác nhau tạo team lớn khó phối hợp, deploy rủi ro, và phải scale toàn bộ khi chỉ authentication cần thêm capacity.
 
 **High Cohesion ✅ — Tách đúng domain**:
 
+```d2 title="Bài toán: Hệ thống quản lý người dùng"
+direction: right
+profile: "Profile Service — User profile đổi" { model: "createUser() • updateProfile()\ndeleteUser() • getProfile()" }
+auth: "Auth Service — Auth logic đổi" { model: "login() • logout() • refreshToken()\nmanageMFA() • validateToken()" }
+authz: "AuthZ Service — Permission rules đổi" { model: "checkPermission() • assignRole()\nmanagePolicies() • evaluateAccess()" }
+notification: "Notification Service — Notification logic đổi" { model: "sendEmail() • sendSMS()\nsendPush() • manageTemplates()" }
 ```
-┌──────────────────┐  ┌──────────────────┐
-│  Profile Service │  │   Auth Service   │
-│  ──────────────  │  │  ──────────────  │
-│  createUser()    │  │  login()         │
-│  updateProfile() │  │  logout()        │
-│  deleteUser()    │  │  refreshToken()  │
-│  getProfile()    │  │  manageMFA()     │
-│                  │  │  validateToken() │
-│  → 1 lý do:      │  │                  │
-│    User profile  │  │  → 1 lý do:      │
-│    thay đổi      │  │    Auth logic    │
-└──────────────────┘  │    thay đổi      │
-                      └──────────────────┘
 
-┌───────────────────┐  ┌───────────────────┐
-│   AuthZ Service   │  │Notification Svc   │
-│  ──────────────   │  │  ──────────────   │
-│  checkPermission()│  │  sendEmail()      │
-│  assignRole()     │  │  sendSMS()        │
-│  managePolicies() │  │  sendPush()       │
-│  evaluateAccess() │  │  manageTemplates()│
-│                   │  │                   │
-│  → 1 lý do:       │  │  → 1 lý do:       │
-│    Permission     │  │    Notification   │
-│    rules thay đổi │  │    logic thay đổi │
-└───────────────────┘  └───────────────────┘
-```
+Mỗi service gom một nhóm trách nhiệm cùng lý do thay đổi.
 
 ---
 
@@ -694,24 +594,22 @@ Triệu chứng: deploy một service phải deploy service khác; đổi một 
 
 **Đặc điểm**: Service A phải gọi Service B **quá nhiều lần** để hoàn thành 1 tác vụ, tạo ra **network overhead** lớn.
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Product Service
-
-    Note over O,P: Chatty ❌ (N+1 calls)
-    O->>P: GET /products/1
-    P-->>O: Product 1
-    O->>P: GET /products/2
-    P-->>O: Product 2
-    O->>P: GET /products/3
-    P-->>O: Product 3
-    Note over O: N sản phẩm = N calls! 🐌
-
-    Note over O,P: Batch ✅ (1 call)
-    O->>P: POST /products/batch {"ids": [1,2,3]}
-    P-->>O: [Product 1, Product 2, Product 3]
-    Note over O: 1 call cho N sản phẩm! 🚀
+```d2 title="5.2. Chatty Services"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Product Service"
+"O".note1: "[Order Service — Product Service]\nChatty ❌ (N+1 calls)"
+"O" -> "P": "GET /products/1"
+"P" -> "O": "Product 1" { style.stroke-dash: 5 }
+"O" -> "P": "GET /products/2"
+"P" -> "O": "Product 2" { style.stroke-dash: 5 }
+"O" -> "P": "GET /products/3"
+"P" -> "O": "Product 3" { style.stroke-dash: 5 }
+"O".note2: "N sản phẩm = N calls! 🐌"
+"O".note3: "[Order Service — Product Service]\nBatch ✅ (1 call)"
+"O" -> "P": "POST /products/batch {\"ids\": [1,2,3]}"
+"P" -> "O": "[Product 1, Product 2, Product 3]" { style.stroke-dash: 5 }
+"O".note4: "1 call cho N sản phẩm! 🚀"
 ```
 
 **Cách fix**:
@@ -724,76 +622,53 @@ sequenceDiagram
 
 **Đặc điểm**: Nhiều service **đọc/ghi cùng 1 database**, phá vỡ encapsulation.
 
+```d2 title="5.3. Shared Database"
+direction: down
+shared: Shared Database {
+ order: Order Service
+ payment: Payment Service
+ shipping: Shipping Service
+ db: "orders table\nCRUD orders • payment_status • ship_status" {shape: cylinder}
+ order -> db: CRUD
+ payment -> db: Update payment_status
+ shipping -> db: Update ship_status
+}
+owned: Database per Service {
+ order: Order Service
+ payment: Payment Service
+ shipping: Shipping Service
+ od: Order DB {shape: cylinder}
+ pd: Payment DB {shape: cylinder}
+ sd: Shipping DB {shape: cylinder}
+ order -> od
+ payment -> pd
+ shipping -> sd
+}
 ```
-❌ Shared Database:
-┌────────────┐  ┌────────────┐  ┌────────────┐
-│  Order     │  │  Payment   │  │  Shipping  │
-│  Service   │  │  Service   │  │  Service   │
-└─────┬──────┘  └─────┬──────┘  └─────┬──────┘
-      │               │               │
-      ▼               ▼               ▼
-┌───────────────────────────────────────────┐
-│              SHARED DATABASE              │
-│                                           │
-│  orders table ← 3 service đều đọc/ghi!    │
-│  • Order Service: CRUD orders             │
-│  • Payment Service: update payment_status │
-│  • Shipping Service: update ship_status   │
-│                                           │
-│  Vấn đề:                                  │
-│  • Ai thay đổi schema? Ảnh hưởng ai?      │
-│  • Ai lock row? Ai bị block?              │
-│  • Performance bottleneck tại DB          │
-└───────────────────────────────────────────┘
 
-✅ Database per Service:
-┌────────────┐  ┌────────────┐  ┌────────────┐
-│  Order     │  │  Payment   │  │  Shipping  │
-│  Service   │  │  Service   │  │  Service   │
-└─────┬──────┘  └─────┬──────┘  └─────┬──────┘
-      │               │               │
-  ┌───▼───┐       ┌───▼───┐       ┌───▼───┐
-  │Order  │       │Payment│       │Ship   │
-  │  DB   │       │  DB   │       │  DB   │
-  └───────┘       └───────┘       └───────┘
-
-  Giao tiếp qua API / Events, không đọc DB nhau
-```
+Shared table gây xung đột schema ownership, row locks và DB bottleneck. Database per Service giao tiếp qua API/events, không đọc database của nhau.
 
 ### 5.4. God Service
 
 **Đặc điểm**: Một service **biết quá nhiều**, **làm quá nhiều**, trở thành **điểm tắc nghẽn** cho toàn bộ hệ thống.
 
+```d2 title="5.4. God Service"
+direction: down
+bad: "God Service — Order" {
+ responsibilities: "Order • Validate sản phẩm • Giá / discount\nPayment • Inventory reserve\nPhí ship • Email • Report\nRefund • Delivery tracking"
+}
+good: Tách business capability {
+ order: Order — Tạo / quản lý đơn
+ pricing: Pricing — Giá / discount
+ payment: Payment — Thanh toán
+ inventory: Inventory — Kho
+ shipping: Shipping — Phí / tracking
+ notification: Notification — Email / SMS
+ reporting: Reporting — Báo cáo
+}
 ```
-❌ God Service:
-┌─────────────────────────────────────────────┐
-│              ORDER SERVICE                  │
-│                                             │
-│  • Tạo đơn hàng                             │
-│  • Validate sản phẩm                        │
-│  • Tính giá & discount                      │
-│  • Xử lý thanh toán                         │
-│  • Kiểm tra & reserve inventory             │
-│  • Tính phí ship                            │
-│  • Gửi email                                │
-│  • Tạo report                               │
-│  • Quản lý refund                           │
-│  • Track delivery                           │
-│                                             │
-│  → 10 lý do thay đổi                        │
-│  → 8 team phải coordinate                   │
-│  → Deploy 1 lần / tháng vì sợ               │
-└─────────────────────────────────────────────┘
 
-✅ Tách ra:
-Order Service → chỉ tạo/quản lý đơn hàng
-Pricing Service → tính giá, discount
-Payment Service → xử lý thanh toán
-Inventory Service → quản lý kho
-Shipping Service → tính phí, track ship
-Notification Service → gửi email/SMS
-Reporting Service → tạo report
-```
+God Service trong ví dụ có 10 lý do thay đổi, 8 team phải coordinate, chỉ dám deploy một lần/tháng. Tách boundary nhằm giảm coordination, không phải số lượng service càng nhiều càng tốt.
 
 ---
 
@@ -863,34 +738,31 @@ $ git log --name-only --pretty=format: | sort | uniq -c | sort -rn
 
 **Bài toán**: Xây dựng hệ thống e-commerce từ monolith sang microservice.
 
+```d2 title="7.1. E-Commerce Platform"
+direction: right
+catalog: "Catalog\nProducts • Search • Category"
+order: "Order\nOrders • Cart • Pricing"
+payment: "Payment\nPayments • Refunds • Billing"
+shipping: "Shipping\nShipments • Tracking • Rates"
+notification: Notification
+es: Elasticsearch {shape: cylinder}
+od: PostgreSQL — Order {shape: cylinder}
+pd: PostgreSQL — Payment {shape: cylinder}
+sd: MongoDB — Shipping {shape: cylinder}
+catalog -> es
+order -> od
+payment -> pd
+shipping -> sd
+catalog -> order: ProductUpdated — cache price
+order -> payment: OrderCreated
+order -> shipping: OrderCreated
+order -> notification: OrderCreated
+payment -> order: PaymentCompleted — update status
+shipping -> order: ShipmentDelivered
+shipping -> notification: ShipmentDelivered
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    E-COMMERCE PLATFORM                       │
-│                                                              │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐      │
-│  │ Catalog  │  │  Order   │  │ Payment  │  │ Shipping │      │
-│  │ Service  │  │ Service  │  │ Service  │  │ Service  │      │
-│  │          │  │          │  │          │  │          │      │
-│  │ products │  │  orders  │  │ payments │  │ shipments│      │
-│  │ search   │  │  cart    │  │ refunds  │  │ tracking │      │
-│  │ category │  │  pricing │  │ billing  │  │ rates    │      │
-│  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘      │
-│       │             │             │             │            │
-│  ┌────▼─────┐  ┌────▼─────┐  ┌────▼─────┐  ┌────▼─────┐      │
-│  │Elastic   │  │PostgreSQL│  │PostgreSQL│  │ MongoDB  │      │
-│  │Search    │  │          │  │          │  │          │      │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘      │
-│                                                              │
-│  Coupling: Loose (event-driven qua Kafka)                    │
-│  Cohesion: High (mỗi service = 1 bounded context)            │
-└──────────────────────────────────────────────────────────────┘
 
-Event Flow:
-  Catalog → ProductUpdated → Order (update cached price)
-  Order → OrderCreated → Payment, Shipping, Notification
-  Payment → PaymentCompleted → Order (update status)
-  Shipping → ShipmentDelivered → Order, Notification
-```
+Event-driven communication qua Kafka giúp loose coupling; mỗi service gom một Bounded Context để high cohesion. Elasticsearch ở hình là store cho search/catalog trong ví dụ; nếu cần transactional source of truth, dùng primary DB phù hợp thay vì mặc định xem search index là dữ liệu gốc.
 
 **Phân tích Coupling**:
 

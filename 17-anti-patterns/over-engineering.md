@@ -171,20 +171,19 @@ Over-engineering vì thế không chỉ là vấn đề thẩm mỹ của sơ đ
 
 **Ví dụ giả định:** một sản phẩm mới do một team nhỏ phát triển. Team tách `Email Validation`, `Email Formatting`, `Email Sending` và `Email Logging` thành bốn service. Team cũng thêm Kafka, service mesh và nhiều database trước khi có dữ liệu chứng minh cần scale hoặc isolation riêng.
 
-```text
-❌ Nhiều boundary kỹ thuật cho một capability chưa cần phân tán
-
-  Feature gửi email
-         │
-         ▼
-  [Email Validation] ── Kafka ──> [Email Formatting]
-                                      │
-                                      └── Kafka ──> [Email Sending]
-                                                       │
-                                                       └── Kafka ──> [Email Logging]
-
-  Mỗi service còn có pipeline, dashboard, policy và database riêng.
-  Service mesh phủ lên các service dù chưa có nhu cầu network tương ứng.
+```d2 title="Topology trước remediation"
+direction: right
+feature: "Email Feature"
+validation: "Email Validation Service"
+format: "Email Formatting Service"
+sending: "Email Sending Service"
+logging: "Email Logging Service"
+ops: "Mỗi service có Pipeline / Dashboard / Policy / DB riêng; mesh khi chưa có driver"
+feature -> validation
+validation -> format: "Kafka"
+format -> sending: "Kafka"
+sending -> logging: "Kafka"
+logging -> ops
 ```
 
 Mỗi service trong ví dụ có thể chạy được. Nhưng một thay đổi ở email flow nay liên quan đến nhiều deployment, contract, dashboard và failure path. Team phải vận hành các thành phần đó trước khi business capability tạo ra nhu cầu tương ứng.
@@ -202,18 +201,17 @@ Vấn đề không phải là bốn service luôn sai. Nếu `Email Sending` c�
 
 Bắt đầu với một service hoặc **modular monolith** có boundary nội bộ rõ ràng:
 
-```text
-✅ Giữ một capability trong mức triển khai phù hợp
-
-  Email Capability
-  ├── validation
-  ├── formatting
-  ├── sending
-  └── logging
-
-  Một deployment unit và một pipeline đơn giản hơn.
-  Thêm queue hoặc tách service sau khi có driver được đo.
+```d2 title="Một hướng đơn giản hơn"
+direction: right
+email: Email Capability — Một Deployment / Pipeline {
+ validation: Validation
+ formatting: Formatting
+ sending: Sending
+ logging: Logging
+}
 ```
+
+Thêm queue hoặc tách service khi có driver đo được; không cần một network boundary cho mỗi bước nội bộ.
 
 Cách này không có nghĩa bỏ qua reliability, security hoặc health signal. Team vẫn cần một golden path tối thiểu gồm logging, health check, pipeline và secret management phù hợp.
 
@@ -223,17 +221,17 @@ Khi có bằng chứng rằng `Email Sending` cần scale hoặc failure isolati
 
 Một biến thể khác là xây `NotificationPlatform` ngay khi chỉ có một consumer email:
 
-```text
-❌ Platform trước consumer
-
-  NotificationPlatform
-  ├── generic message schema
-  ├── plugin router cho email, SMS, push
-  ├── adapter cho nhiều broker
-  ├── policy engine cho mọi retry strategy
-  └── hàng loạt configuration option
-
-  Consumer hiện tại: chỉ gửi email.
+```d2 title="Ví dụ premature abstraction"
+direction: right
+platform: NotificationPlatform — Premature Abstraction {
+ schema: Generic Message Schema
+ router: Plugin Router — Email / SMS / Push
+ broker: Multi-Broker Adapter
+ policy: Retry Policy Engine
+ config: Nhiều Configuration Options
+}
+consumer: Consumer hiện tại — Chỉ gửi Email
+consumer -> platform
 ```
 
 Platform này có thể trông như một khoản đầu tư cho tương lai. Nhưng team phải duy trì contract và behavior cho các variation chưa tồn tại. Nếu giả định ban đầu sai, việc sửa platform có thể khó hơn việc sửa một email flow cụ thể.

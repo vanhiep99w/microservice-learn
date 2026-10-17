@@ -344,114 +344,116 @@ Không nhất thiết phải deploy từng logical component thành một micros
 
 ### 6.1. Các entity chính
 
-```mermaid
-erDiagram
-    USER ||--o{ DEVICE : owns
-    USER ||--o{ NAMESPACE_ENTRY : owns
-    NAMESPACE_ENTRY ||--o| FILE : references
-    FILE ||--o{ FILE_VERSION : has
-    FILE_VERSION ||--o{ VERSION_BLOCK : contains
-    BLOCK ||--o{ VERSION_BLOCK : referenced_by
-    USER ||--o{ SHARE_PERMISSION : receives
-    FILE ||--o{ SHARE_PERMISSION : grants
-    DEVICE ||--|| SYNC_CURSOR : tracks
-    USER ||--o{ CHANGE_EVENT : receives
-    FILE_VERSION ||--o{ UPLOAD_SESSION : created_by
-    UPLOAD_SESSION ||--o{ UPLOAD_PART : contains
-
-    USER {
-        uuid user_id PK
-        string email
-        bigint quota_bytes
-        bigint used_bytes
-    }
-
-    DEVICE {
-        uuid device_id PK
-        uuid user_id FK
-        string platform
-        timestamp last_seen_at
-    }
-
-    NAMESPACE_ENTRY {
-        uuid entry_id PK
-        uuid owner_id FK
-        uuid parent_entry_id FK
-        string name
-        string entry_type
-        uuid file_id FK
-        bigint revision
-    }
-
-    FILE {
-        uuid file_id PK
-        uuid owner_id FK
-        uuid current_version_id
-        timestamp deleted_at
-    }
-
-    FILE_VERSION {
-        uuid version_id PK
-        uuid file_id FK
-        uuid base_version_id
-        string storage_key
-        bigint size_bytes
-        string checksum
-        string status
-        timestamp created_at
-    }
-
-    BLOCK {
-        string block_hash PK
-        bigint size_bytes
-        string storage_key
-        bigint reference_count
-    }
-
-    VERSION_BLOCK {
-        uuid version_id FK
-        int block_order
-        string block_hash FK
-    }
-
-    UPLOAD_SESSION {
-        uuid upload_id PK
-        uuid version_id FK
-        string provider_upload_id
-        string status
-        timestamp expires_at
-    }
-
-    UPLOAD_PART {
-        uuid upload_id FK
-        int part_number
-        string etag
-        string checksum
-        bigint size_bytes
-    }
-
-    SHARE_PERMISSION {
-        uuid share_id PK
-        uuid file_id FK
-        uuid principal_id FK
-        string permission
-        timestamp revoked_at
-    }
-
-    CHANGE_EVENT {
-        bigint sequence_id PK
-        uuid user_id FK
-        string operation
-        uuid entry_id
-        bigint revision
-    }
-
-    SYNC_CURSOR {
-        uuid device_id PK
-        bigint last_sequence_id
-        timestamp updated_at
-    }
+```d2 title="6.1. Các entity chính"
+direction: right
+USER: {
+  shape: sql_table
+  "user_id": "uuid" {constraint: "PK"}
+  "email": "string"
+  "quota_bytes": "bigint"
+  "used_bytes": "bigint"
+}
+DEVICE: {
+  shape: sql_table
+  "device_id": "uuid" {constraint: "PK"}
+  "user_id": "uuid" {constraint: "FK"}
+  "platform": "string"
+  "last_seen_at": "timestamp"
+}
+NAMESPACE_ENTRY: {
+  shape: sql_table
+  "entry_id": "uuid" {constraint: "PK"}
+  "owner_id": "uuid" {constraint: "FK"}
+  "parent_entry_id": "uuid" {constraint: "FK"}
+  "name": "string"
+  "entry_type": "string"
+  "file_id": "uuid" {constraint: "FK"}
+  "revision": "bigint"
+}
+FILE: {
+  shape: sql_table
+  "file_id": "uuid" {constraint: "PK"}
+  "owner_id": "uuid" {constraint: "FK"}
+  "current_version_id": "uuid"
+  "deleted_at": "timestamp"
+}
+FILE_VERSION: {
+  shape: sql_table
+  "version_id": "uuid" {constraint: "PK"}
+  "file_id": "uuid" {constraint: "FK"}
+  "base_version_id": "uuid"
+  "storage_key": "string"
+  "size_bytes": "bigint"
+  "checksum": "string"
+  "status": "string"
+  "created_at": "timestamp"
+}
+BLOCK: {
+  shape: sql_table
+  "block_hash": "string" {constraint: "PK"}
+  "size_bytes": "bigint"
+  "storage_key": "string"
+  "reference_count": "bigint"
+}
+VERSION_BLOCK: {
+  shape: sql_table
+  "version_id": "uuid" {constraint: "FK"}
+  "block_order": "int"
+  "block_hash": "string" {constraint: "FK"}
+}
+UPLOAD_SESSION: {
+  shape: sql_table
+  "upload_id": "uuid" {constraint: "PK"}
+  "version_id": "uuid" {constraint: "FK"}
+  "provider_upload_id": "string"
+  "status": "string"
+  "expires_at": "timestamp"
+}
+UPLOAD_PART: {
+  shape: sql_table
+  "upload_id": "uuid" {constraint: "FK"}
+  "part_number": "int"
+  "etag": "string"
+  "checksum": "string"
+  "size_bytes": "bigint"
+}
+SHARE_PERMISSION: {
+  shape: sql_table
+  "share_id": "uuid" {constraint: "PK"}
+  "file_id": "uuid" {constraint: "FK"}
+  "principal_id": "uuid" {constraint: "FK"}
+  "permission": "string"
+  "revoked_at": "timestamp"
+}
+CHANGE_EVENT: {
+  shape: sql_table
+  "sequence_id": "bigint" {constraint: "PK"}
+  "user_id": "uuid" {constraint: "FK"}
+  "operation": "string"
+  "entry_id": "uuid"
+  "revision": "bigint"
+}
+SYNC_CURSOR: {
+  shape: sql_table
+  "device_id": "uuid" {constraint: "PK"}
+  "last_sequence_id": "bigint"
+  "updated_at": "timestamp"
+}
+USER -> DEVICE: "owns — 1 : 0..N"
+USER -> NAMESPACE_ENTRY: "owns — 1 : 0..N"
+NAMESPACE_ENTRY -> FILE: "references — 1 : 0..1"
+FILE -> FILE_VERSION: "has — 1 : 0..N"
+FILE_VERSION -> VERSION_BLOCK: "contains — 1 : 0..N"
+BLOCK -> VERSION_BLOCK: "referenced_by — 1 : 0..N"
+USER -> SHARE_PERMISSION: "receives — 1 : 0..N"
+FILE -> SHARE_PERMISSION: "grants — 1 : 0..N"
+DEVICE -> SYNC_CURSOR: "tracks — 1 : 1"
+USER -> CHANGE_EVENT: "receives — 1 : 0..N"
+FILE_VERSION -> UPLOAD_SESSION: "created_by — 1 : 0..N"
+UPLOAD_SESSION -> UPLOAD_PART: "contains — 1 : 0..N"
 ```
+
+Nhãn quan hệ ghi rõ cardinality `1 : 0..N`, `1 : 0..1` hoặc `1 : 1`. `PK`/`FK` giữ nguyên như model; mũi tên nối entity không ngụ ý bổ sung một foreign key chưa được khai báo.
 
 Một số lựa chọn quan trọng:
 
@@ -479,19 +481,31 @@ Data model phải xuất phát từ các query chính:
 
 ### 6.3. Trạng thái của File Version
 
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING
-    PENDING --> UPLOADING: signed URLs issued
-    UPLOADING --> PROCESSING: complete requested
-    PROCESSING --> READY: verified and scanned
-    PROCESSING --> FAILED: checksum or scan failed
-    PENDING --> ABORTED: client aborts
-    UPLOADING --> EXPIRED: session timeout
-    FAILED --> [*]
-    ABORTED --> [*]
-    EXPIRED --> [*]
-    READY --> [*]
+```d2 title="6.3. Trạng thái của File Version"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+PENDING: "PENDING"
+initial1 -> PENDING
+UPLOADING: "UPLOADING"
+PENDING -> UPLOADING: "signed URLs issued"
+PROCESSING: "PROCESSING"
+UPLOADING -> PROCESSING: "complete requested"
+READY: "READY"
+PROCESSING -> READY: "verified and scanned"
+FAILED: "FAILED"
+PROCESSING -> FAILED: "checksum or scan failed"
+ABORTED: "ABORTED"
+PENDING -> ABORTED: "client aborts"
+EXPIRED: "EXPIRED"
+UPLOADING -> EXPIRED: "session timeout"
+final2: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+FAILED -> final2
+final3: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+ABORTED -> final3
+final4: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+EXPIRED -> final4
+final5: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+READY -> final5
 ```
 
 Chỉ version ở trạng thái `READY` mới được đặt làm `current_version_id` và xuất hiện trên thiết bị khác.
@@ -609,32 +623,30 @@ GET  /v1/realtime-ticket
 
 File nhỏ có thể dùng một presigned `PUT` URL.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Client
-    participant G as API Gateway
-    participant U as Upload Service
-    participant DB as Metadata DB
-    participant S3 as Object Storage
-    participant Q as Event Queue
-    participant W as Worker
-
-    C->>G: POST /uploads
-    G->>U: Create upload session
-    U->>DB: Insert version=PENDING, session
-    U->>S3: Create presigned PUT URL
-    U-->>C: uploadId + signed URL
-    C->>S3: PUT file bytes
-    S3-->>C: ETag/checksum response
-    C->>G: POST /uploads/{id}:complete
-    G->>U: Complete upload
-    U->>DB: Mark PROCESSING
-    S3-->>Q: ObjectCreated event
-    Q->>W: Deliver event
-    W->>S3: Verify size/checksum
-    W->>DB: Mark READY + set current version
-    W-->>Q: Acknowledge
+```d2 title="8.1. Upload file nhỏ"
+shape: sequence_diagram
+"C": "Client"
+"G": "API Gateway"
+"U": "Upload Service"
+"DB": "Metadata DB"
+"S3": "Object Storage"
+"Q": "Event Queue"
+"W": "Worker"
+"C" -> "G": "1. POST /uploads"
+"G" -> "U": "2. Create upload session"
+"U" -> "DB": "3. Insert version=PENDING, session"
+"U" -> "S3": "4. Create presigned PUT URL"
+"U" -> "C": "5. uploadId + signed URL" { style.stroke-dash: 5 }
+"C" -> "S3": "6. PUT file bytes"
+"S3" -> "C": "7. ETag/checksum response" { style.stroke-dash: 5 }
+"C" -> "G": "8. POST /uploads/{id}:complete"
+"G" -> "U": "9. Complete upload"
+"U" -> "DB": "10. Mark PROCESSING"
+"S3" -> "Q": "11. ObjectCreated event" { style.stroke-dash: 5 }
+"Q" -> "W": "12. Deliver event"
+"W" -> "S3": "13. Verify size/checksum"
+"W" -> "DB": "14. Mark READY + set current version"
+"W" -> "Q": "15. Acknowledge" { style.stroke-dash: 5 }
 ```
 
 Client nhận `202 Accepted` khi completion đang được xử lý. Nếu business yêu cầu completion đồng bộ, backend có thể verify nhanh rồi trả `200`, còn malware scan tiếp tục bất đồng bộ với trạng thái riêng.
@@ -702,27 +714,23 @@ Upload Service chỉ cấp quyền tạm thời. Client truyền file trực ti�
 
 ### 9.1. Download qua signed CDN URL
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant C as Client
-    participant D as Download API
-    participant P as Permission Store
-    participant CDN as CDN
-    participant S3 as Object Storage
-
-    C->>D: POST /files/{id}/download-url
-    D->>P: Check user permission + current version
-    P-->>D: Authorized, immutable storage key
-    D-->>C: Short-lived signed CDN URL
-    C->>CDN: GET /version-key (Range optional)
-    alt Cache hit
-        CDN-->>C: File bytes
-    else Cache miss
-        CDN->>S3: Fetch immutable object
-        S3-->>CDN: File bytes
-        CDN-->>C: File bytes
-    end
+```d2 title="9.1. Download qua signed CDN URL"
+direction: right
+request: "Client → Download API\nPOST /files/{id}/download-url"
+permission: "Permission Store\nCheck permission + current version"
+url: "Authorized — immutable storage key\nAPI trả short-lived signed CDN URL"
+cdn: "Client → CDN\nGET /version-key • Range optional"
+hit: "Cache hit — CDN trả file bytes tới Client"
+miss: "Cache miss — CDN fetch immutable object từ S3"
+s3: "Object Storage → CDN: File bytes"
+return: "CDN → Client: File bytes"
+request -> permission
+permission -> url
+url -> cdn
+cdn -> hit: "Hit"
+cdn -> miss: "Miss"
+miss -> s3
+s3 -> return
 ```
 
 Download API không tự “gọi CDN để kiểm tra cache”. Nó authorize rồi trả signed URL. Client mới là thành phần kết nối đến CDN.
@@ -775,29 +783,27 @@ agent: Desktop Sync Agent {
 
 ### 10.2. Durable Change Log và cursor
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant L as Laptop
-    participant S as Sync Service
-    participant DB as Metadata DB
-    participant CL as Change Log
-    participant N as Notification Service
-    participant P as Phone
-
-    L->>S: Commit version 42 from base version 41
-    S->>DB: Transaction: set current version 42
-    S->>DB: Insert outbox event
-    S-->>L: Commit accepted
-    DB-->>CL: Publish FileVersionReady(sequence=9001)
-    CL-->>N: New change available
-    N-->>P: WebSocket hint: changes available
-    P->>S: GET /changes?cursor=8995
-    S->>CL: Read events 8996..9001
-    CL-->>S: Ordered change batch
-    S-->>P: Changes + nextCursor=9001
-    P->>P: Apply version 42 locally
-    P->>S: ACK cursor 9001
+```d2 title="10.2. Durable Change Log và cursor"
+shape: sequence_diagram
+"L": "Laptop"
+"S": "Sync Service"
+"DB": "Metadata DB"
+"CL": "Change Log"
+"N": "Notification Service"
+"P": "Phone"
+"L" -> "S": "1. Commit version 42 from base version 41"
+"S" -> "DB": "2. Transaction: set current version 42"
+"S" -> "DB": "3. Insert outbox event"
+"S" -> "L": "4. Commit accepted" { style.stroke-dash: 5 }
+"DB" -> "CL": "5. Publish FileVersionReady(sequence=9001)" { style.stroke-dash: 5 }
+"CL" -> "N": "6. New change available" { style.stroke-dash: 5 }
+"N" -> "P": "7. WebSocket hint: changes available" { style.stroke-dash: 5 }
+"P" -> "S": "8. GET /changes?cursor=8995"
+"S" -> "CL": "9. Read events 8996..9001"
+"CL" -> "S": "10. Ordered change batch" { style.stroke-dash: 5 }
+"S" -> "P": "11. Changes + nextCursor=9001" { style.stroke-dash: 5 }
+"P" -> "P": "12. Apply version 42 locally"
+"P" -> "S": "13. ACK cursor 9001"
 ```
 
 `sequence_id` có thể chỉ đảm bảo thứ tự trong phạm vi một user hoặc namespace. Không cần tạo global ordering cho toàn bộ hệ thống vì nó làm tăng contention.
@@ -1282,8 +1288,19 @@ Ba quyết định quan trọng nhất là:
 
 Trong interview, correctness quan trọng nhưng reasoning cũng quan trọng không kém. Hãy luôn trình bày theo chuỗi:
 
-```text
-Requirement → Constraint → Problem → Options → Trade-off → Decision
+```d2 title="19. Kết luận"
+direction: down
+s0: "Requirement"
+s1: "Constraint"
+s2: "Problem"
+s3: "Options"
+s4: "Trade-off"
+s5: "Decision"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
+s4 -> s5
 ```
 
 ---

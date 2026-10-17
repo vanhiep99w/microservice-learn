@@ -110,16 +110,31 @@ Nguyên tắc chẩn đoán: đo **hành vi thay đổi** thay vì chỉ nhìn s
 
 **Ví dụ:** Order, Payment và Inventory có ba codebase nhưng chung schema. Order thay đổi cột trạng thái, Payment cập nhật trực tiếp cột đó và Inventory chỉ chạy được sau khi nhận synchronous call từ Order. Bất kỳ migration nào cũng cần một release window chung.
 
-```text
-❌ Distributed Monolith
-Order ──sync──> Payment ──sync──> Inventory
-  │              │                  │
-  └──────────── Shared schema ──────┘
+```d2 title="3.2. Ví dụ và remediation"
+direction: right
+bad: Distributed Monolith {
+ order: Order
+ payment: Payment
+ inventory: Inventory
+ db: Shared Schema {shape: cylinder}
+ order -> payment -> inventory: Sync
+ order -> db
+ payment -> db
+ inventory -> db
+}
 
-✅ Ranh giới rõ hơn
-Order ──OrderCreated──> Event Broker ──> Inventory
-  │                                      (xử lý cục bộ)
-Order DB              Payment DB              Inventory DB
+good: Ranh giới rõ hơn {
+ order: Order
+ orderdb: Order DB {shape: cylinder}
+ paymentdb: Payment DB {shape: cylinder}
+ inventory: Inventory xử lý cục bộ
+ inventorydb: Inventory DB {shape: cylinder}
+ broker: Event Broker
+ order -> broker: OrderCreated
+ broker -> inventory
+ order -> orderdb
+ inventory -> inventorydb
+}
 ```
 
 **Remediation theo từng bước:**
@@ -198,17 +213,17 @@ Việc tách không luôn tốt hơn: nếu hai phần luôn thay đổi, deploy
 
 **Ví dụ giả định:** Trang chi tiết đơn có ba mặt hàng. Order Service gọi Product Service một lần cho từng SKU để lấy tên/ảnh, rồi gọi thêm từng SKU để lấy giá. Sáu round-trip có thể được thay bằng một query batch hoặc read model phù hợp.
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant P as Product Service
-    Note over O,P: Chatty
-    O->>P: GET /products/A
-    O->>P: GET /products/B
-    O->>P: GET /products/C
-    Note over O,P: Remediation: batch/read model
-    O->>P: POST /products:batch {ids:[A,B,C]}
-    P-->>O: Dữ liệu cần cho use case
+```d2 title="6.2. Ví dụ và remediation"
+shape: sequence_diagram
+"O": "Order Service"
+"P": "Product Service"
+"O".note1: "[Order Service — Product Service]\nChatty"
+"O" -> "P": "GET /products/A"
+"O" -> "P": "GET /products/B"
+"O" -> "P": "GET /products/C"
+"O".note2: "[Order Service — Product Service]\nRemediation: batch/read model"
+"O" -> "P": "POST /products:batch {ids:[A,B,C]}"
+"P" -> "O": "Dữ liệu cần cho use case" { style.stroke-dash: 5 }
 ```
 
 **Remediation:**

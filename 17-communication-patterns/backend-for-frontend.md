@@ -48,10 +48,17 @@ BFF không phải là một bản sao của domain service và cũng không ph�
 
 Giả sử một API chung phục vụ cả Web, Mobile và một thiết bị có tài nguyên hạn chế:
 
-```text
-Web App       ─┐
-Mobile App    ─┼──▶ API chung ──▶ User, Order, Product Services
-IoT Device    ─┘
+```d2 title="Vấn đề cần giải quyết"
+direction: right
+web: "Web App"
+mobile: "Mobile App"
+iot: "IoT Device"
+api: "API chung"
+backend: "User / Order / Product Services"
+web -> api
+mobile -> api
+iot -> api
+api -> backend
 ```
 
 API chung phải chọn một contract mà tất cả client đều có thể dùng. Khi nhu cầu giữa các client lệch nhau, contract này thường trở thành một "ước chung lớn nhất": response chứa nhiều dữ liệu cho client này nhưng lại thiếu hoặc không phù hợp với client khác.
@@ -126,17 +133,15 @@ Ownership không có nghĩa BFF được tự sao chép business rule. Nó có n
 
 BFF có thể là public backend trực tiếp hoặc được route từ một API Gateway. Khi có Gateway, hai lớp nên có trách nhiệm khác nhau:
 
-```text
-Client
-  │
-  ▼
-API Gateway                 BFF
-  │  auth, rate limit,       │  aggregation, transformation
-  │  routing và policy edge  │  theo một client
-  └───────────────▶─────────┘
-                          │
-                          ▼
-                    Domain Services
+```d2 title="Topology tham chiếu"
+direction: right
+client: "Client"
+gw: "API Gateway\nAuth / Rate limit / Routing / Edge policies"
+bff: "BFF\nClient-specific Aggregation / Transformation"
+services: "Domain Services"
+client -> gw
+gw -> bff
+bff -> services
 ```
 
 Một API Gateway dùng chung có thể route `/web/*` đến Web BFF và `/mobile/*` đến Mobile BFF. BFF sau đó gọi User, Order hoặc Product Service theo use case của client. Nếu hệ thống chưa cần một lớp Gateway riêng, BFF vẫn có thể đứng ở edge; điều đó không làm BFF trở thành nơi thay thế mọi policy edge dùng chung.
@@ -147,26 +152,26 @@ Một API Gateway dùng chung có thể route `/web/*` đến Web BFF và `/mobi
 
 Với một request trang chủ Mobile, BFF có thể gọi các service độc lập song song rồi trả về một response gọn:
 
-```mermaid
-sequenceDiagram
-    participant M as Mobile App
-    participant B as Mobile BFF
-    participant U as User Service
-    participant C as Cart Service
-    participant R as Recommendation Service
-
-    M->>B: GET /mobile/home
-    par Gọi các dependency độc lập
-        B->>U: GET /users/123
-        U-->>B: profile
-    and
-        B->>C: GET /cart?userId=123
-        C-->>B: cart
-    and
-        B->>R: GET /recommendations?userId=123
-        R-->>B: recommendations
-    end
-    B-->>M: 200 OK response compact
+```d2 title="Request flow"
+direction: down
+client: "Mobile App"
+gateway: "Mobile BFF\nGET /mobile/home"
+fork: "PAR — fan-out đồng thời"
+user: "User Service\nGET /users/123 → profile"
+cart: "Cart Service\nGET /cart?userId=123 → cart"
+recommend: "Recommendation Service\nGET /recommendations?userId=123 → recommendations"
+join: "JOIN — chờ kết quả các dependency độc lập"
+response: "200 OK — response compact"
+client -> gateway
+gateway -> fork
+fork -> user
+fork -> cart
+fork -> recommend
+user -> join
+cart -> join
+recommend -> join
+join -> response
+response -> client
 ```
 
 Một request flow điển hình gồm các bước:

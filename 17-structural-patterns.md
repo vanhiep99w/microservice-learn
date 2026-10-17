@@ -119,21 +119,20 @@ Trong sơ đồ này, Log Sidecar là Sidecar thuần túy. Ambassador được 
 
 **Sidecar Pattern** đặt một process hoặc container phụ cạnh application chính trong cùng một đơn vị triển khai gần nhất. Trong Kubernetes, đơn vị này thường là **Pod**: các container chia sẻ network namespace (gọi nhau bằng `localhost`), có thể chia sẻ volume, và được schedule/terminate cùng Pod.
 
-```text
-┌──────────────── Kubernetes Pod ────────────────┐
-│ IP: 10.42.1.18                                  │
-│                                                  │
-│  ┌─────────────────┐   shared volume             │
-│  │ Catalog Service │──── /var/log/catalog ──┐    │
-│  │ :8080           │                         │    │
-│  └─────────────────┘                         ▼    │
-│                                      ┌───────────┐ │
-│ localhost:4317 ◀────────────────────│ OTel Agent│ │
-│                                      │ / Log ship│ │
-│                                      └───────────┘ │
-└──────────────────────────────────────────────────┘
-          │                              │
-          └──────── application traffic ─┴──► backend
+```d2 title="3.1. Định nghĩa và cơ chế"
+direction: right
+pod: Kubernetes Pod — IP10.42.1.18 {
+ app: Catalog Service :8080
+ volume: Shared Volume /var/log/catalog
+ agent: OTel Agent / Log Shipper
+ app -> volume: Ghi log
+ volume -> agent: Đọc log
+ app -> agent: Telemetry — localhost4317
+}
+backend: Application Backend
+telemetry: Telemetry Backend
+pod.app -> backend: Application traffic
+pod.agent -> telemetry: Export telemetry
 ```
 
 Điểm quan trọng:
@@ -227,21 +226,23 @@ spec:
 
 **Ambassador Pattern** là một local proxy đại diện cho application khi application gọi **dịch vụ bên ngoài**. App gửi request đến một endpoint ổn định trên `localhost`; Ambassador chọn endpoint thật, áp dụng network policy và chuyển tiếp request. Vì Ambassador thường nằm cùng Pod/process host với client, nó hay là một **trường hợp chuyên biệt của Sidecar**.
 
-```mermaid
-sequenceDiagram
-    participant O as Order Service
-    participant A as Ambassador localhost:15001
-    participant D as Service Discovery / Control Plane
-    participant P as Payment Service
-
-    O->>A: POST /charges (contract đã chuẩn hóa)
-    A->>D: Nhận endpoint, certificate, traffic policy
-    A->>P: mTLS POST /charges đến endpoint phù hợp
-    alt transient network failure và request an toàn để retry
-        A->>P: retry theo budget + backoff
-    end
-    P-->>A: 201 Created / lỗi có phân loại
-    A-->>O: response + telemetry
+```d2 title="4.1. Định nghĩa và luồng outbound"
+direction: right
+caller: "Order Service\nOutbound request theo contract nội bộ\nPOST /charges + deadline + Idempotency-Key"
+ambassador: "Ambassador — localhost:15001\nEndpoint / certificate / traffic policy từ discovery"
+payment: "Payment Service\nForward qua mTLS đến endpoint phù hợp"
+condition: "Lỗi transient VÀ operation an toàn / idempotent?"
+retry: "Retry cùng key\nTrong budget • Backoff • Jitter"
+result: "AUTHORIZED / DECLINED / kết quả chưa rõ\nResponse hoặc lỗi có phân loại"
+return: "Ambassador forward result về caller\nGhi network telemetry"
+caller -> ambassador
+ambassador -> payment
+payment -> condition
+condition -> retry: "Có"
+retry -> payment: "Attempt tiếp theo"
+condition -> result: "Không retry / đã có kết quả"
+result -> return
+return -> caller
 ```
 
 Ambassador **không đồng nghĩa** với mọi reverse proxy. API Gateway/Ingress xử lý traffic **vào** hệ thống hoặc từ client bên ngoài; Ambassador là client-side/local proxy chủ yếu quản lý traffic **đi ra**. Một mesh sidecar có thể proxy cả inbound lẫn outbound, nhưng khi đóng vai đại diện outbound, nó thực hiện intent của Ambassador.
@@ -313,16 +314,16 @@ static_resources:
 
 **Adapter Pattern** chuyển đổi một interface, protocol, schema hoặc semantic contract thành contract mà caller mong đợi. Nó bảo vệ mô hình nội bộ khỏi cách biểu diễn của legacy system, vendor hay một service khác. Khác Sidecar, Adapter là **pattern về interface/contract**, không bắt buộc là container cạnh app.
 
-```text
-Domain của Checkout                  Hệ thống ngoài
-┌──────────────────────┐             ┌──────────────────────────┐
-│ PaymentPort          │             │ Legacy Bank SOAP         │
-│ authorize(command)   │  Adapter    │ submitTransaction(xml)   │
-│ → PaymentResult      │────────────►│ status: A / D / R        │
-└──────────────────────┘             └──────────────────────────┘
-       Không để XML, mã A/D/R, tên field vendor
-       lan vào Order Aggregate hoặc API nội bộ.
+```d2 title="5.1. Định nghĩa: chuyển đổi contract"
+direction: right
+domain: "Checkout Domain\nPaymentPort.authorize command → PaymentResult"
+adapter: "Adapter — Contract mapping"
+bank: "Legacy Bank SOAP\nsubmitTransaction XML / status A,D,R"
+domain -> adapter
+adapter -> bank
 ```
+
+Giữ XML, mã trạng thái A/D/R và tên field vendor bên ngoài Order Aggregate / internal API.
 
 Adapter có thể thực hiện:
 

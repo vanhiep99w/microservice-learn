@@ -72,68 +72,49 @@ Nhưng câu hỏi thực tế là: **"Làm sao biết nên tách thành bao nhi�
 
 ### Ví dụ: Service vi phạm SRP
 
+```d2 title="Ví dụ: Service vi phạm SRP"
+direction: down
+order: Order Service — God Service {
+ responsibilities: "Tạo / sửa / xóa order\nTính giá • Mã giảm giá\nThanh toán Stripe / VNPay\nTồn kho • Email xác nhận\nVận đơn • Báo cáo doanh thu"
+ db: "Shared Database\norders • payments • inventory • shipments" {shape: cylinder}
+ responsibilities -> db
+}
 ```
-❌ "God Service" — 1 service làm quá nhiều việc
 
-┌─────────────────────────────────────────────────────┐
-│              Order Service (God Service)            │
-│                                                     │
-│  • Tạo / sửa / xóa đơn hàng                         │
-│  • Tính giá, áp dụng mã giảm giá                    │
-│  • Xử lý thanh toán (Stripe, VNPay)                 │
-│  • Quản lý tồn kho                                  │
-│  • Gửi email xác nhận                               │
-│  • Tạo vận đơn giao hàng                            │
-│  • Tạo báo cáo doanh thu                            │
-│                                                     │
-│  ┌───────────────────────────────────────────────┐  │
-│  │              Shared Database                  │  │
-│  │  orders | payments | inventory | shipments    │  │
-│  └───────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-
-Vấn đề:
-  → Thay đổi logic thanh toán → phải test lại cả order
-  → Thêm cổng thanh toán mới → deploy lại cả service
-  → Team payment và team order phải coordinate liên tục
-  → Bug ở notification kéo sập cả đặt hàng
-```
+Đổi payment phải test lại Order; thêm gateway payment phải deploy cả service; hai team coordinate liên tục; bug Notification có thể kéo sập đặt hàng.
 
 ### Ví dụ: Service tuân thủ SRP
 
+```d2 title="Ví dụ: Service tuân thủ SRP"
+direction: right
+order: "Order Service" {
+ model: "Tạo • Sửa • Hủy • Trạng thái order"
+ db: "Order DB" {shape: cylinder}
+ model -> db
+}
+payment: "Payment Service" {
+ model: "Thanh toán • Hoàn tiền • Lịch sử TT"
+ db: "Payment DB" {shape: cylinder}
+ model -> db
+}
+inventory: "Inventory Service" {
+ model: "Kiểm tồn • Cập nhật • Cảnh báo hết hàng"
+ db: "Inventory DB" {shape: cylinder}
+ model -> db
+}
+shipping: "Shipping Service" {
+ model: "Vận đơn • Tracking • Đối soát"
+ db: "Shipping DB" {shape: cylinder}
+ model -> db
+}
+notification: "Notification Service" {
+ model: "Email • SMS • Push"
+ db: "Notification DB" {shape: cylinder}
+ model -> db
+}
 ```
-✅ Tách theo SRP — mỗi service 1 business capability
 
-┌──────────────┐  ┌───────────────┐  ┌──────────────┐
-│ Order Service│  │Payment Service│  │Inventory Svc │
-│              │  │               │  │              │
-│ • Tạo order  │  │ • Thanh toán  │  │ • Kiểm tồn   │
-│ • Sửa order  │  │ • Hoàn tiền   │  │ • Cập nhật   │
-│ • Hủy order  │  │ • Lịch sử TT  │  │ • Cảnh báo   │
-│ • Trạng thái │  │               │  │   hết hàng   │
-│              │  │               │  │              │
-│ ┌──────────┐ │  │ ┌──────────┐  │  │ ┌──────────┐ │
-│ │ Order DB │ │  │ │Payment DB│  │  │ │ Inv. DB  │ │
-│ └──────────┘ │  │ └──────────┘  │  │ └──────────┘ │
-└──────────────┘  └───────────────┘  └──────────────┘
-
-┌──────────────┐  ┌──────────────┐
-│Shipping Svc  │  │Notification  │
-│              │  │   Service    │
-│ • Tạo vận đơn│  │ • Gửi email  │
-│ • Tracking   │  │ • Gửi SMS    │
-│ • Đối soát   │  │ • Push noti  │
-│              │  │              │
-│ ┌──────────┐ │  │ ┌──────────┐ │
-│ │ Ship DB  │ │  │ │ Noti DB  │ │
-│ └──────────┘ │  │ └──────────┘ │
-└──────────────┘  └──────────────┘
-
-Lợi ích:
-  → Thay cổng thanh toán? Chỉ sửa Payment Service
-  → Bug notification? Order vẫn chạy bình thường
-  → Team payment deploy độc lập, không ảnh hưởng ai
-```
+Thay cổng thanh toán chỉ sửa Payment; tách notification giảm blast radius; mỗi team có thể deploy riêng khi contracts tương thích.
 
 ### Làm sao biết service đang vi phạm SRP?
 
@@ -301,35 +282,15 @@ Nói đơn giản: **Bounded Context = "Trong phạm vi này, từ X có nghĩa 
 
 Đây là ví dụ kinh điển để hiểu Bounded Context:
 
+```d2 title="Ví dụ: Cùng khái niệm \"Product\" nhưng khác ngữ cảnh"
+direction: right
+catalog: "Catalog Context" { model: "Product\nname • description • images[]\ncategory • specifications" }
+pricing: "Pricing Context" { model: "Product\nbasePrice • discount • taxRate\nfinalPrice() • currency" }
+inventory: "Inventory Context" { model: "Product\nsku • quantity • warehouse • reorderLevel" }
+shipping: "Shipping Context" { model: "Product\nweight • dimensions • isFragile • shippingClass" }
 ```
-Trong hệ thống E-Commerce, "Product" xuất hiện ở NHIỀU nơi,
-nhưng mỗi nơi quan tâm đến KHÍA CẠNH KHÁC NHAU:
 
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│  📦 Catalog Context          💰 Pricing Context             │
-│  ┌───────────────────┐       ┌───────────────────┐          │
-│  │ Product:          │       │ Product:          │          │
-│  │  - name           │       │  - basePrice      │          │
-│  │  - description    │       │  - discount       │          │
-│  │  - images[]       │       │  - taxRate        │          │
-│  │  - category       │       │  - finalPrice()   │          │
-│  │  - specifications │       │  - currency       │          │
-│  └───────────────────┘       └───────────────────┘          │
-│                                                             │
-│  📊 Inventory Context        🚚 Shipping Context            │
-│  ┌───────────────────┐       ┌───────────────────┐          │
-│  │ Product:          │       │ Product:          │          │
-│  │  - sku            │       │  - weight         │          │
-│  │  - quantity       │       │  - dimensions     │          │
-│  │  - warehouse      │       │  - isFragile      │          │
-│  │  - reorderLevel   │       │  - shippingClass  │          │
-│  └───────────────────┘       └───────────────────┘          │
-│                                                             │
-│  Cùng là "Product" nhưng mỗi context có model KHÁC NHAU!    │
-│  Đây chính là lý do cần Bounded Context.                    │
-└─────────────────────────────────────────────────────────────┘
-```
+Cùng từ Product, khác model theo Bounded Context; không dùng một shared model cho mọi ngữ cảnh.
 
 **Nếu KHÔNG có Bounded Context** — dùng chung 1 model:
 
@@ -474,32 +435,15 @@ n4.n3.n14: "🔐 Auth Context\n→ Auth Service\n(wrap Auth0)"
 
 Mỗi service có **model riêng** cho khái niệm "Customer":
 
+```d2 title="Ví dụ thực tế: Hệ thống E-Commerce"
+direction: right
+customer: "Customer Context" { model: "Customer\nid • fullName • email • phone\ndateOfBirth • preferences\nloyaltyPoints • addresses[]" }
+order: "Order Context" { model: "OrderCustomer\ncustomerId • name • shippingAddress" }
+payment: "Payment Context" { model: "Payer\ncustomerId • billingAddress • paymentMethods[]" }
+notification: "Notification Context" { model: "Recipient\ncustomerId • email • phone\npreferences: email / SMS / push" }
 ```
-👤 Customer Context:           🛒 Order Context:
-┌─────────────────────┐        ┌─────────────────────┐
-│ Customer:           │        │ OrderCustomer:      │
-│   - id              │        │   - customerId      │
-│   - fullName        │        │   - name            │
-│   - email           │        │   - shippingAddress │
-│   - phone           │        │                     │
-│   - dateOfBirth     │        │ (chỉ cần info liên  │
-│   - preferences     │        │  quan đến đơn hàng) │
-│   - loyaltyPoints   │        │                     │
-│   - addresses[]     │        └─────────────────────┘
-└─────────────────────┘        
 
-💳 Payment Context:            📧 Notification Context:
-┌─────────────────────┐        ┌─────────────────────┐
-│ Payer:              │        │ Recipient:          │
-│   - customerId      │        │   - customerId      │
-│   - billingAddress  │        │   - email           │
-│   - paymentMethods[]│        │   - phone           │
-│                     │        │   - preferences     │
-│ (thậm chí gọi là    │        │     (email/sms/push)│
-│  "Payer" chứ không  │        │                     │
-│  phải "Customer")   │        └─────────────────────┘
-└─────────────────────┘
-```
+Model và cả tên gọi thay đổi theo ngữ cảnh: Order chỉ giữ thông tin cho đơn hàng, Payment gọi đối tượng là Payer.
 
 ### Ví dụ thực tế: Hệ thống quản lý Bệnh viện
 
@@ -635,44 +579,41 @@ shape: sequence_diagram
 
 **Bước 5: Mỗi service giữ data riêng**
 
+```d2 title="Ví dụ thực tế: Hệ thống quản lý Bệnh viện"
+direction: right
+appointment: "Appointment Service" {
+ model: "patient: name, phone, doctorId, timeSlot"
+ db: "Appointment DB — PostgreSQL" {shape: cylinder}
+ model -> db
+}
+clinical: "Clinical Service" {
+ model: "patient: history, allergies, symptoms, diagnosis"
+ db: "Clinical DB — MongoDB" {shape: cylinder}
+ model -> db
+}
+lab: "Laboratory Service" {
+ model: "testSubject: sampleId, testType, results[]"
+ db: "Lab DB — PostgreSQL" {shape: cylinder}
+ model -> db
+}
+pharmacy: "Pharmacy Service" {
+ model: "prescOwner: patientId, drugs[], drugAllerg"
+ db: "Pharmacy DB — PostgreSQL" {shape: cylinder}
+ model -> db
+}
+billing: "Billing Service" {
+ model: "acctHolder: patientId, services[], insurance, totalDue"
+ db: "Billing DB — PostgreSQL" {shape: cylinder}
+ model -> db
+}
+ward: "Ward Service" {
+ model: "inpatient: patientId, bed 3A, room 201, diet"
+ db: "Ward DB — Redis" {shape: cylinder}
+ model -> db
+}
 ```
-Cùng 1 bệnh nhân "Nguyễn Văn A", mỗi service lưu KHÁC NHAU:
 
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│ Appointment  │  │  Clinical    │  │  Laboratory  │
-│   Service    │  │   Service    │  │   Service    │
-│              │  │              │  │              │
-│ patient:     │  │ patient:     │  │ testSubject: │
-│  - name      │  │  - history   │  │  - sampleId  │
-│  - phone     │  │  - allergies │  │  - testType  │
-│  - doctorId  │  │  - symptoms  │  │  - results[] │
-│  - timeSlot  │  │  - diagnosis │  │              │
-│              │  │              │  │              │
-│ ┌──────────┐ │  │ ┌──────────┐ │  │ ┌──────────┐ │
-│ │Appt DB   │ │  │ │Clinical  │ │  │ │  Lab DB  │ │
-│ │(Postgres)│ │  │ │DB (Mongo)│ │  │ │(Postgres)│ │
-│ └──────────┘ │  │ └──────────┘ │  │ └──────────┘ │
-└──────────────┘  └──────────────┘  └──────────────┘
-
-┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-│  Pharmacy    │  │   Billing    │  │    Ward      │
-│   Service    │  │   Service    │  │   Service    │
-│              │  │              │  │              │
-│ prescOwner:  │  │ acctHolder:  │  │ inpatient:   │
-│  - patientId │  │  - patientId │  │  - patientId │
-│  - drugs[]   │  │  - services[]│  │  - bed: 3A   │
-│  - drugAllerg│  │  - insurance │  │  - room: 201 │
-│              │  │  - totalDue  │  │  - diet      │
-│              │  │              │  │              │
-│ ┌──────────┐ │  │ ┌──────────┐ │  │ ┌──────────┐ │
-│ │Pharma DB │ │  │ │Billing DB│ │  │ │ Ward DB  │ │
-│ │(Postgres)│ │  │ │(Postgres)│ │  │ │ (Redis)  │ │
-│ └──────────┘ │  │ └──────────┘ │  │ └──────────┘ │
-└──────────────┘  └──────────────┘  └──────────────┘
-
-→ KHÔNG CÓ service nào biết TẤT CẢ thông tin về bệnh nhân
-→ Mỗi service chỉ giữ đúng phần nó cần
-```
+Cùng bệnh nhân Nguyễn Văn A nhưng mỗi service chỉ lưu phần cần thiết, không service nào buộc biết toàn bộ hồ sơ.
 
 ### Ví dụ thực tế: Grab — Super App (chi tiết từng bước)
 
@@ -904,37 +845,35 @@ Cùng 1 chuyến đi **"Ride #12345"**, mỗi service lưu KHÁC NHAU:
 
 **Bước 6: Tổng kết — từ Domain đến Microservice**
 
+```d2 title="Ví dụ thực tế: Grab — Super App (chi tiết từng bước)"
+direction: right
+grab: Domain Grab {
+ core: Core Subdomain {
+  matching: Matching Context → Service — Go + Redis
+  pricing: Pricing Context → Service — Go + Redis
+  eta: ETA Context → Service — Python + ML
+ }
+ support: Supporting Subdomain {
+  ride: Ride Context → Service — Java + PostgreSQL
+  rider: Rider Context → Service — Node + PostgreSQL
+  driver: Driver Context → Service — Java + PostgreSQL
+  food: Food Context → Service — Java + MongoDB
+  restaurant: Restaurant Context → Service — Node + PostgreSQL
+  rating: Rating Context → Service — Node + MongoDB
+  wallet: Wallet Context → Service — Java + PostgreSQL
+  promotion: Promotion Context → Service — Go + Redis
+ }
+ generic: Generic Subdomain {
+  auth: Auth Context → Service — Firebase Auth
+  payment: Payment Context → Service — Stripe
+  notification: Notification Context → Service — Twilio + FCM
+  map: Map Context → Service — Google Maps
+  chat: Chat Context → Service — SendBird
+ }
+}
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                     GRAB — TÓM TẮT QUÁ TRÌNH                     │
-│                                                                  │
-│  Domain (Grab)                                                   │
-│    ├── Core Subdomain                                            │
-│    │   ├── Matching Context  ──→  Matching Service (Go+Redis)    │
-│    │   ├── Pricing Context   ──→  Pricing Service (Go+Redis)     │
-│    │   └── ETA Context       ──→  ETA Service (Python+ML)        │
-│    │                                                             │
-│    ├── Supporting Subdomain                                      │
-│    │   ├── Ride Context      ──→  Ride Service (Java+PG)         │
-│    │   ├── Rider Context     ──→  Rider Service (Node+PG)        │
-│    │   ├── Driver Context    ──→  Driver Service (Java+PG)       │
-│    │   ├── Food Context      ──→  Food Service (Java+Mongo)      │
-│    │   ├── Restaurant Context──→  Restaurant Service (Node+PG)   │
-│    │   ├── Rating Context    ──→  Rating Service (Node+Mongo)    │
-│    │   ├── Wallet Context    ──→  Wallet Service (Java+PG)       │
-│    │   └── Promotion Context ──→  Promotion Service (Go+Redis)   │
-│    │                                                             │
-│    └── Generic Subdomain                                         │
-│        ├── Auth Context      ──→  Auth Service (Firebase Auth)   │
-│        ├── Payment Context   ──→  Payment Service (Stripe)       │
-│        ├── Notification Ctx  ──→  Notification Svc (Twilio+FCM)  │
-│        ├── Map Context       ──→  Map Service (Google Maps)      │
-│        └── Chat Context      ──→  Chat Service (SendBird)        │
-│                                                                  │
-│  Tổng: 16 Microservices                                          │
-│  Mỗi service: DB riêng, deploy riêng, team riêng                 │
-└──────────────────────────────────────────────────────────────────┘
-```
+
+Ví dụ phân rã gồm 16 microservices, mỗi service có database, deployment và ownership riêng; đây là mô hình minh họa, không phải khẳng định mọi chi tiết triển khai nội bộ của Grab.
 
 ---
 
@@ -983,25 +922,14 @@ VD: "Account" trong ngân hàng:
 
 **Kỹ thuật 2: Event Storming (đơn giản hóa)**
 
+```d2 title="Bước 2: Tìm Bounded Context"
+direction: right
+order: "Order Context tiềm năng\nOrderPlaced • OrderCancelled • OrderUpdated"
+payment: "Payment Context tiềm năng\nPaymentReceived • RefundIssued"
+shipping: "Shipping Context tiềm năng\nItemShipped • Delivered • Returned"
 ```
-1. Liệt kê các DOMAIN EVENT (sự kiện nghiệp vụ):
-   - OrderPlaced
-   - PaymentReceived
-   - ItemShipped
-   - InventoryUpdated
-   - CustomerRegistered
 
-2. Nhóm các event liên quan:
-   ┌─────────────────┐  ┌──────────────────┐  ┌──────────────┐
-   │ Order Context   │  │ Payment Context  │  │ Shipping     │
-   │                 │  │                  │  │ Context      │
-   │ • OrderPlaced   │  │ • PaymentReceived│  │ • ItemShipped│
-   │ • OrderCancelled│  │ • RefundIssued   │  │ • Delivered  │
-   │ • OrderUpdated  │  │                  │  │ • Returned   │
-   └─────────────────┘  └──────────────────┘  └──────────────┘
-
-3. Mỗi nhóm = 1 Bounded Context tiềm năng
-```
+Bắt đầu liệt kê domain events như OrderPlaced, PaymentReceived, ItemShipped, InventoryUpdated, CustomerRegistered rồi nhóm theo ngữ nghĩa. Mỗi nhóm là một Bounded Context tiềm năng, cần tiếp tục kiểm chứng boundary.
 
 ### Bước 3: Định nghĩa model riêng cho mỗi context
 

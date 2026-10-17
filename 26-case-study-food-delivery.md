@@ -130,16 +130,27 @@ Công ty **FastBite** đang vận hành nền tảng giao đồ ăn trên một 
 
 ### Module hiện tại trong Monolith
 
-```
-┌───────────────────────────────────────────────────────────┐
-│                    FASTBITE MONOLITH                      │
-│                                                           │
-│ User | Restaurant | Menu | Search | Cart                  │
-│ Order | Payment | Dispatch | Driver Tracking              │
-│ Promo | Notification | Review | Support                   │
-│                                                           │
-│             Single PostgreSQL + Redis shared              │
-└───────────────────────────────────────────────────────────┘
+```d2 title="Module hiện tại trong Monolith"
+direction: down
+monolith: FastBite Monolith {
+ modules: Modules {
+  m0: "User"
+  m1: "Restaurant"
+  m2: "Menu"
+  m3: "Search"
+  m4: "Cart"
+  m5: "Order"
+  m6: "Payment"
+  m7: "Dispatch"
+  m8: "Driver Tracking"
+  m9: "Promo"
+  m10: "Notification"
+  m11: "Review"
+  m12: "Support"
+ }
+ db: Single PostgreSQL + Redis shared {shape: cylinder}
+ modules -> db
+}
 ```
 
 ---
@@ -327,52 +338,70 @@ n1 -> n8: "Open Host Service"
 
 ### 1.5. Event Storming cho Place Order
 
+```d2 title="1.5. Event Storming cho Place Order"
+direction: right
+place: "🟦 PlaceOrder"
+cart: "🟨 Cart"
+checked: "🟧 CartCheckedOut"
+create: "🟦 CreateOrder"
+order: "🟨 Order"
+created: "🟧 OrderPlaced"
+voucher: "🟦 ApplyVoucher"
+promotion: "🟨 Promotion"
+applied: "🟧 VoucherApplied"
+rejected: "🟧 VoucherRejected"
+pay: "🟦 InitiatePayment"
+payment: "🟨 Payment"
+paid: "🟧 PaymentCaptured"
+failed: "🟧 PaymentFailed"
+compensation: "🟪 Release voucher / Cancel order"
+confirmed: "🟧 OrderConfirmed"
+notify: "🟦 NotifyRestaurant"
+assign: "🟦 AssignDriver"
+dispatch: "🟨 Dispatch"
+assigned: "🟧 DriverAssigned"
+timeout: "🟧 AssignmentTimeout"
+expand: "🟪 Retry expanded radius / Zone-based queue"
+delivery: "🟧 OrderInDelivery"
+tracking: "🟦 StartTracking"
+incoming: "🟪 Notify user — Tài xế đang đến lấy món / Restaurant — Tài xế sắp tới"
+arrivedrest: "DriverArrived at restaurant"
+picked: "🟧 OrderPickedUp"
+pickednotify: "🟪 Notify user — Tài xế đã lấy món"
+arriveduser: "DriverArrived at user"
+delivered: "🟧 OrderDelivered"
+finish: "🟪 Notify user — Đơn đã giao / Open review window"
+place -> cart
+cart -> checked
+checked -> create
+create -> order
+order -> created
+created -> voucher
+voucher -> promotion
+promotion -> applied: "Thành công"
+promotion -> rejected: "Thất bại"
+created -> pay
+pay -> payment
+payment -> paid: "Thành công"
+payment -> failed: "Thất bại"
+failed -> compensation
+paid -> confirmed
+confirmed -> notify
+confirmed -> assign
+assign -> dispatch
+dispatch -> assigned: "Thành công"
+dispatch -> timeout: "Thất bại"
+timeout -> expand
+assigned -> delivery
+delivery -> tracking
+delivery -> incoming
+arrivedrest -> picked
+picked -> pickednotify
+arriveduser -> delivered
+delivered -> finish
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                  EVENT STORMING — PLACE ORDER (FOOD DELIVERY)                │
-│                                                                              │
-│  🟦 Command    🟧 Domain Event    🟨 Aggregate    🟪 Policy/Rule             │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  🟦 PlaceOrder ──▶ 🟨 Cart ──▶ 🟧 CartCheckedOut                             │
-│        │                              │                                      │
-│        ▼                              ▼                                      │
-│  🟦 CreateOrder ──▶ 🟨 Order ──▶ 🟧 OrderPlaced                              │
-│                              │                                               │
-│                              ├──▶ 🟦 ApplyVoucher ──▶ 🟨 Promotion           │
-│                              │         ├──▶ 🟧 VoucherApplied ✓              │
-│                              │         └──▶ 🟧 VoucherRejected ✗             │
-│                              │                                               │
-│                              └──▶ 🟦 InitiatePayment ──▶ 🟨 Payment          │
-│                                        ├──▶ 🟧 PaymentCaptured ✓             │
-│                                        └──▶ 🟧 PaymentFailed ✗               │
-│                                                   │                          │
-│                                                   ▼                          │
-│                                  🟪 Release voucher + Cancel order           │
-│                                                                              │
-│  (PaymentCaptured) ──▶ 🟧 OrderConfirmed ──▶ 🟦 NotifyRestaurant             │
-│                              │                                               │
-│                              └──▶ 🟦 AssignDriver ──▶ 🟨 Dispatch            │
-│                                        ├──▶ 🟧 DriverAssigned ✓              │
-│                                        └──▶ 🟧 AssignmentTimeout ✗           │
-│                                                   │                          │
-│                                                   ▼                          │
-│                                  🟪 Retry with expanded radius               │
-│                                  🟪 Fallback: zone-based queue               │
-│                                                                              │
-│  (DriverAssigned) ──▶ 🟧 OrderInDelivery ──▶ 🟦 StartTracking                │
-│                              │                                               │
-│                              🟪 Notify user "Tài xế đang đến lấy món"        │
-│                              🟪 Notify restaurant "Tài xế sắp tới"           │
-│                                                                              │
-│  (DriverArrived at restaurant) ──▶ 🟧 OrderPickedUp                          │
-│                              🟪 Notify user "Tài xế đã lấy món"              │
-│                                                                              │
-│  (DriverArrived at user) ──▶ 🟧 OrderDelivered                               │
-│                              🟪 Notify user "Đơn đã giao thành công"         │
-│                              🟪 Open review window                           │
-└──────────────────────────────────────────────────────────────────────────────┘
-```
+
+Legend: 🟦 Command · 🟨 Aggregate · 🟧 Domain Event · 🟪 Policy. Đây là bản đồ Event Storming; fan-out không có nghĩa các bước luôn chạy đồng thời hoặc chỉ PaymentCompleted đã đủ mọi điều kiện confirm.
 
 **Flowchart tổng quan:**
 
@@ -714,43 +743,24 @@ gantt
 
 ### 3.5. API Gateway Design
 
+```d2 title="3.5. API Gateway Design"
+direction: right
+internet: "Internet"
+cdn: "CloudFront CDN"
+alb: "ALB"
+gateway: "Application API Gateway"
+internet -> cdn
+cdn -> alb
+alb -> gateway
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      API GATEWAY (FastBite)                     │
-│                                                                 │
-│  Internet ──▶ CloudFront (CDN) ──▶ ALB ──▶ API Gateway          │
-│                                                                 │
-│  Responsibilities:                                              │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │  1. Auth Verify     │ Validate JWT, reject invalid token │   │
-│  │  2. Routing         │ /api/v1/orders/* → Order Service   │   │
-│  │  3. Rate Limiting   │ Per IP, per user, per endpoint     │   │
-│  │  4. SSL Termination │ HTTPS → HTTP (internal)            │   │
-│  │  5. Request Logging │ Access log + x-request-id          │   │
-│  │  6. CORS            │ Allowed origins (web, mobile)      │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                 │
-│  Routing Table:                                                 │
-│  ┌────────────────────────────┬──────────────────────┐          │
-│  │ Path Pattern               │ Target Service       │          │
-│  ├────────────────────────────┼──────────────────────┤          │
-│  │ /api/v1/auth/*             │ Identity Service     │          │
-│  │ /api/v1/users/*            │ User Service         │          │
-│  │ /api/v1/restaurants/*      │ Merchant Service     │          │
-│  │ /api/v1/menus/*            │ Menu Service         │          │
-│  │ /api/v1/search/*           │ Search Service       │          │
-│  │ /api/v1/carts/*            │ Cart Service         │          │
-│  │ /api/v1/orders/*           │ Order Service        │          │
-│  │ /api/v1/payments/*         │ Payment Service      │          │
-│  │ /api/v1/dispatch/*         │ Dispatch Service     │          │
-│  │ /api/v1/tracking/*         │ Tracking Service     │          │
-│  │ /api/v1/promos/*           │ Promotion Service    │          │
-│  │ /api/v1/notifications/*    │ Notification Service │          │
-│  │ /api/v1/reviews/*          │ Review Service       │          │
-│  │ /api/v1/tickets/*          │ Support Service      │          │
-│  └────────────────────────────┴──────────────────────┘          │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+Sơ đồ dùng application API Gateway sau ALB; không ngụ ý đây là thứ tự bắt buộc của Amazon API Gateway managed. TLS nội bộ vẫn có thể dùng HTTPS/mTLS theo threat model.
+
+| Responsibility | Chi tiết |
+| --- | --- |
+
+| Path pattern | Target service |
+| --- | --- |
 
 ### 3.6. Service Discovery
 
@@ -846,27 +856,26 @@ Response 200 OK:
 
 **Quy trình Health Check:**
 
-```mermaid
-sequenceDiagram
-    participant CM as Cloud Map
-    participant ECS as ECS Agent
-    participant SVC as Service Instance
-
-    loop Mỗi 10 giây
-        ECS->>SVC: GET /readyz
-        alt Response 200 trong 5s
-            SVC-->>ECS: 200 OK
-            ECS->>CM: Report HEALTHY
-        else Timeout hoặc 5xx
-            SVC--xECS: Timeout / 500
-            ECS->>CM: Report UNHEALTHY (count++)
-        end
-    end
-
-    Note over CM: Sau 3 lần UNHEALTHY liên tiếp
-    CM->>CM: Deregister instance khỏi DNS
-    CM->>ECS: Trigger replacement task
+```d2 title="Health Check — Cơ chế giám sát sức khoẻ"
+direction: down
+tick: "ECS Agent — mỗi 10 giây"
+probe: "GET /readyz tới Service Instance"
+check: "Response trong 5 giây?"
+healthy: "200 OK\nReport HEALTHY tới Cloud Map"
+unhealthy: "Timeout / 5xx\nReport UNHEALTHY • count++"
+count: "3 lần UNHEALTHY liên tiếp?"
+remove: "Cloud Map deregister instance khỏi DNS\nTheo flow minh họa: yêu cầu ECS replacement"
+tick -> probe
+probe -> check
+check -> healthy: "200 trong 5s"
+check -> unhealthy: "Timeout / 5xx"
+healthy -> tick: "Chu kỳ tiếp theo"
+unhealthy -> count
+count -> tick: "Chưa đủ"
+count -> remove: "Đủ 3 lần"
 ```
+
+Sơ đồ thể hiện vòng kiểm tra và ngưỡng của ví dụ. Khi triển khai thật, ECS Service scheduler chịu trách nhiệm thay task; Cloud Map quản lý registration/health, không tự gọi ECS để tạo task thay thế.
 
 #### Khi một Service Instance gặp sự cố
 
@@ -894,36 +903,32 @@ T+55s        Traffic phân phối đều cho instance #1, #3, #4
 
 ### 3.7. Sequence Diagram: End-to-End Delivery Flow
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as User
-    participant G as Gateway
-    participant O as Order
-    participant P as Payment
-    participant K as Kafka
-    participant D as Dispatch
-    participant T as Tracking
-    participant N as Notification
-
-    U->>G: POST /orders
-    G->>O: createOrder
-    O->>P: initiatePayment
-    P-->>O: paymentUrl
-    O-->>U: orderId + paymentUrl
-
-    P->>O: payment.captured.v1
-    O->>K: publish order.ready_for_dispatch.v1
-    K->>D: consume order.ready_for_dispatch.v1
-    D->>D: candidate scoring
-    D->>K: publish driver.assigned.v1
-    K->>O: consume driver.assigned.v1
-    O->>N: notify.driver_assigned
-
-    T->>O: order.picked_up.v1
-    O->>N: notify.picked_up
-    T->>O: order.delivered.v1
-    O->>N: notify.delivered
+```d2 title="3.7. Sequence Diagram: End-to-End Delivery Flow"
+shape: sequence_diagram
+"U": "User"
+"G": "Gateway"
+"O": "Order"
+"P": "Payment"
+"K": "Kafka"
+"D": "Dispatch"
+"T": "Tracking"
+"N": "Notification"
+"U" -> "G": "1. POST /orders"
+"G" -> "O": "2. createOrder"
+"O" -> "P": "3. initiatePayment"
+"P" -> "O": "4. paymentUrl" { style.stroke-dash: 5 }
+"O" -> "U": "5. orderId + paymentUrl" { style.stroke-dash: 5 }
+"P" -> "O": "6. payment.captured.v1"
+"O" -> "K": "7. publish order.ready_for_dispatch.v1"
+"K" -> "D": "8. consume order.ready_for_dispatch.v1"
+"D" -> "D": "9. candidate scoring"
+"D" -> "K": "10. publish driver.assigned.v1"
+"K" -> "O": "11. consume driver.assigned.v1"
+"O" -> "N": "12. notify.driver_assigned"
+"T" -> "O": "13. order.picked_up.v1"
+"O" -> "N": "14. notify.picked_up"
+"T" -> "O": "15. order.delivered.v1"
+"O" -> "N": "16. notify.delivered"
 ```
 
 **Ví dụ thực tế:** nếu sau 10 giây chưa assign được driver, Dispatch phát `dispatch.assignment_timeout.v1`, hệ thống tự mở rộng bán kính tìm driver từ 2km lên 4km.
@@ -1043,48 +1048,73 @@ Mỗi service **sở hữu database riêng**, không service nào truy cập tr�
 | 11 | **Notification** | MongoDB | — | Flexible schema cho đa dạng template (push, SMS, email) | ~80GB/năm |
 | 12 | **Review** | MongoDB | — | Flexible content: text + images + ratings | ~30GB/năm |
 
+```d2 title="4.1. Database per Service"
+direction: right
+stores: Database per Service {
+ s0: "Order" {
+  db: "PostgreSQL + Replica" {shape: cylinder}
+ }
+ s1: "Payment" {
+  db: "PostgreSQL — PCI-DSS boundary" {shape: cylinder}
+ }
+ s2: "Dispatch" {
+  db: "PostgreSQL + Redis" {shape: cylinder}
+ }
+ s3: "Tracking" {
+  db: "Redis Streams" {shape: cylinder}
+ }
+ s4: "Menu" {
+  db: "PostgreSQL + Redis" {shape: cylinder}
+ }
+ s5: "Search" {
+  db: "OpenSearch + Redis" {shape: cylinder}
+ }
+ s6: "Cart" {
+  db: "Redis" {shape: cylinder}
+ }
+ s7: "Promotion" {
+  db: "PostgreSQL + Redis" {shape: cylinder}
+ }
+ s8: "Notification" {
+  db: "MongoDB" {shape: cylinder}
+ }
+ s9: "Review" {
+  db: "MongoDB" {shape: cylinder}
+ }
+}
+bus: "Kafka — orders.* / payments.* / dispatch.*"
+s3: "S3 — GPS Archive / Images"
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                  DATA ARCHITECTURE OVERVIEW                    │
-│                                                                │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │  Order   │  │ Payment  │  │ Dispatch │  │ Tracking │        │
-│  │PostgreSQL│  │PostgreSQL│  │PostgreSQL│  │  Redis   │        │
-│  │+ Replica │  │(PCI-DSS) │  │ + Redis  │  │ Streams  │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-│                                                                │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
-│  │   Menu   │  │  Search  │  │   Cart   │  │Promotion │        │
-│  │PostgreSQL│  │OpenSearch│  │  Redis   │  │PostgreSQL│        │
-│  │ + Redis  │  │ + Redis  │  │          │  │ + Redis  │        │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
-│                                                                │
-│  ┌──────────┐  ┌──────────┐  ┌─────────────────────────┐       │
-│  │ Notif    │  │  Review  │  │    Event Bus (Kafka)    │       │
-│  │ MongoDB  │  │ MongoDB  │  │  Topics: orders.*       │       │
-│  └──────────┘  └──────────┘  │  payments.* dispatch.*  │       │
-│                              └─────────────────────────┘       │
-│  ┌─────────────────────────────────────────────────────┐       │
-│  │      Object Storage (S3): GPS archive, images       │       │
-│  └─────────────────────────────────────────────────────┘       │
-└────────────────────────────────────────────────────────────────┘
-```
+
+Mỗi service sở hữu dữ liệu riêng; chọn PostgreSQL không tự bảo đảm PCI-DSS compliance cho Payment.
 
 ### 4.2. Saga Orchestration cho Order Lifecycle
 
-```mermaid
-stateDiagram-v2
-    [*] --> CREATED
-    CREATED --> PAYMENT_PENDING: initiate payment
-    PAYMENT_PENDING --> PAID: payment captured
-    PAYMENT_PENDING --> CANCELLED: payment failed/timeout
-    PAID --> ASSIGNING_DRIVER: dispatch start
-    ASSIGNING_DRIVER --> PREPARING: driver assigned
-    PREPARING --> PICKED_UP: pickup confirmed
-    PICKED_UP --> DELIVERED: dropoff confirmed
-    DELIVERED --> COMPLETED
-    CANCELLED --> [*]
-    COMPLETED --> [*]
+```d2 title="4.2. Saga Orchestration cho Order Lifecycle"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+CREATED: "CREATED"
+initial1 -> CREATED
+PAYMENT_PENDING: "PAYMENT_PENDING"
+CREATED -> PAYMENT_PENDING: "initiate payment"
+PAID: "PAID"
+PAYMENT_PENDING -> PAID: "payment captured"
+CANCELLED: "CANCELLED"
+PAYMENT_PENDING -> CANCELLED: "payment failed/timeout"
+ASSIGNING_DRIVER: "ASSIGNING_DRIVER"
+PAID -> ASSIGNING_DRIVER: "dispatch start"
+PREPARING: "PREPARING"
+ASSIGNING_DRIVER -> PREPARING: "driver assigned"
+PICKED_UP: "PICKED_UP"
+PREPARING -> PICKED_UP: "pickup confirmed"
+DELIVERED: "DELIVERED"
+PICKED_UP -> DELIVERED: "dropoff confirmed"
+COMPLETED: "COMPLETED"
+DELIVERED -> COMPLETED
+final2: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+CANCELLED -> final2
+final3: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
+COMPLETED -> final3
 ```
 
 **Chi tiết từng bước:**
@@ -1108,28 +1138,23 @@ stateDiagram-v2
 
 **Failure Sequence — Payment Failed:**
 
-```mermaid
-sequenceDiagram
-    participant OS as Order Saga
-    participant PAY as Payment
-    participant PRM as Promotion
-    participant K as Kafka
-    participant NTF as Notification
-
-    Note over OS: Payment timeout/failed
-    PAY->>K: payment.failed.v1
-    K->>OS: consume payment.failed
-    
-    rect rgb(36, 29, 29)
-        Note over OS: Compensating Transactions
-        OS->>PRM: reverseVoucherUsage(orderId)
-        PRM-->>OS: reversed ✓
-        OS->>OS: Update order status=CANCELLED
-    end
-    
-    OS->>K: order.cancelled.v1
-    K->>NTF: consume order.cancelled
-    Note over NTF: Push: "Thanh toán thất bại, đơn đã hủy"
+```d2 title="4.2. Saga Orchestration cho Order Lifecycle"
+shape: sequence_diagram
+"OS": "Order Saga"
+"PAY": "Payment"
+"PRM": "Promotion"
+"K": "Kafka"
+"NTF": "Notification"
+"OS".note1: "Payment timeout/failed"
+"PAY" -> "K": "payment.failed.v1"
+"K" -> "OS": "consume payment.failed"
+"OS".note2: "Compensating Transactions"
+"OS" -> "PRM": "reverseVoucherUsage(orderId)"
+"PRM" -> "OS": "reversed ✓" { style.stroke-dash: 5 }
+"OS" -> "OS": "Update order status=CANCELLED"
+"OS" -> "K": "order.cancelled.v1"
+"K" -> "NTF": "consume order.cancelled"
+"NTF".note3: "Push: \"Thanh toán thất bại, đơn đã hủy\""
 ```
 
 ### 4.3. Outbox Pattern
@@ -1478,13 +1503,17 @@ Giải pháp multi-layer:
 
 **Circuit Breaker State Machine:**
 
-```mermaid
-stateDiagram-v2
-    [*] --> CLOSED: Normal operation
-    CLOSED --> OPEN: Failure threshold exceeded
-    OPEN --> HALF_OPEN: After timeout (20-60s)
-    HALF_OPEN --> CLOSED: Probe request succeeds
-    HALF_OPEN --> OPEN: Probe request fails
+```d2 title="5.2. Circuit Breaker/Retry/Timeout"
+direction: down
+initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
+CLOSED: "CLOSED"
+initial1 -> CLOSED: "Normal operation"
+OPEN: "OPEN"
+CLOSED -> OPEN: "Failure threshold exceeded"
+HALF_OPEN: "HALF_OPEN"
+OPEN -> HALF_OPEN: "After timeout (20-60s)"
+HALF_OPEN -> CLOSED: "Probe request succeeds"
+HALF_OPEN -> OPEN: "Probe request fails"
 ```
 
 - **CLOSED**: Mọi request đi qua bình thường, CB theo dõi tỉ lệ lỗi.
@@ -1621,22 +1650,21 @@ Khi một downstream service bị lỗi hoặc phản hồi quá chậm, thay v�
 
 #### Case 1: Routing API Down → Dùng cached ETA
 
-```
-User đặt phở lúc 11:45 → Order Service → Dispatch Service → Routing API (Google Maps)
-                                                                   ❌ Circuit Breaker OPEN
-                                                                   │
-                                                                   ▼
-                                                           Fallback Handler
-                                                                   │
-                                                           ┌───────┴────────┐
-                                                           │  Redis Cache   │
-                                                           │  Key: eta:     │
-                                                           │  {zone}:{dist} │
-                                                           └───────┬────────┘
-                                                                   │
-                                                                   ▼
-                                                           Trả về cached ETA ~28 phút
-                                                           + ghi nhận flag estimated_eta=true
+```d2 title="Case 1: Routing API Down → Dùng cached ETA"
+direction: right
+user: "User đặt phở11:45"
+order: "Order"
+dispatch: "Dispatch"
+routing: "Google Maps Routing API — CB OPEN"
+fallback: "Fallback Handler"
+redis: "Redis — eta:{zone}:{dist}"
+result: "Cached ETA khoảng28 phút\nestimated_eta=true"
+user -> order
+order -> dispatch
+dispatch -> routing
+routing -> fallback
+fallback -> redis
+redis -> result
 ```
 
 - Dispatch Service lưu **ETA trung bình theo zone + khoảng cách** mỗi 15 phút vào Redis (pre-warm).
@@ -1645,16 +1673,17 @@ User đặt phở lúc 11:45 → Order Service → Dispatch Service → Routing 
 
 #### Case 2: Dispatch Scoring Fail → Fallback Nearest Driver
 
-```
-Order Service → Dispatch Service → Scoring Engine (ML-based optimal matching)
-                                         ❌ Timeout 2s / Error
-                                         │
-                                         ▼
-                                 Fallback: nearest driver algorithm
-                                         │
-                                         ▼
-                                 Chọn tài xế gần nhà hàng nhất (Haversine distance)
-                                 + driver online + không đang giao đơn khác
+```d2 title="Case 2: Dispatch Scoring Fail → Fallback Nearest Driver"
+direction: right
+order: "Order"
+dispatch: "Dispatch"
+scoring: "ML Scoring — Timeout2s / Error"
+fallback: "Fallback — Nearest Driver"
+result: "Haversine nearest to restaurant\nOnline / Không đang giao đơn khác"
+order -> dispatch
+dispatch -> scoring
+scoring -> fallback
+fallback -> result
 ```
 
 - ML scoring engine tối ưu theo ETA + cost + driver fairness, nhưng khi fail, fallback về thuật toán đơn giản: **tài xế gần nhất còn rảnh**.
@@ -1709,16 +1738,24 @@ Order Service → Dispatch Service → Scoring Engine (ML-based optimal matching
 
 **Defense in Depth** (phòng thủ nhiều lớp) là chiến lược kết hợp **nhiều resilience pattern thành một chuỗi tuần tự**, trong đó mỗi lớp đảm nhận một nhiệm vụ riêng và **bắt những lỗi mà lớp trước bỏ sót**.
 
+```d2 title="5.8. Defense in Depth"
+direction: right
+request: "Request"
+rate: "Rate Limit — Quá nhiều request →429"
+timeout: "Overall Timeout / Deadline — Hết hạn → Timeout response"
+retry: "Bounded Retry — Retryable / Budget còn"
+cb: "Circuit Breaker — Quá nhiều lỗi → OPEN"
+bulkhead: "Bulkhead — Pool isolation"
+fallback: "Fallback — Result thay thế / Graceful Degradation"
+request -> rate
+rate -> timeout
+timeout -> retry
+retry -> cb
+cb -> bulkhead
+bulkhead -> fallback
 ```
-Request ──▶ Rate Limit ──▶ Timeout ──▶ Retry ──▶ Circuit Breaker ──▶ Bulkhead ──▶ Fallback
-   │            │             │           │            │                │            │
-   │         Quá nhiều     Quá lâu    Thử lại     Quá nhiều lỗi   Isolate pool  Trả kết quả
-   │         request?      chờ?       lần nữa?    → ngắt mạch    → không lan    thay thế
-   │            │             │           │            │           tràn           │
-   ▼            ▼             ▼           ▼            ▼                │         ▼
-  429          504        Retry/Fail    Open CB    Thread pool      Fallback    Graceful
-                                                   isolated       response    degradation
-```
+
+Sơ đồ giữ thứ tự minh họa của ví dụ, không phải decorator order bắt buộc. CB bên trong Retry đo từng attempt; CB bên ngoài đo logical request. Fallback là đường xử lý lỗi, không phải dependency call tiếp theo khi thành công. Cần per-try timeout ngoài deadline tổng.
 
 **Chi tiết từng lớp trong FastBite:**
 
@@ -2419,14 +2456,19 @@ n8 -> n9
 
 **Kiến trúc tổng quan:** Tất cả microservices (Order, Payment, Dispatch, Tracking, Menu…) đều chạy trên **Amazon ECS với launch type Fargate**. AWS quản lý hoàn toàn infrastructure layer — không cần provision hay patch EC2 instance. Mỗi service đóng gói Docker container, định nghĩa Task Definition, deploy qua ECS Service với ALB phía trước.
 
-```
-┌─────────────────────────────────────────────────┐
-│                   ALB / API Gateway             │
-├──────────┬──────────┬──────────┬────────────────┤
-│ Order    │ Payment  │ Dispatch │ Tracking       │
-│ (Fargate)│ (Fargate)│ (Fargate)│ (Fargate)      │
-└──────────┴──────────┴──────────┴────────────────┘
-         Tất cả services → ECS Fargate
+```d2 title="Solution A: ECS Fargate-first"
+direction: down
+ingress: ALB / API Gateway
+core: ECS Fargate {
+ s0: "Order Service"
+ s1: "Payment Service"
+ s2: "Dispatch Service"
+ s3: "Tracking Service"
+}
+ingress -> core.s0
+ingress -> core.s1
+ingress -> core.s2
+ingress -> core.s3
 ```
 
 - **Ưu điểm:**
@@ -2445,16 +2487,19 @@ n8 -> n9
 
 **Kiến trúc tổng quan:** Tất cả microservices chạy trên **Amazon EKS**. Team quản lý Kubernetes cluster, sử dụng Helm charts để deploy. Mỗi service là Deployment + Service + Ingress, với HPA để auto-scale.
 
-```
-┌─────────────────────────────────────────────────┐
-│              Ingress Controller (ALB/Nginx)       │
-├──────────┬──────────┬──────────┬────────────────┤
-│ Order    │ Payment  │ Dispatch │ Tracking       │
-│ (Pod)    │ (Pod)    │ (Pod)    │ (Pod)          │
-├──────────┴──────────┴──────────┴────────────────┤
-│            EKS Cluster (Managed Node Groups)     │
-└─────────────────────────────────────────────────┘
-         Tất cả services → Kubernetes Pods
+```d2 title="Solution B: EKS-first"
+direction: down
+ingress: Ingress Controller — ALB / Nginx
+core: EKS — Managed Node Groups {
+ s0: "Order Pod"
+ s1: "Payment Pod"
+ s2: "Dispatch Pod"
+ s3: "Tracking Pod"
+}
+ingress -> core.s0
+ingress -> core.s1
+ingress -> core.s2
+ingress -> core.s3
 ```
 
 - **Ưu điểm:**
@@ -2473,21 +2518,23 @@ n8 -> n9
 
 **Kiến trúc tổng quan:** Phân loại workload và chọn compute phù hợp nhất cho từng loại. **Core API services** (request-response, cần low latency) deploy trên **ECS Fargate**. **Event-driven và burst workloads** (notification, image processing) chạy trên **Lambda**.
 
-```
-┌─────────────────────────────────────────────────────┐
-│                  ALB / API Gateway                  │
-├──────────┬──────────┬──────────┬──────────┐         │
-│ Order    │ Payment  │ Dispatch │ Tracking │← Fargate│
-│ (Fargate)│ (Fargate)│ (Fargate)│ (Fargate)│ (core)  │
-├──────────┴──────────┴──────────┴──────────┤         │
-│                                           │         │
-│  SQS/SNS/EventBridge triggers             │         │
-│  ┌────────────┬───────────┐               │         │
-│  │Notification│ Image     │  ← Lambda     │         │
-│  │ (Lambda)   │ Resize    │   (event)     │         │
-│  │            │ (Lambda)  │               │         │
-│  └────────────┴───────────┘               │         │
-└─────────────────────────────────────────────────────┘
+```d2 title="Solution C: Hybrid (ECS cho core + Lambda cho event-driven)"
+direction: down
+ingress: ALB / API Gateway
+core: ECS Fargate {
+ s0: "Order Service"
+ s1: "Payment Service"
+ s2: "Dispatch Service"
+ s3: "Tracking Service"
+}
+ingress -> core.s0
+ingress -> core.s1
+ingress -> core.s2
+ingress -> core.s3
+triggers: SQS / SNS / EventBridge triggers
+lambda: Lambda { notification: Notification; image: Image Resize }
+triggers -> lambda.notification
+triggers -> lambda.image
 ```
 
 - **Ưu điểm:**

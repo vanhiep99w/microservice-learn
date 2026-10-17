@@ -112,33 +112,29 @@ Route 53 thực hiện DNS, không proxy từng HTTP request. Internal ALB đặ
 
 ### 2.3. Traffic Flow — Luồng request từ client đến service
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant CF as CloudFront
-    participant R53 as Route 53
-    participant APIGW as API Gateway / ALB
-    participant SVC as Microservice (ECS/EKS)
-    participant DB as Database
-    participant Cache as ElastiCache
-
-    Client->>R53: api.shopvn.com
-    R53->>CF: DNS resolve → CloudFront
-    CF->>APIGW: Forward request (cache miss)
-    APIGW->>APIGW: WAF check → Auth → Rate limit
-    APIGW->>SVC: Route to target service
-    SVC->>Cache: Check cache
-    alt Cache hit
-        Cache-->>SVC: Return cached data
-    else Cache miss
-        SVC->>DB: Query database
-        DB-->>SVC: Return data
-        SVC->>Cache: Store in cache
-    end
-    SVC-->>APIGW: Response
-    APIGW-->>CF: Response
-    CF-->>Client: Response (+ cache)
+```d2 title="2.3. Traffic Flow — Luồng request từ client đến service"
+direction: right
+dns: "Client hỏi Route 53\napi.shopvn.com → CloudFront"
+cf: "CloudFront\nForward khi cache miss"
+gateway: "API Gateway / ALB\nWAF check • Auth • Rate limit"
+service: "Microservice — ECS / EKS"
+cache: "ElastiCache\nCheck cache"
+cached: "Cache hit — cached data"
+db: "Cache miss — Query Database\nDatabase trả data"
+store: "Store data vào cache"
+response: "Service → Gateway → CloudFront\nResponse tới Client, cache theo policy"
+dns -> cf
+cf -> gateway
+gateway -> service
+service -> cache
+cache -> cached: "Hit"
+cache -> db: "Miss"
+db -> store
+store -> response
+cached -> response
 ```
+
+Route 53 chỉ phân giải DNS; HTTP request đi từ Client tới CloudFront, không đi qua Route 53 như một HTTP proxy.
 
 **Luồng đi qua từng layer:**
 
@@ -157,31 +153,22 @@ sequenceDiagram
 
 **ECS Fargate** = Container-as-a-Service — bạn chỉ cần lo container, AWS lo server.
 
-```
-┌─────────────────────────────────────────────────┐
-│              ECS CLUSTER                        │
-│                                                 │
-│  ┌─────────── ECS Service ─────────────────┐    │
-│  │                                         │    │
-│  │  ┌──────────┐  ┌──────────┐  ┌────────┐ │    │
-│  │  │  Task 1  │  │  Task 2  │  │ Task 3 │ │    │
-│  │  │(Fargate) │  │(Fargate) │  │(Farg.) │ │    │
-│  │  │          │  │          │  │        │ │    │
-│  │  │ ┌──────┐ │  │ ┌──────┐ │  │┌──────┐│ │    │
-│  │  │ │ App  │ │  │ │ App  │ │  ││ App  ││ │    │
-│  │  │ │Contai│ │  │ │Contai│ │  ││Conta ││ │    │
-│  │  │ │ ner  │ │  │ │ ner  │ │  ││iner  ││ │    │
-│  │  │ └──────┘ │  │ └──────┘ │  │└──────┘│ │    │
-│  │  └──────────┘  └──────────┘  └────────┘ │    │
-│  │                                         │    │
-│  │  ALB ──▶ Target Group ──▶ Tasks         │    │
-│  └─────────────────────────────────────────┘    │
-│                                                 │
-│  ┌─────────── ECS Service (khác) ──────────┐    │
-│  │  ...                                    │    │
-│  └─────────────────────────────────────────┘    │
-│                                                 │
-└─────────────────────────────────────────────────┘
+```d2 title="3.1. ECS Fargate"
+direction: down
+alb: ALB
+tg: Target Group
+cluster: ECS Cluster {
+ service: ECS Service {
+  t1: Fargate Task1 { app: App Container }
+  t2: Fargate Task2 { app: App Container }
+  t3: Fargate Task3 { app: App Container }
+ }
+ other: ECS Service khác
+}
+alb -> tg
+tg -> cluster.service.t1
+tg -> cluster.service.t2
+tg -> cluster.service.t3
 ```
 
 **Các khái niệm ECS:**
@@ -214,24 +201,12 @@ sequenceDiagram
 
 Giống ECS Fargate nhưng tasks chạy trên **EC2 instances do bạn quản lý**.
 
-```
-┌───────────────────────────────────────────────────┐
-│              ECS CLUSTER (EC2 Launch Type)        │
-│                                                   │
-│  ┌────────── EC2 Instance 1 ───────────────┐      │
-│  │  ECS Agent                              │      │
-│  │  ┌──────────┐  ┌──────────┐             │      │
-│  │  │  Task A  │  │  Task B  │             │      │
-│  │  └──────────┘  └──────────┘             │      │
-│  └─────────────────────────────────────────┘      │
-│                                                   │
-│  ┌────────── EC2 Instance 2 ───────────────┐      │
-│  │  ECS Agent                              │      │
-│  │  ┌──────────┐  ┌──────────┐             │      │
-│  │  │  Task C  │  │  Task D  │             │      │
-│  │  └──────────┘  └──────────┘             │      │
-│  └─────────────────────────────────────────┘      │
-└───────────────────────────────────────────────────┘
+```d2 title="3.2. ECS trên EC2"
+direction: right
+cluster: ECS Cluster — EC2 Launch Type {
+ one: EC2 Instance1 { agent: ECS Agent; a: Task A; b: Task B }
+ two: EC2 Instance2 { agent: ECS Agent; c: Task C; d: Task D }
+}
 ```
 
 **Khi nào chọn ECS EC2 thay vì Fargate?**
@@ -248,32 +223,23 @@ Giống ECS Fargate nhưng tasks chạy trên **EC2 instances do bạn quản l�
 
 **EKS** = AWS managed Kubernetes — AWS quản lý Control Plane, bạn quản lý worker nodes (hoặc dùng Fargate).
 
+```d2 title="3.3. EKS (Elastic Kubernetes Service)"
+direction: down
+eks: EKS Cluster {
+ control: AWS-managed Control Plane — API / etcd / Controllers / Scheduler / Multi-AZ
+ data: Data Plane {
+  mng: Managed Node Group {
+   one: EC2 Instance1 { a: Pod A; b: Pod B }
+   two: EC2 Instance2 { c: Pod C; d: Pod D }
+  }
+  fargate: Fargate Profile { e: Pod E; f: Pod F }
+ }
+ addons: AWS Load Balancer Controller / EBS CSI / CoreDNS / kube-proxy
+ control -- data
+}
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    EKS CLUSTER                           │
-│                                                          │
-│  ┌──── Control Plane (AWS Managed) ────┐                 │
-│  │  API Server, etcd, Controller,      │                 │
-│  │  Scheduler — Multi-AZ, auto-update  │                 │
-│  └──────────────┬──────────────────────┘                 │
-│                 │                                        │
-│  ┌──── Data Plane (Bạn quản lý) ────────────────────┐    │
-│  │                                                  │    │
-│  │  ┌─ Managed Node Group ──────────────────┐       │    │
-│  │  │  EC2 Instance    EC2 Instance         │       │    │
-│  │  │  ┌─────┐┌─────┐ ┌─────┐┌─────┐        │       │    │
-│  │  │  │Pod A││Pod B│ │Pod C││Pod D│        │       │    │
-│  │  │  └─────┘└─────┘ └─────┘└─────┘        │       │    │
-│  │  └───────────────────────────────────────┘       │    │
-│  │                                                  │    │
-│  │  ┌─ Fargate Profile ────────────────────┐        │    │
-│  │  │  Fargate Pod E    Fargate Pod F      │        │    │
-│  │  └──────────────────────────────────────┘        │    │
-│  └──────────────────────────────────────────────────┘    │
-│                                                          │
-│  Add-ons: ALB Controller, EBS CSI, CoreDNS, kube-proxy   │
-└──────────────────────────────────────────────────────────┘
-```
+
+Control-plane/version/add-on/node upgrades theo EKS lifecycle và cấu hình; managed control plane không đồng nghĩa mọi thành phần của cluster tự upgrade cùng lúc.
 
 **Ưu điểm:**
 
@@ -397,31 +363,29 @@ n7 -> n13: "Mix: vừa ổn định vừa spiky"
 
 Trong thực tế, **không bắt buộc chọn 1 compute** cho tất cả services. Một kiến trúc phổ biến:
 
+```d2 title="3.7. Hybrid Approach — Kết hợp nhiều compute"
+direction: right
+hybrid: Hybrid Architecture {
+ fargate: ECS Fargate — Core APIs {
+  user: User — traffic ổn định
+  product: Product — low latency
+  order: Order — long-running processes
+  payment: Payment — compliance / isolation
+ }
+ lambda: Lambda — Event-driven / Lightweight {
+  notification: Notification — spiky
+  image: Image Resize — S3 trigger
+  recommend: Recommendation — batch inference phù hợp limits
+  webhook: Webhook Handler — infrequent / scale to zero
+ }
+ ec2: ECS EC2 + Spot — Batch Workers {
+  search: Search Indexer — CPU intensive
+  report: Report Generator — scheduled / interruption-tolerant
+ }
+}
 ```
-┌───────────────────────────────────────────────────────┐
-│                  HYBRID ARCHITECTURE                  │
-│                                                       │
-│  ┌─── ECS Fargate (Core Services) ───────────────┐    │
-│  │  User Service     ← traffic ổn định, stateful │    │
-│  │  Product Service  ← cần low latency           │    │
-│  │  Order Service    ← long-running processes    │    │
-│  │  Payment Service  ← PCI compliance, isolated  │    │
-│  └───────────────────────────────────────────────┘    │
-│                                                       │
-│  ┌─── Lambda (Event-driven / Lightweight) ───────┐    │
-│  │  Notification     ← event-driven, spiky       │    │
-│  │  Image Resize     ← trigger từ S3 upload      │    │
-│  │  Recommendation   ← batch ML inference        │    │
-│  │  Webhook Handler  ← infrequent, scale to 0    │    │
-│  └───────────────────────────────────────────────┘    │
-│                                                       │
-│  ┌─── ECS EC2 + Spot (Batch / Workers) ─────────┐     │
-│  │  Search Indexer   ← CPU intensive            │     │
-│  │  Report Generator ← schedule-based, tolerant │     │
-│  └──────────────────────────────────────────────┘     │
-│                                                       │
-└───────────────────────────────────────────────────────┘
-```
+
+State/data durability, compliance và timeout limits phải được thiết kế riêng; compute choice không tự giải quyết stateful storage hay PCI compliance.
 
 **Nguyên tắc phân chia:**
 
@@ -768,38 +732,23 @@ Một AWS Account cho tất cả (dev, staging, prod) → **nguy hiểm**:
 
 ### 7.2. Account Structure
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│                  AWS Organizations                           │
-│                  (Management Account)                        │
-│                                                              │
-│  ┌───── Security OU ──────────────────────┐                  │
-│  │  ┌──────────────┐  ┌────────────────┐  │                  │
-│  │  │   Security   │  │    Logging     │  │                  │
-│  │  │   Account    │  │    Account     │  │                  │
-│  │  │  (GuardDuty, │  │  (CloudTrail,  │  │                  │
-│  │  │   Config)    │  │   centralized  │  │                  │
-│  │  └──────────────┘  │   logs)        │  │                  │
-│  │                    └────────────────┘  │                  │
-│  └────────────────────────────────────────┘                  │
-│                                                              │
-│  ┌───── Infrastructure OU ────────────────┐                  │
-│  │  ┌──────────────┐  ┌────────────────┐  │                  │
-│  │  │   Shared     │  │   Networking   │  │                  │
-│  │  │   Services   │  │   Account      │  │                  │
-│  │  │  (ECR, CI/CD │  │  (Transit GW,  │  │                  │
-│  │  │   tooling)   │  │   VPC Peering) │  │                  │
-│  │  └──────────────┘  └────────────────┘  │                  │
-│  └────────────────────────────────────────┘                  │
-│                                                              │
-│  ┌───── Workload OU ──────────────────────┐                  │
-│  │  ┌─────────┐  ┌──────────┐  ┌────────┐ │                  │
-│  │  │   Dev   │  │ Staging  │  │  Prod  │ │                  │
-│  │  │ Account │  │ Account  │  │Account │ │                  │
-│  │  └─────────┘  └──────────┘  └────────┘ │                  │
-│  └────────────────────────────────────────┘                  │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
+```d2 title="7.2. Account Structure"
+direction: right
+org: AWS Organizations — Management Account {
+ security: Security OU {
+  security: Security Account — GuardDuty / Config
+  logging: Logging Account — CloudTrail / Centralized Logs
+ }
+ infrastructure: Infrastructure OU {
+  shared: Shared Services Account — ECR / CI-CD tooling
+  network: Networking Account — Transit GW / VPC Peering
+ }
+ workloads: Workload OU {
+  dev: Dev Account
+  staging: Staging Account
+  prod: Production Account
+ }
+}
 ```
 
 ### 7.3. AWS Organizations & Control Tower
@@ -815,20 +764,12 @@ Một AWS Account cho tất cả (dev, staging, prod) → **nguy hiểm**:
 
 **ECR Cross-Account** — production account pull image từ shared ECR:
 
-```
-┌─────────────────┐         ┌─────────────────┐
-│  Shared Account │         │   Prod Account  │
-│                 │         │                 │
-│  ┌───────────┐  │  pull   │  ┌───────────┐  │
-│  │    ECR    │──┼────────▶│  │ ECS Task  │  │
-│  │ (images)  │  │         │  └───────────┘  │
-│  └───────────┘  │         │                 │
-│                 │         │                 │
-│  ┌───────────┐  │ assume  │  ┌───────────┐  │
-│  │  CI/CD    │──┼────────▶│  │ Deploy    │  │
-│  │ Pipeline  │  │  role   │  │  Role     │  │
-│  └───────────┘  │         │  └───────────┘  │
-└─────────────────┘         └─────────────────┘
+```d2 title="7.4. Cross-Account Access"
+direction: right
+shared: Shared Account { ecr: ECR Images; ci: CI/CD Pipeline }
+prod: Production Account { task: ECS Task; role: Deploy Role }
+prod.task -> shared.ecr: Pull authorized images
+shared.ci -> prod.role: STS AssumeRole
 ```
 
 **Cách hoạt động:**

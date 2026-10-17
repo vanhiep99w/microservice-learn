@@ -134,12 +134,18 @@ Nguyên nhân thường không phải là một quyết định kỹ thuật đ�
 
 Giả sử `Order`, `Payment` và `Inventory` đã có ba codebase riêng nhưng vẫn dùng chung một schema:
 
-```text
-❌ Tách process nhưng chưa tách ownership
-
-Order Service ──sync──> Payment Service ──sync──> Inventory Service
-      │                         │                         │
-      └────────────────── Shared schema ──────────────────┘
+```d2 title="Topology tạo ra anti-pattern"
+direction: right
+bad: Distributed Monolith {
+ order: Order
+ payment: Payment
+ inventory: Inventory
+ db: Shared Schema {shape: cylinder}
+ order -> payment -> inventory: Sync
+ order -> db
+ payment -> db
+ inventory -> db
+}
 ```
 
 `Order Service` thay đổi cột trạng thái của order. `Payment Service` cập nhật trực tiếp cột đó. `Inventory Service` chỉ chạy được sau khi nhận synchronous call từ `Order Service`. Một migration schema vì thế cần một release window chung.

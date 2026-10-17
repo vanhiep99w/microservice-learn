@@ -174,17 +174,24 @@ Trong production, `PAYMENT_URL` có thể đến từ ConfigMap hoặc Config Se
 
 ### Nhiều environment và config drift
 
-```text
-❌ Hardcoded hoặc build theo environment
-Source + config-dev.yml       ──> image-dev
-Source + config-staging.yml   ──> image-staging
-Source + config-prod.yml      ──> image-prod
-
-✅ Một artifact, config được inject khi deploy
-Source ──> image: payment-service:v1
-                    ├── dev:     PAYMENT_URL=dev,     secret riêng
-                    ├── staging: PAYMENT_URL=staging, secret riêng
-                    └── prod:    PAYMENT_URL=prod,    secret riêng
+```d2 title="Nhiều environment và config drift"
+direction: down
+bad: Build theo environment {
+ dev: Source + config-dev.yml -> image-dev
+ staging: Source + config-staging.yml -> image-staging
+ prod: Source + config-prod.yml -> image-prod
+}
+good: Build once / Inject khi deploy {
+ source: Source
+ image: payment-service v1
+ dev: Dev — PAYMENT_URL dev / Secret riêng
+ staging: Staging — PAYMENT_URL staging / Secret riêng
+ prod: Prod — PAYMENT_URL prod / Secret riêng
+ source -> image
+ image -> dev
+ image -> staging
+ image -> prod
+}
 ```
 
 Mô hình thứ hai thực hiện nguyên tắc **build once, deploy anywhere**. Các environment có thể có values khác nhau nhưng dùng cùng artifact và cùng bộ key được kiểm soát. Cấu hình không nên được group trong code theo tên environment chỉ vì cách đó dễ bắt đầu; environment mới như `qa`, `canary` hoặc một region khác không nên đòi hỏi một build branch mới.

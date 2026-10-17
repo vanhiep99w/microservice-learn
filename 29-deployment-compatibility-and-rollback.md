@@ -60,14 +60,19 @@ Trong một deployment hiện đại, việc đổi Docker image hoặc chuyển
 
 Nếu chỉ rollback code, các thành phần còn lại vẫn giữ trạng thái đã bị thay đổi.
 
-```text
-Rollback Docker image về v1
-          │
-          ├── Database đã thêm/xóa field vẫn giữ nguyên
-          ├── Message v2 có thể đã nằm trong queue
-          ├── Cache có thể đang chứa format của v2
-          ├── Payment có thể đã được charge
-          └── Event đã gửi ra ngoài không thể tự biến mất
+```d2 title="1. Vấn đề cốt lõi"
+direction: right
+rollback: "Rollback image về v1"
+db: "DB schema đã đổi vẫn giữ nguyên"
+queue: "Queue có thể có Message v2"
+cache: "Cache có thể chứa Format v2"
+payment: "Payment có thể đã charge"
+event: "Event đã publish không tự biến mất"
+rollback -> db: "Không tự hoàn tác"
+rollback -> queue: "Không tự hoàn tác"
+rollback -> cache: "Không tự hoàn tác"
+rollback -> payment: "Không tự hoàn tác"
+rollback -> event: "Không tự hoàn tác"
 ```
 
 ### 1.1. Vì sao rollback code chưa đủ
@@ -215,8 +220,11 @@ Các nguyên tắc quan trọng:
 
 Trong event-driven architecture, code v2 có thể gửi message mà consumer v1 chưa hiểu:
 
-```text
-v2 Order Service ── order.created.v2 ──► v1 Notification Service
+```d2 title="2.3. Event và message compatibility"
+direction: right
+v2: "Order Service v2"
+v1: "Notification Service v1"
+v2 -> v1: "order.created.v2 — Kiểm tra backward compatibility"
 ```
 
 Cách xử lý:
@@ -308,12 +316,15 @@ Các hành động này cần thiết kế riêng:
 - **Compensating action** như refund, release hoặc cancel.
 - **Reconciliation job** để tìm và sửa trạng thái không nhất quán.
 
-```text
-Rollback code ≠ hoàn tác hành động đã xảy ra bên ngoài
-
-Payment đã charge  ──► cần refund
-Inventory đã reserve ──► cần release
-Email đã gửi ──► không thể thu hồi, chỉ có thể gửi thông báo sửa
+```d2 title="2.6. External side effects"
+direction: right
+rollback: "Rollback code ≠ Undo external effects"
+payment: "Payment charged → Refund nếu được phép"
+inventory: "Inventory reserved → Release"
+email: "Email sent → Không thu hồi; gửi thông báo sửa"
+rollback -> payment
+rollback -> inventory
+rollback -> email
 ```
 
 ## 3. Database Migration — Expand-Contract
@@ -446,42 +457,32 @@ DROP COLUMN customer_name;
 
 Sơ đồ:
 
-```text
-┌──────────────┐
-│ 1. Add field │  full_name nullable
-└──────┬───────┘
-       ▼
-┌───────────────────────┐
-│ 2. Deploy compatible  │  v1 + v2 cùng chạy
-│    code               │
-└──────┬────────────────┘
-       ▼
-┌───────────────────────┐
-│ 3. Dual-write         │  Ghi old + new field
-│    và backfill        │
-└──────┬────────────────┘
-       ▼
-┌───────────────────────┐
-│ 4. Migrate readers    │  Đọc field mới
-└──────┬────────────────┘
-       ▼
-┌───────────────────────┐
-│ 5. Contract           │  Xóa field cũ sau rollback window
-└───────────────────────┘
+```d2 title="Phase 5 — Contract"
+direction: right
+add: "1. Add full_name nullable"
+compatible: "2. Deploy compatible code — v1 + v2"
+write: "3. Dual-write old/new + Backfill"
+read: "4. Migrate Readers sang field mới"
+contract: "5. Xóa field cũ sau rollback window"
+add -> compatible
+compatible -> write
+write -> read
+read -> contract
 ```
 
 ### 3.3. Rollback code sau khi migration
 
 Nếu migration được thiết kế theo Expand-Contract, rollback thường chỉ cần rollback code:
 
-```text
-v2 code có bug
-    ↓
-rollback image về v1
-    ↓
-v1 tiếp tục đọc customer_name
-    ↓
-full_name vẫn tồn tại nhưng không gây lỗi
+```d2 title="3.3. Rollback code sau khi migration"
+direction: right
+s0: "v2 code có bug"
+s1: "rollback image về v1"
+s2: "v1 tiếp tục đọc customer_name"
+s3: "full_name vẫn tồn tại nhưng không gây lỗi"
+s0 -> s1
+s1 -> s2
+s2 -> s3
 ```
 
 Không cần chạy `DROP COLUMN full_name` hoặc một `down migration` ngay lập tức.
@@ -526,14 +527,15 @@ Các lựa chọn:
 
 Trong production, ưu tiên thường là:
 
-```text
-Giữ schema mở rộng
-    ↓
-Rollback code nếu cần
-    ↓
-Phân tích nguyên nhân
-    ↓
-Fix forward bằng code/migration mới
+```d2 title="3.4. Khi nào database rollback thật sự cần thiết"
+direction: right
+s0: "Giữ schema mở rộng"
+s1: "Rollback code nếu cần"
+s2: "Phân tích nguyên nhân"
+s3: "Fix forward bằng code/migration mới"
+s0 -> s1
+s1 -> s2
+s2 -> s3
 ```
 
 Không nên tự động chạy destructive down migration chỉ vì deployment bị rollback.
@@ -552,16 +554,17 @@ Cách này có thể gây race condition và khiến rollback khó đoán.
 
 Nên dùng một migration job riêng:
 
-```text
-Build artifact
-    ↓
-Run migration job một lần
-    ↓
-Verify migration
-    ↓
-Deploy application
-    ↓
-Post-deploy verification
+```d2 title="3.5. Chạy migration như một bước độc lập"
+direction: right
+s0: "Build artifact"
+s1: "Run migration job một lần"
+s2: "Verify migration"
+s3: "Deploy application"
+s4: "Post-deploy verification"
+s0 -> s1
+s1 -> s2
+s2 -> s3
+s3 -> s4
 ```
 
 Migration job nên có:
@@ -664,10 +667,13 @@ Trước khi cho v2 nhận traffic, cần kiểm tra:
 
 Khi phát hiện lỗi:
 
-```text
-v1 ─┐
-    ├── traffic hiện tại
-v2 ─┘
+```d2 title="4.3. Rollback trong Rolling Update"
+direction: right
+traffic: "Traffic hiện tại"
+v1: "Version1"
+v2: "Version2"
+traffic -> v1
+traffic -> v2
 ```
 
 Có thể dừng rollout và rollback Deployment:
@@ -696,11 +702,14 @@ Quy trình rollback nên là:
 
 Không nên mặc định làm:
 
-```text
-kubectl rollout undo
-    ↓
-DROP COLUMN mới ngay lập tức
+```d2 title="4.3. Rollback trong Rolling Update"
+direction: right
+undo: "kubectl rollout undo"
+drop: "DROP COLUMN mới ngay lập tức — Không an toàn"
+undo -> drop: "Anti-pattern — Đừng làm"
 ```
+
+Rollback workload không phải tín hiệu tự động xóa schema mới; giữ schema compatible và đợi rollback window.
 
 ### 4.4. In-flight request và graceful shutdown
 
@@ -852,14 +861,24 @@ Do đó, Canary đặc biệt cần:
 
 Database migration nên **forward-only** trong đa số trường hợp:
 
-```text
-V1 schema → V2 schema → V3 schema
+```d2 title="6.1. Database"
+direction: right
+s0: "V1 schema"
+s1: "V2 schema"
+s2: "V3 schema"
+s0 -> s1
+s1 -> s2
 ```
 
 Thay vì thường xuyên làm:
 
-```text
-V2 schema → V1 schema → V2 schema
+```d2 title="6.1. Database"
+direction: right
+s0: "V2 schema"
+s1: "V1 schema"
+s2: "V2 schema"
+s0 -> s1
+s1 -> s2
 ```
 
 Lý do là dữ liệu đã được ghi theo schema mới có thể không thể chuyển ngược losslessly.
