@@ -935,25 +935,15 @@ Telemetry sao chép dữ liệu khắp nơi: từ service → collector → back
 
 ### 9.2. Theo giai đoạn phát triển
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│              OBSERVABILITY ADOPTION TIMELINE                        │
-│                                                                     │
-│  EARLY (1-3 services)      GROWTH (5-15)        MATURE (20+)        │
-│  ─────────────────         ──────────────       ─────────────       │
-│  ✅ Structured logging     ✅ Log platform       ✅ Tail sampling    │
-│     (JSON ra stdout)         (ELK / Loki)       ✅ Exemplars nối    │
-│  ✅ Correlation ID         ✅ Metrics +            metric ↔ trace   │
-│     từ service đầu tiên       alerting          ✅ SLO-based        │
-│  ✅ Health Check API       ✅ Tracing auto-        alerting          │
-│     (live/ready)              instrumented      ✅ Govern telemetry │
-│  ✅ OTel SDK gắn sẵn       ✅ Sampling cơ bản     (cardinality,      │
-│     (dù chưa có               cho trace            PII, retention)  │
-│     backend trace)         ✅ Cardinality budget                     │
-│                                                                     │
-│  NGUYÊN TẮC: TÍCH LŨY DẦN — mỗi pattern nền là điều kiện cho        │
-│  pattern kế tiếp phát huy giá trị. Không có bước "nhảy cóc".        │
-└─────────────────────────────────────────────────────────────────────┘
+Lộ trình minh họa dưới đây **tích lũy dần** năng lực: mỗi pattern nền giúp pattern tiếp theo phát huy giá trị. Số service chỉ để tham khảo, không phải điều kiện bắt buộc; khoảng cách giữa các mốc không phản ánh thời lượng.
+
+```d2 title="Lộ trình tích lũy năng lực Observability"
+direction: down
+early: "Early · 1–3 services\nStructured logging: JSON ra stdout\nCorrelation ID từ service đầu tiên\nHealth Check API: live / ready\nGắn sẵn OTel SDK, dù chưa có trace backend"
+growth: "Growth · 5–15 services\nLog platform: ELK / Loki\nMetrics + alerting\nTracing auto-instrumented\nSampling cơ bản cho trace\nCardinality budget"
+mature: "Mature · 20+ services\nTail sampling\nExemplars nối metric với trace\nSLO-based alerting\nGovern telemetry: cardinality, PII, retention"
+early -> growth: Giữ nền tảng, thêm khả năng tập trung
+growth -> mature: Giữ nền tảng, tối ưu theo SLO và chi phí
 ```
 
 **Ba lưu ý ra quyết định:**

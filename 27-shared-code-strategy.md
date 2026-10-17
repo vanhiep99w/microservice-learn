@@ -716,30 +716,26 @@ Mỗi service cần dùng event này sẽ **kéo file `.proto`** về và **gene
 
 Khi chạy `mvn compile`, plugin sẽ đọc file `.proto` và **tự động generate** ra Java class:
 
+```d2 title="Protobuf — từ schema tới Java code được generate"
+direction: down
+schema: "Schema .proto\nmessage Money\namount_cents: int64 • currency_code: string"
+compiler: "Maven plugin gọi protoc"
+java: "Generated Java\nMoney • OrderItem • OrderCreatedEvent\nGetters, builder và các method hỗ trợ"
+output: "target/generated-sources/protobuf/java/\ncom/mycompany/order/events/"
+schema -> compiler -> java -> output
 ```
-┌────────────────────────────────────────────────────────────────────┐
-│                    PROTOBUF GENERATE FLOW                          │
-│                                                                    │
-│   Input (.proto file)              Output (generated Java class)   │
-│   ┌─────────────────────┐          ┌───────────────────────────┐   │
-│   │ message Money {     │          │ public final class Money  │   │
-│   │   int64             │  protoc  │   extends GeneratedMsg {  │   │
-│   │     amount_cents=1; │ ───────▶ │   long getAmountCents();  │   │
-│   │   string            │          │   String getCurrencyCode  │   │
-│   │     currency_code=2;│          │   // builder, equals,     │   │
-│   │ }                   │          │   // hashCode, toString   │   │
-│   └─────────────────────┘          └───────────────────────────┘   │
-│                                                                    │
-│   File generated nằm ở:                                            │
-│   target/generated-sources/protobuf/java/                          │
-│   └── com/mycompany/order/events/                                  │
-│       ├── OrderCreatedEvent.java    ← AUTO GENERATED               │
-│       ├── OrderItem.java            ← AUTO GENERATED               │
-│       └── Money.java                ← AUTO GENERATED               │
-│                                                                    │
-│   ⚠️ KHÔNG sửa file generated — sửa file .proto rồi re-generate    │
-└────────────────────────────────────────────────────────────────────┘
+
+Ví dụ schema `Money` ở bước 1 sinh class có các getter `getAmountCents()` và `getCurrencyCode()`, cùng builder và các method như `equals()`, `hashCode()`, `toString()`. Cây output minh họa:
+
+```text
+target/generated-sources/protobuf/java/
+└── com/mycompany/order/events/
+    ├── OrderCreatedEvent.java
+    ├── OrderItem.java
+    └── Money.java
 ```
+
+> **Không sửa file generated.** Sửa file `.proto` rồi re-generate.
 
 #### Bước 4: Service sử dụng generated class như bình thường
 
@@ -931,40 +927,26 @@ components:
 
 #### Bước 3: Kết quả generate
 
+```d2 title="OpenAPI — từ contract tới model và REST client"
+direction: down
+spec: "OpenAPI YAML\nOrderResponse: id, status, totalAmountCents\nOperation: createOrder"
+generator: "OpenAPI Generator\nJava • RestTemplate"
+model: "Generated model\nOrderResponse\nGetters và setters"
+client: "Generated API client\nOrderApi.createOrder(CreateOrderRequest)\nREST call, error handling, serialization"
+consumer: "Payment Service\nGọi Order API qua generated client"
+spec -> generator
+generator -> model
+generator -> client
+consumer -> client: createOrder(request)
+client -> model: Deserialize response thành
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│               OPENAPI GENERATE FLOW                              │
-│                                                                  │
-│   Input (YAML spec)                Output (generated Java)       │
-│   ┌─────────────────────┐          ┌────────────────────────┐    │
-│   │ OrderResponse:      │ openapi  │ public class           │    │
-│   │   properties:       │ generate │   OrderResponse {      │    │
-│   │     id: string      │ ───────▶ │   private String id;   │    │
-│   │     status: string  │          │   private String status│    │
-│   │     totalAmount:    │          │   private Long         │    │
-│   │       integer       │          │     totalAmountCents;  │    │
-│   └─────────────────────┘          │   // getters, setters  │    │
-│                                    └────────────────────────┘    │
-│                                                                  │
-│   Ngoài model, còn generate cả API client:                       │
-│   ┌────────────────────────────────────────┐                     │
-│   │ public class OrderApi {                │                     │
-│   │   OrderResponse createOrder(           │                     │
-│   │     CreateOrderRequest request         │                     │
-│   │   );                                   │                     │
-│   │ }                                      │                     │
-│   │ → Có sẵn RestTemplate call, error      │                     │
-│   │   handling, serialization              │                     │
-│   └────────────────────────────────────────┘                     │
-│                                                                  │
-│   Payment Service gọi Order API:                                 │
-│   ┌────────────────────────────────────────┐                     │
-│   │ OrderApi orderApi = new OrderApi();    │                     │
-│   │ OrderResponse resp =                   │                     │
-│   │   orderApi.createOrder(request);       │                     │
-│   │ // → Tự động call REST, parse JSON     │                     │
-│   └────────────────────────────────────────┘                     │
-└──────────────────────────────────────────────────────────────────┘
+
+Ngoài model `OrderResponse`, generator còn sinh `OrderApi`. Phía Payment Service gọi client thay vì tự viết HTTP call và parse JSON. Ví dụ dưới đây là trích đoạn minh họa, giả sử `request` và cấu hình client đã có:
+
+```java
+OrderApi orderApi = new OrderApi();
+OrderResponse resp = orderApi.createOrder(request);
+// Generated client thực hiện REST call và parse JSON.
 ```
 
 #### So sánh Protobuf vs OpenAPI:

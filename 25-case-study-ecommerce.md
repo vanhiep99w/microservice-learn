@@ -1824,46 +1824,17 @@ Là quá trình **tính toán trước** hệ thống cần bao nhiêu resource 
 
 **Timeline hành động trước/trong/sau Flash Sale:**
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    FLASH SALE TIMELINE                              │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  T-7 ngày   📋 Planning                                            │
-│  ├── Xác nhận campaign: sản phẩm nào, số lượng, khung giờ          │
-│  ├── Tính toán capacity dựa trên dự kiến traffic                   │
-│  └── Chuẩn bị flash sale data trong Promotion Service               │
-│                                                                     │
-│  T-1 ngày   🔧 Pre-scale & Verify                                  │
-│  ├── Scale pods lên theo bảng pre-scale ở trên                     │
-│  ├── Warm up Redis cache (product info, stock level)                │
-│  ├── Pre-warm DB connection pools                                   │
-│  ├── Load test với traffic giả lập 80% peak                        │
-│  └── Verify monitoring dashboards & alerting rules                  │
-│                                                                     │
-│  T-30 phút  🚦 Final check                                         │
-│  ├── Code freeze — không deploy bất kỳ service nào                 │
-│  ├── On-call team vào war-room (Slack channel/Zoom)                │
-│  ├── Verify tất cả pods healthy, zero error rate                   │
-│  └── Bật high-priority alerting (PagerDuty)                        │
-│                                                                     │
-│  T=0        🔥 Flash Sale bắt đầu                                   │
-│  ├── Monitor real-time: RPS, error rate, latency, queue lag        │
-│  ├── Nếu error rate > 5% → xem xét bật degraded mode              │
-│  ├── Nếu queue lag > 5 phút → scale Kafka consumers                │
-│  └── Nếu 1 service chết → Circuit Breaker + fallback               │
-│                                                                     │
-│  T+2 giờ    📉 Kết thúc Flash Sale                                  │
-│  ├── Chờ 30 phút để traffic giảm tự nhiên                          │
-│  ├── Scale down pods dần (không scale xuống đột ngột)              │
-│  ├── Chạy reconciliation jobs kiểm tra dữ liệu                    │
-│  └── Thu thập metrics cho postmortem                                │
-│                                                                     │
-│  T+1 ngày   📝 Postmortem                                          │
-│  ├── So sánh actual vs predicted traffic                           │
-│  ├── Phân tích bottleneck nếu có                                   │
-│  └── Cập nhật capacity model cho lần sale tiếp theo                │
-└─────────────────────────────────────────────────────────────────────┘
+Timeline minh họa dùng `T=0` là lúc Flash Sale bắt đầu; các mốc và ngưỡng xử lý là giả định vận hành của case study. Khoảng cách giữa các mốc không phản ánh thời lượng.
+
+```d2 title="Flash Sale — timeline chuẩn bị, vận hành và postmortem"
+direction: down
+planning: "T−7 ngày · Planning\nXác nhận sản phẩm, số lượng, khung giờ\nTính capacity theo traffic dự kiến\nChuẩn bị flash sale data trong Promotion Service"
+verify: "T−1 ngày · Pre-scale & Verify\nScale pods theo bảng pre-scale\nWarm up Redis: product info, stock level\nPre-warm DB connection pools\nLoad test ở 80% peak giả lập\nVerify dashboards và alerting rules"
+check: "T−30 phút · Final check\nCode freeze: không deploy service\nOn-call vào war-room: Slack / Zoom\nVerify pods healthy, zero error rate\nBật high-priority alerting: PagerDuty"
+peak: "T=0 · Flash Sale bắt đầu\nMonitor RPS, error rate, latency, queue lag\nError rate > 5%: xem xét degraded mode\nQueue lag > 5 phút: scale Kafka consumers\nService chết: Circuit Breaker + fallback"
+finish: "T+2 giờ · Kết thúc Flash Sale\nChờ 30 phút để traffic giảm\nScale down pods dần, không đột ngột\nChạy reconciliation jobs kiểm tra dữ liệu\nThu thập metrics cho postmortem"
+review: "T+1 ngày · Postmortem\nSo sánh actual và predicted traffic\nPhân tích bottleneck nếu có\nCập nhật capacity model cho lần sale sau"
+planning -> verify -> check -> peak -> finish -> review
 ```
 
 **Degraded Mode — tắt gì, giữ gì:**

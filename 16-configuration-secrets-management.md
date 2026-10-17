@@ -886,31 +886,18 @@ spec:
 
 ### 7.1. Config vs Secret — Khác nhau thế nào?
 
-```
-CONFIG vs SECRET — PHÂN BIỆT RÕ RÀNG
-───────────────────────────────────────
+| Tiêu chí | Config (cấu hình) | Secret (bí mật) |
+|---|---|---|
+| Ví dụ | `DB_HOST=prod-db.example.com`, `DB_PORT=5432`, `LOG_LEVEL=INFO`, `SERVER_PORT=8080`, `KAFKA_BROKERS=kafka:9092` | `DB_PASSWORD=<placeholder>`, `API_KEY=<placeholder>`, `JWT_PRIVATE_KEY=<placeholder>`, `OAUTH_CLIENT_SECRET=<placeholder>`; TLS private key cũng là secret |
+| Khi bị lộ | Không cấp quyền truy cập trực tiếp, nhưng có thể lộ topology hoặc thông tin nội bộ | Có thể làm mất quyền kiểm soát tài khoản, dữ liệu hoặc danh tính service |
+| Ai được đọc? | Theo chính sách truy cập cấu hình của hệ thống | Chỉ workload/người thực sự cần, theo Least Privilege |
+| Lưu trong Git? | Có thể, nếu không chứa dữ liệu nhạy cảm và phù hợp quyền truy cập repo | Không lưu plaintext; chỉ lưu bản mã nếu có workflow như Sealed Secrets |
+| Bảo vệ | Kiểm soát quyền đọc/ghi; mã hóa theo mức độ nhạy cảm | Mã hóa khi lưu và truyền, kiểm soát truy cập chặt chẽ |
+| Audit | Theo yêu cầu vận hành | Audit truy cập và thay đổi |
+| Rotate | Thay đổi khi cần | Theo chính sách và ngay khi nghi ngờ bị lộ |
+| Công cụ | ConfigMap, Config Server, Environment Variables | Vault, AWS Secrets Manager, Sealed Secrets |
 
-  CONFIG (Cấu hình):                    SECRET (Bí mật):
-  ┌────────────────────────────┐        ┌────────────────────────────┐
-  │ DB_HOST=prod-db.example.com│        │ DB_PASSWORD=s3cret!@#$     │
-  │ DB_PORT=5432               │        │ API_KEY=sk_live_abc123     │
-  │ LOG_LEVEL=INFO             │        │ JWT_PRIVATE_KEY=-----BEGIN │
-  │ SERVER_PORT=8080           │        │ TLS_CERT=-----BEGIN CERT   │
-  │ KAFKA_BROKERS=kafka:9092   │        │ OAUTH_CLIENT_SECRET=xyz    │
-  └────────────────────────────┘        └────────────────────────────┘
-
-  → Lộ? KHÔNG SAO                       → Lộ? 💀 BIG TROUBLE
-  → Ai cũng đọc được? OK                → Chỉ người cần mới đọc
-  → Lưu trong Git? OK                   → Lưu trong Git? ❌ TUYỆT ĐỐI KHÔNG
-  → Mã hóa? Không cần                   → Mã hóa? BẮT BUỘC
-  → Audit? Nice to have                 → Audit? BẮT BUỘC
-  → Rotate? Khi cần                     → Rotate? ĐỊNH KỲ
-
-  Công cụ:                              Công cụ:
-  → ConfigMap                            → Vault
-  → Config Server                        → AWS Secrets Manager
-  → Environment Variables                → Sealed Secrets
-```
+Các giá trị secret ở trên chỉ là placeholder. Certificate công khai không tự nó là secret; **private key** đi kèm mới phải được giữ bí mật. Environment Variables là cách inject giá trị, không tự cung cấp mã hóa hay kiểm soát truy cập như một secret store.
 
 ### 7.2. Vấn đề thực tế với Secrets
 

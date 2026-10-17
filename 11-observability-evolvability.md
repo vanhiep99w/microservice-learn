@@ -203,21 +203,9 @@ Sử dụng **Structured Logging** (JSON format):
 
 ### 2.3. Log Levels
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    LOG LEVELS                           │
-│                                                         │
-│   FATAL   ████████████████████████████  Hệ thống crash  │
-│   ERROR   ██████████████████████        Lỗi cần xử lý   │
-│   WARN    ████████████████              Cảnh báo        │
-│   INFO    ██████████                    Thông tin chung │
-│   DEBUG   ██████                        Chi tiết debug  │
-│   TRACE   ████                          Rất chi tiết    │
-│                                                         │
-│   ◀── Production ──▶  ◀── Dev/Debug ──▶                 │
-│   (INFO trở lên)      (DEBUG/TRACE)                     │
-└─────────────────────────────────────────────────────────┘
-```
+Mức độ nghiêm trọng giảm dần từ **FATAL → ERROR → WARN → INFO → DEBUG → TRACE**. Đây là thứ tự phân loại, không phải thang đo định lượng.
+
+Production thường ghi **INFO trở lên**. Chỉ bật **DEBUG/TRACE** có phạm vi và thời hạn khi điều tra lỗi; môi trường dev có thể bật chi tiết hơn.
 
 | Level | Khi nào dùng | Ví dụ |
 |-------|-------------|-------|
@@ -266,32 +254,15 @@ shape: sequence_diagram
 
 **Trả lời ngắn:** Request ID **không bắt buộc** gửi từ client, và nó **KHÔNG phải** là một phần của quá trình tracing (Distributed Tracing). Đây là hai cơ chế **riêng biệt**, phục vụ mục đích khác nhau.
 
-```
-┌───────────────────────────────────────────────────────────────────┐
-│     REQUEST ID vs TRACE ID — HAI THỨ KHÁC NHAU                    │
-│                                                                   │
-│  ┌─────────────────────────────┐  ┌──────────────────────────────┐│
-│  │     REQUEST ID / CORRELATION│  │         TRACE ID             ││
-│  │         ID                  │  │     (Distributed Tracing)    ││
-│  │                             │  │                              ││
-│  │  Ai tạo?                    │  │  Ai tạo?                     ││
-│  │  → Client hoặc API Gateway  │  │  → OTel SDK (tự động)        ││
-│  │                             │  │                              ││
-│  │  Mục đích?                  │  │  Mục đích?                   ││
-│  │  → Tìm log, support ticket  │  │  → Đo latency, tìm bottleneck││
-│  │  → "User gửi ticket #abc, │  │  → "Span nào chậm nhất?"     ││
-│  │     tìm log req-abc-123"    │  │  → Waterfall, dependency map ││
-│  │                             │  │                              ││
-│  │  Truyền qua?                │  │  Truyền qua?                 ││
-│  │  → X-Request-ID header      │  │  → traceparent header        ││
-│  │    (convention, không chuẩn)│  │    (W3C standard)            ││
-│  │                             │  │                              ││
-│  │  Ai dùng?                   │  │  Ai dùng?                    ││
-│  │  → Developer đọc log        │  │  → Jaeger, Zipkin, Grafana   ││
-│  │  → Customer support         │  │  → Tracing backend tự động   ││
-│  └─────────────────────────────┘  └──────────────────────────────┘│
-└───────────────────────────────────────────────────────────────────┘
-```
+| Tiêu chí | Request ID / Correlation ID | Trace ID (Distributed Tracing) |
+|---|---|---|
+| Ai tạo? | Client, API Gateway hoặc service ở entry point | OpenTelemetry (OTel) SDK tạo khi bắt đầu trace mới; kế thừa context hợp lệ nếu đã có |
+| Mục đích | Tìm log, tra cứu support ticket | Đo latency, tìm bottleneck, xem waterfall và dependency map |
+| Ví dụ | User gửi ticket: “Tìm log của `req-abc-123`” | “Span nào chậm nhất trong request đặt hàng?” |
+| Truyền qua HTTP | `X-Request-ID` hoặc `X-Correlation-ID`, theo convention của hệ thống | `traceparent`, theo W3C Trace Context; có thể kèm `tracestate` |
+| Ai dùng? | Developer đọc log và Customer Support | Developer/SRE qua Jaeger, Zipkin, Grafana hoặc tracing backend |
+
+Hai ID có thể cùng xuất hiện trong log để nối workflow support với trace; không bắt buộc phải có cùng giá trị.
 
 **Chi tiết về Request ID:**
 
@@ -598,28 +569,16 @@ topk(5, histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
 
 Grafana là công cụ visualization hàng đầu, kết nối với nhiều data sources:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                   GRAFANA DASHBOARD                         │
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │  Order Service Overview                             │    │
-│  ├──────────────┬──────────────┬─────────────────┤     │    │
-│  │  Request Rate│  Error Rate  │  P99 Latency    │     │    │
-│  │  ▃▅▇▅▃▅▇▅▃   │  ▁▁▁▃▁▁▁▁▁   │  ▂▂▃▅▃▂▂▂▂      │     │    │
-│  │  1.2K req/s  │  0.3%        │  245ms          │     │    │
-│  ├──────────────┴──────────────┴─────────────────┤     │    │
-│  │                                               │     │    │
-│  │  Request Rate Over Time                       │     │    │
-│  │  2K ┤                  ╭─╮                    │     │    │
-│  │     │              ╭───╯ ╰──╮                 │     │    │
-│  │  1K ┤         ╭────╯        ╰───╮             │     │    │
-│  │     │    ╭────╯                 ╰──           │     │    │
-│  │   0 ┼────╯                                    │     │    │
-│  │     00:00  04:00  08:00  12:00  16:00  20:00  │     │    │
-│  └───────────────────────────────────────────────┘     │    │
-└─────────────────────────────────────────────────────────────┘
-```
+**Ví dụ dashboard “Order Service Overview”** (số liệu minh họa, không phải dữ liệu production):
+
+| Panel | Giá trị minh họa | Dùng để quan sát |
+|---|---|---|
+| Request Rate | 1.2K req/s | Lưu lượng request hiện tại |
+| Error Rate | 0.3% | Tỷ lệ request lỗi |
+| P99 Latency | 245 ms | Độ trễ mà 99% request không vượt quá |
+| Request Rate Over Time | Biểu đồ theo giờ, từ 00:00 đến 20:00 | Traffic tăng từ sáng, đạt đỉnh rồi giảm về chiều/tối |
+
+Ba panel đầu là số tổng hợp; panel cuối là time series (chuỗi số liệu theo thời gian). Muốn đọc chính xác đỉnh traffic và thời điểm xảy ra, xem trục thời gian cùng dữ liệu thực trong Grafana, không suy ra từ một sơ đồ kiến trúc.
 
 **Grafana hỗ trợ nhiều data sources:**
 - Prometheus (metrics)
@@ -871,36 +830,28 @@ Mỗi span cần các thông số sau để **tính ra trace** và xác định 
 
 #### Trace Context được truyền ở đâu trong request?
 
-Theo chuẩn [W3C Trace Context](https://www.w3.org/TR/trace-context/), trace context được truyền qua **2 HTTP headers**:
+Theo chuẩn [W3C Trace Context](https://www.w3.org/TR/trace-context/), Service A truyền trace context cho Service B qua header `traceparent` và header tùy chọn `tracestate`, không đặt vào body:
 
+```http
+POST /api/payments HTTP/1.1
+Host: payment-service:8080
+Content-Type: application/json
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+tracestate: vendor1=value1,vendor2=value2
+
+{"order_id": "123", "amount": 99.99}
 ```
-┌───────────────────────────────────────────────────────────────────┐
-│       W3C TRACE CONTEXT — TRUYỀN QUA HTTP HEADERS                 │
-│                                                                   │
-│  Service A gửi request tới Service B:                             │
-│                                                                   │
-│  POST /api/payments HTTP/1.1                                      │
-│  Host: payment-service:8080                                       │
-│  Content-Type: application/json                                   │
-│  ┌────────────────────────────────────────────────────────────┐   │
-│  │ traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-          │   │
-│  │              00f067aa0ba902b7-01                           │   │
-│  │                                                            │   │
-│  │ Format:  {version}-{trace-id}-{parent-span-id}-{flags}     │   │
-│  │           ──┬──    ───┬────   ──────┬────────   ──┬──      │   │
-│  │             │         │             │             │        │   │
-│  │          Phiên bản  Trace ID     Span ID của   Sampled?    │   │
-│  │          (luôn 00)  (128-bit)    service A     01 = yes    │   │
-│  │                     KHÔNG ĐỔI    (64-bit)     00 = no      │   │
-│  │                     suốt trace   ĐỔI mỗi hop               │   │
-│  ├────────────────────────────────────────────────────────────┤   │
-│  │ tracestate: vendor1=value1,vendor2=value2                  │   │
-│  │ (Optional: vendor-specific data)                           │   │
-│  └────────────────────────────────────────────────────────────┘   │
-│                                                                   │
-│  Body: {"order_id": "123", "amount": 99.99}                       │
-└───────────────────────────────────────────────────────────────────┘
-```
+
+`traceparent` có format `{version}-{trace-id}-{parent-span-id}-{trace-flags}`:
+
+| Thành phần | Giá trị trong ví dụ | Ý nghĩa |
+|---|---|---|
+| `version` | `00` | Phiên bản định dạng của ví dụ |
+| `trace-id` | `4bf92f3577b34da6a3ce929d0e0e4736` | ID 128-bit giữ nguyên trong cùng trace |
+| `parent-span-id` | `00f067aa0ba902b7` | ID 64-bit của span gửi request ở Service A; khi Service B tạo span con và gọi tiếp, header mang ID của span gửi mới |
+| `trace-flags` | `01` | Sampled bit được bật; `00` nghĩa là bit này không bật |
+
+`tracestate` là header tùy chọn cho dữ liệu vendor-specific. Payload nghiệp vụ vẫn nằm riêng trong body.
 
 #### Quá trình tạo Trace và Span — Từng bước
 
@@ -1566,36 +1517,26 @@ Migration minh họa Payment REST v1 sang gRPC v2. Sunset date phải là HTTP-d
 
 ## 9. Tổng kết
 
+```d2 title="Observability — liên kết Logs, Metrics và Traces"
+direction: down
+logs: "Logs\nWhat happened?\nELK / Loki"
+metrics: "Metrics\nHow much / How many?\nPrometheus + Grafana"
+traces: "Traces\nWhere did it go?\nJaeger + OpenTelemetry"
+correlation: "Liên kết telemetry\nTrace ID trong log; exemplars cho metrics khi có"
+ui: "Unified UI\nGrafana"
+logs -> correlation
+metrics -> correlation
+traces -> correlation
+correlation -> ui
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                      OBSERVABILITY & EVOLVABILITY                │
-│                                                                  │
-│  OBSERVABILITY — "Hệ thống đang chạy như thế nào?"               │
-│  ┌──────────────┬──────────────┬──────────────┐                  │
-│  │    LOGS      │   METRICS    │   TRACES     │                  │
-│  │              │              │              │                  │
-│  │  What        │  How much    │  Where       │                  │
-│  │  happened?   │  / How many? │  did it go?  │                  │
-│  │              │              │              │                  │
-│  │  ELK / Loki  │ Prometheus   │ Jaeger       │                  │
-│  │              │ + Grafana    │ + OTel       │                  │
-│  └──────────────┴──────────────┴──────────────┘                  │
-│           │              │              │                        │
-│           └──────────────┼──────────────┘                        │
-│                          ▼                                       │
-│              Correlation: Trace ID                               │
-│              Unified UI: Grafana                                 │
-│                                                                  │
-│  EVOLVABILITY — "Làm sao phát triển mà không phá vỡ?"            │
-│  ┌──────────────┬──────────────┬──────────────┐                  │
-│  │ API          │  Contract    │  Feature     │                  │
-│  │ Versioning   │  Testing     │  Flags       │                  │
-│  │              │  (Pact)      │              │                  │
-│  │ Backward     │  Tolerant    │  Strangler   │                  │
-│  │ Compatibility│  Reader      │  Fig Pattern │                  │
-│  └──────────────┴──────────────┴──────────────┘                  │
-└──────────────────────────────────────────────────────────────────┘
-```
+
+**Observability** trả lời “Hệ thống đang chạy như thế nào?”. **Evolvability** trả lời “Làm sao phát triển mà không phá vỡ?”:
+
+| Nhóm | Kỹ thuật |
+|---|---|
+| API và compatibility | API Versioning, Backward Compatibility |
+| Kiểm chứng contract | Contract Testing (Pact), Tolerant Reader |
+| Phát hành và migration | Feature Flags, Strangler Fig Pattern |
 
 | Khía cạnh | Công cụ/Pattern | Mục đích |
 |----------|----------------|---------|

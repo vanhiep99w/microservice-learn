@@ -95,24 +95,15 @@ patterns: Microservice Design Patterns {
 
 Không hệ thống nào cần đủ pattern từ ngày đầu — thêm pattern **khi nỗi đau xuất hiện**, không phải để "đủ bộ":
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                 PATTERN ADOPTION TIMELINE                           │
-│                                                                     │
-│  Early Stage          Growth Stage          Mature Stage            │
-│  (1-3 services)       (5-15 services)       (20+ services)          │
-│  ─────────────        ────────────────      ──────────────          │
-│                                                                     │
-│  ✅ DB per Service    ✅ Saga                ✅ CQRS                │
-│  ✅ API Gateway       ✅ Circuit Breaker     ✅ Event Sourcing      │
-│  ✅ Health Check      ✅ Distributed Tracing ✅ Service Mesh        │
-│  ✅ Correlation ID    ✅ Log Aggregation     ✅ Transactional Outbox│
-│  ✅ Retry + Timeout   ✅ Canary Deployment   ✅ Strangler Fig       │
-│  ✅ Feature Toggle    ✅ BFF                 ✅ Adapter Pattern     │
-│                       ✅ Sidecar             ✅ Ambassador          │
-│                       ✅ Bulkhead                                   │
-│                                                                     │
-└─────────────────────────────────────────────────────────────────────┘
+Các giai đoạn sau là lộ trình **minh họa**, không phải ngưỡng bắt buộc theo số service. Chọn pattern theo vấn đề thực tế; chẳng hạn Transactional Outbox có thể cần ngay từ service đầu tiên nếu phải ghi DB và publish event an toàn. Khoảng cách giữa các mốc không phản ánh thời lượng.
+
+```d2 title="Lộ trình tham khảo áp dụng Design Patterns"
+direction: down
+early: "Early Stage · 1–3 services\nDatabase per Service • API Gateway\nHealth Check • Correlation ID\nRetry + Timeout • Feature Toggle"
+growth: "Growth Stage · 5–15 services\nSaga • Circuit Breaker\nDistributed Tracing • Log Aggregation\nCanary Deployment • BFF\nSidecar • Bulkhead"
+mature: "Mature Stage · 20+ services\nCQRS • Event Sourcing\nService Mesh • Transactional Outbox\nStrangler Fig • Adapter Pattern\nAmbassador"
+early -> growth: Nhu cầu phối hợp và vận hành tăng
+growth -> mature: Chọn thêm khi có use case phù hợp
 ```
 
 > ⚠️ Thêm pattern quá sớm chính là một anti-pattern ([over-engineering](17-anti-patterns.md)). Mỗi pattern có cái giá vận hành riêng — hệ thống nhỏ gọn dùng ít pattern thường tốt hơn hệ thống "đủ pattern" mà không có vấn đề nào để giải.

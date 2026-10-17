@@ -802,26 +802,28 @@ JWT BEST PRACTICES
 
 ### 5.1. Authentication vs Authorization
 
-```
-AUTHENTICATION vs AUTHORIZATION
-─────────────────────────────────
+| Tiêu chí | Authentication (AuthN) — xác thực | Authorization (AuthZ) — phân quyền |
+|---|---|---|
+| Câu hỏi | “Bạn là ai?” | “Bạn được làm gì?” |
+| Input | Credentials (thông tin xác thực) | Identity đã xác thực, resource và hành động cần thực hiện |
+| Output | Identity (danh tính) | Allow hoặc deny |
+| Ví dụ | Login bằng email, verify JWT, fingerprint | Chỉ Admin được delete; chỉ Owner được edit |
 
-  Authentication (AuthN):          Authorization (AuthZ):
-  ┌───────────────────────┐        ┌───────────────────────┐
-  │  "BẠN LÀ AI?"         │        │  "BẠN ĐƯỢC LÀM GÌ?"   │
-  │                       │        │                       │
-  │  Input: credentials   │        │  Input: identity +    │
-  │  Output: identity     │        │         resource      │
-  │                       │        │  Output: allow/deny   │
-  │  Ví dụ:               │        │                       │
-  │  → Login bằng email   │        │  Ví dụ:               │
-  │  → Verify JWT         │        │  → Admin mới delete   │
-  │  → Fingerprint        │        │  → Owner mới edit     │
-  └───────────────────────┘        └───────────────────────┘
+Luồng dưới đây minh họa một API yêu cầu đăng nhập: **AuthN trước, AuthZ sau**.
 
-  Luồng: AuthN trước → AuthZ sau
-  ────────────────────────────────
-  Request → Ai gửi? (AuthN) → Được phép không? (AuthZ) → Process
+```d2 title="Authentication và Authorization trong một request"
+direction: down
+request: Request
+authn: "AuthN\nAi gửi request?" {shape: diamond}
+unauthorized: "401 Unauthorized\nThiếu hoặc sai credentials"
+authz: "AuthZ\nCó quyền trên resource?" {shape: diamond}
+forbidden: "403 Forbidden\nĐã xác thực nhưng không đủ quyền"
+process: "Xử lý nghiệp vụ"
+request -> authn
+authn -> unauthorized: Không xác thực được
+authn -> authz: Identity hợp lệ
+authz -> forbidden: Deny
+authz -> process: Allow
 ```
 
 ### 5.2. RBAC — Role-Based Access Control

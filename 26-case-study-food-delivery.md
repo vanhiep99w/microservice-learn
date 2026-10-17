@@ -1628,46 +1628,17 @@ order: Order Service {
 
 **Timeline hành động trước/trong/sau giờ cao điểm (Lunch/Dinner Peak):**
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                   PEAK HOURS TIMELINE (11h-13h / 18h-20h)           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  T-7 ngày   📋 Planning                                             │
-│  ├── Xác nhận campaign promotion giờ trưa/tối (freeship, voucher)   │
-│  ├── Tính toán capacity dựa trên traffic tuần trước + campaign      │
-│  └── Chuẩn bị pre-scale config cho từng service                     │
-│                                                                     │
-│  T-1 ngày   🔧 Pre-scale & Verify                                   │
-│  ├── Scale Dispatch pods lên theo bảng pre-scale                    │
-│  ├── Warm up Redis cache (menu items, restaurant availability)      │
-│  ├── Pre-warm DB connection pools                                   │
-│  ├── Load test với traffic giả lập 80% peak                         │
-│  └── Verify monitoring dashboards & alerting rules                  │
-│                                                                     │
-│  T-30 phút  🚦 Final check (10:30 hoặc 17:30)                       │
-│  ├── Code freeze — không deploy bất kỳ service nào                  │
-│  ├── On-call team monitor Slack channel                             │
-│  ├── Verify tất cả pods healthy, zero error rate                    │
-│  └── Bật high-priority alerting (PagerDuty)                         │
-│                                                                     │
-│  T=0        🔥 Peak bắt đầu (11:00 hoặc 18:00)                      │
-│  ├── Monitor real-time: RPS, error rate, latency, dispatch lag      │
-│  ├── Nếu error rate > 5% → xem xét bật degraded mode                │
-│  ├── Nếu dispatch queue lag > 2 phút → scale consumers              │
-│  └── Nếu 1 service chết → Circuit Breaker + fallback                │
-│                                                                     │
-│  T+2 giờ    📉 Hết giờ cao điểm (13:00 hoặc 20:00)                  │
-│  ├── Chờ 30 phút để traffic giảm tự nhiên                           │
-│  ├── Scale down pods dần (không scale xuống đột ngột)               │
-│  ├── Chạy reconciliation jobs kiểm tra dữ liệu                      │
-│  └── Thu thập metrics cho report                                    │
-│                                                                     │
-│  T+1 ngày   📝 Review                                               │
-│  ├── So sánh actual vs predicted traffic                            │
-│  ├── Phân tích bottleneck nếu có                                    │
-│  └── Cập nhật capacity model cho tuần tiếp theo                     │
-└─────────────────────────────────────────────────────────────────────┘
+Timeline minh họa dùng `T=0` là đầu giờ cao điểm: 11:00 hoặc 18:00. Các mốc và ngưỡng xử lý là giả định vận hành của case study; khoảng cách giữa các mốc không phản ánh thời lượng.
+
+```d2 title="Food Delivery — timeline chuẩn bị và vận hành giờ cao điểm"
+direction: down
+planning: "T−7 ngày · Planning\nXác nhận promotion: freeship, voucher\nTính capacity theo traffic tuần trước + campaign\nChuẩn bị pre-scale config cho từng service"
+verify: "T−1 ngày · Pre-scale & Verify\nScale Dispatch pods theo bảng pre-scale\nWarm up Redis: menu, restaurant availability\nPre-warm DB connection pools\nLoad test ở 80% peak giả lập\nVerify dashboards và alerting rules"
+check: "T−30 phút · Final check: 10:30 / 17:30\nCode freeze: không deploy service\nOn-call monitor Slack channel\nVerify pods healthy, zero error rate\nBật high-priority alerting: PagerDuty"
+peak: "T=0 · Peak bắt đầu: 11:00 / 18:00\nMonitor RPS, error rate, latency, dispatch lag\nError rate > 5%: xem xét degraded mode\nDispatch queue lag > 2 phút: scale consumers\nService chết: Circuit Breaker + fallback"
+finish: "T+2 giờ · Hết peak: 13:00 / 20:00\nChờ 30 phút để traffic giảm\nScale down pods dần, không đột ngột\nChạy reconciliation jobs kiểm tra dữ liệu\nThu thập metrics cho report"
+review: "T+1 ngày · Review\nSo sánh actual và predicted traffic\nPhân tích bottleneck nếu có\nCập nhật capacity model cho tuần sau"
+planning -> verify -> check -> peak -> finish -> review
 ```
 
 **Degraded Mode — giữ gì, giảm gì, tắt gì:**
