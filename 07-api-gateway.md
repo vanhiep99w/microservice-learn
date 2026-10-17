@@ -247,17 +247,45 @@ Rate Limiting Strategies:
 
 **Response khi bị rate limit:**
 
-```
-HTTP/1.1 429 Too Many Requests
-Retry-After: 30
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1708700000
-
-{
-  "error": "Rate limit exceeded",
-  "message": "Bạn đã vượt quá 100 requests/phút. Thử lại sau 30 giây."
-}
+```protocol-exchange
+title: Gateway từ chối request vượt quota
+description: Ví dụ tĩnh; timestamp reset chỉ là dữ liệu minh họa, không phải quota hiện tại.
+variants:
+  - id: limited
+    title: Client đã hết quota
+    request:
+      method: GET
+      url: /api/products
+    response:
+      status: 429
+      statusText: Too Many Requests
+      headers:
+        - id: retry
+          name: Retry-After
+          value: "30"
+        - id: limit
+          name: X-RateLimit-Limit
+          value: "100"
+        - id: remaining
+          name: X-RateLimit-Remaining
+          value: "0"
+        - id: reset
+          name: X-RateLimit-Reset
+          value: "1708700000"
+      body:
+        kind: json
+        json: |-
+          {
+            "error": "Rate limit exceeded",
+            "message": "Bạn đã vượt quá 100 requests/phút. Thử lại sau 30 giây."
+          }
+    annotations:
+      - id: retry
+        side: response
+        target: header
+        header: retry
+        title: Chờ trước khi retry
+        description: Retry-After dạng delay-seconds gợi ý chờ 30 giây. Không retry mutation nếu chưa có idempotency contract.
 ```
 
 ### 3.5. Load Balancing

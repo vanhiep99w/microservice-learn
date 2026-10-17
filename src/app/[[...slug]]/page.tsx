@@ -8,6 +8,20 @@ import {
 import { notFound, redirect } from 'next/navigation';
 import defaultMdxComponents from 'fumadocs-ui/mdx';
 import { MermaidDiagram } from '@/components/mermaid';
+import { AnnotatedExample } from '@vanhiep99w/docs-kit/components/annotated-example';
+import { AnnotatedExampleWithSource } from '@vanhiep99w/docs-kit/components/annotated-example-source';
+import { CodeWalkthrough } from '@vanhiep99w/docs-kit/components/code-walkthrough';
+import { CodeWalkthroughWithSource } from '@vanhiep99w/docs-kit/components/code-walkthrough-source';
+import { TerminalSession } from '@vanhiep99w/docs-kit/components/terminal-session';
+import { MarbleDiagram } from '@vanhiep99w/docs-kit/components/marble';
+import { MarbleZoomDiagram } from '@vanhiep99w/docs-kit/components/marble-zoom';
+import { CodeDiff } from '@vanhiep99w/docs-kit/components/code-diff';
+import { CodeDiffWithSource } from '@vanhiep99w/docs-kit/components/code-diff-source';
+import { DataInspector } from '@vanhiep99w/docs-kit/components/data-inspector';
+import { ProtocolExchange } from '@vanhiep99w/docs-kit/components/protocol-exchange';
+import { SpanWaterfall } from '@vanhiep99w/docs-kit/components/span-waterfall';
+import { ConcurrencyLanes } from '@vanhiep99w/docs-kit/components/concurrency-lanes';
+import { StateTransitionExplorer } from '@vanhiep99w/docs-kit/components/state-transition';
 import { D2Diagram } from '@vanhiep99w/docs-kit/components/d2';
 import { D2InteractiveDiagram } from '@vanhiep99w/docs-kit/components/d2-interactive';
 import { SourceRef } from '@vanhiep99w/docs-kit/components/source-explorer';
@@ -44,7 +58,25 @@ export default async function Page({
       <DocsTitle>{page.data.title}</DocsTitle>
       <DocsDescription>{page.data.description}</DocsDescription>
       <DocsBody>
-        <MDX components={{ ...defaultMdxComponents, D2Diagram, D2InteractiveDiagram, SourceRef, MermaidDiagram, Callout, Card, Cards, Step, Steps, Tab, Tabs, Accordion, Accordions, TypeTable }} />
+        <MDX components={{
+          ...defaultMdxComponents,
+          D2Diagram, D2InteractiveDiagram, SourceRef, MermaidDiagram,
+          Callout, Card, Cards, Step, Steps, Tab, Tabs, Accordion, Accordions, TypeTable,
+          AnnotatedExample,
+          AnnotatedExampleWithSource,
+          CodeWalkthrough,
+          CodeWalkthroughWithSource,
+          TerminalSession,
+          MarbleDiagram,
+          MarbleZoomDiagram,
+          CodeDiff,
+          CodeDiffWithSource,
+          DataInspector,
+          ProtocolExchange,
+          SpanWaterfall,
+          ConcurrencyLanes,
+          StateTransitionExplorer,
+        }} />
       </DocsBody>
     </DocsPage>
   );

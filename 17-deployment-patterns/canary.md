@@ -298,21 +298,37 @@ Alert cũng phải nêu rõ bước rollout và lý do, chẳng hạn: `canary o
 
 Công cụ như Flagger có thể chạy vòng phân tích theo `interval`, tăng `stepWeight` khi metrics đạt và abort khi số lần kiểm tra thất bại vượt `threshold`. Một phần cấu hình minh họa:
 
-```yaml source="snippets/auto-promote-va-auto-abort.yaml"
-analysis:
-  interval: 1m
-  threshold: 5
-  maxWeight: 50
-  stepWeight: 10
-  metrics:
-    - name: request-success-rate
-      thresholdRange:
-        min: 99
-      interval: 1m
-    - name: request-duration
-      thresholdRange:
-        max: 500
-      interval: 1m
+```annotated source="snippets/auto-promote-va-auto-abort.yaml"
+title: "Canary analysis: promotion gate"
+language: yaml
+code: |-
+  analysis:
+    interval: 1m
+    threshold: 5
+    maxWeight: 50
+    stepWeight: 10
+    metrics:
+      - name: request-success-rate
+        thresholdRange:
+          min: 99
+        interval: 1m
+      - name: request-duration
+        thresholdRange:
+          max: 500
+        interval: 1m
+annotations:
+  - id: note-1
+    title: Tốc độ tăng traffic
+    description: interval, stepWeight và maxWeight kiểm soát nhịp rollout trong công cụ minh họa; không tự chứng minh canary an toàn.
+    ranges: [[1, 5]]
+  - id: note-2
+    title: Hai điều kiện cần theo dõi
+    description: Success rate và duration phải có nguồn metric, đơn vị và cửa sổ đo thống nhất với rollout controller.
+    ranges: [[6, 14]]
+source:
+  project: canary
+  snapshot: article
+  file: snippets/auto-promote-va-auto-abort.yaml
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=canary&snapshot=article&file=snippets%2Fauto-promote-va-auto-abort.yaml)

@@ -4,6 +4,7 @@ import { unified } from 'unified';
 import remarkParse from 'remark-parse';
 import { visit } from 'unist-util-visit';
 import { createHighlighter } from 'shiki';
+import { parse as parseYaml } from 'yaml';
 
 export const parser = unified().use(remarkParse);
 
@@ -40,8 +41,36 @@ export function collectExamples(markdown, filename) {
         }
       }
     }
+    // New docs-kit descriptors keep their original code/payload as the artifact,
+    // never the YAML wrapper. Explicit metadata still opts into publication.
+    let artifact = { language: node.lang, code: node.value };
+    const descriptorLanguages = new Set([
+      'annotated', 'data-inspector', 'code-diff', 'code-walkthrough',
+    ]);
+    if (descriptorLanguages.has(node.lang)) {
+      let descriptor;
+      try {
+        descriptor = parseYaml(node.value, { uniqueKeys: true });
+      } catch (error) {
+        throw new Error(`${filename}:${node.position.start.line}: ${error.message}`);
+      }
+      const sources = node.lang === 'code-diff'
+        ? [descriptor.before?.source, descriptor.after?.source]
+        : node.lang === 'code-walkthrough'
+          ? (descriptor.snapshots ?? []).map((snapshot) => snapshot.source)
+          : [descriptor.source];
+      for (const source of sources.filter(Boolean)) refs.push(source);
+      if (node.lang === 'annotated') {
+        artifact = { language: descriptor.language ?? 'text', code: descriptor.code };
+      } else if (node.lang === 'data-inspector') {
+        artifact = { language: 'json', code: descriptor.json };
+      }
+    }
     const path = node.meta?.match(/(?:^|\s)source="([^"]+)"(?:\s|$)/u)?.[1];
     if (!path) return;
+    if (['code-diff', 'code-walkthrough'].includes(node.lang)) {
+      throw new Error(`${filename}: publish each original artifact separately, not a multi-version descriptor`);
+    }
     if (!node.lang || ['d2', 'mermaid', 'text'].includes(node.lang)) {
       throw new Error(`${filename}: source metadata requires a code language`);
     }
@@ -49,7 +78,8 @@ export function collectExamples(markdown, filename) {
       throw new Error(`${filename}: invalid source path ${path}`);
     }
     if (files.some((file) => file.path === path)) throw new Error(`${filename}: duplicate source ${path}`);
-    files.push({ path, language: node.lang, code: node.value, regions: {} });
+    if (typeof artifact.code !== 'string') throw new Error(`${filename}: missing artifact code in ${path}`);
+    files.push({ path, ...artifact, regions: {} });
   });
   visit(tree, 'link', (node) => {
     const request = sourceRequest(node.url);

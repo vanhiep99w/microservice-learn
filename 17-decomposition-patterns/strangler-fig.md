@@ -190,15 +190,27 @@ Với write request, cần xác định rõ hệ nào là nơi ghi nhận chính
 
 Đoạn YAML dưới đây chỉ minh họa cách cấu hình tại proxy hoặc API Gateway:
 
-```yaml
-routes:
-  - path: /api/v1/orders/**
-    destination: order-service
-    canary:
-      weight: 5
-      fallback: monolith
-  - path: /api/v1/**
-    destination: monolith
+```annotated
+title: Routing minh họa cho Strangler Fig
+language: yaml
+code: |-
+  routes:
+    - path: /api/v1/orders/**
+      destination: order-service
+      canary:
+        weight: 5
+        fallback: monolith
+    - path: /api/v1/**
+      destination: monolith
+annotations:
+  - id: note-1
+    title: Route capability cụ thể trước
+    description: Cú pháp minh họa, không phải config của một gateway cụ thể. Fallback ghi phải tránh thực thi side effect hai lần.
+    ranges: [[2, 6]]
+  - id: note-2
+    title: Giữ phần chưa migrate ở monolith
+    description: Catch-all đứng sau route orders trong mô hình first-match của ví dụ.
+    ranges: [[7, 8]]
 ```
 
 Trong ví dụ này, 5% traffic của `/api/v1/orders/**` đi tới `order-service`. Traffic còn lại của path đó và mọi path khác vẫn đi vào Monolith. Tên field thực tế phụ thuộc vào proxy hoặc API Gateway được sử dụng.

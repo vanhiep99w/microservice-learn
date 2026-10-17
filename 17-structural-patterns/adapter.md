@@ -241,26 +241,38 @@ interface PaymentPort {
 
 Adapter chuyển request nội bộ sang request của Bank và chuyển mã response về `PaymentResult`.
 
-```typescript
-// Adapter: đây là nơi mapping mã/provider payload và transport error.
-class BankSoapPaymentAdapter implements PaymentPort {
-  async authorize(command: AuthorizePayment): Promise<PaymentResult> {
-    const response = await bankSoapClient.submitTransaction({
-      merchantReference: command.orderId,
-      amount: command.amountMinor,
-      currencyCode: command.currency,
-      requestId: command.idempotencyKey,
-    });
+```annotated
+title: Adapter giữ vendor contract ở biên hệ thống
+language: typescript
+code: |-
+  // Adapter: đây là nơi mapping mã/provider payload và transport error.
+  class BankSoapPaymentAdapter implements PaymentPort {
+    async authorize(command: AuthorizePayment): Promise<PaymentResult> {
+      const response = await bankSoapClient.submitTransaction({
+        merchantReference: command.orderId,
+        amount: command.amountMinor,
+        currencyCode: command.currency,
+        requestId: command.idempotencyKey,
+      });
 
-    if (response.code === "A") {
-      return { status: "AUTHORIZED", authorizationId: response.authRef };
+      if (response.code === "A") {
+        return { status: "AUTHORIZED", authorizationId: response.authRef };
+      }
+      if (response.code === "D") {
+        return { status: "DECLINED", reason: "INSUFFICIENT_FUNDS" };
+      }
+      return { status: "RETRYABLE_FAILURE", retryAfterMs: 1_000 };
     }
-    if (response.code === "D") {
-      return { status: "DECLINED", reason: "INSUFFICIENT_FUNDS" };
-    }
-    return { status: "RETRYABLE_FAILURE", retryAfterMs: 1_000 };
   }
-}
+annotations:
+  - id: note-1
+    title: Mapping request và identity
+    description: Idempotency key được truyền tới provider. Vẫn phải xác minh provider thực sự hỗ trợ semantics đó.
+    ranges: [[3, 9]]
+  - id: note-2
+    title: Mapping kết quả về domain
+    description: AUTHORIZED, DECLINED và RETRYABLE_FAILURE là contract nội bộ; không đẩy mã A/D ra caller.
+    ranges: [[11, 17]]
 ```
 
 Đoạn code là mapping minh họa theo contract provider đã biết. Trong production, bảng mapping phải bao phủ success, business rejection, retryable failure, timeout và trạng thái chưa xác định. Không được coi mọi mã chưa biết là retryable nếu retry có thể lặp một side effect.

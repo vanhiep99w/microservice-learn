@@ -489,6 +489,33 @@ Nên kiểm thử từng failure mode thay vì chỉ kiểm tra response chậm 
 
 Test phải xác nhận cả kết quả nhìn thấy ở caller và tài nguyên phía sau: thread/connection có được trả lại không, query có bị hủy không, deadline có được truyền xuống không và cùng một payment có bị xử lý trùng không. Khi thay đổi cấu hình production, triển khai theo từng bước và theo dõi timeout rate, tail latency, saturation cùng business metric liên quan.
 
+```span-waterfall
+title: Caller hết deadline không đồng nghĩa downstream dừng
+unit: ms
+provenance:
+  kind: illustrative
+  description: Giả định caller timeout tại 250 ms, downstream không nhận hoặc không hỗ trợ cancellation. Không phải hành vi bắt buộc của mọi client library.
+spans:
+  - id: caller
+    name: Chờ response đến deadline
+    service: order
+    start: 0
+    duration: 250
+    status: error
+  - id: downstream
+    parent: caller
+    name: Payment vẫn có thể hoàn tất sau timeout
+    service: payment
+    start: 50
+    duration: 300
+    description: Child kéo dài tới 350 ms vì công việc không tự bị hủy khi caller ngừng chờ.
+annotations:
+  - id: late
+    span: downstream
+    title: Kết quả chưa biết không phải thất bại chắc chắn
+    description: Trước khi retry charge, cần idempotency key và cơ chế tra cứu/reconcile kết quả; không giả định timeout đã rollback side effect.
+```
+
 ## Checklist
 
 - [ ] Mọi external call qua HTTP, gRPC, database, cache và broker có timeout tường minh.

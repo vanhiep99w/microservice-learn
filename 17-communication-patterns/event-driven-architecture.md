@@ -375,22 +375,38 @@ Một domain event nội bộ có thể được dùng để tính giá hoặc v
 
 Một integration event thường có envelope chứa metadata và payload nghiệp vụ. Đây là mẫu minh họa, không phải schema bắt buộc cho mọi broker:
 
-```json
-{
-  "event_id": "evt-8f2c",
-  "event_type": "order.created",
-  "schema_version": 1,
-  "aggregate_id": "order-123",
-  "occurred_at": "2025-09-18T10:00:00Z",
-  "correlation_id": "req-91ab",
-  "payload": {
-    "customer_id": "customer-9",
-    "items": [
-      { "product_id": "product-7", "quantity": 2 }
-    ],
-    "total": 1250000
+```data-inspector
+title: Event envelope và payload nghiệp vụ
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "event_id": "evt-8f2c",
+    "event_type": "order.created",
+    "schema_version": 1,
+    "aggregate_id": "order-123",
+    "occurred_at": "2025-09-18T10:00:00Z",
+    "correlation_id": "req-91ab",
+    "payload": {
+      "customer_id": "customer-9",
+      "items": [
+        { "product_id": "product-7", "quantity": 2 }
+      ],
+      "total": 1250000
+    }
   }
-}
+annotations:
+  - id: field-1
+    pointer: /event_id
+    title: Dedupe khi giao lại
+    description: Một event có thể được giao nhiều lần; identity phải ổn định qua các lần retry.
+  - id: field-2
+    pointer: /aggregate_id
+    title: Ordering theo aggregate
+    description: Khóa nghiệp vụ giúp chọn partition/group nhưng không tạo thứ tự toàn cục.
+  - id: field-3
+    pointer: /payload
+    title: Data contract của consumer
+    description: Không đưa toàn bộ internal entity ra broker nếu consumer không cần.
 ```
 
 Các trường có vai trò khác nhau:

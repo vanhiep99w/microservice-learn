@@ -464,6 +464,59 @@ delay = random(base_delay, previous_delay × 3)
 | 5 | 16s | random(0, 16s) = 11.2s |
 | 6 | 30s (capped) | random(0, 30s) = 22.7s |
 
+Các lần thử đều dùng cùng operation identity. Tổng thời gian phải nằm trong deadline; hết budget thì dừng thay vì cố đủ số lần retry.
+
+```concurrency-lanes
+title: Retry với một lịch Full Jitter minh họa
+unit: ms
+provenance:
+  kind: illustrative
+  description: Giả định base 100 ms, attempt index bắt đầu từ 0. Hai lần chờ được tác giả chọn là 60 ms và 150 ms, không phải kết quả chạy random.
+lanes:
+  - id: caller
+    label: Caller
+  - id: dependency
+    label: Dependency
+events:
+  - id: a1
+    lane: caller
+    at: 0
+    label: Attempt 1
+  - id: f1
+    lane: dependency
+    at: 20
+    label: Lỗi transient
+  - id: a2
+    lane: caller
+    at: 80
+    label: Attempt 2
+  - id: f2
+    lane: dependency
+    at: 100
+    label: Lỗi transient
+  - id: a3
+    lane: caller
+    at: 250
+    label: Attempt 3
+  - id: ok
+    lane: dependency
+    at: 270
+    label: Thành công
+intervals:
+  - id: wait1
+    lane: caller
+    start: 20
+    end: 80
+    kind: wait
+    label: Jitter 60 ms trong [0, 100]
+  - id: wait2
+    lane: caller
+    start: 100
+    end: 250
+    kind: wait
+    label: Jitter 150 ms trong [0, 200]
+```
+
 ### 3.4. Idempotency — Điều kiện tiên quyết
 
 **Retry chỉ an toàn khi operation là idempotent** (thực hiện nhiều lần cho cùng kết quả).

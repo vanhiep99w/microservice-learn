@@ -533,6 +533,36 @@ Những thay đổi **breaking** (chỉ được ở MAJOR):
 - Xóa field khỏi type/interface
 - Thay đổi required dependencies
 
+```code-diff
+title: Nâng shared library ở từng consumer
+language: xml
+view: split
+wordDiff: true
+caption: Chỉ minh họa thay version dependency, không chứng minh version mới tương thích. Mỗi service phải test và release độc lập.
+before:
+  label: Order Service trước nâng cấp
+  code: |-
+    <dependency>
+      <groupId>com.example.platform</groupId>
+      <artifactId>common-observability</artifactId>
+      <version>1.2.0</version>
+    </dependency>
+after:
+  label: Order Service sau nâng cấp
+  code: |-
+    <dependency>
+      <groupId>com.example.platform</groupId>
+      <artifactId>common-observability</artifactId>
+      <version>1.3.0</version>
+    </dependency>
+annotations:
+  - id: version
+    side: after
+    title: Consumer tự chọn thời điểm nâng
+    description: Payment Service có thể giữ 1.2.0 nếu contract còn tương thích; không buộc toàn hệ thống deploy lockstep.
+    ranges: [[4, 4]]
+```
+
 ### 4.4. Mono-repo vs Multi-repo cho shared library
 
 | Tiêu chí | Mono-repo | Multi-repo |

@@ -108,13 +108,17 @@ graph LR
 - Bài cần đối chiếu nhiều code dùng code fence có metadata `source="snippets/tên-artifact.ext"` và link `[Đọc source](?source=tên-file-không-đuôi&snapshot=article&file=snippets%2Ftên-artifact.ext)`; remark plugin chuyển link thành `SourceRef` của docs-kit.
 - Có thể thêm `&lines=1-4` để highlight. Không khai báo `region` nếu pipeline chưa có region đó.
 - Icon D2: chọn đúng sản phẩm trong `https://icons.d2lang.com/`, khai báo `node.icon` bằng URL catalog. Vendor SVG tin cậy và SHA-256 trong `diagrams/icons/manifest.json`; `remarkD2Icons` + `assetsRoot` nhúng icon lúc build. Không gán một logo cho node gộp nhiều sản phẩm hoặc dùng AWS logo cho thành phần generic. Xem hướng dẫn README.
-- docs-kit 0.6.0: chỉ opt-in `interactive` cho sơ đồ lớn; `mode=steps` khi cần diễn tiến trạng thái. Mặc định vẫn tĩnh; không bật toàn site. Viewer lazy-load khi bấm Explore, không chạy compiler trong browser.
+- docs-kit 0.7.0: chỉ opt-in `interactive` cho sơ đồ lớn; `mode=steps` khi cần diễn tiến trạng thái. Mặc định vẫn tĩnh; không bật toàn site. Viewer lazy-load khi bấm Explore, không chạy compiler trong browser.
 - Node D2 có thể dùng `link: "./?source=..."` hoặc `node.link: "./?source=..."` để mở SourceExplorer tại chỗ qua `D2SourceLinks`. Dùng query URL percent-encoded trong nháy kép; `prepare-content` validate cùng manifest như Markdown SourceRef.
 - Trích đoạn phải giữ code nguyên bản, có language hợp lệ, không trùng artifact path trong một bài. Không ngụ ý các snippets độc lập là một project chạy được.
 - `prepare-content` tự sinh/validate manifest và snapshots tại `public/source-examples/`. Không chỉnh/commit output hoặc cache `.next/cache/docs-kit/d2`.
 - Chỉ publish source tin cậy, không chứa secrets thật. HTML highlight và SVG D2 được nhúng vào trang, không phải dữ liệu input công khai.
 - Yêu cầu Node.js 22+. Chạy `npm test`, `npm run check-diagrams`, `npm run build` khi thay pipeline/component/diagram; thêm `npm run typecheck` sau khi build đã tạo types.
-- Tham khảo hướng dẫn authoring trong README, mục “Website docs và quy ước D2 / SourceExplorer”.
+- docs-kit 0.7.0 có fences `annotated`, `code-walkthrough`, `terminal-session`, `code-diff`, `data-inspector`, `protocol-exchange`, `span-waterfall`, `concurrency-lanes`, `marble`, `state-transition`. Chỉ dùng khi giúp đọc code/payload/diễn tiến, không thay mọi code fence, D2 hoặc bảng. Xem API trong `node_modules/@vanhiep99w/docs-kit/docs/` trước khi thêm descriptor.
+- `annotated source="..."` xuất `code` với `language` gốc; `data-inspector source="..."` xuất chuỗi `json`, không xuất YAML wrapper. Giữ snippets nguyên bản và SourceRef cũ. `source` trong descriptor Annotated Example, Diff hoặc Walkthrough được pipeline validate cùng manifest; không gắn metadata một artifact lên descriptor nhiều phiên bản.
+- Timeline biên soạn phải có `provenance.kind: illustrative`, đơn vị và giả định rõ ràng. Guard/effects, terminal transcript, HTTP exchange chỉ mô tả, không chạy code, request, timer hay business side effect. Nội dung đóng trong disclosure vẫn công khai, không chứa secrets thật.
+- `scripts/learning-components.test.mjs` kiểm tra mọi ví dụ của 10 nhóm component bằng parser, remark và server render. Không đưa Shiki/YAML parser/D2 renderer vào client.
+- Tham khảo hướng dẫn authoring trong README, mục “Website docs và quy ước D2 / SourceExplorer” và “Component học tập docs-kit 0.7.0”.
 
 ### Khi thêm doc mới
 

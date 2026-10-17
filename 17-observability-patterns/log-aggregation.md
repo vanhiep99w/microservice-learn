@@ -137,20 +137,28 @@ Các field theo nghiệp vụ như `order_id`, `error_type` và `duration_ms` ch
 
 Ví dụ dưới đây mô tả một lỗi thanh toán. Các giá trị chỉ mang tính minh họa:
 
-```json source="snippets/vi-du-mot-log-entry.json"
-{
-  "timestamp": "2025-03-15T10:30:45.123Z",
-  "level": "ERROR",
-  "service": "payment-service",
-  "environment": "production",
-  "version": "1.4.2",
-  "correlation_id": "req-789",
-  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
-  "message": "Charge failed",
-  "order_id": "ORD-456",
-  "error_type": "GatewayTimeout",
-  "duration_ms": 2503
-}
+```data-inspector source="snippets/vi-du-mot-log-entry.json"
+title: Log entry để truy vấn xuyên service
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "timestamp": "2025-03-15T10:30:45.123Z",
+    "level": "ERROR",
+    "service": "payment-service",
+    "environment": "production",
+    "version": "1.4.2",
+    "correlation_id": "req-789",
+    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "message": "Charge failed",
+    "order_id": "ORD-456",
+    "error_type": "GatewayTimeout",
+    "duration_ms": 2503
+  }
+annotations:
+  - id: field-1
+    pointer: /message
+    title: Thông điệp là một field
+    description: Dùng các field có cấu trúc để filter và aggregate, không chỉ tìm chuỗi trong message.
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=log-aggregation&snapshot=article&file=snippets%2Fvi-du-mot-log-entry.json)

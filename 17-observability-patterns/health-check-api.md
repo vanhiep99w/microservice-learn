@@ -309,39 +309,55 @@ Kubernetes dùng ba loại probe với hành động khác nhau:
 
 Manifest dưới đây dùng các endpoint của contract ở trên:
 
-```yaml source="snippets/cau-hinh-probes-minh-hoa.yaml"
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: order-service
-spec:
-  template:
-    spec:
-      containers:
-        - name: order-service
-          image: myapp/order-service:1.4.2
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: 8080
-            initialDelaySeconds: 10
-            periodSeconds: 10
-            timeoutSeconds: 3
-            failureThreshold: 3
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: 8080
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 2
-          startupProbe:
-            httpGet:
-              path: /health/startup
-              port: 8080
-            periodSeconds: 5
-            timeoutSeconds: 3
-            failureThreshold: 30
+```annotated source="snippets/cau-hinh-probes-minh-hoa.yaml"
+title: Probes là contract với orchestrator
+language: yaml
+code: |-
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: order-service
+  spec:
+    template:
+      spec:
+        containers:
+          - name: order-service
+            image: myapp/order-service:1.4.2
+            livenessProbe:
+              httpGet:
+                path: /health/live
+                port: 8080
+              initialDelaySeconds: 10
+              periodSeconds: 10
+              timeoutSeconds: 3
+              failureThreshold: 3
+            readinessProbe:
+              httpGet:
+                path: /health/ready
+                port: 8080
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 2
+            startupProbe:
+              httpGet:
+                path: /health/startup
+                port: 8080
+              periodSeconds: 5
+              timeoutSeconds: 3
+              failureThreshold: 30
+annotations:
+  - id: note-1
+    title: Đặt probes trên đúng container
+    description: Đây là trích đoạn minh họa; Deployment hoàn chỉnh còn cần selector và labels khớp nhau.
+    ranges: [[1, 10]]
+  - id: note-2
+    title: Tách tín hiệu sống, sẵn sàng và khởi động
+    description: Không dùng cùng dependency policy cho cả ba endpoint; đọc contract của từng probe trước khi chọn threshold.
+    ranges: [[11, 32]]
+source:
+  project: health-check-api
+  snapshot: article
+  file: snippets/cau-hinh-probes-minh-hoa.yaml
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=health-check-api&snapshot=article&file=snippets%2Fcau-hinh-probes-minh-hoa.yaml)

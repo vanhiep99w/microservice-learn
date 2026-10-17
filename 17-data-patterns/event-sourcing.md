@@ -102,20 +102,28 @@ Event Sourcing không có nghĩa mọi bản sao state đều bị cấm. Snapsh
 
 Một event record thường có các trường nhận diện và truy nguyên tương tự sau:
 
-```json source="snippets/cac-khai-niem-cot-loi.json"
-{
-  "event_id": "evt-8f2c",
-  "aggregate_id": "account-001",
-  "aggregate_type": "TradingAccount",
-  "sequence": 2,
-  "event_type": "MoneyDeposited",
-  "schema_version": 1,
-  "occurred_at": "2025-06-01T10:00:05Z",
-  "data": {
-    "amount": 1000000,
-    "currency": "VND"
+```data-inspector source="snippets/cac-khai-niem-cot-loi.json"
+title: "Stored event: stream, version và business fact"
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "event_id": "evt-8f2c",
+    "aggregate_id": "account-001",
+    "aggregate_type": "TradingAccount",
+    "sequence": 2,
+    "event_type": "MoneyDeposited",
+    "schema_version": 1,
+    "occurred_at": "2025-06-01T10:00:05Z",
+    "data": {
+      "amount": 1000000,
+      "currency": "VND"
+    }
   }
-}
+annotations:
+  - id: field-1
+    pointer: /event_id
+    title: Identity bất biến
+    description: Không sửa event lịch sử để đổi ý nghĩa; bổ sung event hoặc cơ chế evolution đã định nghĩa.
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=event-sourcing&snapshot=article&file=snippets%2Fcac-khai-niem-cot-loi.json)

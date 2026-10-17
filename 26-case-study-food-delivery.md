@@ -961,26 +961,34 @@ shape: sequence_diagram
 
 **`order.placed.v1`**
 
-```json source="snippets/3-9-event-payload-samples-json.json"
-{
-  "eventId": "evt-9bda-1201",
-  "eventType": "order.placed.v1",
-  "occurredAt": "2026-02-27T11:45:18Z",
-  "orderId": "ORD-20260227-1881",
-  "userId": "USR-1001",
-  "restaurantId": "RES-902",
-  "amount": {
-    "subtotal": 185000,
-    "discount": 30000,
-    "shippingFee": 15000,
-    "total": 170000,
-    "currency": "VND"
-  },
-  "items": [
-    {"menuItemId": "IT-1", "qty": 1},
-    {"menuItemId": "IT-5", "qty": 2}
-  ]
-}
+```data-inspector source="snippets/3-9-event-payload-samples-json.json"
+title: "Event giao đồ ăn: envelope và payload"
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "eventId": "evt-9bda-1201",
+    "eventType": "order.placed.v1",
+    "occurredAt": "2026-02-27T11:45:18Z",
+    "orderId": "ORD-20260227-1881",
+    "userId": "USR-1001",
+    "restaurantId": "RES-902",
+    "amount": {
+      "subtotal": 185000,
+      "discount": 30000,
+      "shippingFee": 15000,
+      "total": 170000,
+      "currency": "VND"
+    },
+    "items": [
+      {"menuItemId": "IT-1", "qty": 1},
+      {"menuItemId": "IT-5", "qty": 2}
+    ]
+  }
+annotations:
+  - id: field-1
+    pointer: /eventId
+    title: Identity của event
+    description: Consumer dùng identity ổn định để dedupe khi có giao lại message.
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=26-case-study-food-delivery&snapshot=article&file=snippets%2F3-9-event-payload-samples-json.json)

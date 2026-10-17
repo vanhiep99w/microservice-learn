@@ -203,9 +203,26 @@ Rollback của Rolling Update là một rollout theo chiều ngược lại. Con
 
 Với Kubernetes, lệnh cơ bản là:
 
-```bash
-kubectl rollout undo deployment/<deployment-name>
-kubectl rollout status deployment/<deployment-name>
+```terminal-session
+title: Rollback một Deployment trong namespace demo
+description: Phiên lệnh biên soạn, không thực thi. Đổi order-service và namespace theo môi trường; bảo đảm Deployment không paused trước khi undo.
+context:
+  kind: local
+  label: kubectl context đã kiểm tra
+steps:
+  - id: context
+    command: kubectl config current-context
+    expected: Đúng cluster cần thao tác.
+  - id: history
+    command: kubectl rollout history deployment/order-service -n demo
+    expected: Có revision phù hợp và đã kiểm tra schema/data tương thích.
+  - id: undo
+    command: kubectl rollout undo deployment/order-service -n demo
+    warning: Thay đổi workload thật nếu chạy. Undo Pod template không rollback database, event hoặc external side effect.
+    expected: Yêu cầu rollout revision trước; không coi lệnh trả thành công là traffic đã phục hồi.
+  - id: status
+    command: kubectl rollout status deployment/order-service -n demo --timeout=120s
+    expected: Đọc kết quả rollout rồi kiểm tra metrics và business smoke tests.
 ```
 
 Trình tự xử lý nên rõ ràng trước khi deploy:

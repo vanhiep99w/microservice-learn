@@ -798,6 +798,26 @@ KUBERNETES DNS NAMING CONVENTION:
     → Hoặc ngắn gọn: http://auth-service.infra:8080/verify
 ```
 
+**Chẩn đoán discovery:** đọc cả Service lẫn EndpointSlice, không chỉ kiểm tra tên DNS có tồn tại.
+
+```terminal-session
+title: Kiểm tra Service và endpoints trong Kubernetes
+description: Phiên lệnh minh họa chỉ đọc. Cần kubectl, quyền đọc và Service order-service trong namespace demo; tên tài nguyên phải đổi theo cluster của bạn.
+context:
+  kind: local
+  label: kubectl context đã chọn
+steps:
+  - id: context
+    command: kubectl config current-context
+    expected: Xác nhận đúng cluster trước khi chẩn đoán.
+  - id: service
+    command: kubectl get service order-service -n demo -o yaml
+    expected: Đối chiếu selector, port và targetPort với workload.
+  - id: endpoints
+    command: kubectl get endpointslices -n demo -l kubernetes.io/service-name=order-service -o yaml
+    expected: Kiểm tra địa chỉ backend và conditions.ready; Service tồn tại chưa chứng minh có backend Ready.
+```
+
 ### 9.2. Kubernetes Services
 
 ```

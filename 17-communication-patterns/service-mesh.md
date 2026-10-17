@@ -269,40 +269,52 @@ Canary không làm mất yêu cầu tương thích contract. `v2` phải đọc 
 
 Đoạn YAML dưới đây minh họa cách Istio tách stable và canary bằng `DestinationRule`, sau đó chia traffic bằng `VirtualService`. Tên API và field cần được kiểm tra theo phiên bản Istio đang dùng; đây là policy minh họa, không phải cấu hình áp dụng cho mọi mesh.
 
-```yaml
-# VirtualService: chia traffic đến hai subset của Payment Service
-apiVersion: networking.istio.io/v1beta1
-kind: VirtualService
-metadata:
-  name: payment
-spec:
-  hosts:
-    - payment
-  http:
-    - route:
-        - destination:
-            host: payment
-            subset: stable
-          weight: 95
-        - destination:
-            host: payment
-            subset: canary
-          weight: 5
----
-# DestinationRule: ánh xạ subset tới version của workload
-apiVersion: networking.istio.io/v1beta1
-kind: DestinationRule
-metadata:
-  name: payment
-spec:
-  host: payment
-  subsets:
-    - name: stable
-      labels:
-        version: v1
-    - name: canary
-      labels:
-        version: v2
+```annotated
+title: "Istio: weight phải khớp subset"
+language: yaml
+code: |-
+  # VirtualService: chia traffic đến hai subset của Payment Service
+  apiVersion: networking.istio.io/v1beta1
+  kind: VirtualService
+  metadata:
+    name: payment
+  spec:
+    hosts:
+      - payment
+    http:
+      - route:
+          - destination:
+              host: payment
+              subset: stable
+            weight: 95
+          - destination:
+              host: payment
+              subset: canary
+            weight: 5
+  ---
+  # DestinationRule: ánh xạ subset tới version của workload
+  apiVersion: networking.istio.io/v1beta1
+  kind: DestinationRule
+  metadata:
+    name: payment
+  spec:
+    host: payment
+    subsets:
+      - name: stable
+        labels:
+          version: v1
+      - name: canary
+        labels:
+          version: v2
+annotations:
+  - id: note-1
+    title: Traffic split 95/5
+    description: Weight chia traffic theo cấu hình proxy, không bảo đảm chính xác 5% user hay session.
+    ranges: [[10, 18]]
+  - id: note-2
+    title: Subset nối tới label của workload
+    description: DestinationRule định nghĩa stable/canary; Pod labels phải khớp version v1/v2.
+    ranges: [[20, 33]]
 ```
 
 Routing chỉ là một phần của canary. Cần có policy mTLS và authorization phù hợp cho cả hai subset. Nếu `v2` không nhận được traffic vì identity, endpoint hoặc policy sai, việc giảm trọng số không giải quyết được nguyên nhân.

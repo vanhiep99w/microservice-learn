@@ -301,13 +301,21 @@ query ProductDetail {
 GET /mobile/products/456
 ```
 
-```json
-{
-  "id": 456,
-  "name": "iPhone 15",
-  "price": 29990000,
-  "thumbnail": "https://cdn.example.com/456-thumb.webp"
-}
+```data-inspector
+title: "Mobile DTO: contract riêng cho màn hình"
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "id": 456,
+    "name": "iPhone 15",
+    "price": 29990000,
+    "thumbnail": "https://cdn.example.com/456-thumb.webp"
+  }
+annotations:
+  - id: field-1
+    pointer: /id
+    title: Identity vẫn nhất quán
+    description: BFF thay đổi hình dạng response, không tự trở thành source of truth của Product.
 ```
 
 **IoT BFF** dùng gRPC và Protobuf với message nhỏ:

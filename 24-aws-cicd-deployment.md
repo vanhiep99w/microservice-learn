@@ -412,26 +412,42 @@ Tiếp tục shifting khi metrics/gates đạt; terminate Blue theo deployment p
 
 **AppSpec cho ECS Blue-Green:**
 
-```yaml source="snippets/5-1-codedeploy-cho-ecs.yaml"
-# appspec.yaml — ECS Blue-Green deployment
-version: 0.0
+```annotated source="snippets/5-1-codedeploy-cho-ecs.yaml"
+title: "AppSpec ECS: task definition và lifecycle hooks"
+language: yaml
+code: |-
+  # appspec.yaml — ECS Blue-Green deployment
+  version: 0.0
 
-Resources:
-  - TargetService:
-      Type: AWS::ECS::Service
-      Properties:
-        TaskDefinition: <TASK_DEFINITION>  # Replaced by CodePipeline
-        LoadBalancerInfo:
-          ContainerName: "order-service"
-          ContainerPort: 8080
-        PlatformVersion: "LATEST"
+  Resources:
+    - TargetService:
+        Type: AWS::ECS::Service
+        Properties:
+          TaskDefinition: <TASK_DEFINITION>  # Replaced by CodePipeline
+          LoadBalancerInfo:
+            ContainerName: "order-service"
+            ContainerPort: 8080
+          PlatformVersion: "LATEST"
 
-Hooks:
-  - BeforeInstall: "LambdaFunctionToValidateBeforeInstall"
-  - AfterInstall: "LambdaFunctionToValidateAfterInstall"
-  - AfterAllowTestTraffic: "LambdaFunctionToRunIntegrationTests"
-  - BeforeAllowTraffic: "LambdaFunctionToValidateBeforeTraffic"
-  - AfterAllowTraffic: "LambdaFunctionToRunSmokeTests"
+  Hooks:
+    - BeforeInstall: "LambdaFunctionToValidateBeforeInstall"
+    - AfterInstall: "LambdaFunctionToValidateAfterInstall"
+    - AfterAllowTestTraffic: "LambdaFunctionToRunIntegrationTests"
+    - BeforeAllowTraffic: "LambdaFunctionToValidateBeforeTraffic"
+    - AfterAllowTraffic: "LambdaFunctionToRunSmokeTests"
+annotations:
+  - id: note-1
+    title: Nối task definition với container nhận traffic
+    description: Tên container và port phải khớp task definition. Placeholder TASK_DEFINITION được pipeline thay trước deploy.
+    ranges: [[4, 12]]
+  - id: note-2
+    title: Kiểm thử tại các mốc traffic
+    description: Hooks là các Lambda do team cung cấp; khai báo tên không tự tạo hoặc kiểm chứng logic validation.
+    ranges: [[14, 19]]
+source:
+  project: 24-aws-cicd-deployment
+  snapshot: article
+  file: snippets/5-1-codedeploy-cho-ecs.yaml
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=24-aws-cicd-deployment&snapshot=article&file=snippets%2F5-1-codedeploy-cho-ecs.yaml)

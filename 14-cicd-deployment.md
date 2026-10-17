@@ -390,30 +390,46 @@ s3 -> s4
 
 Rolling là default Deployment strategy K8s. Tốn thêm surge capacity ít hơn blue-green; v1/v2 cùng tồn tại nên cần backward compatibility. Rollback rolling có thể mất vài phút; readiness/draining/capacity mới quyết định downtime, không có bảo đảm zero downtime tự động.
 
-```yaml source="snippets/4-2-rolling-update.yaml"
-# Kubernetes — Rolling Update Strategy (MẶC ĐỊNH)
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: order-service
-spec:
-  replicas: 3
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1          # Tối đa thêm 1 pod mới (tổng 4 pods tạm thời)
-      maxUnavailable: 0    # Không cho phép pod nào unavailable (zero downtime)
-  template:
-    spec:
-      containers:
-        - name: order-service
-          image: order-service:v2.0
-          readinessProbe:         # BẮT BUỘC — K8s dùng để biết v2 ready
-            httpGet:
-              path: /actuator/health/readiness
-              port: 8082
-            initialDelaySeconds: 10
-            periodSeconds: 5
+```annotated source="snippets/4-2-rolling-update.yaml"
+title: "Rolling Update: budget và điều kiện Ready"
+language: yaml
+code: |-
+  # Kubernetes — Rolling Update Strategy (MẶC ĐỊNH)
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: order-service
+  spec:
+    replicas: 3
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1          # Tối đa thêm 1 pod mới (tổng 4 pods tạm thời)
+        maxUnavailable: 0    # Không cho phép pod nào unavailable (zero downtime)
+    template:
+      spec:
+        containers:
+          - name: order-service
+            image: order-service:v2.0
+            readinessProbe:         # BẮT BUỘC — K8s dùng để biết v2 ready
+              httpGet:
+                path: /actuator/health/readiness
+                port: 8082
+              initialDelaySeconds: 10
+              periodSeconds: 5
+annotations:
+  - id: note-1
+    title: Giới hạn unavailable
+    description: maxUnavailable bằng 0 giữ budget sẵn sàng trong rollout; vẫn cần đủ capacity, graceful shutdown và API tương thích.
+    ranges: [[8, 12]]
+  - id: note-2
+    title: Ready trước khi nhận traffic
+    description: Probe phải phản ánh khả năng phục vụ thực tế, không chỉ việc process đã mở cổng.
+    ranges: [[18, 23]]
+source:
+  project: 14-cicd-deployment
+  snapshot: article
+  file: snippets/4-2-rolling-update.yaml
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=14-cicd-deployment&snapshot=article&file=snippets%2F4-2-rolling-update.yaml)

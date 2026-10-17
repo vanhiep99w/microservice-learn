@@ -281,13 +281,21 @@ Gateway chịu trách nhiệm gọi song song và ghép cấu trúc response. Ga
 
 Ví dụ, nếu Recommendation Service lỗi, Gateway vẫn có thể trả profile và cart:
 
-```json
-{
-  "user": { "name": "An", "tier": "GOLD" },
-  "cart": { "items": 3, "total": 1250000 },
-  "recommendations": null,
-  "_meta": { "degraded": ["recommendations"] }
-}
+```data-inspector
+title: Partial response khi dependency phụ lỗi
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "user": { "name": "An", "tier": "GOLD" },
+    "cart": { "items": 3, "total": 1250000 },
+    "recommendations": null,
+    "_meta": { "degraded": ["recommendations"] }
+  }
+annotations:
+  - id: field-1
+    pointer: /user
+    title: Phần dữ liệu còn phục vụ được
+    description: Chỉ degrade các phần mà contract cho phép; không biến lỗi dữ liệu bắt buộc thành response thành công.
 ```
 
 Đây chỉ là một response contract mẫu. Nếu Payment Service hoặc một bước bắt buộc của checkout thất bại, Gateway không được biến trạng thái đó thành thành công chỉ để giữ HTTP `200`. Partial failure phải phù hợp với ý nghĩa nghiệp vụ của endpoint.

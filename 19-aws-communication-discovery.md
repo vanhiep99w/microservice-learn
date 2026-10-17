@@ -856,6 +856,35 @@ Message Group: "order-789"  → [created] → [paid]                (ordered)
 
 ---
 
+```marble
+title: "FIFO: thứ tự trong group, không phải giữa các group"
+frameLabel: Cột logic minh họa, không phải ms hoặc throughput
+rows:
+  - id: g1
+    label: order-123
+    kind: output
+    marble: -a-b-c---
+  - id: g2
+    label: order-456
+    kind: output
+    marble: -x---y---
+values:
+  a: "123: created"
+  b: "123: paid"
+  c: "123: shipped"
+  x: "456: created"
+  y: "456: cancelled"
+caption: Hai group có thể tiến triển độc lập. Cùng frame không khẳng định cùng CPU/thread hoặc delivery đúng cùng thời điểm.
+annotations:
+  - id: order
+    row: g1
+    frames:
+      - 1
+      - 5
+    title: Ordering theo MessageGroupId
+    description: Không suy ra thứ tự toàn cục giữa order-123 và order-456, và không suy ra exactly-once side effect ở consumer.
+```
+
 ## 6. Ví dụ thực tế — E-Commerce Communication Map
 
 > 🔗 Đề bài chi tiết tại [25 — Case Study: E-Commerce](25-case-study-ecommerce.md)

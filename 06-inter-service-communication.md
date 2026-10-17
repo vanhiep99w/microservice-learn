@@ -85,31 +85,54 @@ POST   /api/products              → Tạo product mới
 PUT    /api/products/123          → Cập nhật toàn bộ product 123
 PATCH  /api/products/123          → Cập nhật 1 phần product 123
 DELETE /api/products/123          → Xóa product 123
+```
 
-Ví dụ request & response:
-─────────────────────────
-
-Request:
-  POST /api/orders HTTP/1.1
-  Content-Type: application/json
-  Authorization: Bearer eyJhbGciOi...
-  
-  {
-    "productId": 123,
-    "quantity": 2,
-    "shippingAddress": "123 Nguyen Hue, HCM"
-  }
-
-Response:
-  HTTP/1.1 201 Created
-  Content-Type: application/json
-  
-  {
-    "id": 456,
-    "status": "CREATED",
-    "totalAmount": 500000,
-    "createdAt": "2026-02-23T10:30:00Z"
-  }
+```protocol-exchange
+title: Tạo order qua HTTP
+description: Request/response tĩnh, credential giả lập; component không gửi request.
+variants:
+  - id: created
+    title: Order được tạo
+    request:
+      method: POST
+      url: /api/orders
+      headers:
+        - id: content
+          name: Content-Type
+          value: application/json
+        - id: auth
+          name: Authorization
+          value: Bearer DEMO_NOT_A_REAL_TOKEN
+      body:
+        kind: json
+        json: |-
+          {
+            "productId": 123,
+            "quantity": 2,
+            "shippingAddress": "123 Nguyen Hue, HCM"
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - id: content
+          name: Content-Type
+          value: application/json
+      body:
+        kind: json
+        json: |-
+          {
+            "id": 456,
+            "status": "CREATED",
+            "totalAmount": 500000,
+            "createdAt": "2026-02-23T10:30:00Z"
+          }
+    annotations:
+      - id: created
+        side: response
+        target: start
+        title: 201 mô tả kết quả tạo mới
+        description: Status và body là contract của API; viewer không thực thi validation hoặc tạo order.
 ```
 
 **REST Maturity Model** (Richardson):

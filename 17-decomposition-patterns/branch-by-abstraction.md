@@ -278,35 +278,51 @@ Team muốn đưa payment vào một **Payment Service** riêng để đáp ứn
 
 Contract nên biểu đạt capability của domain thay vì chi tiết SDK:
 
-```java
-public interface PaymentProcessor {
-    PaymentResult charge(PaymentRequest request);
-    RefundResult refund(String transactionId, Money amount);
-}
+```annotated
+title: Một port, hai implementation
+language: java
+code: |-
+  public interface PaymentProcessor {
+      PaymentResult charge(PaymentRequest request);
+      RefundResult refund(String transactionId, Money amount);
+  }
 
-public final class LegacyPaymentAdapter implements PaymentProcessor {
-    @Override
-    public PaymentResult charge(PaymentRequest request) {
-        return legacyPaymentGateway.charge(request);
-    }
+  public final class LegacyPaymentAdapter implements PaymentProcessor {
+      @Override
+      public PaymentResult charge(PaymentRequest request) {
+          return legacyPaymentGateway.charge(request);
+      }
 
-    @Override
-    public RefundResult refund(String transactionId, Money amount) {
-        return legacyPaymentGateway.refund(transactionId, amount);
-    }
-}
+      @Override
+      public RefundResult refund(String transactionId, Money amount) {
+          return legacyPaymentGateway.refund(transactionId, amount);
+      }
+  }
 
-public final class PaymentServiceClient implements PaymentProcessor {
-    @Override
-    public PaymentResult charge(PaymentRequest request) {
-        return paymentService.charge(request);
-    }
+  public final class PaymentServiceClient implements PaymentProcessor {
+      @Override
+      public PaymentResult charge(PaymentRequest request) {
+          return paymentService.charge(request);
+      }
 
-    @Override
-    public RefundResult refund(String transactionId, Money amount) {
-        return paymentService.refund(transactionId, amount);
-    }
-}
+      @Override
+      public RefundResult refund(String transactionId, Money amount) {
+          return paymentService.refund(transactionId, amount);
+      }
+  }
+annotations:
+  - id: note-1
+    title: Contract ổn định cho caller
+    description: Caller phụ thuộc PaymentProcessor, không phụ thuộc cách gọi legacy hoặc service mới.
+    ranges: [[1, 4]]
+  - id: note-2
+    title: Adapter cho legacy
+    description: Giữ implementation cũ sau abstraction để có thể chuyển ngược khi cần.
+    ranges: [[6, 16]]
+  - id: note-3
+    title: Client của service mới
+    description: Cùng interface chưa đủ bảo đảm cùng semantics; cần kiểm thử lỗi, timeout và idempotency.
+    ranges: [[18, 28]]
 ```
 
 Các kiểu `PaymentRequest`, `PaymentResult`, `RefundResult` và `Money` thuộc contract của Monolith hoặc một package dùng chung có kiểm soát. Chúng không nên làm lộ kiểu request, exception hoặc response riêng của SDK cũ.

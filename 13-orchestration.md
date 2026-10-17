@@ -320,66 +320,86 @@ Thường dùng Deployment để quản lý ReplicaSets, không tạo RS thủ c
 
 Deployment quản lý **ReplicaSets** và hỗ trợ **rolling updates**, **rollback**.
 
-```yaml source="snippets/4-3-deployment.yaml"
-# deployment.yaml — Object dùng NHIỀU NHẤT trong K8s
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: order-service
-  namespace: production
-  labels:
-    app: order-service
-spec:
-  replicas: 3                          # Số pods mong muốn
-  selector:
-    matchLabels:
-      app: order-service               # Pods nào thuộc Deployment này
-  strategy:
-    type: RollingUpdate                # Chiến lược update
-    rollingUpdate:
-      maxSurge: 1                      # Tối đa thêm 1 pod khi update
-      maxUnavailable: 0                # Không cho phép pod nào down
-  template:                            # Pod template
-    metadata:
-      labels:
-        app: order-service
-        version: "2.0"
-    spec:
-      containers:
-        - name: order-service
-          image: order-service:2.0.0
-          ports:
-            - containerPort: 8082
-          env:
-            - name: DB_HOST
-              valueFrom:
-                configMapKeyRef:
-                  name: order-config
-                  key: db-host
-            - name: DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: order-secrets
-                  key: db-password
-          resources:
-            requests:
-              cpu: "250m"
-              memory: "256Mi"
-            limits:
-              cpu: "500m"
-              memory: "512Mi"
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness
-              port: 8082
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness
-              port: 8082
-            initialDelaySeconds: 10
-            periodSeconds: 5
+```annotated source="snippets/4-3-deployment.yaml"
+title: Đọc Deployment từ rollout tới probes
+language: yaml
+code: |-
+  # deployment.yaml — Object dùng NHIỀU NHẤT trong K8s
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: order-service
+    namespace: production
+    labels:
+      app: order-service
+  spec:
+    replicas: 3                          # Số pods mong muốn
+    selector:
+      matchLabels:
+        app: order-service               # Pods nào thuộc Deployment này
+    strategy:
+      type: RollingUpdate                # Chiến lược update
+      rollingUpdate:
+        maxSurge: 1                      # Tối đa thêm 1 pod khi update
+        maxUnavailable: 0                # Không cho phép pod nào down
+    template:                            # Pod template
+      metadata:
+        labels:
+          app: order-service
+          version: "2.0"
+      spec:
+        containers:
+          - name: order-service
+            image: order-service:2.0.0
+            ports:
+              - containerPort: 8082
+            env:
+              - name: DB_HOST
+                valueFrom:
+                  configMapKeyRef:
+                    name: order-config
+                    key: db-host
+              - name: DB_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: order-secrets
+                    key: db-password
+            resources:
+              requests:
+                cpu: "250m"
+                memory: "256Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+            livenessProbe:
+              httpGet:
+                path: /actuator/health/liveness
+                port: 8082
+              initialDelaySeconds: 30
+              periodSeconds: 10
+            readinessProbe:
+              httpGet:
+                path: /actuator/health/readiness
+                port: 8082
+              initialDelaySeconds: 10
+              periodSeconds: 5
+annotations:
+  - id: note-1
+    title: Số replica và rollout budget
+    description: Ba replica là desired state. maxSurge cho phép thêm Pod; maxUnavailable giới hạn Pod unavailable, không tự bảo đảm ứng dụng không downtime.
+    ranges: [[10, 18]]
+  - id: note-2
+    title: Config và secret qua reference
+    description: ConfigMap và Secret tách giá trị khỏi image. Secret reference không tự chứng minh dữ liệu đã được mã hóa at rest.
+    ranges: [[30, 40]]
+  - id: note-3
+    title: Resources và probes có vai trò khác nhau
+    description: Requests phục vụ scheduling; limits giới hạn tài nguyên. Liveness quyết định restart, readiness quyết định nhận traffic.
+    ranges: [[41, 59]]
+source:
+  project: 13-orchestration
+  snapshot: article
+  file: snippets/4-3-deployment.yaml
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=13-orchestration&snapshot=article&file=snippets%2F4-3-deployment.yaml)

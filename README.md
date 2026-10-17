@@ -39,6 +39,7 @@
   - [Icon D2 — AWS và công nghệ được hỗ trợ](#icon-d2--aws-và-công-nghệ-được-hỗ-trợ)
   - [D2 tương tác — zoom, steps và liên kết source](#d2-tương-tác--zoom-steps-và-liên-kết-source)
   - [SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài](#sourceexplorer--đối-chiếu-nhiều-đoạn-code-trong-cùng-bài)
+  - [Component học tập docs-kit 0.7.0](#component-học-tập-docs-kit-070)
 - [Tham khảo](#-tham-khảo)
 
 ---
@@ -210,7 +211,7 @@ Mỗi tài liệu đều có:
 
 ## Website docs và quy ước D2 / SourceExplorer
 
-Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.6.0**. Yêu cầu **Node.js 22+**.
+Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.7.0**. Yêu cầu **Node.js 22+**.
 
 ```bash
 npm ci
@@ -314,6 +315,59 @@ metadata:
 - Markdown link được remark plugin chuyển thành component **`SourceRef`** của docs-kit. Provider dùng chung mở drawer, file tree, copy, deep link và Back/Forward; đổi pathname sẽ reset drawer.
 - `prepare-content` sinh manifest và JSON highlight light/dark tại `public/source-examples/`, rồi kiểm tra project/snapshot/file/line references. Reference sai làm build thất bại. Assets được tái tạo, không commit; **không đưa secrets thật hoặc HTML không tin cậy vào source**.
 - Giữ code quan trọng inline để bài vẫn đọc được trên GitHub. SourceExplorer bổ sung khả năng đọc chéo, không thay thế giải thích trong bài.
+
+### Component học tập docs-kit 0.7.0
+
+Đã rà soát 77 tài liệu gốc (69 trang publish và 8 bài pattern tổng hợp). Áp dụng **51 ví dụ trên 47 bài**, không bật tương tác hoặc thay mọi code fence trên toàn site. Các bài overview, glossary, cheat sheet và bảng quyết định vẫn giữ dạng hiện tại khi không cần khám phá code, payload hoặc diễn tiến.
+
+| Fence | Dùng khi | Ví dụ đã áp dụng |
+|---|---|---|
+| `annotated` | Chú thích gắn với dòng code/config quan trọng | [Deployment](13-orchestration.md#43-deployment), [Adapter](17-structural-patterns/adapter.md#52-mapping-sang-provider), [Secrets Manager](23-aws-security.md#51-aws-secrets-manager) |
+| `code-walkthrough` | Đọc các snapshot theo giai đoạn, không thực thi code | [Expand-Contract](29-deployment-compatibility-and-rollback.md#32-quy-trình-expand-contract-an-toàn) |
+| `terminal-session` | Lệnh theo bước có context, warning và expected result | [Discovery](08-service-discovery.md#91-kubernetes-dns), [Rollback](17-deployment-patterns/rolling-update.md#cách-rollback-rolling-update) |
+| `code-diff` | Đối chiếu trước/sau và giải thích compatibility | [API contract](03-loose-coupling-high-cohesion.md#242-api-contract--versioning), [Shared library](27-shared-code-strategy.md#43-backward-compatibility) |
+| `data-inspector` | JSON lồng nhau cần đọc, tìm và copy từng field | [Event envelope](17-communication-patterns/event-driven-architecture.md#event-envelope-và-payload), [Chunk manifest](31-case-study-dropbox-system-design.md#114-chunk-manifest) |
+| `protocol-exchange` | HTTP request/response, headers và body cần đọc cùng nhau | [REST](06-inter-service-communication.md#21-rest-httpjson), [Rate limit](07-api-gateway.md#34-rate-limiting--throttling) |
+| `span-waterfall` | Span có thời điểm/thời lượng, cần nhìn overlap | [Distributed tracing](11-observability-evolvability.md#42-distributed-tracing-là-gì), [Timeout không tự hủy downstream](17-reliability-patterns/timeout.md#checklist) |
+| `concurrency-lanes` | Nhiều actor, khoảng chờ và cửa sổ lỗi | [Outbox crash](09-data-management.md#10-transactional-outbox-pattern), [Full Jitter](10-resilience-patterns.md#33-exponential-backoff-với-jitter), [Projection lag](20-aws-data-management.md#43-sync-data-giữa-write-db-và-read-db) |
+| `marble` | Thứ tự notification trên các lane dùng chung cột logic | [FIFO message groups](19-aws-communication-discovery.md#55-fifo-vs-standard-queue) |
+| `state-transition` | Người đọc chọn nhánh, xem guard và trạng thái trước/sau | [Circuit Breaker](17-reliability-patterns/circuit-breaker.md#tổng-quan) |
+
+**Quy ước authoring:**
+
+- Descriptor bên trong fence là YAML tin cậy của tác giả. `code`, `json`, command, body và snapshot chỉ được hiển thị; không chạy shell, gọi API, mô phỏng broker hoặc tự kiểm chứng business contract.
+- Dùng `code: |-` / `json: |-` để giữ nội dung và bỏ newline cuối ngoài ý muốn. Annotation code dùng ranges từ **1**, inclusive; Inspector dùng JSON Pointer, không dùng JavaScript dot notation.
+- Timeline phải khai báo `provenance`; dữ liệu tự biên soạn dùng `kind: illustrative`. Nêu rõ đơn vị, giả định, overlap và khoảng chưa mô hình hóa. Marble dùng cột logic, không mặc định ms hoặc cú pháp RxJS TestScheduler.
+- Walkthrough và state explorer không autoplay. Guard/effects chỉ là text; chọn nhánh không chạy validation, timer, retry hay side effect thật. D2 vẫn dùng cho graph/kiến trúc, không thay mọi diagram bằng explorer.
+- Chỉ dùng `view: split` / `wordDiff: true` cho diff ngắn cần đối chiếu. Marble zoom vẫn opt-in, chưa bật ở ví dụ FIFO ngắn.
+- Nội dung và reference vẫn có HTML server-rendered khi tắt JavaScript; các thao tác chọn/copy/search cần hydration. Disclosure đóng vẫn được publish: chỉ dùng credential giả và dữ liệu đã lọc.
+
+Ví dụ chú thích code:
+
+````markdown
+```annotated
+title: Retry budget minh họa
+language: typescript
+code: |-
+  const maxAttempts = 3;
+annotations:
+  - id: budget
+    title: Retry hữu hạn
+    description: Chọn theo deadline và idempotency contract, không lấy 3 làm mặc định cho mọi hệ thống.
+    ranges: [[1, 1]]
+```
+````
+
+**Giữ SourceExplorer khi nâng cấp ví dụ:**
+
+- Fence `annotated source="snippets/tên-file.ext"` publish **`code` với `language` gốc**, không publish YAML descriptor. Có thể thêm field `source: { project, snapshot, file }` trong descriptor để hiện nút mở source; reference phải trỏ tới artifact đã đăng ký, được pipeline validate như Markdown/D2 links.
+- Fence `data-inspector source="snippets/event.json"` publish chuỗi **`json` nguyên bản**. Inspector không có field `source` trong descriptor; giữ Markdown SourceRef kế bên khi cần mở drawer.
+- Không gắn metadata `source="..."` lên `code-diff` hoặc `code-walkthrough`: nhiều phiên bản không đại diện cho một artifact. Publish code gốc riêng rồi reference qua `before.source` / `after.source` hoặc `snapshots[].source`; pipeline kiểm tra cả những reference này.
+- Đối chiếu đã xác nhận **213 artifacts cũ giữ nguyên code và ngôn ngữ** sau chuyển đổi. Các snippets vẫn là trích đoạn độc lập, không phải project chạy được.
+
+Plugin đăng ký ở `source.config.ts`, MDX components ở `src/app/[[...slug]]/page.tsx`, CSS ở `src/app/globals.css`. Không import parser, Shiki hay D2 renderer vào client component. `scripts/learning-components.test.mjs` validate/compile/server-render mọi ví dụ của cả 10 nhóm, kiểm tra artifact gốc và source references. Chạy đủ `npm test`, `npm run check-diagrams`, `npm run build`, `npm run typecheck` khi thay component hoặc descriptor.
+
+API chi tiết: [docs-kit 0.7.0](https://www.npmjs.com/package/@vanhiep99w/docs-kit/v/0.7.0), tài liệu từng component tại `node_modules/@vanhiep99w/docs-kit/docs/`.
 
 ## 📚 Tham khảo
 

@@ -167,26 +167,34 @@ Thay vì log text thuần:
 
 Sử dụng **Structured Logging** (JSON format):
 
-```json source="snippets/2-2-structured-logging.json"
-{
-  "timestamp": "2025-01-15T10:23:45.123Z",
-  "level": "ERROR",
-  "service": "payment-service",
-  "instance": "payment-pod-abc123",
-  "trace_id": "abc123def456",
-  "span_id": "span789",
-  "correlation_id": "req-xyz-001",
-  "message": "Payment failed",
-  "context": {
-    "order_id": "12345",
-    "user_id": "user-001",
-    "amount": 99.99,
-    "currency": "USD",
-    "payment_method": "credit_card",
-    "error_code": "INSUFFICIENT_FUNDS",
-    "gateway_response_time_ms": 2340
+```data-inspector source="snippets/2-2-structured-logging.json"
+title: "Structured log: tìm theo context"
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "timestamp": "2025-01-15T10:23:45.123Z",
+    "level": "ERROR",
+    "service": "payment-service",
+    "instance": "payment-pod-abc123",
+    "trace_id": "abc123def456",
+    "span_id": "span789",
+    "correlation_id": "req-xyz-001",
+    "message": "Payment failed",
+    "context": {
+      "order_id": "12345",
+      "user_id": "user-001",
+      "amount": 99.99,
+      "currency": "USD",
+      "payment_method": "credit_card",
+      "error_code": "INSUFFICIENT_FUNDS",
+      "gateway_response_time_ms": 2340
+    }
   }
-}
+annotations:
+  - id: field-1
+    pointer: /trace_id
+    title: Trace context
+    description: Dùng identity để liên kết log với trace, không dùng message text để join thủ công.
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=11-observability-evolvability&snapshot=article&file=snippets%2F2-2-structured-logging.json)
@@ -734,18 +742,65 @@ Khi một request chậm hoặc lỗi, Logs và Metrics không đủ:
 
 Distributed Tracing theo dõi **toàn bộ hành trình** của một request khi nó đi qua nhiều service. Nó tạo ra một **"bản đồ"** (trace) cho thấy mỗi service xử lý bao lâu và thứ tự gọi nhau.
 
-```
-Trace: POST /api/orders (Total: 8.2s)
-
-Service              Span                  0ms                          8200ms
-─────────────────────────────────────────────────────────────────────────────
-API Gateway          Route request         ██ (0-50ms)
-Order Service        Validate order          ██ (50-170ms)
-Order Service        Save to DB                ██ (170-250ms)
-Inventory Service    Check stock                 ██ (250-330ms)
-Payment Service      Process payment              ██████████████████████████████ (330-7830ms) 🔴
-  └─ Payment Svc     Call Bank API                 █████████████████████████████ (350-7550ms) 🔴
-Notification         Send email                                                 █ (7830-7875ms)
+```span-waterfall
+title: "POST /api/orders: đọc latency theo span"
+unit: ms
+provenance:
+  kind: illustrative
+  description: Giữ các mốc của ví dụ gốc. Root 8200 ms gồm cả khoảng không được mô hình hóa sau email; không phải benchmark hoặc trace production.
+spans:
+  - id: request
+    name: POST /api/orders
+    service: edge
+    start: 0
+    duration: 8200
+  - id: route
+    parent: request
+    name: Route request
+    service: gateway
+    start: 0
+    duration: 50
+  - id: validate
+    parent: request
+    name: Validate order
+    service: order
+    start: 50
+    duration: 120
+  - id: save
+    parent: request
+    name: Save to DB
+    service: order
+    start: 170
+    duration: 80
+  - id: stock
+    parent: request
+    name: Check stock
+    service: inventory
+    start: 250
+    duration: 80
+  - id: payment
+    parent: request
+    name: Process payment
+    service: payment
+    start: 330
+    duration: 7500
+  - id: bank
+    parent: payment
+    name: Call Bank API
+    service: bank
+    start: 350
+    duration: 7200
+  - id: email
+    parent: request
+    name: Send email
+    service: notification
+    start: 7830
+    duration: 45
+annotations:
+  - id: bank-wait
+    span: bank
+    title: Phần chờ nổi bật trong ví dụ
+    description: Bank span nằm trong Payment span. Không cộng 7200 ms với 7500 ms vì hai khoảng chồng nhau; cần phân tích dependency trước khi kết luận critical path.
 ```
 
 #### Trace có bao gồm Async Messaging (Kafka, RabbitMQ,...) không?

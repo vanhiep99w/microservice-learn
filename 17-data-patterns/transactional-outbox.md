@@ -147,14 +147,26 @@ Sau khi commit, relay hoạt động bất đồng bộ. Vì vậy request tạo
 
 Một bảng outbox điển hình có thể bắt đầu với các trường sau:
 
-```sql
-CREATE TABLE outbox (
-    id           UUID PRIMARY KEY,
-    aggregate_id TEXT NOT NULL,
-    event_type   TEXT NOT NULL,
-    payload      JSONB NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+```annotated
+title: "Outbox record: identity và payload"
+language: sql
+code: |-
+  CREATE TABLE outbox (
+      id           UUID PRIMARY KEY,
+      aggregate_id TEXT NOT NULL,
+      event_type   TEXT NOT NULL,
+      payload      JSONB NOT NULL,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+  );
+annotations:
+  - id: note-1
+    title: Identity cho dedupe và ordering theo aggregate
+    description: Primary key bảo vệ identity ở outbox; consumer vẫn cần dedupe khi relay phát lại.
+    ranges: [[2, 4]]
+  - id: note-2
+    title: Payload và thời điểm tạo
+    description: created_at hỗ trợ quan sát backlog, không tự tạo thứ tự toàn cục hoặc exactly-once delivery.
+    ranges: [[5, 6]]
 ```
 
 Ý nghĩa của các trường:
@@ -306,20 +318,32 @@ Xét luồng e-commerce trong đó Order Service sở hữu Order DB và Invento
 
 Payload minh họa:
 
-```json
-{
-  "id": "evt-8f2c",
-  "type": "OrderCreated",
-  "schema_version": 1,
-  "aggregate_id": "order-123",
-  "payload": {
-    "customer_id": "customer-9",
-    "total": 1250000,
-    "items": [
-      { "product_id": "product-7", "quantity": 2 }
-    ]
+```data-inspector
+title: Event được relay từ outbox
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "id": "evt-8f2c",
+    "type": "OrderCreated",
+    "schema_version": 1,
+    "aggregate_id": "order-123",
+    "payload": {
+      "customer_id": "customer-9",
+      "total": 1250000,
+      "items": [
+        { "product_id": "product-7", "quantity": 2 }
+      ]
+    }
   }
-}
+annotations:
+  - id: field-1
+    pointer: /id
+    title: Identity dùng lại khi publish retry
+    description: Relay phải giữ cùng ID khi phát lại cùng event để consumer có thể dedupe.
+  - id: field-2
+    pointer: /aggregate_id
+    title: Gắn với business entity
+    description: Không coi đây là transaction ID toàn cục hoặc bảo đảm thứ tự giữa mọi aggregate.
 ```
 
 `id` là event identity, còn `aggregate_id` là identity của order. Hai giá trị này có vai trò khác nhau: `id` giúp dedupe event; `aggregate_id` giúp giữ ordering theo order.

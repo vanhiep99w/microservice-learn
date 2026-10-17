@@ -312,14 +312,22 @@ Hai ID có thể cùng xuất hiện trong một log entry nhưng phục vụ ha
 
 Khuyến nghị thực tế là ghi cả hai field khi hệ thống có tracing:
 
-```json source="snippets/correlation-id-va-trace-id.json"
-{
-  "correlation_id": "req-789",
-  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
-  "service": "payment-service",
-  "level": "ERROR",
-  "message": "GatewayTimeout calling Bank API"
-}
+```data-inspector source="snippets/correlation-id-va-trace-id.json"
+title: Correlation ID và Trace ID có vai trò riêng
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "correlation_id": "req-789",
+    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "service": "payment-service",
+    "level": "ERROR",
+    "message": "GatewayTimeout calling Bank API"
+  }
+annotations:
+  - id: field-1
+    pointer: /correlation_id
+    title: Tìm một business flow
+    description: Correlation ID có thể liên kết nhiều request/trace; không dùng nó thay span parent context.
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=correlation-id&snapshot=article&file=snippets%2Fcorrelation-id-va-trace-id.json)

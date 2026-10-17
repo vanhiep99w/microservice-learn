@@ -256,47 +256,67 @@ Trong Kubernetes, hãy cân nhắc `stdout` và node-level collector trước. S
 
 Manifest dưới đây minh họa topology, shared volume và việc cấp resource riêng cho log sidecar. Output `stdout` của Fluent Bit là một sink minh họa; khi triển khai thật, thay bằng output plugin và backend logging đã được cấu hình cùng retry, buffer, TLS và credential phù hợp.
 
-```yaml source="snippets/manifest-minh-hoa.yaml"
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: order-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: order-service
-  template:
-    metadata:
-      labels:
+```annotated source="snippets/manifest-minh-hoa.yaml"
+title: "Sidecar: shared volume, resource budget riêng"
+language: yaml
+code: |-
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: order-service
+  spec:
+    replicas: 3
+    selector:
+      matchLabels:
         app: order-service
-    spec:
-      terminationGracePeriodSeconds: 30
-      containers:
-        - name: order-service
-          image: registry.example.com/order-service:1.4.0
-          env:
-            - name: LOG_PATH
-              value: /var/log/app/orders.json
-          volumeMounts:
-            - name: app-logs
-              mountPath: /var/log/app
-          resources:
-            requests: { cpu: "250m", memory: "256Mi" }
-            limits: { cpu: "500m", memory: "512Mi" }
-        - name: log-sidecar
-          image: cr.fluentbit.io/fluent/fluent-bit:3.0
-          args: ["-i", "tail", "-p", "path=/var/log/app/orders.json", "-o", "stdout"]
-          volumeMounts:
-            - name: app-logs
-              mountPath: /var/log/app
-              readOnly: true
-          resources:
-            requests: { cpu: "50m", memory: "64Mi" }
-            limits: { cpu: "100m", memory: "128Mi" }
-      volumes:
-        - name: app-logs
-          emptyDir: {}
+    template:
+      metadata:
+        labels:
+          app: order-service
+      spec:
+        terminationGracePeriodSeconds: 30
+        containers:
+          - name: order-service
+            image: registry.example.com/order-service:1.4.0
+            env:
+              - name: LOG_PATH
+                value: /var/log/app/orders.json
+            volumeMounts:
+              - name: app-logs
+                mountPath: /var/log/app
+            resources:
+              requests: { cpu: "250m", memory: "256Mi" }
+              limits: { cpu: "500m", memory: "512Mi" }
+          - name: log-sidecar
+            image: cr.fluentbit.io/fluent/fluent-bit:3.0
+            args: ["-i", "tail", "-p", "path=/var/log/app/orders.json", "-o", "stdout"]
+            volumeMounts:
+              - name: app-logs
+                mountPath: /var/log/app
+                readOnly: true
+            resources:
+              requests: { cpu: "50m", memory: "64Mi" }
+              limits: { cpu: "100m", memory: "128Mi" }
+        volumes:
+          - name: app-logs
+            emptyDir: {}
+annotations:
+  - id: note-1
+    title: Ứng dụng ghi log lên volume
+    description: Ứng dụng sở hữu log; requests/limits của nó độc lập với log-sidecar.
+    ranges: [[17, 27]]
+  - id: note-2
+    title: Sidecar chỉ đọc và chuyển log
+    description: readOnly hạn chế quyền trên mount của sidecar; Fluent Bit vẫn cần cấu hình production phù hợp.
+    ranges: [[28, 37]]
+  - id: note-3
+    title: emptyDir đi theo vòng đời Pod
+    description: Dữ liệu không bền vững sau khi Pod bị xóa; cần destination bền vững nếu phải giữ log.
+    ranges: [[38, 40]]
+source:
+  project: sidecar
+  snapshot: article
+  file: snippets/manifest-minh-hoa.yaml
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=sidecar&snapshot=article&file=snippets%2Fmanifest-minh-hoa.yaml)
@@ -307,19 +327,27 @@ spec:
 
 Log sidecar chỉ parse và gửi dữ liệu tốt khi application phát log có cấu trúc. Một entry minh họa cho `Order Service`:
 
-```json source="snippets/structured-log-va-metadata.json"
-{
-  "timestamp": "2025-03-15T10:30:45.123Z",
-  "level": "INFO",
-  "service": "order-service",
-  "environment": "production",
-  "version": "1.4.0",
-  "pod": "order-service-7d9f8c6b5f-k2m4n",
-  "correlation_id": "req-789",
-  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
-  "order_id": "ORD-456",
-  "message": "order created"
-}
+```data-inspector source="snippets/structured-log-va-metadata.json"
+title: Log sau khi sidecar thêm metadata
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "timestamp": "2025-03-15T10:30:45.123Z",
+    "level": "INFO",
+    "service": "order-service",
+    "environment": "production",
+    "version": "1.4.0",
+    "pod": "order-service-7d9f8c6b5f-k2m4n",
+    "correlation_id": "req-789",
+    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "order_id": "ORD-456",
+    "message": "order created"
+  }
+annotations:
+  - id: field-1
+    pointer: /message
+    title: Log vẫn là dữ liệu của ứng dụng
+    description: Sidecar bổ sung transport/metadata, không tự biết ngữ nghĩa nghiệp vụ của message.
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=sidecar&snapshot=article&file=snippets%2Fstructured-log-va-metadata.json)

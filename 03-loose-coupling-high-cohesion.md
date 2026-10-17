@@ -243,6 +243,35 @@ n2.n8 -> n2.n11: "Subscribe"
 | **Header** | `Accept: application/vnd.api+json;version=1` | URL sạch | Khó test bằng browser |
 | **Query Param** | `/api/orders?version=1` | Dễ test | Dễ quên, không chuẩn |
 
+```code-diff
+title: Thêm field khác với đổi tên field trong public contract
+language: json
+view: split
+wordDiff: true
+caption: Ví dụ thêm fullName trong khi giữ name. Chỉ tương thích với consumer cho phép unknown fields; consumer dùng strict schema vẫn cần kiểm thử.
+before:
+  label: Response v1
+  code: |-
+    {
+      "id": 123,
+      "name": "Nguyễn An"
+    }
+after:
+  label: Response chuyển tiếp
+  code: |-
+    {
+      "id": 123,
+      "name": "Nguyễn An",
+      "fullName": "Nguyễn An"
+    }
+annotations:
+  - id: keep
+    side: after
+    title: Không xóa field cũ ngay
+    description: Giữ contract cho consumer cũ trong migration window; tên và ý nghĩa của field cũ phải được giữ ổn định.
+    ranges: [[3, 4]]
+```
+
 #### 2.4.3. Event-Driven Architecture
 
 Thay vì service A **yêu cầu** service B làm gì (command), service A **thông báo** điều gì đã xảy ra (event), và các service khác tự quyết định phản ứng.

@@ -556,17 +556,25 @@ gantt
 
 **`POST /orders` (Order Service):**
 
-```json source="snippets/2-5-service-api-contracts-quan-trong.json"
-{
-  "userId": "USR-9821",
-  "items": [
-    { "skuId": "SKU-RED-42", "qty": 1 },
-    { "skuId": "SKU-BLACK-38", "qty": 2 }
-  ],
-  "voucherCode": "SALE50",
-  "shippingAddressId": "ADDR-102",
-  "paymentMethod": "vnpay"
-}
+```data-inspector source="snippets/2-5-service-api-contracts-quan-trong.json"
+title: "Payload tạo order: đọc contract theo field"
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "userId": "USR-9821",
+    "items": [
+      { "skuId": "SKU-RED-42", "qty": 1 },
+      { "skuId": "SKU-BLACK-38", "qty": 2 }
+    ],
+    "voucherCode": "SALE50",
+    "shippingAddressId": "ADDR-102",
+    "paymentMethod": "vnpay"
+  }
+annotations:
+  - id: field-1
+    pointer: /userId
+    title: Người dùng trong ví dụ
+    description: Không tin userId do client gửi nếu chưa đối chiếu identity đã xác thực.
 ```
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=25-case-study-ecommerce&snapshot=article&file=snippets%2F2-5-service-api-contracts-quan-trong.json)

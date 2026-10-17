@@ -235,31 +235,43 @@ Các field dưới đây giúp trace có giá trị khi đọc. Tên field cụ 
 
 Một span minh họa có thể có dạng:
 
-```json
-{
-  "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
-  "span_id": "a1b2c3d4e5f6a7b8",
-  "parent_span_id": "00f067aa0ba902b7",
-  "operation_name": "POST /api/orders",
-  "service_name": "order-service",
-  "start_time": "2025-03-15T10:30:45.050Z",
-  "end_time": "2025-03-15T10:30:45.270Z",
-  "duration_ms": 220,
-  "status": "OK",
-  "kind": "SERVER",
-  "attributes": {
-    "http.method": "POST",
-    "http.status_code": 201,
-    "peer.service": "payment-service",
-    "order.id": "ORD-456"
-  },
-  "events": [
-    {
-      "name": "payment.retry",
-      "attributes": { "retry.attempt": 2, "error": "timeout" }
-    }
-  ]
-}
+```data-inspector
+title: "Span attributes: đọc metadata của một operation"
+description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
+json: |-
+  {
+    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "span_id": "a1b2c3d4e5f6a7b8",
+    "parent_span_id": "00f067aa0ba902b7",
+    "operation_name": "POST /api/orders",
+    "service_name": "order-service",
+    "start_time": "2025-03-15T10:30:45.050Z",
+    "end_time": "2025-03-15T10:30:45.270Z",
+    "duration_ms": 220,
+    "status": "OK",
+    "kind": "SERVER",
+    "attributes": {
+      "http.method": "POST",
+      "http.status_code": 201,
+      "peer.service": "payment-service",
+      "order.id": "ORD-456"
+    },
+    "events": [
+      {
+        "name": "payment.retry",
+        "attributes": { "retry.attempt": 2, "error": "timeout" }
+      }
+    ]
+  }
+annotations:
+  - id: field-1
+    pointer: /attributes
+    title: Attributes không phải quan hệ parent
+    description: Parent context tạo cây span; attributes chỉ bổ sung dữ liệu mô tả.
+  - id: field-2
+    pointer: /duration_ms
+    title: Thời lượng span
+    description: Không cộng mọi span để tính request latency vì các span có thể chồng nhau.
 ```
 
 Phần lớn ID, timestamp và metadata kỹ thuật có thể do SDK hoặc auto instrumentation thu thập. Developer chủ yếu bổ sung business attributes và events cần thiết. Attributes không nên biến thành nơi sao chép toàn bộ request hoặc response body.

@@ -470,6 +470,56 @@ write -> read
 read -> contract
 ```
 
+```code-walkthrough
+title: Đọc schema qua các phase Expand và Contract
+description: Snapshots rút gọn của cùng bảng, không phải migration chạy được. Backfill và dual-write cần implementation riêng; chỉ Contract sau rollback window.
+language: sql
+snapshots:
+  - id: old
+    title: Schema ban đầu
+    code: |-
+      CREATE TABLE orders (
+        id BIGINT PRIMARY KEY,
+        customer_name TEXT NOT NULL
+      );
+  - id: expanded
+    title: "Expand: hai cột cùng tồn tại"
+    code: |-
+      CREATE TABLE orders (
+        id BIGINT PRIMARY KEY,
+        customer_name TEXT NOT NULL,
+        full_name TEXT
+      );
+  - id: contracted
+    title: "Contract: chỉ giữ tên mới"
+    code: |-
+      CREATE TABLE orders (
+        id BIGINT PRIMARY KEY,
+        full_name TEXT NOT NULL
+      );
+steps:
+  - id: v1
+    snapshot: old
+    title: v1 vẫn dùng tên cũ
+    description: Đổi tên hoặc xóa cột trực tiếp sẽ làm v1 đang chạy bị lỗi.
+    ranges: [[3, 3]]
+  - id: expand
+    snapshot: expanded
+    title: Thêm cột trước
+    description: full_name nullable trong giai đoạn chuyển tiếp; chưa ép dữ liệu cũ phải có giá trị mới ngay.
+    ranges: [[3, 4]]
+  - id: backfill
+    snapshot: expanded
+    title: Deploy tương thích rồi backfill
+    description: Dual-write hoặc cơ chế tương đương phải giữ hai cột nhất quán; v2 đọc fallback khi dữ liệu mới chưa có.
+    ranges: [[3, 4]]
+  - id: contract
+    snapshot: contracted
+    title: Chỉ xóa sau khi hết nhu cầu rollback
+    description: Chỉ bỏ customer_name và thêm NOT NULL sau khi mọi writer đã chuyển, backfill được kiểm chứng và không còn v1 cần cột cũ.
+    ranges: [[3, 3]]
+```
+
 ### 3.3. Rollback code sau khi migration
 
 Nếu migration được thiết kế theo Expand-Contract, rollback thường chỉ cần rollback code:

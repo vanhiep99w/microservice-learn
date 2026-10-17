@@ -1705,6 +1705,59 @@ Tránh polling loop/DB scans, có thể giảm latency. Độ tin cậy dựa tr
 
 ---
 
+**Đọc cửa sổ lỗi của Outbox:** local transaction không làm broker và database trở thành một transaction chung.
+
+```concurrency-lanes
+title: Outbox vẫn có thể phát lại sau crash
+unit: step
+provenance:
+  kind: illustrative
+  description: Lịch biên soạn cho một event, không phải trace đo từ broker hoặc bằng chứng exactly-once.
+lanes:
+  - id: db
+    label: Order DB
+  - id: relay
+    label: Outbox Relay
+  - id: consumer
+    label: Inventory Consumer
+events:
+  - id: commit
+    lane: db
+    at: 0
+    label: Commit order + outbox
+  - id: publish1
+    lane: relay
+    at: 1
+    label: Broker chấp nhận event e1
+  - id: apply
+    lane: consumer
+    at: 2
+    label: Áp dụng e1 và lưu dedupe
+  - id: crash
+    lane: relay
+    at: 3
+    label: Crash trước khi đánh dấu sent
+  - id: publish2
+    lane: relay
+    at: 4
+    label: Restart, publish lại e1
+  - id: skip
+    lane: consumer
+    at: 5
+    label: Dedupe e1, bỏ qua side effect
+relations:
+  - id: first
+    from: publish1
+    to: apply
+    label: Delivery lần đầu
+    description: Giả định consumer commit business change cùng dedupe record trong một local transaction.
+  - id: again
+    from: publish2
+    to: skip
+    label: Delivery lặp
+    description: Relay dùng lại event ID; consumer không trừ kho lần hai.
+```
+
 ## 11. Tổng kết
 
 ```
