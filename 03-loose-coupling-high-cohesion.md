@@ -243,6 +243,8 @@ n2.n8 -> n2.n11: "Subscribe"
 | **Header** | `Accept: application/vnd.api+json;version=1` | URL sạch | Khó test bằng browser |
 | **Query Param** | `/api/orders?version=1` | Dễ test | Dễ quên, không chuẩn |
 
+**Điều kiện tương thích:** ví dụ dưới đây thêm `fullName` nhưng giữ `name`. Chỉ an toàn với consumer chấp nhận unknown fields; consumer dùng strict schema vẫn cần kiểm thử.
+
 ```code-diff
 title: Thêm field khác với đổi tên field trong public contract
 language: json

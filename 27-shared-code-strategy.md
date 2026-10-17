@@ -533,6 +533,8 @@ Những thay đổi **breaking** (chỉ được ở MAJOR):
 - Xóa field khỏi type/interface
 - Thay đổi required dependencies
 
+**Lưu ý:** tăng version dependency không chứng minh bản mới tương thích. Mỗi service phải kiểm thử và release độc lập.
+
 ```code-diff
 title: Nâng shared library ở từng consumer
 language: xml

@@ -201,7 +201,7 @@ Nếu thay đổi chưa tương thích, hãy tách thành các bước additive 
 
 Rollback của Rolling Update là một rollout theo chiều ngược lại. Controller đưa specification về revision trước, sau đó thay pod v2 bằng pod v1 từng bước. Đây không phải thao tác chuyển traffic tức thời.
 
-Với Kubernetes, lệnh cơ bản là:
+Với Kubernetes, phiên lệnh dưới đây dùng Deployment `order-service` trong namespace `demo`. Đổi tên tài nguyên theo môi trường, xác nhận đúng context và bảo đảm Deployment không paused trước khi `undo`.
 
 ```terminal-session
 title: Rollback một Deployment trong namespace demo
@@ -218,7 +218,7 @@ steps:
     expected: Có revision phù hợp và đã kiểm tra schema/data tương thích.
   - id: undo
     command: kubectl rollout undo deployment/order-service -n demo
-    warning: Thay đổi workload thật nếu chạy. Undo Pod template không rollback database, event hoặc external side effect.
+    warning: Thay đổi workload thật nếu chạy. Xác nhận đúng context/namespace, Deployment không paused, revision đích và schema/data còn tương thích trước khi undo. Undo Pod template không rollback database, event hoặc external side effect.
     expected: Yêu cầu rollout revision trước; không coi lệnh trả thành công là traffic đã phục hồi.
   - id: status
     command: kubectl rollout status deployment/order-service -n demo --timeout=120s

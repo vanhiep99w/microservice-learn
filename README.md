@@ -211,7 +211,7 @@ Mỗi tài liệu đều có:
 
 ## Website docs và quy ước D2 / SourceExplorer
 
-Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.7.0**. Yêu cầu **Node.js 22+**.
+Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.7.1**. Yêu cầu **Node.js 22+**.
 
 ```bash
 npm ci
@@ -332,6 +332,8 @@ metadata:
 | `concurrency-lanes` | Nhiều actor, khoảng chờ và cửa sổ lỗi | [Outbox crash](09-data-management.md#10-transactional-outbox-pattern), [Full Jitter](10-resilience-patterns.md#33-exponential-backoff-với-jitter), [Projection lag](20-aws-data-management.md#43-sync-data-giữa-write-db-và-read-db) |
 | `marble` | Thứ tự notification trên các lane dùng chung cột logic | [FIFO message groups](19-aws-communication-discovery.md#55-fifo-vs-standard-queue) |
 | `state-transition` | Người đọc chọn nhánh, xem guard và trạng thái trước/sau | [Circuit Breaker](17-reliability-patterns/circuit-breaker.md#tổng-quan) |
+
+**Giao diện 0.7.1:** UI gọn được áp dụng mặc định, không cần đổi plugin, MDX map hoặc descriptor. Diff caption, session description/expected và walkthrough description nằm trong mục thu gọn. Điều kiện an toàn phải viết trong prose ngay trước ví dụ hoặc `TerminalStep.warning` để luôn hiện trước thao tác; không chỉ đặt trong metadata. Xem `node_modules/@vanhiep99w/docs-kit/docs/compact-ui.md`.
 
 **Quy ước authoring:**
 

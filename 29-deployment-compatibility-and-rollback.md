@@ -470,6 +470,8 @@ write -> read
 read -> contract
 ```
 
+Các snapshot dưới đây là **schema rút gọn để đọc, không phải migration chạy được**. Backfill và dual-write cần implementation riêng; chỉ Contract sau khi hết rollback window và dữ liệu đã được kiểm chứng.
+
 ```code-walkthrough
 title: Đọc schema qua các phase Expand và Contract
 description: Snapshots rút gọn của cùng bảng, không phải migration chạy được. Backfill và dual-write cần implementation riêng; chỉ Contract sau rollback window.

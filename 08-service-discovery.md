@@ -798,7 +798,7 @@ KUBERNETES DNS NAMING CONVENTION:
     → Hoặc ngắn gọn: http://auth-service.infra:8080/verify
 ```
 
-**Chẩn đoán discovery:** đọc cả Service lẫn EndpointSlice, không chỉ kiểm tra tên DNS có tồn tại.
+**Chẩn đoán discovery:** đọc cả Service lẫn EndpointSlice, không chỉ kiểm tra tên DNS có tồn tại. Các lệnh chỉ đọc dưới đây cần `kubectl`, quyền đọc và Service `order-service` trong namespace `demo`; xác nhận đúng cluster và đổi tên tài nguyên theo môi trường của bạn.
 
 ```terminal-session
 title: Kiểm tra Service và endpoints trong Kubernetes

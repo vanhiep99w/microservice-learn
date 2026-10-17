@@ -123,3 +123,28 @@ test('walkthrough and diff source references participate in manifest validation'
     assert.throws(() => validateReferences(refs.map((request) => ({ request, filename: 'example.md' })), new Map()), /unknown source project/u);
   }
 });
+
+test('compact UI keeps rollback prerequisites visible before command copy', async () => {
+  const path = '17-deployment-patterns/rolling-update.md';
+  const tree = parser.parse(await readFile(path, 'utf8'));
+  const node = tree.children.find((child) => child.type === 'code' && child.lang === 'terminal-session');
+  assert.ok(node);
+  const intro = tree.children[tree.children.indexOf(node) - 1];
+  assert.equal(intro.type, 'paragraph');
+  const text = intro.children.map((child) => child.value ?? '').join('');
+  assert.match(text, /context/u);
+  assert.match(text, /không paused/u);
+  const { remarkTerminalSession } = await import('@vanhiep99w/docs-kit/terminal-session');
+  const { TerminalSession } = await import('@vanhiep99w/docs-kit/components/terminal-session');
+  const compiled = await unified().use(remarkTerminalSession).run({ type: 'root', children: [structuredClone(node)] }, { path });
+  const props = componentProps(compiled.children[0]);
+  const warning = props.data.steps.find((step) => step.id === 'undo').warning;
+  assert.match(warning, /schema\/data còn tương thích/u);
+  const html = renderToStaticMarkup(createElement(TerminalSession, props));
+  const warningAt = html.indexOf(warning);
+  assert.ok(warningAt >= 0, 'Warning must be server-rendered');
+  const disclosures = html.slice(0, warningAt).match(/<details\b[^>]*>|<\/details>/gu) ?? [];
+  let depth = 0;
+  for (const tag of disclosures) depth += tag.startsWith('</') ? -1 : 1;
+  assert.equal(depth, 0, 'Warning must not be hidden inside any disclosure');
+});
