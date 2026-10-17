@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { SourceExplorerProvider } from '@vanhiep99w/docs-kit/components/source-explorer';
+import { D2SourceLinks, SourceExplorerProvider } from '@vanhiep99w/docs-kit/components/source-explorer';
 
 export function SourceExplorer({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -13,7 +13,7 @@ export function SourceExplorer({ children }: { children: ReactNode }) {
       manifestUrl="/source-examples/manifest.json"
       scrollAnchorSelector="#nd-page .prose > *"
     >
-      {children}
+      <D2SourceLinks>{children}</D2SourceLinks>
     </SourceExplorerProvider>
   );
 }

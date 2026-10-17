@@ -456,7 +456,9 @@ Legend: 🟦 Command · 🟨 Aggregate · 🟧 Domain Event · 🟪 Policy. Đâ
 
 ### 2.3. Service Dependency Graph
 
-```d2 title="2.3. Service Dependency Graph"
+Trên website, bấm **Explore diagram** để zoom/pan, mở rộng hoặc tải SVG; sơ đồ vẫn đọc được khi chưa bật tương tác.
+
+```d2 interactive title="2.3. Service Dependency Graph"
 direction: down
 n1: "API Gateway"
 n2: "Auth Service"

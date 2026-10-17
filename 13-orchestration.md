@@ -647,7 +647,9 @@ PostgreSQL dùng PostgreSQL/TCP protocol, không phải URL `http://...:5432`. N
 
 ### 4.8. Tổng hợp quan hệ giữa các Objects
 
-```d2 title="4.8. Tổng hợp quan hệ giữa các Objects"
+Trên website, bấm các node **Deployment**, **Service**, **Ingress**, **ConfigMap**, **Secret** hoặc **Pod 1** để mở YAML minh họa trong SourceExplorer. Bấm **Explore diagram** nếu cần phóng to. Các trích đoạn YAML vẫn nằm ở từng mục phía trên, không phải một project chạy độc lập.
+
+```d2 interactive title="4.8. Tổng hợp quan hệ giữa các Objects"
 direction: down
 n1: "Namespace"
 n2: "Deployment"
@@ -659,6 +661,18 @@ n7: "ReplicaSet"
 n8: "Pod 1"
 n9: "Pod 2"
 n10: "Pod 3"
+n2.link: "./?source=13-orchestration&snapshot=article&file=snippets%2F4-3-deployment.yaml"
+n2.tooltip: "Mở YAML Deployment"
+n3.link: "./?source=13-orchestration&snapshot=article&file=snippets%2F4-4-service.yaml"
+n3.tooltip: "Mở YAML Service"
+n4.link: "./?source=13-orchestration&snapshot=article&file=snippets%2F4-5-ingress.yaml"
+n4.tooltip: "Mở YAML Ingress"
+n5.link: "./?source=13-orchestration&snapshot=article&file=snippets%2F4-6-configmap-secret.yaml"
+n5.tooltip: "Mở YAML ConfigMap"
+n6.link: "./?source=13-orchestration&snapshot=article&file=snippets%2F4-6-configmap-secret-2.yaml"
+n6.tooltip: "Mở YAML Secret — chỉ chứa dữ liệu minh họa"
+n8.link: "./?source=13-orchestration&snapshot=article&file=snippets%2F4-1-pod.yaml"
+n8.tooltip: "Mở YAML Pod minh họa"
 n1 -> n2
 n1 -> n3
 n1 -> n4

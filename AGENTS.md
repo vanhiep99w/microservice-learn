@@ -107,6 +107,8 @@ graph LR
 
 - Bài cần đối chiếu nhiều code dùng code fence có metadata `source="snippets/tên-artifact.ext"` và link `[Đọc source](?source=tên-file-không-đuôi&snapshot=article&file=snippets%2Ftên-artifact.ext)`; remark plugin chuyển link thành `SourceRef` của docs-kit.
 - Có thể thêm `&lines=1-4` để highlight. Không khai báo `region` nếu pipeline chưa có region đó.
+- docs-kit 0.6.0: chỉ opt-in `interactive` cho sơ đồ lớn; `mode=steps` khi cần diễn tiến trạng thái. Mặc định vẫn tĩnh; không bật toàn site. Viewer lazy-load khi bấm Explore, không chạy compiler trong browser.
+- Node D2 có thể dùng `link: "./?source=..."` hoặc `node.link: "./?source=..."` để mở SourceExplorer tại chỗ qua `D2SourceLinks`. Dùng query URL percent-encoded trong nháy kép; `prepare-content` validate cùng manifest như Markdown SourceRef.
 - Trích đoạn phải giữ code nguyên bản, có language hợp lệ, không trùng artifact path trong một bài. Không ngụ ý các snippets độc lập là một project chạy được.
 - `prepare-content` tự sinh/validate manifest và snapshots tại `public/source-examples/`. Không chỉnh/commit output hoặc cache `.next/cache/docs-kit/d2`.
 - Chỉ publish source tin cậy, không chứa secrets thật. HTML highlight và SVG D2 được nhúng vào trang, không phải dữ liệu input công khai.

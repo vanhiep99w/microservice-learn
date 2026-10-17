@@ -30,6 +30,16 @@ export function collectExamples(markdown, filename) {
   const files = [];
   const refs = [];
   visit(tree, 'code', (node) => {
+    if (node.lang === 'd2') {
+      // Author D2 source links as quoted query URLs (also supported on node.link).
+      // Ignore comment-only lines; never treat examples in other languages as refs.
+      for (const line of node.value.split('\n')) {
+        if (line.trimStart().startsWith('#')) continue;
+        for (const [, url] of line.matchAll(/\blink\s*:\s*"((?:\.\/)?\?source=[^"\r\n]*)"/gu)) {
+          refs.push(sourceRequest(url.replace(/^\.\//u, '')));
+        }
+      }
+    }
     const path = node.meta?.match(/(?:^|\s)source="([^"]+)"(?:\s|$)/u)?.[1];
     if (!path) return;
     if (!node.lang || ['d2', 'mermaid', 'text'].includes(node.lang)) {

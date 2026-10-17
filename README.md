@@ -36,6 +36,7 @@
 - [11. Case Study — Thiết kế kiến trúc Microservice từ đầu](#11-case-study--thiết-kế-kiến-trúc-microservice-từ-đầu)
 - [Website docs và quy ước D2 / SourceExplorer](#website-docs-và-quy-ước-d2--sourceexplorer)
   - [D2 — sơ đồ dạng text, render lúc build](#d2--sơ-đồ-dạng-text-render-lúc-build)
+  - [D2 tương tác — zoom, steps và liên kết source](#d2-tương-tác--zoom-steps-và-liên-kết-source)
   - [SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài](#sourceexplorer--đối-chiếu-nhiều-đoạn-code-trong-cùng-bài)
 - [Tham khảo](#-tham-khảo)
 
@@ -208,7 +209,7 @@ Mỗi tài liệu đều có:
 
 ## Website docs và quy ước D2 / SourceExplorer
 
-Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit). Yêu cầu **Node.js 22+**.
+Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.6.0**. Yêu cầu **Node.js 22+**.
 
 ```bash
 npm ci
@@ -217,6 +218,7 @@ npm run dev
 npm test
 npm run check-diagrams
 npm run build
+npm run typecheck # Sau build để có Next.js generated types
 ```
 
 **Chỉnh tài liệu gốc** ở thư mục gốc hoặc `17-*/`, không chỉnh `content/docs/`. `prepare-content` tự sinh frontmatter, routes, sidebar và assets cho SourceExplorer; được chạy trước `dev`/`build`.
@@ -240,6 +242,36 @@ client -> order -> db
 - D2 fenced blocks được render trên website; GitHub chỉ hiển thị source D2. Dùng nhãn ngắn, tách sơ đồ lớn thành các phần. Escape ký tự `$` thành `\$` trong nhãn D2 để không bị hiểu là substitution.
 - `npm run check-diagrams` render và kiểm tra tất cả D2 trong tài liệu gốc, kể cả các bài tổng hợp không publish riêng. Cache dùng `.next/cache/docs-kit/d2`, không commit vào Git.
 - `npm run diagrams:inventory` liệt kê các block Mermaid / ASCII candidate theo file, dòng và heading; `npm run diagrams:inventory -- --json` xuất toàn bộ inventory kèm source hash. Candidate chỉ là gợi ý rà soát: cây thư mục, bảng và prose có mũi tên cũng có thể được nhận diện, không nên tự động chuyển hàng loạt.
+
+### D2 tương tác — zoom, steps và liên kết source
+
+Từ docs-kit 0.6.0, website đăng ký cả `D2Diagram` và `D2InteractiveDiagram`. **Mặc định vẫn là sơ đồ tĩnh**; chỉ thêm viewer ở nơi giúp đọc rõ hơn:
+
+| Tính năng | Đã áp dụng |
+|---|---|
+| `interactive`: zoom/pan, fit/reset, mở rộng, xem/copy D2 và tải SVG theo theme | [Dependency graph E-Commerce](25-case-study-ecommerce.md#23-service-dependency-graph), [kiến trúc Dropbox](31-case-study-dropbox-system-design.md#5-high-level-architecture), [quan hệ Kubernetes Objects](13-orchestration.md#48-tổng-hợp-quan-hệ-giữa-các-objects) |
+| `mode=steps`: trạng thái kế thừa qua từng bước, Previous/Next và Play/Pause | [Saga compensation khi hết hàng](17-data-patterns/saga.md#luồng-thành-công-và-thất-bại) |
+| `D2SourceLinks`: click node mở code tại chỗ | Các node YAML trong sơ đồ Kubernetes Objects ở mục 4.8 |
+
+Thêm `interactive` vào fence hiện có:
+
+````markdown
+```d2 interactive title="Đọc kiến trúc và mở code"
+direction: right
+client: Client
+order: Order Service {
+  tooltip: "Mở YAML Deployment minh họa"
+  link: "./?source=13-orchestration&snapshot=article&file=snippets%2F4-3-deployment.yaml"
+}
+client -> order
+```
+````
+
+- Bấm **Explore diagram** để tải controls; chưa bấm vẫn đọc được SVG. Không đưa D2 compiler/WASM vào browser. Toolbar hiện dùng tiếng Anh, chưa có API dịch nhãn.
+- `mode=steps` tự bật tương tác. Root là trạng thái ban đầu; mỗi entry trong `steps: { ... }` kế thừa bước trước. Không autoplay khi mở bài. Bàn phím canvas: `+`, `-`, `0`; trái/phải để chuyển bước.
+- Không có JavaScript vẫn có SVG, **All views** cho các board còn lại và **D2 source**. Giữ giải thích bằng prose để tài liệu gốc vẫn có ý nghĩa khi đọc trên GitHub.
+- Source links dùng `link: "./?source=..."` hoặc `node.link: "./?source=..."`, đặt URL trong dấu nháy kép, dùng cùng `project/snapshot/file/lines` như SourceRef. Pipeline validate các query links này trước khi sinh assets; adapter mở drawer không reload ở cùng trang. Dùng prefix `./?source=` cho D2: SDK hiện tại bỏ mất link chỉ có `?source=` khi compile. Website dùng trailing slash nên `./` vẫn trỏ đúng bài hiện tại. Giữ query URL percent-encoded, không nhúng secrets.
+- `mode=tabs` (scenarios độc lập), `mode=explorer` (layers/drill-down), `mode=animation`, override layout/theme theo fence, imports/icons local và TTF fonts cũng đã có trong package. Chưa bật đại trà vì chưa cần cho các ví dụ hiện tại; nhiều board làm tăng HTML/MDX và thời gian build. Khi thêm, xem [API và giới hạn D2 0.6.0](https://github.com/vanhiep99w/docs-kit/blob/main/docs/d2.md), dùng roots tài nguyên chuyên biệt và chạy đầy đủ kiểm tra.
 
 ### SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài
 

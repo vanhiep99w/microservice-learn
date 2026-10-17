@@ -91,6 +91,34 @@ Nếu `T3` thất bại, `T1` và `T2` vẫn đã commit. Saga không xóa lịc
 
 Mỗi bước cần có kết quả rõ ràng: thành công, thất bại có thể retry, thất bại cần compensation, hoặc thất bại cần can thiệp thủ công. Một workflow chỉ mô tả happy path chưa phải là một Saga hoàn chỉnh.
 
+Ví dụ dưới đây theo dõi **state sau mỗi local transaction** khi hết hàng ở `T3`. Trên website, bấm **Explore 6 views**, rồi dùng Previous/Next để đi qua từng bước; không tự phát khi mở trang. Nếu không dùng JavaScript, mở **All views** để xem các trạng thái còn lại.
+
+```d2 mode=steps title="Saga — từ PENDING đến compensation khi hết hàng"
+grid-columns: 3
+order: "Order DB\nChưa tạo order"
+payment: "Payment DB\nChưa charge"
+inventory: "Inventory DB\nChưa reserve"
+steps: {
+  "1 · Create order": {
+    order: "Order DB\nPENDING — T1 đã commit"
+  }
+  "2 · Charge payment": {
+    payment: "Payment DB\nCHARGED — T2 đã commit"
+  }
+  "3 · Reserve bị từ chối": {
+    inventory: "Inventory DB\nHết hàng — không tạo reservation"
+  }
+  "4 · Refund payment": {
+    payment: "Payment DB\nREFUNDED — C2 đã commit"
+  }
+  "5 · Cancel order": {
+    order: "Order DB\nCANCELLED — C1 đã commit"
+  }
+}
+```
+
+Các board (khung trạng thái) kế thừa bước trước: ở bước cuối, reservation vẫn không tồn tại và bản ghi charge/refund vẫn được giữ để đối soát. Đây là nhánh compensation thành công; nếu refund thất bại, Saga phải giữ trạng thái đang bù và retry hoặc chuyển sang xử lý thủ công, không được đánh dấu đã hoàn tất.
+
 ## Compensating action
 
 ### Compensation không phải rollback

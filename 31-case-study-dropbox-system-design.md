@@ -250,7 +250,9 @@ Peak ≈ 5,800 downloads/s
 
 ## 5. High-Level Architecture
 
-```d2 title="5. High-Level Architecture"
+Trên website, bấm **Explore diagram** để phóng to và theo dõi riêng đường đi của metadata hoặc file bytes.
+
+```d2 interactive title="5. High-Level Architecture"
 direction: right
 n1: "Client Devices" {}
 n1.n2: "Web Client"

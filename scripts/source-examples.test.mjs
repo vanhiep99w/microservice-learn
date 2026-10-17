@@ -18,6 +18,26 @@ test('extract exact code and decode source query; leave regular links alone', ()
   assert.equal(sourceRequest('#heading'), null);
 });
 
+test('collect D2 node links for the same build-time validation as SourceRef', () => {
+  const diagram = [
+    '```d2 interactive title="Code links"',
+    'deployment: Deployment {',
+    '  link: "?source=demo&snapshot=article&file=src%2Fdemo.js&lines=1-2"',
+    '}',
+    'pod.link: "./?source=demo&file=src%2Fdemo.js"',
+    '# ignored.link: "?source=missing"',
+    'external.link: "https://example.com/?source=external"',
+    '```',
+  ].join('\n');
+  const { files, refs } = collectExamples(diagram, 'demo.md');
+  assert.deepEqual(files, []);
+  assert.equal(refs.length, 2);
+  assert.deepEqual(refs[0], { project: 'demo', snapshot: 'article', file: 'src/demo.js', lines: '1-2' });
+  validateReferences(refs.map((request) => ({ request, filename: 'demo.md' })), new Map([['demo', snapshot]]));
+  assert.throws(() => collectExamples('```d2\na.link: "?source=demo&lines=1&region=x"\n```', 'demo.md'), /Invalid SourceRef/u);
+  assert.equal(collectExamples('```js\nconst example = \'link: "?source=missing"\';\n```', 'demo.md').refs.length, 0);
+});
+
 test('reject duplicate, unknown, conflicting params and unsafe source paths', () => {
   for (const url of ['?source=demo&source=bad', '?source=demo&unknown=x', '?source=demo&region=a&lines=1', '?source=']) {
     assert.throws(() => sourceRequest(url));
@@ -65,6 +85,11 @@ test('generate public assets, escape HTML, number lines and remove stale assets'
     assert.match(asset.files[0].html, /--shiki-dark/u);
     assert.doesNotMatch(asset.files[0].html, /<script>/u);
     await assert.rejects(readFile(join(outputDir, 'stale.json')));
+    // D2 refs must fail before removing the last known-good assets.
+    const originalManifest = await readFile(join(outputDir, 'manifest.json'), 'utf8');
+    await writeFile(join(docsDir, 'demo.md'), markdown + '\n```d2\na.link: "./?source=demo&file=missing.js"\n```\n');
+    await assert.rejects(buildSourceExamples({ docsDir, outputDir }), /missing source file/u);
+    assert.equal(await readFile(join(outputDir, 'manifest.json'), 'utf8'), originalManifest);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
