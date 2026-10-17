@@ -97,70 +97,25 @@ Tài liệu này tập trung vào một Circuit Breaker cho **một cặp caller
 
 > Các con số trong ví dụ là điểm khởi đầu minh họa, không phải preset áp dụng cho mọi traffic pattern. Cần đo lường và kiểm thử trước khi đưa vào production.
 
-**Khám phá trạng thái:** chọn một nhánh với giả định ghi rõ. Đây không phải timer, bộ đếm lỗi hoặc request thật.
+**Đọc chuyển trạng thái: Closed → Open → Half-open**
 
-```state-transition
-title: Closed → Open → Half-open
-assumptions: Một breaker cho một downstream. Chỉ minh họa một probe trong Half-open; không mô hình hóa sliding window, concurrency hoặc race khi nhận nhiều kết quả.
-initial: closed
-states:
-  - id: closed
-    label: Closed
-    description: Cho phép request đi tới downstream trong mô hình này.
-  - id: open
-    label: Open
-    description: Request thông thường bị từ chối; chờ event cooldown được người đọc chọn thủ công.
-  - id: half-open
-    label: Half-open
-    description: Cho phép một probe minh họa, không có request hoặc timer thật.
-transitions:
-  - id: healthy
-    from: closed
-    to: closed
-    event: REQUEST_SUCCEEDED
-    description: Request thành công; trạng thái vẫn là Closed. Đây là self-loop, vẫn ghi một bước lựa chọn.
-  - id: below-threshold
-    from: closed
-    to: closed
-    event: REQUEST_FAILED
-    label: Chưa đạt ngưỡng
-    guard: Tác giả giả định số lỗi còn dưới ngưỡng.
-    description: Chọn nhánh này không tự tăng hay kiểm tra bộ đếm lỗi.
-    effects:
-      - Ghi nhận lỗi trong một implementation thực tế; ở đây chỉ là mô tả.
-  - id: trip
-    from: closed
-    to: open
-    event: REQUEST_FAILED
-    label: Đã đạt ngưỡng
-    guard: Tác giả giả định ngưỡng lỗi đã đạt.
-    description: Cùng event nhưng nhánh khác với trường hợp dưới ngưỡng. Người đọc phải tự chọn nhánh cần giải thích.
-    effects:
-      - Ngừng gửi request thông thường tới downstream (chỉ mô tả).
-  - id: reject
-    from: open
-    to: open
-    event: REQUEST_ATTEMPTED
-    description: Request bị từ chối trong mô hình; không có network request thực tế.
-  - id: cooldown
-    from: open
-    to: half-open
-    event: COOLDOWN_ELAPSED
-    guard: Giả định cooldown đã hết.
-    description: Event được chọn thủ công. Component không đợi, đếm thời gian hoặc tự phát event.
-  - id: probe-success
-    from: half-open
-    to: closed
-    event: PROBE_SUCCEEDED
-    description: Probe minh họa thành công, cho phép trở về Closed.
-    effects:
-      - Cho phép request thông thường trở lại (chỉ mô tả).
-  - id: probe-failure
-    from: half-open
-    to: open
-    event: PROBE_FAILED
-    description: Probe minh họa thất bại, quay về Open; không kiểm chứng liveness hoặc recovery tự động.
-```
+Mô hình rút gọn cho một breaker và một downstream, chỉ xét một probe ở Half-open. Bảng không mô phỏng bộ đếm, sliding window, cooldown timer, concurrency hoặc race khi nhận nhiều kết quả.
+
+- **Closed**: Cho phép request tới downstream.
+- **Open**: Từ chối request thông thường trong thời gian chờ cooldown.
+- **Half-open**: Cho phép probe theo policy để kiểm tra khả năng phục hồi.
+
+| Trước | Event / điều kiện giả định | Sau | Ý nghĩa |
+|---|---|---|---|
+| Closed | `REQUEST_SUCCEEDED` | Closed | Request thành công; trạng thái vẫn là Closed (self-loop). |
+| Closed | `REQUEST_FAILED` — Tác giả giả định số lỗi còn dưới ngưỡng. | Closed | Lỗi chưa đủ ngưỡng; tiếp tục Closed. Bộ đếm phải do implementation thật quản lý. Ghi nhận lỗi trong một implementation thực tế; ở đây chỉ là mô tả. |
+| Closed | `REQUEST_FAILED` — Tác giả giả định ngưỡng lỗi đã đạt. | Open | Cùng event nhưng đã đủ ngưỡng; chuyển sang Open. Ngừng gửi request thông thường tới downstream (chỉ mô tả). |
+| Open | `REQUEST_ATTEMPTED` | Open | Request bị từ chối trong mô hình; không có network request thực tế. |
+| Open | `COOLDOWN_ELAPSED` — Giả định cooldown đã hết. | Half-open | Hết cooldown theo policy thì cho phép probe; bảng không chạy timer. |
+| Half-open | `PROBE_SUCCEEDED` | Closed | Probe minh họa thành công, cho phép trở về Closed. Cho phép request thông thường trở lại (chỉ mô tả). |
+| Half-open | `PROBE_FAILED` | Open | Probe minh họa thất bại, quay về Open; không kiểm chứng liveness hoặc recovery tự động. |
+
+Các điều kiện trong bảng do tác giả giả định, không được tự đánh giá. Sơ đồ D2 ở mục State machine bên dưới biểu diễn cùng ba trạng thái.
 
 ## Cách hoạt động
 

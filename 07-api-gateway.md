@@ -249,7 +249,6 @@ Rate Limiting Strategies:
 
 ```protocol-exchange
 title: Gateway từ chối request vượt quota
-description: Ví dụ tĩnh; timestamp reset chỉ là dữ liệu minh họa, không phải quota hiện tại.
 variants:
   - id: limited
     title: Client đã hết quota
@@ -279,14 +278,11 @@ variants:
             "error": "Rate limit exceeded",
             "message": "Bạn đã vượt quá 100 requests/phút. Thử lại sau 30 giây."
           }
-    annotations:
-      - id: retry
-        side: response
-        target: header
-        header: retry
-        title: Chờ trước khi retry
-        description: Retry-After dạng delay-seconds gợi ý chờ 30 giây. Không retry mutation nếu chưa có idempotency contract.
 ```
+
+Ví dụ tĩnh; timestamp reset chỉ là dữ liệu minh họa, không phải quota hiện tại.
+
+**Chờ trước khi retry:** Retry-After dạng delay-seconds gợi ý chờ 30 giây. Không retry mutation nếu chưa có idempotency contract.
 
 ### 3.5. Load Balancing
 

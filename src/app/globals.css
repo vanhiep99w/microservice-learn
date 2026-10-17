@@ -2,15 +2,11 @@
 @import '@vanhiep99w/docs-kit/styles/d2.css';
 @import '@vanhiep99w/docs-kit/styles/source-explorer.css';
 @import '@vanhiep99w/docs-kit/styles/source-explorer-fumadocs.css';
-@import '@vanhiep99w/docs-kit/styles/annotated-example.css';
 @import '@vanhiep99w/docs-kit/styles/terminal-session.css';
-@import '@vanhiep99w/docs-kit/styles/marble.css';
 @import '@vanhiep99w/docs-kit/styles/code-diff.css';
-@import '@vanhiep99w/docs-kit/styles/data-inspector.css';
 @import '@vanhiep99w/docs-kit/styles/protocol-exchange.css';
 @import '@vanhiep99w/docs-kit/styles/span-waterfall.css';
 @import '@vanhiep99w/docs-kit/styles/concurrency-lanes.css';
-@import '@vanhiep99w/docs-kit/styles/state-transition.css';
 @import '@vanhiep99w/docs-kit/styles/code-walkthrough.css';
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
@@ -36,6 +32,16 @@ html,
 @media (min-width: 768px) {
   #nd-docs-layout {
     padding-inline: 1rem;
+  }
+}
+
+/* Tailwind's base [hidden] rule is !important. Keep all walkthrough
+   snapshots readable without JS, without exposing inactive snapshots after hydration. */
+@layer base {
+  @media (scripting: none) {
+    .code-walkthrough pre[hidden] {
+      display: block !important;
+    }
   }
 }
 

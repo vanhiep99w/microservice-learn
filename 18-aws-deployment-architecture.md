@@ -551,45 +551,38 @@ ecr.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2-Container-Registry.sv
 
 Tránh tích lũy hàng nghìn images cũ tốn storage:
 
-```data-inspector source="snippets/5-2-image-lifecycle-policy.json"
-title: "ECR lifecycle: chọn image trước khi expire"
-description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
-json: |-
-  {
-    "rules": [
-      {
-        "rulePriority": 1,
-        "description": "Giữ 20 images gần nhất có tag",
-        "selection": {
-          "tagStatus": "tagged",
-          "countType": "imageCountMoreThan",
-          "countNumber": 20
-        },
-        "action": { "type": "expire" }
+```json source="snippets/5-2-image-lifecycle-policy.json"
+{
+  "rules": [
+    {
+      "rulePriority": 1,
+      "description": "Giữ 20 images gần nhất có tag",
+      "selection": {
+        "tagStatus": "tagged",
+        "countType": "imageCountMoreThan",
+        "countNumber": 20
       },
-      {
-        "rulePriority": 2,
-        "description": "Xóa images untagged sau 3 ngày",
-        "selection": {
-          "tagStatus": "untagged",
-          "countType": "sinceImagePushed",
-          "countUnit": "days",
-          "countNumber": 3
-        },
-        "action": { "type": "expire" }
-      }
-    ]
-  }
-annotations:
-  - id: field-1
-    pointer: /rules/0/selection
-    title: Selection của rule ưu tiên 1
-    description: Giữ policy phù hợp với tag strategy và rollback window; đừng để image đang cần rollback bị xóa.
-  - id: field-2
-    pointer: /rules/1/selection
-    title: Untagged sau ba ngày
-    description: Thời gian ví dụ phải được điều chỉnh theo cách pipeline gắn và bỏ tag.
+      "action": { "type": "expire" }
+    },
+    {
+      "rulePriority": 2,
+      "description": "Xóa images untagged sau 3 ngày",
+      "selection": {
+        "tagStatus": "untagged",
+        "countType": "sinceImagePushed",
+        "countUnit": "days",
+        "countNumber": 3
+      },
+      "action": { "type": "expire" }
+    }
+  ]
+}
 ```
+
+**ECR lifecycle: chọn image trước khi expire — các field cần chú ý:**
+
+- **Selection của rule ưu tiên 1** (`/rules/0/selection`): Giữ policy phù hợp với tag strategy và rollback window; đừng để image đang cần rollback bị xóa.
+- **Untagged sau ba ngày** (`/rules/1/selection`): Thời gian ví dụ phải được điều chỉnh theo cách pipeline gắn và bỏ tag.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=18-aws-deployment-architecture&snapshot=article&file=snippets%2F5-2-image-lifecycle-policy.json)
 
@@ -620,56 +613,42 @@ Với Monolith, bạn có thể setup infra thủ công qua Console. Với Micro
 
 **CDK** (Cloud Development Kit) — viết infrastructure bằng ngôn ngữ lập trình (TypeScript, Python, Java, Go).
 
-```annotated source="snippets/6-2-aws-cdk.ts"
-title: "ECS Fargate bằng CDK: network, secret và scaling"
-language: typescript
-code: |-
-  // CDK Example: Tạo ECS Fargate Service
-  import * as cdk from 'aws-cdk-lib';
-  import * as ecs from 'aws-cdk-lib/aws-ecs';
-  import * as patterns from 'aws-cdk-lib/aws-ecs-patterns';
+```typescript source="snippets/6-2-aws-cdk.ts"
+// CDK Example: Tạo ECS Fargate Service
+import * as cdk from 'aws-cdk-lib';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
+import * as patterns from 'aws-cdk-lib/aws-ecs-patterns';
 
-  const service = new patterns.ApplicationLoadBalancedFargateService(this, 'UserService', {
-    cluster,
-    taskImageOptions: {
-      image: ecs.ContainerImage.fromEcrRepository(repo, 'v1.0.0'),
-      containerPort: 8080,
-      environment: {
-        DB_HOST: dbInstance.dbInstanceEndpointAddress,
-      },
-      secrets: {
-        DB_PASSWORD: ecs.Secret.fromSecretsManager(dbSecret),
-      },
+const service = new patterns.ApplicationLoadBalancedFargateService(this, 'UserService', {
+  cluster,
+  taskImageOptions: {
+    image: ecs.ContainerImage.fromEcrRepository(repo, 'v1.0.0'),
+    containerPort: 8080,
+    environment: {
+      DB_HOST: dbInstance.dbInstanceEndpointAddress,
     },
-    desiredCount: 2,
-    cpu: 512,
-    memoryLimitMiB: 1024,
-    publicLoadBalancer: false,  // Internal ALB
-  });
+    secrets: {
+      DB_PASSWORD: ecs.Secret.fromSecretsManager(dbSecret),
+    },
+  },
+  desiredCount: 2,
+  cpu: 512,
+  memoryLimitMiB: 1024,
+  publicLoadBalancer: false,  // Internal ALB
+});
 
-  // Auto Scaling
-  const scaling = service.service.autoScaleTaskCount({ maxCapacity: 10 });
-  scaling.scaleOnCpuUtilization('CpuScaling', {
-    targetUtilizationPercent: 70,
-  });
-annotations:
-  - id: note-1
-    title: Không nhúng password vào environment literal
-    description: CDK tham chiếu Secrets Manager; cần Task Role và quyền đọc secret phù hợp khi triển khai.
-    ranges: [[8, 17]]
-  - id: note-2
-    title: Replica, tài nguyên và ALB nội bộ
-    description: ALB nội bộ không tự thay thế security groups, routing hoặc xác thực giữa các service.
-    ranges: [[18, 21]]
-  - id: note-3
-    title: Scale theo CPU
-    description: Target 70% và tối đa 10 task chỉ là cấu hình minh họa; cần đo workload và capacity của dependency.
-    ranges: [[24, 28]]
-source:
-  project: 18-aws-deployment-architecture
-  snapshot: article
-  file: snippets/6-2-aws-cdk.ts
+// Auto Scaling
+const scaling = service.service.autoScaleTaskCount({ maxCapacity: 10 });
+scaling.scaleOnCpuUtilization('CpuScaling', {
+  targetUtilizationPercent: 70,
+});
 ```
+
+**ECS Fargate bằng CDK: network, secret và scaling — điểm cần đọc:**
+
+- **Không nhúng password vào environment literal** (dòng 8–17): CDK tham chiếu Secrets Manager; cần Task Role và quyền đọc secret phù hợp khi triển khai.
+- **Replica, tài nguyên và ALB nội bộ** (dòng 18–21): ALB nội bộ không tự thay thế security groups, routing hoặc xác thực giữa các service.
+- **Scale theo CPU** (dòng 24–28): Target 70% và tối đa 10 task chỉ là cấu hình minh họa; cần đo workload và capacity của dependency.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=18-aws-deployment-architecture&snapshot=article&file=snippets%2F6-2-aws-cdk.ts)
 

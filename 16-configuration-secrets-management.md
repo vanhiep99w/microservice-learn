@@ -452,35 +452,24 @@ logging:
 
 **Service đọc config từ Config Server:**
 
-```annotated source="snippets/5-2-spring-cloud-config-server-2.yaml"
-title: "Config client: nhận diện service và lỗi khởi động"
-language: yaml
-code: |-
-  # bootstrap.yml trong order-service
-  spring:
-    application:
-      name: order-service
-    cloud:
-      config:
-        uri: http://config-server:8888
-        fail-fast: true          # Fail nếu không connect được Config Server
-        retry:
-          max-attempts: 5        # Retry 5 lần
-          initial-interval: 1000 # Chờ 1s giữa mỗi retry
-annotations:
-  - id: note-1
-    title: Tên service và địa chỉ Config Server
-    description: Tên ứng dụng quyết định bộ config cần đọc; URI là ví dụ, cần xác thực và TLS theo môi trường thật.
-    ranges: [[2, 7]]
-  - id: note-2
-    title: Fail fast nhưng retry hữu hạn
-    description: Các giá trị minh họa giúp tránh khởi động với config thiếu. Kiểm tra dependency retry và semantics của phiên bản Spring đang dùng.
-    ranges: [[8, 11]]
-source:
-  project: 16-configuration-secrets-management
-  snapshot: article
-  file: snippets/5-2-spring-cloud-config-server-2.yaml
+```yaml source="snippets/5-2-spring-cloud-config-server-2.yaml"
+# bootstrap.yml trong order-service
+spring:
+  application:
+    name: order-service
+  cloud:
+    config:
+      uri: http://config-server:8888
+      fail-fast: true          # Fail nếu không connect được Config Server
+      retry:
+        max-attempts: 5        # Retry 5 lần
+        initial-interval: 1000 # Chờ 1s giữa mỗi retry
 ```
+
+**Config client: nhận diện service và lỗi khởi động — điểm cần đọc:**
+
+- **Tên service và địa chỉ Config Server** (dòng 2–7): Tên ứng dụng quyết định bộ config cần đọc; URI là ví dụ, cần xác thực và TLS theo môi trường thật.
+- **Fail fast nhưng retry hữu hạn** (dòng 8–11): Các giá trị minh họa giúp tránh khởi động với config thiếu. Kiểm tra dependency retry và semantics của phiên bản Spring đang dùng.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=16-configuration-secrets-management&snapshot=article&file=snippets%2F5-2-spring-cloud-config-server-2.yaml)
 

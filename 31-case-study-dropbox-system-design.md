@@ -927,37 +927,33 @@ Nếu chèn một byte ở đầu file, fixed-size chunking có thể làm check
 
 Một file version có thể được biểu diễn bằng ordered manifest:
 
-```data-inspector source="snippets/11-4-chunk-manifest.json"
-title: "Chunk manifest: metadata không phải nội dung file"
-description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
-json: |-
-  {
-    "versionId": "version-42",
-    "totalSize": 12582912,
-    "blocks": [
-      {
-        "order": 0,
-        "hash": "sha256:block-a",
-        "size": 4194304
-      },
-      {
-        "order": 1,
-        "hash": "sha256:block-b",
-        "size": 4194304
-      },
-      {
-        "order": 2,
-        "hash": "sha256:block-c",
-        "size": 4194304
-      }
-    ]
-  }
-annotations:
-  - id: field-1
-    pointer: /versionId
-    title: Version bất biến
-    description: Manifest phải gắn với đúng phiên bản file; không ghi đè lịch sử bằng manifest của bản mới.
+```json source="snippets/11-4-chunk-manifest.json"
+{
+  "versionId": "version-42",
+  "totalSize": 12582912,
+  "blocks": [
+    {
+      "order": 0,
+      "hash": "sha256:block-a",
+      "size": 4194304
+    },
+    {
+      "order": 1,
+      "hash": "sha256:block-b",
+      "size": 4194304
+    },
+    {
+      "order": 2,
+      "hash": "sha256:block-c",
+      "size": 4194304
+    }
+  ]
+}
 ```
+
+**Chunk manifest: metadata không phải nội dung file — các field cần chú ý:**
+
+- **Version bất biến** (`/versionId`): Manifest phải gắn với đúng phiên bản file; không ghi đè lịch sử bằng manifest của bản mới.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=31-case-study-dropbox-system-design&snapshot=article&file=snippets%2F11-4-chunk-manifest.json)
 

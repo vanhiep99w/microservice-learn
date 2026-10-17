@@ -250,7 +250,6 @@ title: Thêm field khác với đổi tên field trong public contract
 language: json
 view: split
 wordDiff: true
-caption: Ví dụ thêm fullName trong khi giữ name. Chỉ tương thích với consumer cho phép unknown fields; consumer dùng strict schema vẫn cần kiểm thử.
 before:
   label: Response v1
   code: |-
@@ -271,8 +270,12 @@ annotations:
     side: after
     title: Không xóa field cũ ngay
     description: Giữ contract cho consumer cũ trong migration window; tên và ý nghĩa của field cũ phải được giữ ổn định.
-    ranges: [[3, 4]]
+    ranges:
+      - - 3
+        - 4
 ```
+
+- **Không xóa field cũ ngay** (bản sau, dòng 3–4): Giữ contract cho consumer cũ trong migration window; tên và ý nghĩa của field cũ phải được giữ ổn định.
 
 #### 2.4.3. Event-Driven Architecture
 

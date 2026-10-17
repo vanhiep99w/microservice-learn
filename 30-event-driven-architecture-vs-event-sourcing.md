@@ -581,25 +581,21 @@ Vai trò của **Event Sourcing** trong ví dụ này:
 
 Sau khi `OrderConfirmed` được append thành công, service công bố integration event:
 
-```data-inspector
-title: Integration event không đồng nghĩa event store
-description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
-json: |-
-  {
-    "event_type": "order.confirmed.v1",
-    "event_id": "evt-999",
-    "payload": {
-      "order_id": "order-123",
-      "customer_id": "customer-7",
-      "total": 500000
-    }
+```json
+{
+  "event_type": "order.confirmed.v1",
+  "event_id": "evt-999",
+  "payload": {
+    "order_id": "order-123",
+    "customer_id": "customer-7",
+    "total": 500000
   }
-annotations:
-  - id: field-1
-    pointer: /event_type
-    title: Contract thông báo ra ngoài
-    description: Integration event có thể được tạo từ state database thông thường; không chứng minh đang dùng Event Sourcing.
+}
 ```
+
+**Integration event không đồng nghĩa event store — các field cần chú ý:**
+
+- **Contract thông báo ra ngoài** (`/event_type`): Integration event có thể được tạo từ state database thông thường; không chứng minh đang dùng Event Sourcing.
 
 Vai trò của **EDA** trong ví dụ này:
 

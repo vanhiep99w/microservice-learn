@@ -298,31 +298,24 @@ Một request handler có thể vẫn là resource chung của Order Service. V�
 
 Bulkhead cũng có thể được bổ sung ở tầng container. Ví dụ sau đặt resource request và limit cho Payment Pod:
 
-```annotated
-title: Resource isolation ở cấp container
-language: yaml
-code: |-
-  apiVersion: v1
-  kind: Pod
-  metadata:
-    name: payment-service
-  spec:
-    containers:
-      - name: payment
-        image: myapp/payment:v2.1
-        resources:
-          requests: { cpu: "250m", memory: "256Mi" }
-          limits:   { cpu: "500m", memory: "512Mi" }
-annotations:
-  - id: note-1
-    title: Một workload riêng
-    description: Tách container giúp đặt resource budget, nhưng chưa cô lập thread pool hay connection pool bên trong process.
-    ranges: [[6, 8]]
-  - id: note-2
-    title: Requests và limits
-    description: CPU/memory chỉ là một lớp Bulkhead. Cần budget riêng cho từng dependency để tránh cạn tài nguyên dùng chung.
-    ranges: [[9, 11]]
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: payment-service
+spec:
+  containers:
+    - name: payment
+      image: myapp/payment:v2.1
+      resources:
+        requests: { cpu: "250m", memory: "256Mi" }
+        limits:   { cpu: "500m", memory: "512Mi" }
 ```
+
+**Resource isolation ở cấp container — điểm cần đọc:**
+
+- **Một workload riêng** (dòng 6–8): Tách container giúp đặt resource budget, nhưng chưa cô lập thread pool hay connection pool bên trong process.
+- **Requests và limits** (dòng 9–11): CPU/memory chỉ là một lớp Bulkhead. Cần budget riêng cho từng dependency để tránh cạn tài nguyên dùng chung.
 
 Nếu process vượt memory limit trong kịch bản memory leak, container có thể bị `OOMKill` thay vì tiếp tục dùng memory vô hạn của node. Resource limit ở Pod không thay thế concurrency limit trong ứng dụng và cũng không bảo vệ khỏi mọi sự cố ở node.
 

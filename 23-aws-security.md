@@ -778,56 +778,42 @@ App phải refresh cache/pool/credentials theo policy mới nhận secret mới;
 
 **Tạo secret + auto rotation (Terraform):**
 
-```annotated source="snippets/5-1-aws-secrets-manager.tf"
-title: "Secrets Manager: mã hóa, secret value và rotation"
-language: hcl
-code: |-
-  resource "aws_secretsmanager_secret" "db_password" {
-    name = "prod/db/orders"
-    
-    # KMS key cho encryption
-    kms_key_id = aws_kms_key.secrets.arn
-  }
+```hcl source="snippets/5-1-aws-secrets-manager.tf"
+resource "aws_secretsmanager_secret" "db_password" {
+  name = "prod/db/orders"
+  
+  # KMS key cho encryption
+  kms_key_id = aws_kms_key.secrets.arn
+}
 
-  resource "aws_secretsmanager_secret_version" "db_password" {
-    secret_id     = aws_secretsmanager_secret.db_password.id
-    secret_string = jsonencode({
-      username = "admin"
-      password = random_password.db.result
-      engine   = "mysql"
-      host     = aws_rds_cluster.orders.endpoint
-      port     = 3306
-      dbname   = "orders"
-    })
-  }
+resource "aws_secretsmanager_secret_version" "db_password" {
+  secret_id     = aws_secretsmanager_secret.db_password.id
+  secret_string = jsonencode({
+    username = "admin"
+    password = random_password.db.result
+    engine   = "mysql"
+    host     = aws_rds_cluster.orders.endpoint
+    port     = 3306
+    dbname   = "orders"
+  })
+}
 
-  # Auto rotation mỗi 30 ngày
-  resource "aws_secretsmanager_secret_rotation" "db_password" {
-    secret_id           = aws_secretsmanager_secret.db_password.id
-    rotation_lambda_arn = aws_lambda_function.rotate_secret.arn
-    
-    rotation_rules {
-      automatically_after_days = 30
-    }
+# Auto rotation mỗi 30 ngày
+resource "aws_secretsmanager_secret_rotation" "db_password" {
+  secret_id           = aws_secretsmanager_secret.db_password.id
+  rotation_lambda_arn = aws_lambda_function.rotate_secret.arn
+  
+  rotation_rules {
+    automatically_after_days = 30
   }
-annotations:
-  - id: note-1
-    title: Chọn KMS key
-    description: KMS key mã hóa secret; policy của key và quyền IAM vẫn phải cho phép đúng principal đọc.
-    ranges: [[1, 6]]
-  - id: note-2
-    title: Secret value vẫn có thể đi vào Terraform state
-    description: Không commit state. Cần backend được bảo vệ; dùng random_password không làm state tự hết nhạy cảm.
-    ranges: [[8, 18]]
-  - id: note-3
-    title: Lịch rotation không phải toàn bộ cơ chế
-    description: Lambda rotation phải được triển khai và có quyền cập nhật credential ở cả database lẫn Secrets Manager.
-    ranges: [[20, 28]]
-source:
-  project: 23-aws-security
-  snapshot: article
-  file: snippets/5-1-aws-secrets-manager.tf
+}
 ```
+
+**Secrets Manager: mã hóa, secret value và rotation — điểm cần đọc:**
+
+- **Chọn KMS key** (dòng 1–6): KMS key mã hóa secret; policy của key và quyền IAM vẫn phải cho phép đúng principal đọc.
+- **Secret value vẫn có thể đi vào Terraform state** (dòng 8–18): Không commit state. Cần backend được bảo vệ; dùng random_password không làm state tự hết nhạy cảm.
+- **Lịch rotation không phải toàn bộ cơ chế** (dòng 20–28): Lambda rotation phải được triển khai và có quyền cập nhật credential ở cả database lẫn Secrets Manager.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=23-aws-security&snapshot=article&file=snippets%2F5-1-aws-secrets-manager.tf)
 

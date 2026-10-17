@@ -457,51 +457,37 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-3-dockerfile.dockerfile)
 
-```annotated source="snippets/3-3-dockerfile-2.dockerfile"
-title: "Dockerfile Node.js: cache và quyền chạy"
-language: dockerfile
-code: |-
-  # ===== Dockerfile cho Node.js Service =====
+```dockerfile source="snippets/3-3-dockerfile-2.dockerfile"
+# ===== Dockerfile cho Node.js Service =====
 
-  FROM node:20-alpine
+FROM node:20-alpine
 
-  RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-  WORKDIR /app
+WORKDIR /app
 
-  # Copy package.json TRƯỚC → tận dụng cache
-  COPY package.json package-lock.json ./
-  RUN npm ci --only=production
+# Copy package.json TRƯỚC → tận dụng cache
+COPY package.json package-lock.json ./
+RUN npm ci --only=production
 
-  # Copy source code SAU (thay đổi thường xuyên → layer sau)
-  COPY src/ ./src/
+# Copy source code SAU (thay đổi thường xuyên → layer sau)
+COPY src/ ./src/
 
-  USER appuser
+USER appuser
 
-  EXPOSE 3000
+EXPOSE 3000
 
-  HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-    CMD wget -qO- http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD wget -qO- http://localhost:3000/health || exit 1
 
-  CMD ["node", "src/index.js"]
-annotations:
-  - id: note-1
-    title: Cache dependency trước source
-    description: COPY manifest và cài dependency trước COPY source để sửa business code không làm mất cache của dependency layer.
-    ranges: [[9, 14]]
-  - id: note-2
-    title: Tạo user riêng
-    description: User không phải root giảm quyền của process; vẫn cần kiểm soát filesystem và capabilities.
-    ranges: [[5, 5]]
-  - id: note-3
-    title: Chạy với quyền thấp và kiểm tra sức khỏe
-    description: USER chọn danh tính process. Docker HEALTHCHECK không thay thế Kubernetes readiness/liveness probes.
-    ranges: [[16, 21]]
-source:
-  project: 12-containerization
-  snapshot: article
-  file: snippets/3-3-dockerfile-2.dockerfile
+CMD ["node", "src/index.js"]
 ```
+
+**Dockerfile Node.js: cache và quyền chạy — điểm cần đọc:**
+
+- **Cache dependency trước source** (dòng 9–14): COPY manifest và cài dependency trước COPY source để sửa business code không làm mất cache của dependency layer.
+- **Tạo user riêng** (dòng 5): User không phải root giảm quyền của process; vẫn cần kiểm soát filesystem và capabilities.
+- **Chạy với quyền thấp và kiểm tra sức khỏe** (dòng 16–21): USER chọn danh tính process. Docker HEALTHCHECK không thay thế Kubernetes readiness/liveness probes.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=12-containerization&snapshot=article&file=snippets%2F3-3-dockerfile-2.dockerfile)
 

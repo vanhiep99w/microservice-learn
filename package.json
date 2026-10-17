@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@vanhiep99w/docs-kit": "^0.7.1",
+    "@vanhiep99w/docs-kit": "^0.8.0",
     "fumadocs-core": "16.14.0",
     "fumadocs-mdx": "15.2.2",
     "fumadocs-ui": "16.14.0",

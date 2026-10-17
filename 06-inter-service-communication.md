@@ -89,7 +89,6 @@ DELETE /api/products/123          → Xóa product 123
 
 ```protocol-exchange
 title: Tạo order qua HTTP
-description: Request/response tĩnh, credential giả lập; component không gửi request.
 variants:
   - id: created
     title: Order được tạo
@@ -127,13 +126,11 @@ variants:
             "totalAmount": 500000,
             "createdAt": "2026-02-23T10:30:00Z"
           }
-    annotations:
-      - id: created
-        side: response
-        target: start
-        title: 201 mô tả kết quả tạo mới
-        description: Status và body là contract của API; viewer không thực thi validation hoặc tạo order.
 ```
+
+Request/response tĩnh, credential giả lập; component không gửi request.
+
+**201 mô tả kết quả tạo mới:** Status và body là contract của API; viewer không thực thi validation hoặc tạo order.
 
 **REST Maturity Model** (Richardson):
 

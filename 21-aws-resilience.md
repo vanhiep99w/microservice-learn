@@ -246,72 +246,58 @@ HPA và node autoscaler làm việc ở hai lớp khác nhau. Thời gian<60s ha
 
 #### HPA — Horizontal Pod Autoscaler
 
-```annotated source="snippets/hpa-horizontal-pod-autoscaler.yaml"
-title: "HPA: scale nhanh, thu hẹp có kiểm soát"
-language: yaml
-code: |-
-  # HPA dựa trên CPU + Custom Metric
-  apiVersion: autoscaling/v2
-  kind: HorizontalPodAutoscaler
-  metadata:
-    name: order-service-hpa
-    namespace: production
-  spec:
-    scaleTargetRef:
-      apiVersion: apps/v1
-      kind: Deployment
-      name: order-service
-    minReplicas: 3
-    maxReplicas: 50
-    behavior:
-      scaleUp:
-        stabilizationWindowSeconds: 30      # Scale up nhanh
-        policies:
-          - type: Percent
-            value: 100                       # Tối đa gấp đôi
-            periodSeconds: 60
-          - type: Pods
-            value: 5                         # Hoặc thêm 5 pods
-            periodSeconds: 60
-        selectPolicy: Max
-      scaleDown:
-        stabilizationWindowSeconds: 300      # Scale down chậm (5 phút)
-        policies:
-          - type: Percent
-            value: 10                        # Giảm tối đa 10%
-            periodSeconds: 60
-    metrics:
-      - type: Resource
-        resource:
-          name: cpu
-          target:
-            type: Utilization
-            averageUtilization: 70
-      - type: Pods
-        pods:
-          metric:
-            name: http_requests_per_second    # Custom metric từ Prometheus
-          target:
-            type: AverageValue
-            averageValue: "1000"              # 1000 RPS per pod
-annotations:
-  - id: note-1
-    title: Workload đích và biên replica
-    description: HPA điều chỉnh Deployment được tham chiếu trong khoảng minReplicas và maxReplicas.
-    ranges: [[8, 13]]
-  - id: note-2
-    title: Behavior khác nhau giữa scale up và scale down
-    description: Stabilization window và policies hạn chế dao động; số liệu là ví dụ chứ không phải SLO.
-    ranges: [[14, 30]]
-  - id: note-3
-    title: Hai loại metric
-    description: CPU utilization cần resource requests; metric Pods tùy chỉnh cần metrics adapter và pipeline thu thập tương ứng.
-    ranges: [[31, 44]]
-source:
-  project: 21-aws-resilience
-  snapshot: article
-  file: snippets/hpa-horizontal-pod-autoscaler.yaml
+```yaml source="snippets/hpa-horizontal-pod-autoscaler.yaml"
+# HPA dựa trên CPU + Custom Metric
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: order-service-hpa
+  namespace: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: order-service
+  minReplicas: 3
+  maxReplicas: 50
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30      # Scale up nhanh
+      policies:
+        - type: Percent
+          value: 100                       # Tối đa gấp đôi
+          periodSeconds: 60
+        - type: Pods
+          value: 5                         # Hoặc thêm 5 pods
+          periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300      # Scale down chậm (5 phút)
+      policies:
+        - type: Percent
+          value: 10                        # Giảm tối đa 10%
+          periodSeconds: 60
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Pods
+      pods:
+        metric:
+          name: http_requests_per_second    # Custom metric từ Prometheus
+        target:
+          type: AverageValue
+          averageValue: "1000"              # 1000 RPS per pod
 ```
+
+**HPA: scale nhanh, thu hẹp có kiểm soát — điểm cần đọc:**
+
+- **Workload đích và biên replica** (dòng 8–13): HPA điều chỉnh Deployment được tham chiếu trong khoảng minReplicas và maxReplicas.
+- **Behavior khác nhau giữa scale up và scale down** (dòng 14–30): Stabilization window và policies hạn chế dao động; số liệu là ví dụ chứ không phải SLO.
+- **Hai loại metric** (dòng 31–44): CPU utilization cần resource requests; metric Pods tùy chỉnh cần metrics adapter và pipeline thu thập tương ứng.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=21-aws-resilience&snapshot=article&file=snippets%2Fhpa-horizontal-pod-autoscaler.yaml)
 

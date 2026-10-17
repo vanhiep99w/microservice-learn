@@ -164,20 +164,16 @@ shipping -> table: UPDATE orders.shipping_status
 
 Đoạn ghi dưới đây minh họa việc Shipping Service phụ thuộc trực tiếp vào table của Order Service:
 
-```annotated
-title: Một UPDATE có thể phá data ownership
-language: sql
-code: |-
-  -- Shipping Service: phụ thuộc vào schema nội bộ của Order Service
-  UPDATE orders
-  SET shipping_status = 'IN_TRANSIT'
-  WHERE id = :order_id;
-annotations:
-  - id: note-1
-    title: Ghi vào schema của service khác
-    description: "Ví dụ anti-pattern: Shipping phụ thuộc cấu trúc nội bộ của Order DB. Chuyển thao tác qua contract của chủ sở hữu."
-    ranges: [[1, 4]]
+```sql
+-- Shipping Service: phụ thuộc vào schema nội bộ của Order Service
+UPDATE orders
+SET shipping_status = 'IN_TRANSIT'
+WHERE id = :order_id;
 ```
+
+**Một UPDATE có thể phá data ownership — điểm cần đọc:**
+
+- **Ghi vào schema của service khác** (dòng 1–4): Ví dụ anti-pattern: Shipping phụ thuộc cấu trúc nội bộ của Order DB. Chuyển thao tác qua contract của chủ sở hữu.
 
 Sau đó Order Service đổi cách biểu diễn status. Shipping Service và các báo cáo cũ bị lỗi, dù API của Order Service không thay đổi. Một migration tưởng như nội bộ của Order Service vì thế cần phối hợp với mọi consumer đang đọc hoặc ghi `orders`.
 

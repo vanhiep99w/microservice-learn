@@ -8,16 +8,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { parser, collectExamples, validateReferences } from './source-examples.mjs';
 
 const features = [
-  ['annotated', 'annotated-example', 'remarkAnnotatedExample', 'annotated-example', 'AnnotatedExample'],
-  ['code-walkthrough', 'annotated-example/walkthrough', 'remarkCodeWalkthrough', 'code-walkthrough', 'CodeWalkthrough'],
+  ['code-walkthrough', 'code-walkthrough', 'remarkCodeWalkthrough', 'code-walkthrough', 'CodeWalkthrough'],
   ['terminal-session', 'terminal-session', 'remarkTerminalSession', 'terminal-session', 'TerminalSession'],
-  ['marble', 'marble', 'remarkMarble', 'marble', 'MarbleDiagram'],
   ['code-diff', 'code-diff', 'remarkCodeDiff', 'code-diff', 'CodeDiff'],
-  ['data-inspector', 'data-inspector', 'remarkDataInspector', 'data-inspector', 'DataInspector'],
   ['protocol-exchange', 'protocol-exchange', 'remarkProtocolExchange', 'protocol-exchange', 'ProtocolExchange'],
   ['span-waterfall', 'span-waterfall', 'remarkSpanWaterfall', 'span-waterfall', 'SpanWaterfall'],
   ['concurrency-lanes', 'concurrency-lanes', 'remarkConcurrencyLanes', 'concurrency-lanes', 'ConcurrencyLanes'],
-  ['state-transition', 'state-transition', 'remarkStateTransition', 'state-transition', 'StateTransitionExplorer'],
 ];
 
 async function sourceDocuments() {
@@ -72,34 +68,21 @@ test('all authored docs-kit examples validate, compile and retain server-rendere
         const html = renderToStaticMarkup(createElement(Component, props));
         assert.ok(html.includes(props.data.title), `${path}: missing accessible title`);
         assert.doesNotMatch(html, /<iframe|<canvas/u, path);
-        if (language === 'annotated') assert.ok(html.includes(props.data.annotations[0].title), path);
       }
       t.diagnostic(`${language}: ${examples.length} examples validated and SSR-rendered`);
     });
   }
 });
 
-test('descriptor artifacts publish original code/JSON and validate embedded source links', () => {
+test('ordinary fences preserve original source and large JSON numbers', () => {
   const markdown = [
-    '```annotated source="snippets/demo.ts"',
-    'title: Example',
-    'language: typescript',
-    'code: |-',
-    '  const retries = 3;',
-    'annotations:',
-    '  - id: retry',
-    '    title: Retry',
-    '    description: Example only',
-    '    ranges: [[1, 1]]',
-    'source:',
-    '  project: demo',
-    '  snapshot: article',
-    '  file: snippets/demo.ts',
+    '```typescript source="snippets/demo.ts"',
+    'const retries = 3;',
     '```',
-    '```data-inspector source="snippets/event.json"',
-    'title: Payload',
-    'json: \'{"sequence":9007199254740993}\'',
+    '```json source="snippets/event.json"',
+    '{"sequence":9007199254740993}',
     '```',
+    '[Source](?source=demo&snapshot=article&file=snippets%2Fdemo.ts)',
   ].join('\n');
   const { files, refs } = collectExamples(markdown, 'demo.md');
   assert.equal(files[0].language, 'typescript');
@@ -109,8 +92,6 @@ test('descriptor artifacts publish original code/JSON and validate embedded sour
   const snapshots = new Map([['demo', { project: 'demo', snapshot: 'article', files }]]);
   validateReferences(refs.map((request) => ({ request, filename: 'demo.md' })), snapshots);
   assert.throws(() => validateReferences([{ request: { ...refs[0], file: 'missing.ts' }, filename: 'demo.md' }], snapshots), /missing source file/u);
-  assert.throws(() => collectExamples(markdown.replace('code: |-', 'code: 123\nignored: |-'), 'demo.md'), /missing artifact code/u);
-  assert.throws(() => collectExamples(markdown.replace('title: Example', 'title: A\ntitle: B'), 'demo.md'), /unique|Map keys/u);
 });
 
 test('walkthrough and diff source references participate in manifest validation', () => {
@@ -120,6 +101,9 @@ test('walkthrough and diff source references participate in manifest validation'
   ]) {
     const { refs } = collectExamples(markdown, 'example.md');
     assert.equal(refs.length, 1);
+    const language = markdown.match(/^```([^\n]+)/u)[1];
+    assert.throws(() => collectExamples(markdown.replace('```' + language, '```' + language + ' source="snippets/descriptor.yaml"'), 'example.md'), /publish each original artifact separately/u);
+    assert.throws(() => collectExamples(markdown.replace('title: Example', 'title: A\ntitle: B'), 'example.md'), /unique|Map keys/u);
     assert.throws(() => validateReferences(refs.map((request) => ({ request, filename: 'example.md' })), new Map()), /unknown source project/u);
   }
 });
@@ -147,4 +131,60 @@ test('compact UI keeps rollback prerequisites visible before command copy', asyn
   let depth = 0;
   for (const tag of disclosures) depth += tag.startsWith('</') ? -1 : 1;
   assert.equal(depth, 0, 'Warning must not be hidden inside any disclosure');
+});
+
+test('docs-kit 0.8 uses public exports only and rejects all retired fences', async () => {
+  const retired = ['annotated', 'data-inspector', 'marble', 'state-transition'];
+  for (const language of retired) {
+    assert.throws(() => collectExamples(`\`\`\`${language}\ntitle: Obsolete\n\`\`\``, 'example.md'), /removed in docs-kit 0\.8\.0/u);
+  }
+  // Include README authoring examples and all aggregate/reference documents too.
+  for (const path of ['README.md', ...await sourceDocuments()]) {
+    visit(parser.parse(await readFile(path, 'utf8')), 'code', (node) => {
+      assert.ok(!retired.includes(node.lang), `${path}:${node.position.start.line}: retired ${node.lang} fence`);
+    });
+  }
+  const pkg = JSON.parse(await readFile('node_modules/@vanhiep99w/docs-kit/package.json', 'utf8'));
+  for (const path of ['source.config.ts', 'src/app/[[...slug]]/page.tsx', 'src/app/globals.css', 'src/components/source-explorer.tsx']) {
+    const code = await readFile(path, 'utf8');
+    for (const [, subpath] of code.matchAll(/['"]@vanhiep99w\/docs-kit\/([^'"\s]+)['"]/gu)) {
+      assert.ok(Object.hasOwn(pkg.exports, `./${subpath}`), `${path}: missing public export ${subpath}`);
+    }
+  }
+});
+
+test('explanations omitted by the new viewers remain readable outside descriptors', async () => {
+  for (const path of ['03-loose-coupling-high-cohesion.md', '27-shared-code-strategy.md', '06-inter-service-communication.md', '07-api-gateway.md']) {
+    const tree = parser.parse(await readFile(path, 'utf8'));
+    const prose = [];
+    visit(tree, (node) => {
+      if (node.type === 'text' || node.type === 'inlineCode') prose.push(node.value);
+    });
+    const text = prose.join(' ');
+    if (path.startsWith('03-')) assert.ok(text.includes('tên và ý nghĩa của field cũ phải được giữ ổn định'));
+    if (path.startsWith('27-')) assert.ok(text.includes('không buộc toàn hệ thống deploy lockstep'));
+    if (path.startsWith('06-')) assert.ok(text.includes('viewer không thực thi validation hoặc tạo order'));
+    if (path.startsWith('07-')) assert.ok(text.includes('Không retry mutation nếu chưa có idempotency contract'));
+  }
+});
+
+test('independent walkthrough preserves every snapshot and step in the no-JS fallback', async () => {
+  const path = '29-deployment-compatibility-and-rollback.md';
+  const tree = parser.parse(await readFile(path, 'utf8'));
+  const node = tree.children.find((child) => child.type === 'code' && child.lang === 'code-walkthrough');
+  assert.ok(node);
+  const { remarkCodeWalkthrough } = await import('@vanhiep99w/docs-kit/code-walkthrough');
+  const { CodeWalkthrough } = await import('@vanhiep99w/docs-kit/components/code-walkthrough');
+  const compiled = await unified().use(remarkCodeWalkthrough).run({ type: 'root', children: [structuredClone(node)] }, { path });
+  const props = componentProps(compiled.children[0]);
+  const html = renderToStaticMarkup(createElement(CodeWalkthrough, props));
+  assert.match(html, /<noscript>/u);
+  for (const snapshot of props.data.snapshots) assert.ok(html.includes(`data-snapshot="${snapshot.id}"`));
+  for (const step of props.data.steps) assert.ok(html.includes(step.description));
+  assert.doesNotMatch(html, /annotated-example/u);
+});
+
+test('Fumadocs/Tailwind hidden rule has a scoped no-JS walkthrough override', async () => {
+  const css = await readFile('src/app/globals.css', 'utf8');
+  assert.match(css, /@layer base\s*\{\s*@media \(scripting: none\)\s*\{\s*\.code-walkthrough pre\[hidden\]\s*\{\s*display: block !important;/u);
 });

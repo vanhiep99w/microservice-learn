@@ -139,28 +139,21 @@ Các cách giới hạn phạm vi chuyển đổi gồm:
 
 Ví dụ minh họa tại proxy hoặc API Gateway:
 
-```annotated
-title: Cutover từng phần của Billing
-language: yaml
-code: |-
-  routes:
-    - path: /api/v1/billing/**
-      destination: billing-service
-      canary:
-        weight: 5
-        fallback: monolith
-    - path: /api/v1/**
-      destination: monolith
-annotations:
-  - id: note-1
-    title: Chuyển một phần traffic
-    description: Weight 5 là bước thử minh họa; fallback cần policy rõ ràng để không charge hai lần.
-    ranges: [[2, 6]]
-  - id: note-2
-    title: Không chuyển mọi capability cùng lúc
-    description: Phần API còn lại vẫn ở monolith; cần đối soát dữ liệu trước khi tăng traffic.
-    ranges: [[7, 8]]
+```yaml
+routes:
+  - path: /api/v1/billing/**
+    destination: billing-service
+    canary:
+      weight: 5
+      fallback: monolith
+  - path: /api/v1/**
+    destination: monolith
 ```
+
+**Cutover từng phần của Billing — điểm cần đọc:**
+
+- **Chuyển một phần traffic** (dòng 2–6): Weight 5 là bước thử minh họa; fallback cần policy rõ ràng để không charge hai lần.
+- **Không chuyển mọi capability cùng lúc** (dòng 7–8): Phần API còn lại vẫn ở monolith; cần đối soát dữ liệu trước khi tăng traffic.
 
 Đây chỉ là cấu hình minh họa; field thực tế phụ thuộc vào proxy hoặc API Gateway. Với caller nội bộ không có endpoint, team vẫn phải tạo một điểm gọi có thể kiểm soát. Nếu caller tiếp tục gọi thẳng code cũ, việc đổi route ở edge sẽ không bảo vệ được cutover.
 

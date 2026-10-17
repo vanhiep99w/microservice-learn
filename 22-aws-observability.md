@@ -548,33 +548,29 @@ resource "aws_cloudwatch_log_group" "payment_lambda" {
 
 #### Structured Logging Format (JSON)
 
-```data-inspector source="snippets/structured-logging-format-json.json"
-title: CloudWatch structured log
-description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
-json: |-
-  {
-    "timestamp": "2025-02-27T10:30:45.123Z",
-    "level": "INFO",
-    "service": "order-service",
-    "traceId": "1-65d8f3a1-abcdef012345678901234567",
-    "spanId": "a1b2c3d4e5f6",
-    "correlationId": "req-abc123",
-    "message": "Order created successfully",
-    "orderId": "ORD-2025-001",
-    "userId": "USR-456",
-    "amount": 150.00,
-    "duration_ms": 245,
-    "metadata": {
-      "items_count": 3,
-      "payment_method": "credit_card"
-    }
+```json source="snippets/structured-logging-format-json.json"
+{
+  "timestamp": "2025-02-27T10:30:45.123Z",
+  "level": "INFO",
+  "service": "order-service",
+  "traceId": "1-65d8f3a1-abcdef012345678901234567",
+  "spanId": "a1b2c3d4e5f6",
+  "correlationId": "req-abc123",
+  "message": "Order created successfully",
+  "orderId": "ORD-2025-001",
+  "userId": "USR-456",
+  "amount": 150.00,
+  "duration_ms": 245,
+  "metadata": {
+    "items_count": 3,
+    "payment_method": "credit_card"
   }
-annotations:
-  - id: field-1
-    pointer: /traceId
-    title: Khóa nối với trace
-    description: Giữ format nhất quán ở các service; log không tự sinh distributed trace.
+}
 ```
+
+**CloudWatch structured log — các field cần chú ý:**
+
+- **Khóa nối với trace** (`/traceId`): Giữ format nhất quán ở các service; log không tự sinh distributed trace.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=22-aws-observability&snapshot=article&file=snippets%2Fstructured-logging-format-json.json)
 

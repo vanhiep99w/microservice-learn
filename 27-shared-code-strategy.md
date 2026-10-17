@@ -540,7 +540,6 @@ title: Nâng shared library ở từng consumer
 language: xml
 view: split
 wordDiff: true
-caption: Chỉ minh họa thay version dependency, không chứng minh version mới tương thích. Mỗi service phải test và release độc lập.
 before:
   label: Order Service trước nâng cấp
   code: |-
@@ -562,8 +561,12 @@ annotations:
     side: after
     title: Consumer tự chọn thời điểm nâng
     description: Payment Service có thể giữ 1.2.0 nếu contract còn tương thích; không buộc toàn hệ thống deploy lockstep.
-    ranges: [[4, 4]]
+    ranges:
+      - - 4
+        - 4
 ```
+
+- **Consumer tự chọn thời điểm nâng** (bản sau, dòng 4): Payment Service có thể giữ 1.2.0 nếu contract còn tương thích; không buộc toàn hệ thống deploy lockstep.
 
 ### 4.4. Mono-repo vs Multi-repo cho shared library
 

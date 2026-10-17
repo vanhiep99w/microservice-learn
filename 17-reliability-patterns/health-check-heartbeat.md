@@ -385,55 +385,45 @@ Kubernetes chuẩn hóa ba câu hỏi thành ba loại probe:
 
 Manifest dưới đây dùng các endpoint minh họa ở trên. Các giá trị chỉ là điểm bắt đầu để kiểm thử, không phải cấu hình mặc định cho mọi service.
 
-```annotated
-title: Ba probes, ba hành động
-language: yaml
-code: |-
-  apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: order-service
-  spec:
-    template:
-      spec:
-        containers:
-          - name: order-service
-            image: myapp/order-service:1.4.2
-            livenessProbe:
-              httpGet:
-                path: /health/live
-                port: 8080
-              periodSeconds: 10
-              timeoutSeconds: 3
-              failureThreshold: 3
-            readinessProbe:
-              httpGet:
-                path: /health/ready
-                port: 8080
-              periodSeconds: 5
-              timeoutSeconds: 3
-              failureThreshold: 2
-            startupProbe:
-              httpGet:
-                path: /health/startup
-                port: 8080
-              periodSeconds: 5
-              timeoutSeconds: 3
-              failureThreshold: 30
-annotations:
-  - id: note-1
-    title: Liveness để restart
-    description: Endpoint chỉ phản ánh process có cần khởi động lại; tránh phụ thuộc trực tiếp vào mọi downstream.
-    ranges: [[11, 17]]
-  - id: note-2
-    title: Readiness để ngừng nhận traffic
-    description: Pod không Ready bị loại khỏi tập endpoint phục vụ; không đồng nghĩa container bị restart.
-    ranges: [[18, 24]]
-  - id: note-3
-    title: Startup bảo vệ khởi động chậm
-    description: Khi có startupProbe, liveness/readiness chưa chạy cho đến khi startup thành công.
-    ranges: [[25, 31]]
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+spec:
+  template:
+    spec:
+      containers:
+        - name: order-service
+          image: myapp/order-service:1.4.2
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8080
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /health/startup
+              port: 8080
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
 ```
+
+**Ba probes, ba hành động — điểm cần đọc:**
+
+- **Liveness để restart** (dòng 11–17): Endpoint chỉ phản ánh process có cần khởi động lại; tránh phụ thuộc trực tiếp vào mọi downstream.
+- **Readiness để ngừng nhận traffic** (dòng 18–24): Pod không Ready bị loại khỏi tập endpoint phục vụ; không đồng nghĩa container bị restart.
+- **Startup bảo vệ khởi động chậm** (dòng 25–31): Khi có startupProbe, liveness/readiness chưa chạy cho đến khi startup thành công.
 
 Trong ví dụ, startup budget nominal là `30 × 5 = 150` giây, chưa tính mọi chi tiết thời điểm probe bắt đầu và timeout. Budget phải lớn hơn thời gian boot bình thường của app trong môi trường tương ứng.
 

@@ -845,25 +845,18 @@ Effective permissions là hợp các permissions đã grant, không tự mở r�
 
 **JWT chứa roles:**
 
-```data-inspector
-title: "Claims cho RBAC: chỉ là dữ liệu minh họa"
-description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
-json: |-
-  {
-    "sub": "user-123",
-    "roles": ["admin", "order-manager"],
-    "permissions": ["user:read", "user:write", "order:*"]
-  }
-annotations:
-  - id: field-1
-    pointer: /roles
-    title: Role không tự tạo quyền
-    description: Authorization phía server cần policy rõ ràng và token đã được verify.
-  - id: field-2
-    pointer: /permissions
-    title: Permission theo contract
-    description: Viewer không xác minh chữ ký, issuer, audience hoặc expiration của JWT.
+```json
+{
+  "sub": "user-123",
+  "roles": ["admin", "order-manager"],
+  "permissions": ["user:read", "user:write", "order:*"]
+}
 ```
+
+**Claims cho RBAC: chỉ là dữ liệu minh họa — các field cần chú ý:**
+
+- **Role không tự tạo quyền** (`/roles`): Authorization phía server cần policy rõ ràng và token đã được verify.
+- **Permission theo contract** (`/permissions`): Viewer không xác minh chữ ký, issuer, audience hoặc expiration của JWT.
 
 **Triển khai trong service:**
 

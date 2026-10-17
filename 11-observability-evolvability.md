@@ -167,35 +167,31 @@ Thay vì log text thuần:
 
 Sử dụng **Structured Logging** (JSON format):
 
-```data-inspector source="snippets/2-2-structured-logging.json"
-title: "Structured log: tìm theo context"
-description: Payload tĩnh được biên soạn cho bài học; không gọi API hoặc xác minh schema.
-json: |-
-  {
-    "timestamp": "2025-01-15T10:23:45.123Z",
-    "level": "ERROR",
-    "service": "payment-service",
-    "instance": "payment-pod-abc123",
-    "trace_id": "abc123def456",
-    "span_id": "span789",
-    "correlation_id": "req-xyz-001",
-    "message": "Payment failed",
-    "context": {
-      "order_id": "12345",
-      "user_id": "user-001",
-      "amount": 99.99,
-      "currency": "USD",
-      "payment_method": "credit_card",
-      "error_code": "INSUFFICIENT_FUNDS",
-      "gateway_response_time_ms": 2340
-    }
+```json source="snippets/2-2-structured-logging.json"
+{
+  "timestamp": "2025-01-15T10:23:45.123Z",
+  "level": "ERROR",
+  "service": "payment-service",
+  "instance": "payment-pod-abc123",
+  "trace_id": "abc123def456",
+  "span_id": "span789",
+  "correlation_id": "req-xyz-001",
+  "message": "Payment failed",
+  "context": {
+    "order_id": "12345",
+    "user_id": "user-001",
+    "amount": 99.99,
+    "currency": "USD",
+    "payment_method": "credit_card",
+    "error_code": "INSUFFICIENT_FUNDS",
+    "gateway_response_time_ms": 2340
   }
-annotations:
-  - id: field-1
-    pointer: /trace_id
-    title: Trace context
-    description: Dùng identity để liên kết log với trace, không dùng message text để join thủ công.
+}
 ```
+
+**Structured log: tìm theo context — các field cần chú ý:**
+
+- **Trace context** (`/trace_id`): Dùng identity để liên kết log với trace, không dùng message text để join thủ công.
 
 [Đối chiếu đoạn này với các ví dụ khác trong SourceExplorer](?source=11-observability-evolvability&snapshot=article&file=snippets%2F2-2-structured-logging.json)
 
