@@ -213,6 +213,11 @@ bidi: "4. Bidirectional Streaming — N:N" {
  server: Server
  client <-> server: Cùng lúc — hai chiều độc lập
 }
+# Icons: https://icons.d2lang.com/
+unary.server.icon: "https://icons.d2lang.com/tech/022-server.svg"
+server_stream.server.icon: "https://icons.d2lang.com/tech/022-server.svg"
+client_stream.server.icon: "https://icons.d2lang.com/tech/022-server.svg"
+bidi.server.icon: "https://icons.d2lang.com/tech/022-server.svg"
 ```
 
 Unary giống REST request/response. Server Streaming: real-time tracking, live feed. Client Streaming: upload batch data, log streaming. Bidirectional: chat, real-time collaboration.

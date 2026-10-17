@@ -149,6 +149,8 @@ metrics -> ui
 metrics -> alerts: Alert rules
 k8s -> health: Poll probes
 health -> k8s: Liveness restart / Readiness remove traffic
+# Icons: https://icons.d2lang.com/
+k8s.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 Ba thành phần quan trọng của pipeline:
@@ -988,6 +990,8 @@ gateway -> services: Propagate traceparent + CID
 services -> collectors -> stores -> grafana
 k8s -> services: Poll /health/live shallow và /health/ready
 services -> k8s: Probe results — Restart / Traffic removal
+# Icons: https://icons.d2lang.com/
+k8s.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 Readiness kiểm tra dependency có chọn lọc; tránh deep check mọi dependency khiến lỗi cục bộ kéo toàn bộ fleet ra khỏi endpoints.

@@ -603,6 +603,9 @@ shape: sequence_diagram
 "K8s" -> "M": "Observe v1 + v2 metrics"
 "M" -> "CI": "Error rate and latency stable" { style.stroke-dash: 5 }
 "CI" -> "CI": "Complete rollout"
+# Icons: https://icons.d2lang.com/
+DB.icon: "https://icons.d2lang.com/essentials/117-database.svg"
+K8s.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 Trong thời gian này, service phải chấp nhận request từ cả v1 và v2.
@@ -1136,6 +1139,8 @@ shape: sequence_diagram
 "DB" -> "V1": "Error: column does not exist" { style.stroke-dash: 5 }
 "V2" -> "DB": "SELECT full_name"
 "DB" -> "V2": "Success" { style.stroke-dash: 5 }
+# Icons: https://icons.d2lang.com/
+DB.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 Trong Rolling Update, v1 vẫn tồn tại nên hệ thống bị lỗi. Nếu rollback code về v1, v1 vẫn không thể hoạt động vì column cũ đã bị rename.

@@ -202,6 +202,8 @@ n4 -> n10
 n5 -> n11
 n6 -> n12
 n7 -> n13
+# Icons: https://icons.d2lang.com/
+n3.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 | Yêu cầu | Mô tả | Tại sao cần |
@@ -612,6 +614,10 @@ n1.n4 -> n1.n5
 n1.n6 -> n1.n7
 n1.n8 -> n1.n9
 n1.n10 -> n1.n11
+# Icons: https://icons.d2lang.com/
+n1.n3.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+n1.n5.icon: "https://icons.d2lang.com/dev/mongodb.svg"
+n1.n7.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 ### 5.3. Khi nào nên / không nên đa công nghệ
@@ -685,6 +691,8 @@ domains: "Theo domain — feature có thể nằm trong 1 team" {
  pt -> ps
  ct -> cs
 }
+# Icons: https://icons.d2lang.com/
+by_layer.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 ### 6.2. Inverse Conway Maneuver

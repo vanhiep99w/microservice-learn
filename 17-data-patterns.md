@@ -125,6 +125,10 @@ n3 -> n4
 n5 -> n6
 n1 -> n3: "Chỉ qua API / Event" { style.stroke-dash: 5 }
 n1 -> n5: "Chỉ qua API / Event" { style.stroke-dash: 5 }
+# Icons: https://icons.d2lang.com/
+n2.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+n4.icon: "https://icons.d2lang.com/dev/mongodb.svg"
+n6.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 Hai quy tắc bất di bất dịch:
@@ -451,6 +455,8 @@ pg -> projector: "Reliable change stream"
 projector -> read
 query -> model
 model -> read
+# Icons: https://icons.d2lang.com/
+pg.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 > 📖 Chi tiết ba mức kèm ví dụ Product Service: [09 — Data Management, mục 7.3–7.4](09-data-management.md#73-các-mức-độ-áp-dụng-cqrs).

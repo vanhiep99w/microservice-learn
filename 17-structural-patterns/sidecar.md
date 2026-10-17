@@ -67,6 +67,8 @@ pod: Kubernetes Pod {
  app -> volume: Ghi log JSON
  volume -> logger: Đọc shared volume
 }
+# Icons: https://icons.d2lang.com/
+pod.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 ### Phạm vi của tài liệu

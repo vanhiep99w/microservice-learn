@@ -167,6 +167,8 @@ lifecycle.containerd -> oci
 lifecycle.crio -> oci
 high.podman -> oci: Qua container libraries / monitor, không cần dockerd
 oci -> process
+# Icons: https://icons.d2lang.com/
+high.docker.icon: "https://icons.d2lang.com/dev/docker.svg"
 ```
 
 #### Tại sao Kubernetes bỏ Docker, chuyển sang containerd?
@@ -190,6 +192,8 @@ new: K8s — CRI trực tiếp tới runtime {
  kubelet -> containerd: CRI
  containerd -> runc -> process
 }
+# Icons: https://icons.d2lang.com/
+old.dockerd.icon: "https://icons.d2lang.com/dev/docker.svg"
 ```
 
 K8s v1.24 bỏ dockershim tích hợp để giảm maintenance/adapter layers; vẫn có thể chạy Docker qua external CRI adapter nếu cần. K8s không cần toàn bộ Docker build/CLI/Compose/Swarm stack. containerd là daemon, còn per-container shims giúp tách lifecycle khỏi daemon; không gọi containerd là daemon-per-container hay bảo đảm daemon crash không có ảnh hưởng.
@@ -248,6 +252,9 @@ podman: Podman — mô hình daemonless {
  cli -> runtime: Create container
  cli -- monitor: Setup monitor
 }
+# Icons: https://icons.d2lang.com/
+docker.icon: "https://icons.d2lang.com/dev/docker.svg"
+docker.cli.icon: "https://icons.d2lang.com/dev/docker.svg"
 ```
 
 Podman do Red Hat khởi xướng, hỗ trợ rootless, Pods, systemd và CLI tương thích nhiều Docker commands (`alias docker=podman`). Compose cần provider như podman-compose/docker-compose integration; không bảo đảm mọi behavior giống 100%. Docker cũng có rootless mode. Daemonless giảm phụ thuộc central daemon, không loại bỏ mọi failure/security risks. Cả hai hỗ trợ build images; Mac/Windows thường qua Linux VM.
@@ -380,6 +387,10 @@ host: Docker Host {
 registry: "Container Registry\nDocker Hub / ECR / GCR / ACR"
 cli -> host.daemon: API
 host.daemon -> registry: Pull nếu image chưa có local
+# Icons: https://icons.d2lang.com/
+cli.icon: "https://icons.d2lang.com/dev/docker.svg"
+host.icon: "https://icons.d2lang.com/dev/docker.svg"
+host.daemon.icon: "https://icons.d2lang.com/dev/docker.svg"
 ```
 
 `docker run nginx`: CLI gửi request; daemon kiểm tra image/pull nếu thiếu; containerd quản lý lifecycle; runc tạo process với namespaces và cgroups.
@@ -667,6 +678,8 @@ bridge: Docker Host — Bridge {
 }
 host: Host Network — dùng trực tiếp network namespace / ports của host
 none: None — không có external network, vẫn có loopback
+# Icons: https://icons.d2lang.com/
+bridge.icon: "https://icons.d2lang.com/dev/docker.svg"
 ```
 
 User-defined bridge hỗ trợ DNS theo container name, khác default bridge. Ví dụ:
@@ -696,6 +709,10 @@ host: Docker Host {
  new -> volume: Mount sau migration / compatibility check
  old -> new: Thay container — không xóa volume
 }
+# Icons: https://icons.d2lang.com/
+host.icon: "https://icons.d2lang.com/dev/docker.svg"
+host.old.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+host.new.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 Volume sống ngoài writable layer. **Giữ volume không có nghĩa mount data directory PostgreSQL 15 trực tiếp vào 16 là hợp lệ**: major upgrade cần backup/restore hoặc quy trình `pg_upgrade` phù hợp.
@@ -842,6 +859,9 @@ network: myproject_default — Compose network {
  order -> redis
 }
 compose -> network: Auto-created network / Service-name DNS
+# Icons: https://icons.d2lang.com/
+network.pg.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+network.redis.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 Order dùng `DB_HOST=postgres`, `USER_SERVICE=http://user-service:8081/api`, `REDIS_HOST=redis`. Ví dụ DNS resolve user-service tới 172.18.0.2, postgres tới 172.18.0.4; code không hardcode IP hay phụ thuộc `container_name`.
@@ -1555,6 +1575,9 @@ n3 -> n4: "docker build"
 n4 -> n5: "docker push"
 n5 -> n6: "docker pull"
 n6 -> n7: "run"
+# Icons: https://icons.d2lang.com/
+n4.icon: "https://icons.d2lang.com/dev/docker.svg"
+n6.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 ---

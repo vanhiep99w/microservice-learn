@@ -600,6 +600,9 @@ node1: Node 1 { agent: Consul Agent; payment: Payment Service; payment -- agent 
 node2: Node 2 { agent: Consul Agent; order: Order Service; order -- agent }
 node1.agent -- servers
 node2.agent -- servers
+# Icons: https://icons.d2lang.com/
+servers.two.icon: "https://icons.d2lang.com/tech/022-server.svg"
+servers.three.icon: "https://icons.d2lang.com/tech/022-server.svg"
 ```
 
 Consul dùng Go, agent độc lập ngôn ngữ service. Có HTTP API và DNS (`payment.service.consul`), health checks HTTP/TCP/gRPC/script, KV config, multi-datacenter/WAN federation và Consul Connect mTLS. Raft bảo vệ consistency của server state; đặc tính nhất quán của read còn phụ thuộc chế độ query. App có thể dùng client-side API hoặc DNS/proxy integration.
@@ -696,6 +699,11 @@ alb -> tg
 tg -> a
 tg -> b
 tg -> c
+# Icons: https://icons.d2lang.com/
+alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+a.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+b.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+c.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
 ```
 
 ECS Service tự register/deregister tasks vào Target Group; ALB ngừng route tới unhealthy targets sau health-check policy. Auto Scaling và control-plane cập nhật target có độ trễ, không phải tức thời.
@@ -946,6 +954,8 @@ cluster: Kubernetes Cluster {
  ingress.gateway -> prod.product: Product route
 }
 internet -> lb -> cluster.ingress.gateway
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 Kong/NGINX chạy như Pods trong namespace riêng, scale bằng HPA; cloud LB đứng trước theo Service/Ingress integration đã cài. Controller của nhà cung cấp quyết định loại LB, không phải mọi `type=LoadBalancer` đều tự tạo ALB. Gateway dùng DNS/endpoint discovery tùy cấu hình.

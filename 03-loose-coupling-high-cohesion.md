@@ -273,6 +273,10 @@ ud: "User DB\nPostgreSQL" {shape: cylinder}
 order -> od: Own
 product -> pd: Own
 user -> ud: Own
+# Icons: https://icons.d2lang.com/
+od.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+pd.icon: "https://icons.d2lang.com/dev/mongodb.svg"
+ud.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 > 📖 Chi tiết về Database per Service → [09-data-management.md](09-data-management.md)
@@ -760,6 +764,10 @@ order -> notification: OrderCreated
 payment -> order: PaymentCompleted — update status
 shipping -> order: ShipmentDelivered
 shipping -> notification: ShipmentDelivered
+# Icons: https://icons.d2lang.com/
+od.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+pd.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+sd.icon: "https://icons.d2lang.com/dev/mongodb.svg"
 ```
 
 Event-driven communication qua Kafka giúp loose coupling; mỗi service gom một Bounded Context để high cohesion. Elasticsearch ở hình là store cho search/catalog trong ví dụ; nếu cần transactional source of truth, dùng primary DB phù hợp thay vì mặc định xem search index là dữ liệu gốc.

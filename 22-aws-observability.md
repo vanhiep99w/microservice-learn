@@ -76,6 +76,17 @@ incidents: Incident Response {
  runbooks: Systems Manager Runbooks — Remediation
  chat: AWS Chatbot — Slack / Teams integration trong ví dụ
 }
+# Icons: https://icons.d2lang.com/
+traces.xray.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
+traces.xray_sdk.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
+logs.cw.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
+logs.query.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
+metrics.cw.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
+metrics.emf.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
+incidents.sns.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Notification-Service-SNS.svg"
+incidents.events.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+incidents.runbooks.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-Systems-Manager.svg"
+metrics.alarms.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
 ```
 
 ---
@@ -103,6 +114,9 @@ b: Service B {
 xray: "X-Ray Service\nTraces • Service Map • Analytics"
 a.daemon -> xray
 b.collector -> xray
+# Icons: https://icons.d2lang.com/
+a.daemon.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
+xray.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
 ```
 
 Ví dụ header context X-Ray: `X-Amzn-Trace-Id: Root=1-xxx;Parent=yyy;Sampled=1`. Chọn exporter/protocol tương thích: X-Ray SDK thường gửi tới Daemon; OTel SDK thường dùng OTLP tới ADOT Collector.
@@ -282,6 +296,9 @@ gw -> order
 order -> payment: "450ms minh họa"
 order -> aurora
 payment -> stripe: "380ms — bottleneck minh họa"
+# Icons: https://icons.d2lang.com/
+gw.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-API-Gateway.svg"
+aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
 ```
 
 Legend ví dụ: xanh errors<1% và latency<200ms; vàng errors1–5% hoặc latency>500ms; đỏ errors>5%. Ngưỡng phân loại cần nhất quán với metrics hiển thị, không phải X-Ray tự mặc định mọi ngưỡng này.
@@ -373,6 +390,11 @@ otel: OpenTelemetry / ADOT Path {
  collector -> metrics
  collector -> jaeger
 }
+# Icons: https://icons.d2lang.com/
+native.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
+native.daemon.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
+native.xray.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
+otel.xray.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
 ```
 
 OTel giảm vendor coupling, có nhiều instrumentation/exporters nhưng cần cấu hình đúng protocols/pipelines. Traces không được export như metrics tới Prometheus; mỗi signal dùng exporter tương ứng. Đối chiếu lifecycle của X-Ray SDK/Daemon khi chọn cho dự án mới.
@@ -409,6 +431,15 @@ logs -> insights
 logs -> filter -> targets
 logs -> s3: Export
 s3 -> athena
+# Icons: https://icons.d2lang.com/
+ecs.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+eks.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
+lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+api.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-API-Gateway.svg"
+alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+logs.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
+s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+athena.icon: "https://icons.d2lang.com/aws/Analytics/Amazon-Athena.svg"
 ```
 
 ALB access logs mặc định được publish vào S3, không trực tiếp vào CloudWatch Logs; cần pipeline bổ sung nếu muốn hợp nhất tại CloudWatch.
@@ -604,6 +635,10 @@ central: Central Logging Account {
 }
 prod -> central.firehose: Subscription Filter
 staging -> central.firehose: Subscription Filter
+# Icons: https://icons.d2lang.com/
+central.firehose.icon: "https://icons.d2lang.com/aws/Analytics/Amazon-Kinesis-Data-Firehose.svg"
+central.s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+central.athena.icon: "https://icons.d2lang.com/aws/Analytics/Amazon-Athena.svg"
 ```
 
 ```hcl source="snippets/3-4-cross-account-cross-region-logging.tf"
@@ -1014,6 +1049,8 @@ grafana: "Amazon Managed Grafana\nDashboards • SSO • Alerts"
 pods -> agent: "Scrape metrics"
 agent -> amp: "remote_write"
 amp -> grafana: "Queries / Data source"
+# Icons: https://icons.d2lang.com/
+pods.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
 ```
 
 Retention ví dụ150ngày cần kiểm tra workspace settings hiện hành. IAM/SigV4, SSO/auth và Alertmanager integrations phải được cấu hình; diagram không đại diện cho mọi default.
@@ -1140,6 +1177,8 @@ route -> p1
 route -> p2
 route -> p4
 p1 -> response: "Approved automation policy"
+# Icons: https://icons.d2lang.com/
+cw.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
 ```
 
 SNS không mặc định tự phân loại severity hay thực thi remediation; cần message attributes/subscriptions/rules. Automations phải có permission, guardrails, stop conditions và audit.
@@ -1382,6 +1421,8 @@ alert: Alerting / Remediation {
 }
 metrics.sources -> alert.alarms
 logs.cw -> alert.alarms: Extracted error metrics
+# Icons: https://icons.d2lang.com/
+logs.cw.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
 ```
 
 Retention minh họa30ngày CloudWatch rồi archive. Custom EMF: OrderCount, OrderValue, ProcessingTime. Dashboards: CPU/memory/task count; orders/min/revenue/conversion; error rate/P50/P90/P99.

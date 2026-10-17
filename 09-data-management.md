@@ -119,6 +119,10 @@ tables: Separate Tables — Schema public {
  product: product_products / product_categories
  user: user_users
 }
+# Icons: https://icons.d2lang.com/
+server.a.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+server.b.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+server.c.icon: "https://icons.d2lang.com/dev/mysql.svg"
 ```
 
 Separate server cách ly tốt hơn nhưng chi phí cao. Separate schema tiết kiệm và có thể enforce quyền theo schema, nhưng chia sẻ CPU/RAM/I/O và server failure. Separate table theo convention đơn giản cho team nhỏ, nhưng convention một mình không enforce ownership; cần quyền DB phù hợp để ngăn truy cập chéo/JOIN tùy tiện.
@@ -168,6 +172,9 @@ specialized: Specialized / Derived / Ephemeral {
  cart -> cartdb
  analytics -> warehouse
 }
+# Icons: https://icons.d2lang.com/
+specialized.pg.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+specialized.redis.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 Chọn store theo use case: session có thể chấp nhận login lại khi mất, cart cần policy durability rõ. Replica/partitioning không tự bảo đảm không mất dữ liệu hay không có failure; phải thiết kế cấu hình vận hành.
@@ -215,6 +222,8 @@ write -> pg: "Chỉ ghi primary"
 pg -> es: "CDC / Event"
 user -> read
 read -> es: "Search read-only"
+# Icons: https://icons.d2lang.com/
+pg.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 Index có thể rebuild từ primary. Elasticsearch down làm search tạm lỗi nhưng không mất dữ liệu gốc ở PostgreSQL.
@@ -878,6 +887,8 @@ query: "Query Side\nRead / Search / Filter / Report\nDenormalized • Read-optim
  model -> db
 }
 command.db -> query.db: Async event / CDC — eventual consistency
+# Icons: https://icons.d2lang.com/
+command.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 Đây là biến thể CQRS tách stores; CQRS cũng có thể chỉ tách logic/read-write models trên cùng một database.
@@ -917,6 +928,8 @@ user: "User — GET /products\nq=iphone&category=phone&sort=price"
 admin -> validate -> pg
 pg -> worker -> transform -> es
 user -> es: Full-text / Faceted filtering — không JOIN lúc query
+# Icons: https://icons.d2lang.com/
+pg.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 Read document còn có `description`. Tất cả data phục vụ query được flatten/pre-join; publish sau write cần Outbox/CDC để xử lý dual-write gap, không mặc định atomic với DB commit.
@@ -1482,6 +1495,8 @@ product -> db
 db -> debezium
 debezium -> kafka
 kafka -> order
+# Icons: https://icons.d2lang.com/
+db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 Producer không cần biết consumer hay sửa business code để CDC. Đổi lại cần vận hành Kafka/Debezium và cẩn thận schema coupling/lộ DB internals. Near-real-time và delivery phụ thuộc WAL retention, offsets, connector recovery và consumer idempotency; không phải bảo đảm tuyệt đối không mất event.

@@ -82,6 +82,8 @@ micro: "Microservices — N entry/deployment/database boundaries" {
  b -- db
  c -- dc
 }
+# Icons: https://icons.d2lang.com/
+monolith.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 Attack surface tăng với nhiều trust boundaries; topology fully connected có thể tới N×(N−1) directed service relationships, không phải mọi hệ thống đều có tất cả kết nối đó.
@@ -611,6 +613,8 @@ jwt: Self-contained Token {
  client -> service: JWT token
  service -> verify
 }
+# Icons: https://icons.d2lang.com/
+session.server.icon: "https://icons.d2lang.com/tech/022-server.svg"
 ```
 
 Session store có thể được HA/scale nên session-based không đồng nghĩa không scale horizontal được. JWT local verification giảm lookup nhưng cần key rotation/revocation strategy; authorization vẫn là trách nhiệm của resource service.
@@ -987,6 +991,9 @@ mtls: Mutual TLS {
  client -> server: Client certificate — server verify
  client <-> server: Hai bên có authenticated transport identity
 }
+# Icons: https://icons.d2lang.com/
+tls.server.icon: "https://icons.d2lang.com/tech/022-server.svg"
+mtls.server.icon: "https://icons.d2lang.com/tech/022-server.svg"
 ```
 
 TLS một chiều không có client-certificate authentication; server vẫn có thể xác thực client ở application layer bằng token/cookie. mTLS không tự quyết định resource permissions.
@@ -1294,6 +1301,9 @@ zero: Network — không tin mặc định {
  a -> b: mTLS / AuthN / AuthZ / Logs
  b -> db: TLS / Identity / AuthZ / Logs
 }
+# Icons: https://icons.d2lang.com/
+traditional.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
+zero.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 Zero Trust giảm khả năng lateral movement nhờ verify identity và least privilege cho từng resource access; không bảo đảm attacker trong network không bao giờ truy cập được nếu credentials/policy/endpoints bị compromise.
@@ -1432,6 +1442,8 @@ service -> vault: 3. Read secret/db-pass hoặc database/creds role
 vault -> db: Dynamic secret — tạo temporary DB user nếu dùng DB engine
 vault -> service: 4. Secret / Dynamic credentials — lease ví dụ1h {style.stroke-dash: 5}
 vault -> db: Hết lease / Revoke → revoke dynamic user
+# Icons: https://icons.d2lang.com/
+db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 Dynamic credentials có lease/renewal/revocation. KV static secret không mặc định có DB-user lease/revoke như dynamic secrets; auth/token TTL và secret-engine behavior là các cơ chế khác nhau.
@@ -1797,6 +1809,8 @@ vault -> services: Credentials
 mesh -- services: Transport / AuthZ policies
 network -- services: Network segmentation
 services -> audit: Audit logs
+# Icons: https://icons.d2lang.com/
+network.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 **Security flow khi user tạo order:**

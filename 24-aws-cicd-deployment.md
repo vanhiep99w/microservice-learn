@@ -113,6 +113,10 @@ pipeline: "CodePipeline — Orchestrator\nSource → Build → Test → Deploy\n
  deploy: "CodeDeploy\nDeployment automation\nBlue-Green / Canary theo target\nAuto rollback"
  source -> build -> deploy
 }
+# Icons: https://icons.d2lang.com/
+pipeline.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-CodePipeline.svg"
+pipeline.build.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-CodeBuild.svg"
+pipeline.deploy.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-CodeDeploy.svg"
 ```
 
 Deployment strategy phụ thuộc compute target. Ví dụ ECS rolling update do ECS scheduler quản lý, không phải CodeDeploy ECS blue-green.
@@ -138,6 +142,14 @@ aws: AWS {
  ecr -> lambda
 }
 github.runners -> aws.ecr: OIDC — không lưu access keys
+# Icons: https://icons.d2lang.com/
+github.icon: "https://icons.d2lang.com/dev/github.svg"
+github.runners.icon: "https://icons.d2lang.com/dev/github.svg"
+aws.ecr.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2-Container-Registry.svg"
+aws.ecs.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+aws.eks.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
+aws.lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+aws.icon: "https://icons.d2lang.com/dev/amazonwebservices.svg"
 ```
 
 GitHub Actions đảm nhiệm CI/CD; AWS đảm nhiệm hạ tầng deployment.
@@ -222,6 +234,12 @@ dr: DR444444444444 { role: Deploy Role; ecs: ECS Cluster; role -> ecs }
 tooling.build -> staging.role: AssumeRole
 tooling.build -> prod.role: AssumeRole
 tooling.build -> dr.role: AssumeRole
+# Icons: https://icons.d2lang.com/
+tooling.build.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-CodeBuild.svg"
+tooling.ecr.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2-Container-Registry.svg"
+staging.ecs.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+prod.ecs.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+dr.ecs.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
 ```
 
 Account IDs minh họa; trust/resource/artifact-KMS policies và environment approvals phải giới hạn đúng pipeline principal.
@@ -383,6 +401,11 @@ shift: Bước2 — Shift Canary {
  alarm -> blue: Rollback100% nếu configured alarm breach
 }
 complete: Bước3 — 100%Green / Blue0% giữ tới termination window
+# Icons: https://icons.d2lang.com/
+test.prod.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+test.test.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+shift.prod.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+shift.alarm.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
 ```
 
 Tiếp tục shifting khi metrics/gates đạt; terminate Blue theo deployment policy/rollback window chứ không luôn xóa ngay tại thời điểm100%Green.
@@ -729,6 +752,10 @@ new: "Mới — OIDC" {
  sts -> actions: 2. Temporary credentials
  actions -> apis: 3. Use AWS APIs
 }
+# Icons: https://icons.d2lang.com/
+old.secrets.icon: "https://icons.d2lang.com/dev/github.svg"
+new.actions.icon: "https://icons.d2lang.com/dev/github.svg"
+old.aws.icon: "https://icons.d2lang.com/dev/amazonwebservices.svg"
 ```
 
 Thời hạn temporary credentials phụ thuộc session configuration và giới hạn của STS/role; không luôn cố định 15 phút.
@@ -971,6 +998,8 @@ cluster: EKS {
  argo.ui -- argo.controller
 }
 cluster.argo.controller -> git: Poll ví dụ3phút / Webhook trigger
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
 ```
 
 Webhook trigger không bảo đảm apply tức thời. Auto-sync/self-heal theo policy; rollback cần phối hợp source of truth (revert Git/desired version), không chỉ click UI rồi để controller sync lại revision mới.
@@ -1157,6 +1186,9 @@ build -> trivy
 trivy -> block: "Policy violation"
 trivy -> ecr: "Pass"
 ecr -> inspector
+# Icons: https://icons.d2lang.com/
+build.icon: "https://icons.d2lang.com/dev/docker.svg"
+inspector.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2-Container-Registry.svg"
 ```
 
 Dockerfile/config/secret scanners có flags/input-specific support; không mặc định image scan tự bao phủ mọi repository/misconfiguration. Scan trước push và registry scan sau push là hai lớp khác nhau.
@@ -1368,6 +1400,9 @@ s1 -> s2
 s2 -> s3
 s3 -> s4
 s4 -> s5
+# Icons: https://icons.d2lang.com/
+s1.icon: "https://icons.d2lang.com/dev/github.svg"
+s3.icon: "https://icons.d2lang.com/dev/github.svg"
 ```
 
 Shared ECR images theo cross-account policy; Secrets Manager tách account/environment; alarms qua SNS/Slack. Staging/prod nên promote cùng immutable artifact, không rebuild sau staging.

@@ -1030,6 +1030,8 @@ cluster: Kubernetes Cluster {
 }
 cluster.argo -> git: Pull
 ui -- cluster.argo: Dashboard / Sync status
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 ```yaml source="snippets/5-3-argocd.yaml"
@@ -1514,6 +1516,8 @@ teams -> source: Push / PR
 source -> ci: Webhook
 ci -> config: Update image tag qua reviewed PR
 cluster.argo -> config: Pull desired state
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 **Luồng deploy chi tiết:**

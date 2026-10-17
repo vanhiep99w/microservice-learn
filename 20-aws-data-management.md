@@ -74,6 +74,13 @@ cross: Cross-Service Data {
  state: EventBridge — Event-Carried State
  pipeline: DMS + Kinesis — CDC Pipeline
 }
+# Icons: https://icons.d2lang.com/
+db.document.icon: "https://icons.d2lang.com/aws/Database/Amazon-DocumentDB-MongoDB.svg"
+consistency.orchestration.icon: "https://icons.d2lang.com/aws/Application%20Integration/AWS-Step-Functions.svg"
+consistency.choreography.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+consistency.migration.icon: "https://icons.d2lang.com/aws/Migration%20%26%20Transfer/AWS-Database-Migration-Service.svg"
+cross.composition.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-AppSync.svg"
+cross.state.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
 ```
 
 DynamoDB Streams là change stream có retention hữu hạn, không tự là authoritative Event Store. Event Sourcing cần lưu domain events bền vững; Streams có thể phân phối thay đổi từ Event Store table.
@@ -106,6 +113,8 @@ catalog: AWS Purpose-Built Databases {
  ledger: QLDB — Ledger / Verifiable history trong ví dụ lịch sử
  warehouse: Redshift — Columnar OLAP / Large-scale Analytics
 }
+# Icons: https://icons.d2lang.com/
+catalog.relational.rds.icon: "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg"
 ```
 
 Danh mục thể hiện nhóm use case, không bảo đảm mọi offering còn mở cho tài khoản mới: kiểm tra lifecycle, region và engine support trước khi chọn. Các mức latency và claim Aurora “5x MySQL” phụ thuộc workload/benchmark, không phải cam kết cho mọi ứng dụng.
@@ -123,6 +132,9 @@ aurora: Aurora PostgreSQL {
  writer -> storage
  readers -> storage
 }
+# Icons: https://icons.d2lang.com/
+aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+aurora.storage.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
 ```
 
 Mô hình storage có6copies/3AZ. Storage growth/upper limits, Serverless v2 ACU range, retention tối đa35ngày và failover/cross-region lag phụ thuộc engine/version/region/config; các số128TB,0.5–128ACU,<30s,<1s trong ví dụ cũ không phải SLA phổ quát. Có continuous backup/PITR, reader autoscaling, Global Database, IAM DB auth, KMS at-rest và TLS khi cấu hình.
@@ -281,6 +293,9 @@ redis -> response: "Hit"
 redis -> aurora: "Miss"
 aurora -> cache
 cache -> response
+# Icons: https://icons.d2lang.com/
+redis.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
 ```
 
 TTL ví dụ product5phút/user1giờ/config24giờ. Redis còn dùng session TTL24h, rate counter, locks và sorted-set leaderboard (`ZADD`, top10). INCR+EXPIRE đơn thuần không phải sliding-window algorithm; atomic scripts/expiry policy cần thiết. Lock `SET NX EX30` cần owner token/safe unlock/fencing tùy use case. Multi-AZ, sharding, encryption/auth cần cấu hình. Với kiến trúc cache này, order/payment gốc ở RDS/DynamoDB; không xem cache failure là mất source of truth, nhưng session/cart có durability trade-off riêng.
@@ -302,6 +317,8 @@ aurora -> cdc
 cdc -> search
 user -> read
 read -> search: "Full-text / Fuzzy / Autocomplete / Facets / Sort"
+# Icons: https://icons.d2lang.com/
+aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
 ```
 
 Ví dụ tìm iPhone giá dưới20triệu. Trong kiến trúc này index là derived store/rebuildable, không thay primary transactional DB. Cũng dùng log analytics/APM với OpenSearch Dashboards; search visibility phụ thuộc refresh/indexing, không mặc định chính xác1giây.
@@ -651,6 +668,8 @@ bus -> confirm: "PaymentDone"
 bus -> notification: "PaymentDone"
 bus -> release: "PaymentFailed"
 bus -> cancel: "PaymentFailed"
+# Icons: https://icons.d2lang.com/
+bus.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
 ```
 
 Mỗi service handle events và failure local; dùng trace/correlation context để debug thay vì mặc định mọi nhánh có cùng synchronous stack.
@@ -701,6 +720,10 @@ db -> stream
 stream -> lambda
 lambda -> read
 user -> read: "Full-text / Facets / Autocomplete"
+# Icons: https://icons.d2lang.com/
+db.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+stream.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 Ví dụ models khác nhau, cùng product:
@@ -732,6 +755,11 @@ client -> order: "GET /orders/{id}"
 order -> redis: Cache lookup
 redis -> order: Hit — cached data
 order -> aurora: Miss — query DB rồi cache
+# Icons: https://icons.d2lang.com/
+aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+event.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+updater.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+redis.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
 ```
 
 Cache-Aside: app lookup → miss → query DB → cache. Write-Through cập nhật DB và cache trên write path; Write-Behind ghi cache rồi async xuống DB nên rủi ro mất dữ liệu. Event-driven invalidation dùng event để vô hiệu hóa cache. Phù hợp read/write > 10:1, query đơn giản, không full-text search và cần cache latency thấp. Để tránh mất event sau DB commit, kết hợp Outbox/CDC thay vì coi DB write + publish là atomic.
@@ -842,6 +870,12 @@ client -> query
 query -> readmodels.aurora
 query -> readmodels.redis
 query -> readmodels.search
+# Icons: https://icons.d2lang.com/
+store.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+streams.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+projector.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+readmodels.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+readmodels.redis.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
 ```
 
 Projector xây dựng/cập nhật read models; query đọc store tối ưu cho nhu cầu cụ thể. Rebuild bằng cách đọc lại **Event Store** và replay theo đúng thứ tự từng stream, không dựa vào retention ngắn của DynamoDB Streams. Có thể tạo read model mới mà không đổi write side.
@@ -919,6 +953,9 @@ c: Aurora Outbox + CDC {
  target: EventBridge
  outbox -> cdc -> stream -> relay -> target
 }
+# Icons: https://icons.d2lang.com/
+a.relay.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+c.target.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
 ```
 
 | Option | Complexity / Ops | Latency minh họa | Phù hợp |
@@ -938,6 +975,15 @@ direction: down
 dynamo: DynamoDB CDC { db: DynamoDB Table; streams: DynamoDB Streams; consumer: Lambda Consumer; db -> streams -> consumer }
 dms: DMS CDC { db: Aurora / RDS; dms: DMS; targets: Kinesis / Kafka / S3 / OpenSearch / Redshift / DynamoDB; db -> dms: Transaction log; dms -> targets }
 debezium: MSK Connect { db: Aurora / RDS; connector: Debezium Connector; msk: MSK Kafka; consumers: Consumers độc lập; db -> connector -> msk -> consumers }
+# Icons: https://icons.d2lang.com/
+dynamo.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+dynamo.db.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+dynamo.streams.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+dynamo.consumer.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+dms.icon: "https://icons.d2lang.com/aws/Migration%20%26%20Transfer/AWS-Database-Migration-Service.svg"
+dms.dms.icon: "https://icons.d2lang.com/aws/Migration%20%26%20Transfer/AWS-Database-Migration-Service.svg"
+debezium.icon: "https://icons.d2lang.com/aws/Analytics/Amazon-Managed-Streaming-for-Kafka.svg"
+debezium.msk.icon: "https://icons.d2lang.com/aws/Analytics/Amazon-Managed-Streaming-for-Kafka.svg"
 ```
 
 DynamoDB record types INSERT/MODIFY/REMOVE; view KEYS_ONLY/NEW_IMAGE/OLD_IMAGE/NEW_AND_OLD_IMAGES; retention24h, ordering theo item. DMS hỗ trợ full-load + ongoing replication theo source/target/engine; đọc WAL/binlog vẫn có overhead cần đo. Debezium là open-source CDC, MSK Connect là managed Kafka Connect; schema registry/checkpoints hữu ích nhưng không tự bảo đảm exactly-once external effects.
@@ -1005,6 +1051,8 @@ user -> merge
 items -> merge
 ship -> merge
 merge -> client
+# Icons: https://icons.d2lang.com/
+appsync.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-AppSync.svg"
 ```
 
 Model: `Order.id:ID!`, `status:String!`, `user:User!`, `items:[OrderItem!]`, `shipment:Shipment`. AppSync có subscriptions, resolver caching/pipelines và Cognito/IAM/API-key/OIDC auth theo API/config. Direct DB resolver phải thuộc ownership/authorization boundary thích hợp, không mở tùy tiện private DB của service khác. Chọn AppSync khi cần field selection/composition; API Gateway cho REST proxy/usage-plan requirements theo API type.
@@ -1083,6 +1131,9 @@ cutover: Sau validation / Cutover {
  green: Green DB — nhận writes mới
  service -> green: Switch connection
 }
+# Icons: https://icons.d2lang.com/
+setup.blue.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+setup.green.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
 ```
 
 Steps: tạo Green/clone hoặc full-load+CDC, kiểm chứng replication/schema/app, cutover có write-consistency plan, monitor24–48h theo yêu cầu rồi decommission Blue. **Không đơn giản switch ngược về Blue sau khi Green nhận writes**: Blue có thể stale, cần reverse-sync/reconciliation/rollback design.
@@ -1138,6 +1189,14 @@ write.odb -> events.cdc: Outbox CDC
 write.udb -> events.bridge: User events qua reliable relay
 write.prod -> read.search: CDC / Sync pipeline
 write.cdb -> read.reporting: Streams → Lambda → Analytics
+# Icons: https://icons.d2lang.com/
+write.cdb.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+write.ndb.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+events.bridge.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+read.cache.icon: "https://icons.d2lang.com/dev/redis.svg"
+read.session.icon: "https://icons.d2lang.com/dev/redis.svg"
+read.history.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+events.sqs.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
 ```
 
 Sagas điều phối CreateOrder → ReserveStock → ProcessPayment → ConfirmOrder, bù đúng bước đã commit khi fail. EventBridge rules: OrderCreated → Inventory/Notification; PaymentCompleted → Order/Shipping; UserUpdated → Order cache/Notification; LowStock → SNS Ops. DMS cần target/consumer/relay hợp lệ để publish EventBridge, không mặc định hỗ trợ direct EventBridge destination. Các TTL là retention policy ví dụ; DynamoDB TTL cleanup không đúng tại một thời điểm tuyệt đối.
@@ -1204,6 +1263,18 @@ n4.n24 -> n1.n11
 n4.n24 -> n4.n25
 n2.n15 -> n26: "Events"
 n26 -> n27
+# Icons: https://icons.d2lang.com/
+n1.n6.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+n1.n8.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+n1.n10.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+n1.n12.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+n1.n14.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+n2.n15.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+n2.n17.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+n3.n19.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+n3.n22.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+n4.n24.icon: "https://icons.d2lang.com/aws/Application%20Integration/AWS-Step-Functions.svg"
+n26.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
 ```
 
 ---

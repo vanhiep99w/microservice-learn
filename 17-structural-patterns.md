@@ -133,6 +133,8 @@ backend: Application Backend
 telemetry: Telemetry Backend
 pod.app -> backend: Application traffic
 pod.agent -> telemetry: Export telemetry
+# Icons: https://icons.d2lang.com/
+pod.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 Điểm quan trọng:

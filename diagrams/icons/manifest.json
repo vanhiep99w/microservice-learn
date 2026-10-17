@@ -1,0 +1,392 @@
+[
+  {
+    "id": "acm",
+    "file": "acm.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Certificate-Manager.svg",
+    "sha256": "05806ab80319c97163fca68c6a37bc31bdec84fa4d6812820a2cea36da26c131"
+  },
+  {
+    "id": "alb",
+    "file": "alb.svg",
+    "url": "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg",
+    "sha256": "d7410cc67361579ac1359cd0391c5b2025a3927f9fbd916a24be3e6f62d3985e",
+    "sourceSha256": "0f2bacabaf61cb670d65ffa70e3bd600af33d9d441faeb20135c191134b65d6d",
+    "modification": "White background for contrast in light/dark diagrams; logo paths unchanged."
+  },
+  {
+    "id": "api-gateway",
+    "file": "api-gateway.svg",
+    "url": "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-API-Gateway.svg",
+    "sha256": "ef4aec9c0aa6de58b2a84f6e0f27c3bb9c5e2e3699c1467e13c704b5810f9144"
+  },
+  {
+    "id": "app-mesh",
+    "file": "app-mesh.svg",
+    "url": "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-App-Mesh.svg",
+    "sha256": "2638231751eeff55e1adb9aea5ebce2a839fdbaf924122a5cf4ab993995847e9"
+  },
+  {
+    "id": "appconfig",
+    "file": "appconfig.svg",
+    "url": "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-App-Config.svg",
+    "sha256": "612a6721d44c7aa5d724fa82d57af5b328f174ea96e1e497776fb20734db5e3d"
+  },
+  {
+    "id": "appsync",
+    "file": "appsync.svg",
+    "url": "https://icons.d2lang.com/aws/Application%20Integration/Amazon-AppSync.svg",
+    "sha256": "4473c66a3848ed78c0d7eed69693c14f5bb6d0630e2ba53879e0367e417ea473"
+  },
+  {
+    "id": "athena",
+    "file": "athena.svg",
+    "url": "https://icons.d2lang.com/aws/Analytics/Amazon-Athena.svg",
+    "sha256": "65c22dcf8b1438e9f74fdcf9a830a0f33a088bc1ac0d40970cefa2830ac332e8"
+  },
+  {
+    "id": "aurora",
+    "file": "aurora.svg",
+    "url": "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg",
+    "sha256": "a1f15dfc94f9c77cd3eee4bc466d530dd6063de3794ade58403e58a7c068fd0b"
+  },
+  {
+    "id": "auto-scaling",
+    "file": "auto-scaling.svg",
+    "url": "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-Auto-Scaling.svg",
+    "sha256": "877e9478cc363849227575ccce6feba0843a1ea0559478953bc3fca1d57779e2"
+  },
+  {
+    "id": "aws",
+    "file": "aws.svg",
+    "url": "https://icons.d2lang.com/dev/amazonwebservices.svg",
+    "sha256": "d5abeaefc19c7c2e79250cee83b8f45bbadfc0a07539f41eed3f8ac7f3eaad8b",
+    "sourceSha256": "dd46ebb490fba1d661c60bf41b389600b621012867c6c147d8a1fb46587ed54c",
+    "modification": "White background for contrast in light/dark diagrams; logo paths unchanged."
+  },
+  {
+    "id": "cloud-map",
+    "file": "cloud-map.svg",
+    "url": "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-Cloud-Map.svg",
+    "sha256": "0953e6ff1a8db06ef291a782c84164d9b43907c5840b9787f96d2edd87db7c93"
+  },
+  {
+    "id": "cloudfront",
+    "file": "cloudfront.svg",
+    "url": "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-CloudFront.svg",
+    "sha256": "bcdcc3bd8b00d4b82f4ad7fa50e83896d96e4dc9572de1fe7a92c14a5b7abd60"
+  },
+  {
+    "id": "cloudtrail",
+    "file": "cloudtrail.svg",
+    "url": "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-CloudTrail.svg",
+    "sha256": "44c2596ccdc112927e6fa24038b0d69b3b58b41480b6ba5346bd487e03253e26"
+  },
+  {
+    "id": "cloudwatch",
+    "file": "cloudwatch.svg",
+    "url": "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg",
+    "sha256": "625a894fd6bd849b50201afd1074ad06748b43cd13335ebd6f4a7a9c96b34e1e"
+  },
+  {
+    "id": "codebuild",
+    "file": "codebuild.svg",
+    "url": "https://icons.d2lang.com/aws/Developer%20Tools/AWS-CodeBuild.svg",
+    "sha256": "94934eefccde699a27abdf559c35a9ebf27652567b5eb70a0ffc8bdadd22acd0"
+  },
+  {
+    "id": "codedeploy",
+    "file": "codedeploy.svg",
+    "url": "https://icons.d2lang.com/aws/Developer%20Tools/AWS-CodeDeploy.svg",
+    "sha256": "46df37519b7327bc6ce111fe8a97df9280fd244e524c1d9070e93d645accc4fd"
+  },
+  {
+    "id": "codepipeline",
+    "file": "codepipeline.svg",
+    "url": "https://icons.d2lang.com/aws/Developer%20Tools/AWS-CodePipeline.svg",
+    "sha256": "8db65b7a64f02f6159f34147ebbcb815c7bf15d9ec030926e92c1a8da03760eb"
+  },
+  {
+    "id": "cognito",
+    "file": "cognito.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Cognito.svg",
+    "sha256": "14a9a39c418164d8dadfec3545302ab9e453f7ab24824f551a4d2a10e4f5db74"
+  },
+  {
+    "id": "database",
+    "file": "database.svg",
+    "url": "https://icons.d2lang.com/essentials/117-database.svg",
+    "sha256": "5e8018133f51fc393d4cf6988102e51ec7a7b859991f827e7dcf1eaae9531a14",
+    "sourceSha256": "25e6df9beba586e90ebd792bff6a0cc3ca09f9960a5a59cc98954568066010ec",
+    "modification": "White background for contrast in light/dark diagrams; logo paths unchanged."
+  },
+  {
+    "id": "dms",
+    "file": "dms.svg",
+    "url": "https://icons.d2lang.com/aws/Migration%20%26%20Transfer/AWS-Database-Migration-Service.svg",
+    "sha256": "8f4948eff6f08d1ca44ff4f6edec22b846f06389c19973e8ef9b1f39afd5920b"
+  },
+  {
+    "id": "docker",
+    "file": "docker.svg",
+    "url": "https://icons.d2lang.com/dev/docker.svg",
+    "sha256": "1c8b529209147b235f05de3ecbb512e9694ca3c51c96e9da1064eecb5bc02de0"
+  },
+  {
+    "id": "documentdb",
+    "file": "documentdb.svg",
+    "url": "https://icons.d2lang.com/aws/Database/Amazon-DocumentDB-MongoDB.svg",
+    "sha256": "f9558f1882243731582ec5caf7649232f6894027051c11d0c111b5375fea7d6e"
+  },
+  {
+    "id": "dynamodb",
+    "file": "dynamodb.svg",
+    "url": "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg",
+    "sha256": "99604fea1c18981f9ec044de8483d49e7f8a504cbe93c70838c25093e3d7232a"
+  },
+  {
+    "id": "ec2",
+    "file": "ec2.svg",
+    "url": "https://icons.d2lang.com/aws/Compute/Amazon-EC2.svg",
+    "sha256": "ea555d770fc0a0faec485905df6a9803d2f44f8d88a7eacaa275f7c5c82629d8"
+  },
+  {
+    "id": "ecr",
+    "file": "ecr.svg",
+    "url": "https://icons.d2lang.com/aws/Compute/Amazon-EC2-Container-Registry.svg",
+    "sha256": "64e2c7cf012ce03b8a8c77766ee2beee586ce3b8f33e70faad21502837fd8a31"
+  },
+  {
+    "id": "ecs",
+    "file": "ecs.svg",
+    "url": "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg",
+    "sha256": "51ae9491c9ca2409258e1112f36a4c858064783759233e8ac73dab3a8f26226a"
+  },
+  {
+    "id": "eks",
+    "file": "eks.svg",
+    "url": "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg",
+    "sha256": "68a0ca208ce47206d1d685fe182b8ab84c5fc143b247ef4566e74d24732b4585"
+  },
+  {
+    "id": "elasticache",
+    "file": "elasticache.svg",
+    "url": "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg",
+    "sha256": "4832a892a358678c920cf4c5fc2d2ed1069a66b394afc2b56ea3a6d5eec0a463"
+  },
+  {
+    "id": "eventbridge",
+    "file": "eventbridge.svg",
+    "url": "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg",
+    "sha256": "335a8274344788a6bc6dcea9dc3fc99b6d7f3041a310d583dbea4b455bad6424"
+  },
+  {
+    "id": "fargate",
+    "file": "fargate.svg",
+    "url": "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg",
+    "sha256": "b726e4913b14c5eca3b3ee355ea9ade464d9dfa58ff98ce4968684c43b32eeee"
+  },
+  {
+    "id": "firehose",
+    "file": "firehose.svg",
+    "url": "https://icons.d2lang.com/aws/Analytics/Amazon-Kinesis-Data-Firehose.svg",
+    "sha256": "fbaa993ab0f9d0695ce72a25fd274153f51f4eba7162f5da444880d221a2defc"
+  },
+  {
+    "id": "github",
+    "file": "github.svg",
+    "url": "https://icons.d2lang.com/dev/github.svg",
+    "sha256": "b01a3e218a8c4e40d11b5376fe280d81a2b51c99c0535e54f6c4b80102f1f2d5",
+    "sourceSha256": "f59eaa8332343c0b063e8fc69586edeaec387ea03b5dc250a9b8e8c8ddc8d0ed",
+    "modification": "White background for contrast in light/dark diagrams; logo paths unchanged."
+  },
+  {
+    "id": "guardduty",
+    "file": "guardduty.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-GuardDuty.svg",
+    "sha256": "5c32c22f92c78e7d6e0a02f1db0e65671f1a166aee94dbc9aff42f237fb652e0"
+  },
+  {
+    "id": "iam",
+    "file": "iam.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Identify-and-Access-Management_IAM.svg",
+    "sha256": "b6db7d9e703a135ed5d9768a743aa2e9c7c55b7f7a469dabb64e2baffca60a88"
+  },
+  {
+    "id": "inspector",
+    "file": "inspector.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Inspector.svg",
+    "sha256": "62947ef967451eb258c87dd97ddff4784c8353ea9a1716338bb00fffbb7342ff"
+  },
+  {
+    "id": "kms",
+    "file": "kms.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Key-Management-Service.svg",
+    "sha256": "cd990ab3f139a525f77ca040fa2c9d278829ac3ad37cd9e5230e5df007a83c04"
+  },
+  {
+    "id": "kubernetes",
+    "file": "kubernetes.svg",
+    "url": "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg",
+    "sha256": "aba51863e22903d8b44662ed9a7100b0d7b8977251662a608c8f8b71f5964279"
+  },
+  {
+    "id": "lambda",
+    "file": "lambda.svg",
+    "url": "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg",
+    "sha256": "53b408426985e922c13d340c89c28bde1ea8b4db7e04787cac5454735cccf504"
+  },
+  {
+    "id": "macie",
+    "file": "macie.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Macie.svg",
+    "sha256": "46a1684a16cb48bbb6e70921048ba87716065907327a402578f6539e62646b3e"
+  },
+  {
+    "id": "mobile",
+    "file": "mobile.svg",
+    "url": "https://icons.d2lang.com/tech/052-smartphone-3.svg",
+    "sha256": "c2d3a266663c547744b164e9b6883dcc9567ccb6418d4400180068fad07f8ccb"
+  },
+  {
+    "id": "mongodb",
+    "file": "mongodb.svg",
+    "url": "https://icons.d2lang.com/dev/mongodb.svg",
+    "sha256": "df7a6d2e601fa75437cc0f49f553f56c0d5ecac605ee5bcdece472eec80526d1"
+  },
+  {
+    "id": "msk",
+    "file": "msk.svg",
+    "url": "https://icons.d2lang.com/aws/Analytics/Amazon-Managed-Streaming-for-Kafka.svg",
+    "sha256": "2f1dc728d1c4982e2a160207ea079244a450d83be23946fb43d648e966607077"
+  },
+  {
+    "id": "mysql",
+    "file": "mysql.svg",
+    "url": "https://icons.d2lang.com/dev/mysql.svg",
+    "sha256": "9b53df11d210f23761ffb58d4459d9a1b851172ab8731914ea0a5ca326e00f9e"
+  },
+  {
+    "id": "nat",
+    "file": "nat.svg",
+    "url": "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC_NAT-Gateway_light-bg.svg",
+    "sha256": "1bdca456ad411c7aa399e7ca9b35a5fff41b5e2a8439abe8160a6f4b105d7b5e",
+    "sourceSha256": "5b96eb9d99e35377f2422e265f1a0576a4c8f80970aa6c13f9488710e9e23bf9",
+    "modification": "White background for contrast in light/dark diagrams; logo paths unchanged."
+  },
+  {
+    "id": "nginx",
+    "file": "nginx.svg",
+    "url": "https://icons.d2lang.com/dev/nginx.svg",
+    "sha256": "9f89ac61e06217d5bc637f908e6194a8d871652374a4233c3b015bc867331131"
+  },
+  {
+    "id": "organizations",
+    "file": "organizations.svg",
+    "url": "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-Organizations.svg",
+    "sha256": "6c4510ce9728a161db08c91c1a1ef8d097f3d77fb7a44c6f98f7803c6a3b8891"
+  },
+  {
+    "id": "postgresql",
+    "file": "postgresql.svg",
+    "url": "https://icons.d2lang.com/dev/postgresql.svg",
+    "sha256": "b629cb7e0251e2c22b5b35182ff26f1e5cc620d036f873a4fddd30a569dd461b"
+  },
+  {
+    "id": "rds",
+    "file": "rds.svg",
+    "url": "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg",
+    "sha256": "b90467c4047636e3769efd0515d059917b8cdc6909e6da6bfd7347a7fbccb821"
+  },
+  {
+    "id": "redis",
+    "file": "redis.svg",
+    "url": "https://icons.d2lang.com/dev/redis.svg",
+    "sha256": "a468661f2928a2f4461eec7bd71eb9dd99726738a0912eb4fb6a82494d79f08d"
+  },
+  {
+    "id": "route53",
+    "file": "route53.svg",
+    "url": "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-Route-53.svg",
+    "sha256": "fb5a29f16e8d93954fe39342dec28df70da1942a1729f4593ce9abb41eab99b1"
+  },
+  {
+    "id": "s3",
+    "file": "s3.svg",
+    "url": "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg",
+    "sha256": "33b02f474419040cb30eef4fad90f18659819f95d23a9bfaa5d57449f832a0fe"
+  },
+  {
+    "id": "secrets-manager",
+    "file": "secrets-manager.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg",
+    "sha256": "03a77b5de9f0d3e3ca2ca39918b431a7cad61d989a416d836e3790ea9b1890a1"
+  },
+  {
+    "id": "security-hub",
+    "file": "security-hub.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Security-Hub.svg",
+    "sha256": "58e6834cbb2177caea3a4fdf085b4e320b548959efbce1e98587bf0526ff4551"
+  },
+  {
+    "id": "server",
+    "file": "server.svg",
+    "url": "https://icons.d2lang.com/tech/022-server.svg",
+    "sha256": "90f716a07984816da6781e691406287c246499accae1fa04747ef7e90682df4c"
+  },
+  {
+    "id": "shield",
+    "file": "shield.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Shield.svg",
+    "sha256": "119d70bcd50aea6c49167351ec9626c3787be6c0744119aea1ffa9cf36c55eca"
+  },
+  {
+    "id": "sns",
+    "file": "sns.svg",
+    "url": "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Notification-Service-SNS.svg",
+    "sha256": "42f902ace6042942f505436d5eee4419a8415c5d5dd2abd5e4c2ddfabdf8c1d2"
+  },
+  {
+    "id": "sqs",
+    "file": "sqs.svg",
+    "url": "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg",
+    "sha256": "b5c6f06c315a0af615e3421883acf70a4612b4505270128bc7ca44c617cc1113"
+  },
+  {
+    "id": "step-functions",
+    "file": "step-functions.svg",
+    "url": "https://icons.d2lang.com/aws/Application%20Integration/AWS-Step-Functions.svg",
+    "sha256": "c2fd46faae8e4e079b0be45119d5719345f8cdfc0ab09e482120c61ae07d6c28"
+  },
+  {
+    "id": "sts",
+    "file": "sts.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Identity-and-Access-Management-IAM_AWS-STS_light-bg.svg",
+    "sha256": "2f753584ac5ec076b4e776ceed9dbba29389720e55e8fa0064027338fa6b1fe5",
+    "sourceSha256": "b24bec72cc00ccd85da726c9b41e70cd92d2a9179af9a4d2cbd8551a7bc29b09",
+    "modification": "White background for contrast in light/dark diagrams; logo paths unchanged."
+  },
+  {
+    "id": "systems-manager",
+    "file": "systems-manager.svg",
+    "url": "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-Systems-Manager.svg",
+    "sha256": "3d61e515203b567e28fd33b047183cf82de7b97fbdd1420c90c9d78cc8f28b7e"
+  },
+  {
+    "id": "vpc",
+    "file": "vpc.svg",
+    "url": "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC.svg",
+    "sha256": "46d18bcce0081fd3878258bfb29f4d9bfe2c5e06e4ca5acb07b42e7122e5b759"
+  },
+  {
+    "id": "waf",
+    "file": "waf.svg",
+    "url": "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-WAF.svg",
+    "sha256": "9eb23bb728d59577cc1500322753a96a3f1f1348bf9ba61ed21c8dab1ff5a00d"
+  },
+  {
+    "id": "xray",
+    "file": "xray.svg",
+    "url": "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg",
+    "sha256": "0b85809d84ba09b410d2f06d6e1805d280340e00b24df7923452ad0bc6fa7701"
+  }
+]

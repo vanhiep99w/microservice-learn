@@ -107,6 +107,7 @@ graph LR
 
 - Bài cần đối chiếu nhiều code dùng code fence có metadata `source="snippets/tên-artifact.ext"` và link `[Đọc source](?source=tên-file-không-đuôi&snapshot=article&file=snippets%2Ftên-artifact.ext)`; remark plugin chuyển link thành `SourceRef` của docs-kit.
 - Có thể thêm `&lines=1-4` để highlight. Không khai báo `region` nếu pipeline chưa có region đó.
+- Icon D2: chọn đúng sản phẩm trong `https://icons.d2lang.com/`, khai báo `node.icon` bằng URL catalog. Vendor SVG tin cậy và SHA-256 trong `diagrams/icons/manifest.json`; `remarkD2Icons` + `assetsRoot` nhúng icon lúc build. Không gán một logo cho node gộp nhiều sản phẩm hoặc dùng AWS logo cho thành phần generic. Xem hướng dẫn README.
 - docs-kit 0.6.0: chỉ opt-in `interactive` cho sơ đồ lớn; `mode=steps` khi cần diễn tiến trạng thái. Mặc định vẫn tĩnh; không bật toàn site. Viewer lazy-load khi bấm Explore, không chạy compiler trong browser.
 - Node D2 có thể dùng `link: "./?source=..."` hoặc `node.link: "./?source=..."` để mở SourceExplorer tại chỗ qua `D2SourceLinks`. Dùng query URL percent-encoded trong nháy kép; `prepare-content` validate cùng manifest như Markdown SourceRef.
 - Trích đoạn phải giữ code nguyên bản, có language hợp lệ, không trùng artifact path trong một bài. Không ngụ ý các snippets độc lập là một project chạy được.

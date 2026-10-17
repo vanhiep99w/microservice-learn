@@ -145,6 +145,11 @@ bff -> services.user
 bff -> services.notification
 services.order.db -> kafka: Outbox / Relay
 kafka -> consumers: Subscribe
+# Icons: https://icons.d2lang.com/
+services.order.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+services.product.db.icon: "https://icons.d2lang.com/dev/mongodb.svg"
+services.payment.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+services.user.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 ### Flow "Đặt hàng" — các pattern phối hợp

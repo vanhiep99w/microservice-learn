@@ -36,6 +36,7 @@
 - [11. Case Study — Thiết kế kiến trúc Microservice từ đầu](#11-case-study--thiết-kế-kiến-trúc-microservice-từ-đầu)
 - [Website docs và quy ước D2 / SourceExplorer](#website-docs-và-quy-ước-d2--sourceexplorer)
   - [D2 — sơ đồ dạng text, render lúc build](#d2--sơ-đồ-dạng-text-render-lúc-build)
+  - [Icon D2 — AWS và công nghệ được hỗ trợ](#icon-d2--aws-và-công-nghệ-được-hỗ-trợ)
   - [D2 tương tác — zoom, steps và liên kết source](#d2-tương-tác--zoom-steps-và-liên-kết-source)
   - [SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài](#sourceexplorer--đối-chiếu-nhiều-đoạn-code-trong-cùng-bài)
 - [Tham khảo](#-tham-khảo)
@@ -243,6 +244,26 @@ client -> order -> db
 - `npm run check-diagrams` render và kiểm tra tất cả D2 trong tài liệu gốc, kể cả các bài tổng hợp không publish riêng. Cache dùng `.next/cache/docs-kit/d2`, không commit vào Git.
 - `npm run diagrams:inventory` liệt kê các block Mermaid / ASCII candidate theo file, dòng và heading; `npm run diagrams:inventory -- --json` xuất toàn bộ inventory kèm source hash. Candidate chỉ là gợi ý rà soát: cây thư mục, bảng và prose có mũi tên cũng có thể được nhận diện, không nên tự động chuyển hàng loạt.
 
+### Icon D2 — AWS và công nghệ được hỗ trợ
+
+Các sơ đồ dùng icon từ [catalog chính thức của D2](https://icons.d2lang.com/) cho thành phần có danh tính rõ ràng: AWS compute/network/data/security/observability/CI-CD, PostgreSQL, Redis, MongoDB, MySQL, Docker, Kubernetes, GitHub, NGINX và một số thành phần generic như mobile/server/database.
+
+````markdown
+```d2 title="AWS lưu trữ object"
+client: Client
+bucket: S3 Bucket {shape: cylinder}
+client -> bucket: Upload
+bucket.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+```
+````
+
+- Giữ URL catalog trong tài liệu gốc để source D2 vẫn dùng được ngoài website. Chỉ thêm thuộc tính `node.icon`; không thay nhãn, shape, ranh giới hay chiều mũi tên vì mục đích trang trí.
+- Build dùng `remarkD2Icons` trước `remarkD2`: chuyển URL đã đăng ký sang file local trong `diagrams/icons/`, rồi docs-kit nhúng **data URL vào SVG light/dark** qua `assetsRoot`. Đọc trang và tải SVG không cần gọi icon CDN; build không tải icon từ mạng.
+- [Manifest icon](diagrams/icons/manifest.json) ghi URL nguồn, file local và SHA-256. Một số icon nét mảnh/đơn sắc có nền trắng để rõ ở dark mode, không đổi đường nét/màu logo; manifest ghi thêm thay đổi và hash bản nguồn. Muốn thêm icon mới: chọn đúng URL trong catalog, tải SVG tin cậy vào thư mục này, thêm manifest tương ứng rồi chạy tests/check-diagrams/build/typecheck. URL D2 catalog chưa được vendor sẽ làm build thất bại thay vì âm thầm phụ thuộc mạng.
+- Không gán logo AWS cho API Gateway/database generic, không dùng logo MSK cho Kafka tự quản, không chọn một logo đại diện cho node gộp nhiều sản phẩm hoặc lựa chọn. Catalog có tên sản phẩm cũ; không tự suy ra chúng tương đương dịch vụ mới. Kubernetes dùng logo `azure/_Companies/Kubernetes.svg` trong catalog, không biểu thị triển khai trên Azure.
+- Icon là tài nguyên bên thứ ba, không phải source code của repository. Giữ nguyên nhận diện và quyền của chủ sở hữu: [AWS Architecture Icons](https://aws.amazon.com/architecture/icons/), [Devicon](https://github.com/devicons/devicon), [Azure Architecture Icons](https://learn.microsoft.com/azure/architecture/icons/). URL nguồn từng asset nằm trong manifest. Chỉ dùng SVG đã review; không nhận SVG/icon URL từ input công khai.
+- Tests kiểm tra hash, file/URL trùng, nội dung SVG chủ động hoặc tham chiếu ảnh ngoài; các bản render được kiểm tra có icon nhúng sẵn. Không đổi cây thư mục/logs/payload sang diagram chỉ để gắn icon.
+
 ### D2 tương tác — zoom, steps và liên kết source
 
 Từ docs-kit 0.6.0, website đăng ký cả `D2Diagram` và `D2InteractiveDiagram`. **Mặc định vẫn là sơ đồ tĩnh**; chỉ thêm viewer ở nơi giúp đọc rõ hơn:
@@ -271,7 +292,7 @@ client -> order
 - `mode=steps` tự bật tương tác. Root là trạng thái ban đầu; mỗi entry trong `steps: { ... }` kế thừa bước trước. Không autoplay khi mở bài. Bàn phím canvas: `+`, `-`, `0`; trái/phải để chuyển bước.
 - Không có JavaScript vẫn có SVG, **All views** cho các board còn lại và **D2 source**. Giữ giải thích bằng prose để tài liệu gốc vẫn có ý nghĩa khi đọc trên GitHub.
 - Source links dùng `link: "./?source=..."` hoặc `node.link: "./?source=..."`, đặt URL trong dấu nháy kép, dùng cùng `project/snapshot/file/lines` như SourceRef. Pipeline validate các query links này trước khi sinh assets; adapter mở drawer không reload ở cùng trang. Dùng prefix `./?source=` cho D2: SDK hiện tại bỏ mất link chỉ có `?source=` khi compile. Website dùng trailing slash nên `./` vẫn trỏ đúng bài hiện tại. Giữ query URL percent-encoded, không nhúng secrets.
-- `mode=tabs` (scenarios độc lập), `mode=explorer` (layers/drill-down), `mode=animation`, override layout/theme theo fence, imports/icons local và TTF fonts cũng đã có trong package. Chưa bật đại trà vì chưa cần cho các ví dụ hiện tại; nhiều board làm tăng HTML/MDX và thời gian build. Khi thêm, xem [API và giới hạn D2 0.6.0](https://github.com/vanhiep99w/docs-kit/blob/main/docs/d2.md), dùng roots tài nguyên chuyên biệt và chạy đầy đủ kiểm tra.
+- `mode=tabs` (scenarios độc lập), `mode=explorer` (layers/drill-down), `mode=animation`, override layout/theme theo fence, imports và TTF fonts cũng đã có trong package. Chưa bật đại trà vì chưa cần cho các ví dụ hiện tại; nhiều board làm tăng HTML/MDX và thời gian build. Icons local được dùng như hướng dẫn phía trên. Khi thêm, xem [API và giới hạn D2 0.6.0](https://github.com/vanhiep99w/docs-kit/blob/main/docs/d2.md), dùng roots tài nguyên chuyên biệt và chạy đầy đủ kiểm tra.
 
 ### SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài
 

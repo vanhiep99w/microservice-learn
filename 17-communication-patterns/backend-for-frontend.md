@@ -59,6 +59,8 @@ web -> api
 mobile -> api
 iot -> api
 api -> backend
+# Icons: https://icons.d2lang.com/
+mobile.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 API chung phải chọn một contract mà tất cả client đều có thể dùng. Khi nhu cầu giữa các client lệch nhau, contract này thường trở thành một "ước chung lớn nhất": response chứa nhiều dữ liệu cho client này nhưng lại thiếu hoặc không phù hợp với client khác.
@@ -109,6 +111,8 @@ n4 -> n8
 n4 -> n9
 n6 -> n7
 n6 -> n9
+# Icons: https://icons.d2lang.com/
+n3.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Web BFF có thể dùng GraphQL để Web tự chọn field. Mobile BFF có thể dùng REST với response compact. IoT BFF có thể dùng gRPC và Protobuf để giảm kích thước message. Đây là khác biệt ở lớp trình bày; các domain service vẫn sở hữu business rule và dữ liệu của domain mình.
@@ -172,6 +176,8 @@ cart -> join
 recommend -> join
 join -> response
 response -> client
+# Icons: https://icons.d2lang.com/
+client.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Một request flow điển hình gồm các bước:
@@ -378,6 +384,8 @@ n4 -> n6
 n4 -> n7
 n5 -> n6
 n5 -> n7
+# Icons: https://icons.d2lang.com/
+n3.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Gateway chịu trách nhiệm policy edge dùng chung và route request đến đúng BFF. BFF chịu trách nhiệm dựng response của Web hoặc Mobile. Service-to-service call từ BFF đến domain service không nên vòng qua Gateway chỉ để dùng Gateway như một proxy chung.

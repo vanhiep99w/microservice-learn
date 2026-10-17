@@ -491,6 +491,8 @@ n3 -> n4
 n2 -> n5
 n4 -> n5
 n5 -> n6
+# Icons: https://icons.d2lang.com/
+n3.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 BFF có thể version public contract theo UX của client mà không buộc domain service dùng cùng hình dạng response. Tuy nhiên, BFF không xóa nhu cầu compatibility: nếu Product API rename field, cả Web BFF và Mobile BFF đều là consumer cần được kiểm tra hoặc migrate.

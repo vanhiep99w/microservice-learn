@@ -535,6 +535,8 @@ app: AWS AppConfig — Application order-service {
  staging: Environment staging { settings: "Profile settings\nDB_HOST staging-db • LOG_LEVEL INFO"; strategy: Strategy ví dụ — Linear50PercentEvery30Seconds }
  prod: Environment prod { settings: "Profile settings\nDB_HOST prod-db • LOG_LEVEL WARN"; strategy: Strategy ví dụ — Canary10Percent20Minutes }
 }
+# Icons: https://icons.d2lang.com/
+app.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-App-Config.svg"
 ```
 
 Tên deployment strategies trong hình minh họa rollout policy; kiểm tra presets/custom strategy thực tế thay vì mặc định mọi tên này tồn tại sẵn.
@@ -698,6 +700,13 @@ appconfig: AWS AppConfig Data API
 ecs.agent -> appconfig
 lambda.extension -> appconfig
 eks.agent -> appconfig
+# Icons: https://icons.d2lang.com/
+ecs.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
+lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+lambda.extension.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-App-Config.svg"
+eks.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
+eks.agent.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-App-Config.svg"
+appconfig.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-App-Config.svg"
 ```
 
 Lambda cần thêm extension/layer, IAM và configuration; không mặc định có sẵn chỉ vì dùng AppConfig. EKS sidecar là container cùng Pod, hoặc app gọi SDK trực tiếp nếu chọn.
@@ -962,6 +971,8 @@ n2 -> n6: "Azure"
 n2 -> n7: "Kubernetes + GitOps"
 n7 -> n8: "Encrypt secrets trong Git"
 n7 -> n9: "Sync từ external store"
+# Icons: https://icons.d2lang.com/
+n4.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg"
 ```
 
 | Giải pháp | Loại | Dynamic Secrets | Auto Rotation | Phù hợp |
@@ -1072,6 +1083,8 @@ pod -> vault: Kubernetes Auth — ServiceAccount Token
 vault -> k8s: TokenReview / Verify identity theo auth method
 k8s -> vault: Validation result {style.stroke-dash: 5}
 vault -> pod: Vault token với policies / TTL nếu hợp lệ {style.stroke-dash: 5}
+# Icons: https://icons.d2lang.com/
+k8s.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 AppRole dùng RoleID + SecretID với TTL/num_uses theo cấu hình, không mặc định SecretID luôn dùng một lần. OIDC/JWT auth verify identity/token để phát Vault token theo role/policy; cần bảo vệ bootstrap credentials.
@@ -1116,6 +1129,8 @@ vault -> pod: username v-order-abc / password random123 / lease1h — minh họa
 pod -> pg: 4. Connect bằng temporary credentials
 pg -> pod: Connected {style.stroke-dash: 5}
 vault -> pg: 5. Lease hết / Revoke — revoke role theo DB plugin
+# Icons: https://icons.d2lang.com/
+pg.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 ### 8.6. Vault với Kubernetes
@@ -1197,6 +1212,8 @@ sm: AWS Secrets Manager
 app -> sm: GetSecretValue — IAM-authorized
 sm.note: KMS encryption / Versioning / Rotation theo cấu hình
 sm -> app: Secret value {style.stroke-dash: 5}
+# Icons: https://icons.d2lang.com/
+sm.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg"
 ```
 
 ```python source="snippets/9-1-aws-secrets-manager.py"
@@ -1236,6 +1253,10 @@ rotation -> sm: 3. Stage / Promote secret version sau validation
 app -> sm: 4. Refresh secret bằng SDK/cache policy
 sm -> app: New secret version {style.stroke-dash: 5}
 app.note: Reinitialize / Reconnect pool nếu cần
+# Icons: https://icons.d2lang.com/
+sm.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg"
+rotation.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+rds.icon: "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg"
 ```
 
 Flow rút gọn; rotation implementations có create/set/test/finish stages, single/alternating user strategies. Không restart được chỉ khi app/agent thực sự refresh credentials và xử lý connections cũ/mới, không tự động chỉ vì secret trên server đổi.
@@ -1626,6 +1647,10 @@ cluster: Kubernetes {
 aws: AWS Secrets Manager
 cluster.argo -> git: Pull / Sync
 cluster.eso -> aws: Fetch authorized secret
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
+cluster.secrets.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
+aws.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg"
 ```
 
 Không commit plaintext secrets. ESO sync và SDK refresh theo policy riêng; app nhận config/secret thay đổi còn phụ thuộc mount/env và code reload behavior.

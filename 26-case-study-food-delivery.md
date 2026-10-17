@@ -752,6 +752,9 @@ gateway: "Application API Gateway"
 internet -> cdn
 cdn -> alb
 alb -> gateway
+# Icons: https://icons.d2lang.com/
+cdn.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-CloudFront.svg"
+alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
 ```
 
 Sơ đồ dùng application API Gateway sau ALB; không ngụ ý đây là thứ tự bắt buộc của Amazon API Gateway managed. TLS nội bộ vẫn có thể dùng HTTPS/mTLS theo threat model.
@@ -873,6 +876,9 @@ healthy -> tick: "Chu kỳ tiếp theo"
 unhealthy -> count
 count -> tick: "Chưa đủ"
 count -> remove: "Đủ 3 lần"
+# Icons: https://icons.d2lang.com/
+tick.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+remove.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-Cloud-Map.svg"
 ```
 
 Sơ đồ thể hiện vòng kiểm tra và ngưỡng của ví dụ. Khi triển khai thật, ECS Service scheduler chịu trách nhiệm thay task; Cloud Map quản lý registration/health, không tự gọi ECS để tạo task thay thế.
@@ -1084,6 +1090,12 @@ stores: Database per Service {
 }
 bus: "Kafka — orders.* / payments.* / dispatch.*"
 s3: "S3 — GPS Archive / Images"
+# Icons: https://icons.d2lang.com/
+stores.s1.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+stores.s3.db.icon: "https://icons.d2lang.com/dev/redis.svg"
+stores.s6.db.icon: "https://icons.d2lang.com/dev/redis.svg"
+stores.s8.db.icon: "https://icons.d2lang.com/dev/mongodb.svg"
+stores.s9.db.icon: "https://icons.d2lang.com/dev/mongodb.svg"
 ```
 
 Mỗi service sở hữu dữ liệu riêng; chọn PostgreSQL không tự bảo đảm PCI-DSS compliance cho Payment.
@@ -1250,6 +1262,8 @@ n2.n8 -> n3.n9
 n3.n9 -> n3.n10
 n3.n11 -> n3.n12
 n3.n12 -> n3.n10
+# Icons: https://icons.d2lang.com/
+n1.n6.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 **Ví dụ thực tế:** ứng dụng người dùng đọc ETA từ Redis Hash projection thay vì query trực tiếp Redis Streams. Merchant cập nhật menu -> CDC -> Kafka -> Search consumer -> OpenSearch index cập nhật trong 1-3 giây.
@@ -1665,6 +1679,8 @@ dispatch -> routing
 routing -> fallback
 fallback -> redis
 redis -> result
+# Icons: https://icons.d2lang.com/
+redis.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 - Dispatch Service lưu **ETA trung bình theo zone + khoảng cách** mỗi 15 phút vào Redis (pre-warm).
@@ -1847,6 +1863,9 @@ n6 -> n8
 n7 -> n8
 n6 -> n9
 n9 -> n10
+# Icons: https://icons.d2lang.com/
+n5.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
+n7.icon: "https://icons.d2lang.com/aws/Developer%20Tools/AWS-X-Ray.svg"
 ```
 
 ### 6.2. Metrics & SLO
@@ -2333,6 +2352,9 @@ n4 -> n5
 n5 -> n6
 n5 -> n7
 n5 -> n8
+# Icons: https://icons.d2lang.com/
+n2.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-CloudFront.svg"
+n3.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-WAF.svg"
 ```
 
 **Thiết kế mạng:**
@@ -2469,6 +2491,8 @@ ingress -> core.s0
 ingress -> core.s1
 ingress -> core.s2
 ingress -> core.s3
+# Icons: https://icons.d2lang.com/
+core.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
 ```
 
 - **Ưu điểm:**
@@ -2500,6 +2524,8 @@ ingress -> core.s0
 ingress -> core.s1
 ingress -> core.s2
 ingress -> core.s3
+# Icons: https://icons.d2lang.com/
+core.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
 ```
 
 - **Ưu điểm:**
@@ -2535,6 +2561,9 @@ triggers: SQS / SNS / EventBridge triggers
 lambda: Lambda { notification: Notification; image: Image Resize }
 triggers -> lambda.notification
 triggers -> lambda.image
+# Icons: https://icons.d2lang.com/
+core.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
+lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 - **Ưu điểm:**

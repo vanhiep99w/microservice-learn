@@ -150,6 +150,8 @@ monolith: ShopVN Monolith {
  db: Single PostgreSQL {shape: cylinder}
  modules -> db
 }
+# Icons: https://icons.d2lang.com/
+monolith.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 ---
@@ -692,6 +694,9 @@ gateway: "Application API Gateway"
 internet -> cdn
 cdn -> alb
 alb -> gateway
+# Icons: https://icons.d2lang.com/
+cdn.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-CloudFront.svg"
+alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
 ```
 
 Sơ đồ dùng application API Gateway sau ALB; không ngụ ý đây là thứ tự bắt buộc của Amazon API Gateway managed. TLS nội bộ vẫn có thể dùng HTTPS/mTLS theo threat model.
@@ -812,6 +817,9 @@ healthy -> tick: "Chu kỳ tiếp theo"
 unhealthy -> count
 count -> tick: "Chưa đủ"
 count -> remove: "Đủ 3 lần"
+# Icons: https://icons.d2lang.com/
+tick.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+remove.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-Cloud-Map.svg"
 ```
 
 Sơ đồ thể hiện vòng kiểm tra và ngưỡng của ví dụ. Khi triển khai thật, ECS Service scheduler chịu trách nhiệm thay task; Cloud Map quản lý registration/health, không tự gọi ECS để tạo task thay thế.
@@ -843,6 +851,8 @@ after: "Deregister Instance2 crash\nInstance1 10.0.1.10 / Instance3 10.0.3.30"
 recovery: "Recovery — Register Instance4 mới\nInstance1 10.0.1.10 / Instance3 10.0.3.30 / Instance4 10.0.4.40"
 before -> after
 after -> recovery
+# Icons: https://icons.d2lang.com/
+before.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-Cloud-Map.svg"
 ```
 
 Deregistration không xóa cache DNS đã cấp ngay lập tức; còn TTL/client caching và cơ chế health/discovery của workload.
@@ -1011,6 +1021,10 @@ stores: Database per Service {
 }
 bus: "Kafka — orders.* / payments.* / catalog.*"
 s3: "S3 — Images / Media"
+# Icons: https://icons.d2lang.com/
+stores.s3.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+stores.s8.db.icon: "https://icons.d2lang.com/dev/mongodb.svg"
+stores.s9.db.icon: "https://icons.d2lang.com/dev/mongodb.svg"
 ```
 
 Mỗi service sở hữu dữ liệu riêng; chọn PostgreSQL không tự bảo đảm PCI-DSS compliance cho Payment.
@@ -1147,6 +1161,8 @@ n2.n8 -> n3.n9
 n3.n9 -> n3.n10
 n3.n11 -> n3.n12
 n3.n12 -> n3.n10
+# Icons: https://icons.d2lang.com/
+n1.n6.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 ### 4.4. Event Sourcing — Decision
@@ -1553,6 +1569,8 @@ gateway -> search
 search -> fallback: "Dependency call bị từ chối"
 fallback -> redis
 redis -> result
+# Icons: https://icons.d2lang.com/
+redis.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 **Cách chuẩn bị cache (pre-warm):**
@@ -1987,6 +2005,8 @@ n3.n10 -> n4.n12
 n3.n11 -> n4.n12
 n3.n10 -> n4.n13
 n4.n13 -> n4.n14
+# Icons: https://icons.d2lang.com/
+n3.n9.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
 ```
 
 **Luồng đúng theo tín hiệu:**
@@ -2473,6 +2493,9 @@ n3 -> n4
 n4 -> n5
 n5 -> n6
 n5 -> n7
+# Icons: https://icons.d2lang.com/
+n2.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-CloudFront.svg"
+n3.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-WAF.svg"
 ```
 
 **Thiết kế mạng:**
@@ -2599,6 +2622,8 @@ ingress -> core.s0
 ingress -> core.s1
 ingress -> core.s2
 ingress -> core.s3
+# Icons: https://icons.d2lang.com/
+core.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
 ```
 
 - **Ưu điểm:**
@@ -2630,6 +2655,8 @@ ingress -> core.s0
 ingress -> core.s1
 ingress -> core.s2
 ingress -> core.s3
+# Icons: https://icons.d2lang.com/
+core.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
 ```
 
 - **Ưu điểm:**
@@ -2663,6 +2690,9 @@ triggers: SQS / SNS / EventBridge triggers
 lambda: Lambda { notification: Notification; image: Image Resize }
 triggers -> lambda.notification
 triggers -> lambda.image
+# Icons: https://icons.d2lang.com/
+core.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
+lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 - **Ưu điểm:**

@@ -112,6 +112,8 @@ mobile -> user
 mobile -> order
 mobile -> product
 mobile -> review
+# Icons: https://icons.d2lang.com/
+mobile.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Client biết từng service URL/port, nhiều round-trips, cross-cutting logic dễ lặp và thiếu một điểm monitor; URL thay đổi buộc client cập nhật.
@@ -135,6 +137,8 @@ n2 -> n4
 n2 -> n5
 n2 -> n6
 n2 -> n7
+# Icons: https://icons.d2lang.com/
+n3.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 | Chức năng | Mô tả | Chi tiết |
@@ -170,6 +174,8 @@ cart -> join
 recommend -> join
 join -> response
 response -> client
+# Icons: https://icons.d2lang.com/
+client.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Điểm pattern-level cần chú ý: gateway gọi các service **song song** (parallel) thay vì tuần tự để giảm latency, và cần chính sách **partial failure** — nếu Recommendation Service lỗi, trả về phần còn lại kèm trường rỗng thay vì lỗi cả trang chủ:
@@ -241,6 +247,8 @@ iot -> ibff
 wbff -> services
 mbff -> services
 ibff -> services
+# Icons: https://icons.d2lang.com/
+mobile.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Điểm mấu chốt của BFF không phải là "nhiều gateway" mà là **ownership**: Web BFF do team web viết bằng Node.js, Mobile BFF do team mobile viết bằng Kotlin — mỗi team tự quyết định API hình dạng thế nào cho phù hợp client của mình.

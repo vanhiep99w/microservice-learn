@@ -5,6 +5,7 @@ import { visit } from 'unist-util-visit';
 import { parser } from './source-examples.mjs';
 import { unified } from 'unified';
 import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
+import { d2IconAssetsRoot, remarkD2Icons } from './d2-icons.mjs';
 
 export async function checkDiagrams(root = '.') {
   const files = [];
@@ -16,7 +17,8 @@ export async function checkDiagrams(root = '.') {
       }
     }
   }
-  const processor = unified().use(remarkD2, {
+  const processor = unified().use(remarkD2Icons).use(remarkD2, {
+    assetsRoot: d2IconAssetsRoot,
     cacheDir: '.next/cache/docs-kit/d2',
     concurrency: 1,
     defaultCaption: 'Sơ đồ',

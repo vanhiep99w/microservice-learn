@@ -199,6 +199,8 @@ cluster: Kubernetes Cluster {
 }
 kubectl -> cluster.control.api
 dashboard -> cluster.control.api
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 ### 3.2. Control Plane
@@ -641,6 +643,10 @@ cluster: Kubernetes Cluster {
  monitoring: Namespace monitoring { prometheus: Prometheus; grafana: Grafana; jaeger: Jaeger }
  prod.order -> infra.postgres: postgres.infra.svc.cluster.local — TCP5432
 }
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
+cluster.infra.postgres.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+cluster.infra.redis.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 PostgreSQL dùng PostgreSQL/TCP protocol, không phải URL `http://...:5432`. Namespace không tự chặn network cross-namespace; dùng RBAC/NetworkPolicy để enforce isolation.
@@ -1342,6 +1348,8 @@ cluster: Kubernetes Cluster {
  control -> payment.proxy: Push config
  order.proxy <-> payment.proxy: Service traffic
 }
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 App vẫn gọi `http://payment-service:8084`. Các tính năng retry/circuit breaking phụ thuộc proxy và policy đã cấu hình; không phải mọi Service Mesh đều cung cấp chúng giống nhau.
@@ -1551,6 +1559,9 @@ cluster: "AWS EKS\nWorkers5 × m5.xlarge 4vCPU/16GB\nCluster Autoscaler3–10 No
  ingress.nginx -> production.product: /products
 }
 alb -> cluster.ingress.nginx
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
+cluster.ingress.nginx.icon: "https://icons.d2lang.com/dev/nginx.svg"
 ```
 
 Deploy flow: developer git push → GitHub Actions build multi-stage image → push ECR → `helm upgrade order-service --set image.tag=${GIT_SHA} -f values-production.yaml` → Kubernetes rolling update. Database StatefulSets cần replication/backup/operator riêng; chỉ đặt replicas=3 không tự có HA database. Kiểm tra LB/controller integration thực tế; topology là minh họa.
@@ -1676,6 +1687,9 @@ n5 -> n6
 n6 -> n7
 n6 -> n8
 n6 -> n9
+# Icons: https://icons.d2lang.com/
+n3.icon: "https://icons.d2lang.com/dev/docker.svg"
+n5.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 ---

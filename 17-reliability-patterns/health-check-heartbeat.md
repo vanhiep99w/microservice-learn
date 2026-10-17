@@ -467,6 +467,8 @@ healthy -> livefail
 livefail -> restart
 restart -> startup
 startup -> return
+# Icons: https://icons.d2lang.com/
+remove.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 ```
 
 Đây là kịch bản minh họa, không phải thứ tự đồng bộ bắt buộc: readiness và liveness được đánh giá độc lập theo cấu hình probes.

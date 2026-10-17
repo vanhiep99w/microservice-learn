@@ -75,6 +75,15 @@ chaos: Chaos Engineering {
  fis: AWS FIS — Managed Experiments
  gameday: Game Day — Planned Failure Drills
 }
+# Icons: https://icons.d2lang.com/
+scaling.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+scaling.dynamo.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+resilience.dlq.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+dr.dns.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-Route-53.svg"
+dr.s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+dr.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+dr.dynamo.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+scaling.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-Auto-Scaling.svg"
 ```
 
 Multi-AZ không tự bảo đảm99.99% availability cho cả ứng dụng; SLO còn phụ thuộc service, cấu hình và đường request end-to-end. Replication không thay thế backup độc lập và restore drill.
@@ -338,6 +347,8 @@ lambda: Lambda Concurrency {
  reserved: Reserved — ví dụ Payment200 / reservation và upper cap
  provisioned: Provisioned — pre-warm execution environments / billed
 }
+# Icons: https://icons.d2lang.com/
+lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 Account concurrency ví dụ1.000 có thể khác theo account/region/quota. Reserved không phải pre-warming; Provisioned giảm cold-start cho lượng provisioned, không loại bỏ mọi cold-start/initialization khi spillover hoặc deployment. Burst/scaling rates phụ thuộc hiện hành, không dùng các mốc3.000/1.000/+500phút cũ như guarantee.
@@ -453,6 +464,16 @@ region: ap-southeast-1 {
  b.aurora -- storage
  c.aurora -- storage
 }
+# Icons: https://icons.d2lang.com/
+region.a.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+region.a.redis.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+region.b.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+region.b.redis.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+region.c.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+region.c.redis.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+region.a.nat.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC_NAT-Gateway_light-bg.svg"
+region.b.nat.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC_NAT-Gateway_light-bg.svg"
+region.c.nat.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC_NAT-Gateway_light-bg.svg"
 ```
 
 Aurora instances trong cùng cluster dùng shared distributed storage; không diễn tả readers như một chain writer→reader→reader replication. NAT per-AZ phục vụ egress, cần route tables/policy phù hợp.
@@ -496,6 +517,14 @@ route -> dr.cluster: Secondary khi DR ready / Policy failover
 primary.aurora -> dr.aurora: Global Database async replication
 primary.dynamo <-> dr.dynamo: Global Tables theo consistency/topology đã chọn
 primary.s3 -> dr.s3: Cross-Region Replication
+# Icons: https://icons.d2lang.com/
+route.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-Route-53.svg"
+primary.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+primary.dynamo.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+primary.s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+dr.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+dr.dynamo.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+dr.s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
 ```
 
 Replication lag/RPO tùy dịch vụ và cấu hình, không bảo đảm mọi async replica luôn<1s. DNS failover không tự promote DB hay tạo compute; cần DR readiness/orchestration riêng.
@@ -766,6 +795,10 @@ bulkheads: AWS Bulkhead Layers {
   cache: Separate critical ElastiCache clusters
  }
 }
+# Icons: https://icons.d2lang.com/
+bulkheads.infra.lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+bulkheads.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
+bulkheads.db.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
 ```
 
 ### 4.4. Rate Limiting trên AWS
@@ -840,6 +873,9 @@ db -> fresh: Success
 db -> redis: Fail / Timeout
 redis -> cached: Cache Hit
 redis -> s3: Cache Miss
+# Icons: https://icons.d2lang.com/
+redis.icon: "https://icons.d2lang.com/dev/redis.svg"
+s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
 ```
 
 ---
@@ -1282,6 +1318,14 @@ primary.aurora -> dr.aurora: Global DB — Async
 primary.dynamo <-> dr.dynamo: Global Tables
 primary.s3 -> dr.s3: Cross-Region Replication
 primary.secrets -> dr.secrets: Secret replication
+# Icons: https://icons.d2lang.com/
+primary.aurora.icon: "https://icons.d2lang.com/aws/Database/Amazon-Aurora.svg"
+primary.dynamo.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+primary.redis.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+primary.s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+primary.secrets.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg"
+dr.dynamo.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+dr.s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
 ```
 
 Pilot Light flow minh họa: health failure → Step Functions/Lambda promote DB, scale ECS từ0 lênN, tạo/warm cache, verify readiness rồi đổi DNS về DR ALB. Redis trong ví dụ không cross-region replicate, không phải mọi ElastiCache deployment đều bắt buộc như vậy. RTO10–30phút là mục tiêu cần kiểm nghiệm.
@@ -1362,6 +1406,9 @@ alarm -> event
 event -> workflow
 workflow -> ready
 ready -> route
+# Icons: https://icons.d2lang.com/
+health.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-Route-53.svg"
+workflow.icon: "https://icons.d2lang.com/aws/Application%20Integration/AWS-Step-Functions.svg"
 ```
 
 Control-plane automation và DNS failover phải được phối hợp/config riêng. DNS/cache TTL khiến traffic switch không tức thời; không chuyển users vào DR chưa sẵn sàng.
@@ -1393,6 +1440,8 @@ edge -> api -> services
 services -- data: Theo ownership / Query needs
 services -- async: Events / Queue work
  data -- dr: Replication / Recovery
+# Icons: https://icons.d2lang.com/
+async.bridge.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
 ```
 
 Auto Scaling ví dụ CPU target70%, scale-out cooldown60s, scale-in300s. Các proxy/CB numbers là logical policy, không mặc định mọi knob được Service Connect expose. DB failover~30s, retry counts, concurrency và quotas không phải SLA; đo/kiểm chứng cấu hình thực tế.

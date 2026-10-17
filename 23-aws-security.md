@@ -126,6 +126,12 @@ eks: EKS IRSA {
  pod -> sa -> sts -> role
 }
 lambda: Lambda Function { code: Function Code; role: Execution Role — AWS APIs / Logs; code -> role }
+# Icons: https://icons.d2lang.com/
+ecs.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+eks.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
+eks.sa.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
+lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+eks.role.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Identify-and-Access-Management_IAM.svg"
 ```
 
 Role permissions và trust policy khác nhau. IRSA role chỉ được assume khi token/trust conditions match SA/namespace/audience; EKS Pod Identity là một lựa chọn khác. Prefer least-privilege role theo workload, không dùng chung node role rộng cho mọi Pod.
@@ -284,6 +290,9 @@ review: "Review missing/rare paths / Test / Apply least privilege"
 trail -> analyzer
 analyzer -> policy
 policy -> review
+# Icons: https://icons.d2lang.com/
+trail.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-CloudTrail.svg"
+analyzer.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Identify-and-Access-Management_IAM.svg"
 ```
 
 Observed calls không bao phủ mọi disaster/rare path. Không cần cố cấp admin quyền rộng30–90ngày để tạo logs; bắt đầu bằng permissions tối thiểu dự kiến và refine trong môi trường phù hợp.
@@ -337,6 +346,8 @@ order -> sts: 1. AssumeRole Role B
 sts -> role: Evaluate trust + caller permissions
 sts -> order: 2. Temporary credentials scoped theo Role B {style.stroke-dash: 5}
 order -> s3: 3. Access S3 với temporary credentials
+# Icons: https://icons.d2lang.com/
+sts.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Identity-and-Access-Management-IAM_AWS-STS_light-bg.svg"
 ```
 
 Role B trust phải chỉ định principal/conditions thích hợp; access có thể cần cả identity/resource/KMS policies, không chỉ một `s3:Get*` rộng.
@@ -383,6 +394,8 @@ pool -> client: Confirmation / Verification challenge theo flow {style.stroke-da
 client -> pool: Confirm / Sign In
 pool.note: Email/Phone verification • Password policy • MFA TOTP/SMS theo cấu hình
 pool -> client: ID / Access / Refresh tokens theo auth flow {style.stroke-dash: 5}
+# Icons: https://icons.d2lang.com/
+pool.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Cognito.svg"
 ```
 
 User Pools có thể tích hợp Google/Facebook/Apple hoặc SAML/OIDC providers; signup verification và MFA là hai mục đích khác nhau, không gọi mọi confirmation code là MFA.
@@ -472,6 +485,9 @@ user -> client: JWT tokens {style.stroke-dash: 5}
 client -> identity: Present federated token
 identity -> client: Temporary AccessKeyId / SecretAccessKey / SessionToken qua IAM role mapping {style.stroke-dash: 5}
 client -> aws: Authorized AWS API calls bằng temporary credentials
+# Icons: https://icons.d2lang.com/
+user.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Cognito.svg"
+identity.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Cognito.svg"
 ```
 
 User Pool cung cấp user authentication/tokens; Identity Pool map federated identity tới AWS credential permissions. IAM/resource policies quyết định thực sự được làm gì, không phải client tự chọn quyền.
@@ -501,6 +517,9 @@ gw -> client: Response {style.stroke-dash: 5}
 client.note: Token hết hạn — ví dụ1giờ theo configuration
 client -> cognito: 3. Refresh bằng Refresh Token
 cognito -> client: New ID / Access tokens, Refresh rotation nếu bật {style.stroke-dash: 5}
+# Icons: https://icons.d2lang.com/
+cognito.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Cognito.svg"
+gw.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-API-Gateway.svg"
 ```
 
 ### 3.4. Cognito + API Gateway Integration
@@ -527,6 +546,10 @@ custom: Lambda Authorizer {
  gw -> auth
  auth -> backend: Allow theo authorizer response/API type
 }
+# Icons: https://icons.d2lang.com/
+managed.gw.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-API-Gateway.svg"
+custom.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+custom.gw.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-API-Gateway.svg"
 ```
 
 Deny/invalid phải bị chặn ở Gateway. REST API Cognito authorizer, HTTP API JWT authorizer và Lambda authorizer response/caching models khác nhau. Per-user rate limiting cần cơ chế rate enforcement riêng, không mặc định có chỉ vì dùng Lambda Authorizer.
@@ -623,6 +646,8 @@ ca: ACM Private CA — PKI issuance
 provision: Certificate provisioning / Rotation integration
 ca -> provision -> workload.envoy
 workload.envoy <-> other: mTLS — Encrypted / Mutual identity
+# Icons: https://icons.d2lang.com/
+ca.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Certificate-Manager.svg"
 ```
 
 Mô hình Envoy/App Mesh legacy được minh họa để hiểu trách nhiệm certificate. Rotation/provisioning cần integration phù hợp; CA không tự đẩy mọi certificate tới ứng dụng nếu chưa có controller/agent/policy.
@@ -743,6 +768,10 @@ sm -> app: Authorized secret value
 sm -> rotation: Trigger rotation
 rotation -> rds: Set / Test credentials
 rotation -> sm: Promote version theo rotation protocol
+# Icons: https://icons.d2lang.com/
+sm.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg"
+rotation.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+rds.icon: "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg"
 ```
 
 App phải refresh cache/pool/credentials theo policy mới nhận secret mới; không tự động luôn dùng latest password chỉ vì gọi SDK một lần lúc startup.
@@ -806,6 +835,8 @@ ssm: "Parameter Store hoặc AppConfig theo dynamic rollout needs"
 need -> sm: "Có"
 need -> config: "Không"
 config -> ssm: "Config, không secret lifecycle đặc thù"
+# Icons: https://icons.d2lang.com/
+sm.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg"
 ```
 
 So sánh cross-account sharing, tiers, KMS, rotation và pricing theo tính năng/version hiện hành; không dùng quy tắc mọi cross-account value đều chỉ có Secrets Manager hoặc mọi feature flag đều nên là Parameter Store Free tier.
@@ -937,6 +968,9 @@ key -> datakey: "GenerateDataKey theo access policy"
 datakey -> data
 key -> wrapped: "Wrap / Encrypt data key"
 wrapped -> decrypt
+# Icons: https://icons.d2lang.com/
+key.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Key-Management-Service.svg"
+decrypt.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Key-Management-Service.svg"
 ```
 
 KMS key material được bảo vệ bởi KMS; data-key usage/caching/reuse phụ thuộc dịch vụ/client. Không mặc định một data key luôn chỉ dùng đúng một object; blast radius phụ thuộc envelope-encryption design. Xóa plaintext key khỏi memory khi không còn cần.
@@ -974,6 +1008,16 @@ vpc: VPC — 10.0.0.0/16 {
  a.private -> a.isolated: Allowed DB traffic
  b.private -> b.isolated: Allowed DB traffic
 }
+# Icons: https://icons.d2lang.com/
+vpc.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC.svg"
+vpc.a.public.alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+vpc.a.isolated.rds.icon: "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg"
+vpc.a.isolated.cache.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+vpc.b.public.alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+vpc.b.isolated.rds.icon: "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg"
+vpc.b.isolated.cache.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+vpc.a.public.nat.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC_NAT-Gateway_light-bg.svg"
+vpc.b.public.nat.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC_NAT-Gateway_light-bg.svg"
 ```
 
 Một logical ALB có nodes ở nhiều subnets/AZs, không bắt buộc là2 ALBs độc lập. Public subnet có route Internet Gateway; private có outbound NAT theo policy; isolated không route Internet. Routes/SG/NACL quyết định reachability, không chỉ tên subnet.
@@ -1093,6 +1137,13 @@ private: Gateway Endpoint Path {
  s3: S3
  task -> vpce -> s3
 }
+# Icons: https://icons.d2lang.com/
+nat.task.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+nat.endpoint.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+private.task.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+private.vpce.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+private.s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+nat.nat.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC_NAT-Gateway_light-bg.svg"
 ```
 
 NAT path có processing cost phụ thuộc region/pricing; S3/DynamoDB Gateway Endpoints không có endpoint hourly/data-processing charge như Interface Endpoints. Không khẳng định AWS-to-AWS traffic qua NAT bắt buộc rời AWS backbone hay endpoint luôn nhanh hơn; VPC endpoint giảm phụ thuộc NAT/public endpoint routing và hỗ trợ policy boundary.
@@ -1118,6 +1169,9 @@ shield: "AWS Shield Standard\nLayer 3/4 DDoS protection" {
 }
 services: API Gateway / Services
 internet -> shield.edge.waf -> services
+# Icons: https://icons.d2lang.com/
+shield.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Shield.svg"
+shield.edge.waf.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-WAF.svg"
 ```
 
 **WAF Rule Groups phổ biến:**
@@ -1247,6 +1301,15 @@ n1.n8 -> n2.n9
 n2.n11 -> n3.n12
 n3.n14 -> n4.n15
 n4.n17 -> n5.n18
+# Icons: https://icons.d2lang.com/
+n1.n6.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Identify-and-Access-Management_IAM.svg"
+n2.n9.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Cognito.svg"
+n3.n12.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Key-Management-Service.svg"
+n3.n13.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Certificate-Manager.svg"
+n3.n14.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Secrets-Manager.svg"
+n5.n18.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-CloudTrail.svg"
+n5.n19.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-GuardDuty.svg"
+n1.n7.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC.svg"
 ```
 
 ### 7.3. AWS Verified Access
@@ -1296,6 +1359,11 @@ calls -> trail
 trail -> s3
 trail -> cw
 trail -> event
+# Icons: https://icons.d2lang.com/
+trail.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-CloudTrail.svg"
+s3.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+cw.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
+event.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
 ```
 
 Management/data/network events có configuration/support khác nhau; CloudTrail không tự ghi mọi API/data event nếu logging scope chưa bật. ARNs trong hình cũ rút gọn để minh họa, không phải deployment-ready ARN literals.
@@ -1329,6 +1397,9 @@ rds -> rdsrule
 rdsrule -> ok
 sg -> sgrule
 sgrule -> sgfix
+# Icons: https://icons.d2lang.com/
+public.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+rds.icon: "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg"
 ```
 
 Config evaluates compliance; auto-fix cần remediation configuration/SSM role/guardrails, không tự diễn ra vì bật rule.
@@ -1364,6 +1435,11 @@ config -> hub
 macie -> hub
 third -> hub
 hub -> event
+# Icons: https://icons.d2lang.com/
+guard.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-GuardDuty.svg"
+macie.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Macie.svg"
+hub.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-Security-Hub.svg"
+inspector.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-Inspector.svg"
 ```
 
 Findings/integration standards và security scores phụ thuộc service version, enabled standards và account/region settings.
@@ -1391,6 +1467,10 @@ lambda: "Lambda — Auto-isolate\nĐổi SG sang isolation SG\nSNS alert"
 pager: SNS → PagerDuty
 guard -> event -> lambda
 event -> pager
+# Icons: https://icons.d2lang.com/
+guard.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/Amazon-GuardDuty.svg"
+event.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 Isolation SG hạn chế kết nối mới; Security Group là stateful nên không được giả định mọi established connection sẽ bị cắt ngay lập tức.
@@ -1427,6 +1507,10 @@ client -> edge -> api -> vpc.apps
 vpc.apps.inventory -> dynamo: Authorized AWS API qua endpoint/route phù hợp
 secrets -> vpc.apps: Scoped credentials/config
 vpc.apps -- audit: Audit / Detection / Compliance
+# Icons: https://icons.d2lang.com/
+vpc.data.order.icon: "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg"
+vpc.data.payment.icon: "https://icons.d2lang.com/aws/Database/Amazon-RDS.svg"
+vpc.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC.svg"
 ```
 
 DynamoDB không phải instance nằm trong isolated subnet và không dùng `db-sg` như RDS; dùng IAM/resource policies và endpoints phù hợp. Ví dụ rate2.000req/5phút/IP, rotation30ngày và15+compliance rules là policy minh họa. GuardDuty auto-isolation chỉ xảy ra khi event/remediation workflow được cấu hình, không phải default finding behavior.

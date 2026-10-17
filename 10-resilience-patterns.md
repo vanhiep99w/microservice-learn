@@ -217,6 +217,8 @@ shape: sequence_diagram
 "C".note3: "[Client — Server]\nIdle Timeout (30-300s)"
 "C".note4: "[Client — Server]\nKhông có traffic..."
 "C" -> "S": "Connection đóng" { target-arrowhead.shape: cross }
+# Icons: https://icons.d2lang.com/
+S.icon: "https://icons.d2lang.com/tech/022-server.svg"
 ```
 
 ### 2.3. Cách chọn giá trị Timeout
@@ -1116,6 +1118,8 @@ client -> edge
 edge -> gw
 gw -> service
 service -> db
+# Icons: https://icons.d2lang.com/
+db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 ### 6.4. Ví dụ thực tế — Public API
@@ -1161,6 +1165,8 @@ redis: "Redis\nkey user:123 • count 85 • TTL 55s" {shape: cylinder}
 a -> redis
 b -> redis
 c -> redis
+# Icons: https://icons.d2lang.com/
+redis.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 Dùng Lua script hoặc thao tác atomic phù hợp để việc tăng counter và thiết lập expiry không bị tách rời.

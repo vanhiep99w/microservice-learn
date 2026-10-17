@@ -64,6 +64,15 @@ async: Service → Service Async {
  msk: MSK Kafka — Streaming / Replay
  workflow: Step Functions — Workflow Orchestration
 }
+# Icons: https://icons.d2lang.com/
+ingress.alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+sync.alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+sync.connect.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+sync.map.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-Cloud-Map.svg"
+async.sqs.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+async.sns.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Notification-Service-SNS.svg"
+async.workflow.icon: "https://icons.d2lang.com/aws/Application%20Integration/AWS-Step-Functions.svg"
+sync.mesh.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-App-Mesh.svg"
 ```
 
 ---
@@ -94,6 +103,10 @@ websocket: WebSocket API {
  connect -> lambda -> db
  disconnect -> lambda
 }
+# Icons: https://icons.d2lang.com/
+rest.user.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+websocket.lambda.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+websocket.db.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
 ```
 
 REST API có usage plans/API keys, validation, stage response cache, Cognito authorizer, custom domain/WAF integrations theo support. HTTP API ít tính năng quản trị hơn nhưng thường rẻ hơn; tỷ lệ tiết kiệm phụ thuộc pricing/usage, không cố định70%. WebSocket phục vụ chat/notifications/live updates; custom routes dùng handlers.
@@ -135,6 +148,8 @@ alb -> order: "/orders/*"
 alb -> product: "/products/*"
 alb -> payment: "/payments/*"
 alb -> default: "Không match"
+# Icons: https://icons.d2lang.com/
+alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
 ```
 
 Hỗ trợ path/host/header/query routing, weighted target groups, sticky sessions, target-group health checks, gRPC/HTTP2 và Cognito/OIDC listener authentication theo protocol/configuration.
@@ -196,6 +211,11 @@ n2 -> n4: "Static assets"
 n3 -> n5: "VPC Link"
 n5 -> n6
 n5 -> n7
+# Icons: https://icons.d2lang.com/
+n2.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-CloudFront.svg"
+n3.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-API-Gateway.svg"
+n4.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service-S3.svg"
+n5.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
 ```
 
 **Tại sao đặt CloudFront trước?**
@@ -221,6 +241,8 @@ web -> wbff
 mobile -> mbff
 wbff -> backend
 mbff -> backend
+# Icons: https://icons.d2lang.com/
+mobile.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Aggregation/client-specific logic nằm ở BFF compute/integration tương ứng; API Gateway không mặc định tự thực thi mọi business aggregation.
@@ -252,6 +274,8 @@ order -> alb: "HTTP"
 payment -> alb: "HTTP"
 alb -> a
 alb -> b
+# Icons: https://icons.d2lang.com/
+alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
 ```
 
 VPC private subnets; ví dụ URL `http://user-alb.internal.shopvn.com/users/123`, DNS từ Route53 Private Hosted Zone.
@@ -284,6 +308,8 @@ cluster: ECS + Service Connect {
  namespace -- order.proxy: Endpoint configuration
  namespace -- user.proxy
 }
+# Icons: https://icons.d2lang.com/
+cluster.namespace.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-Cloud-Map.svg"
 ```
 
 Order gọi `http://user-service:8080/users/123`; proxy được ECS quản lý, thực hiện load balancing và supported timeout/retry behavior. Không giả định mọi Envoy option đều có thể cấu hình trực tiếp qua Service Connect.
@@ -323,6 +349,8 @@ map: Cloud Map — shopvn.local {
 }
 client: Consumer
 client -> map: DNS user-service.shopvn.local / DiscoverInstances API
+# Icons: https://icons.d2lang.com/
+map.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-Cloud-Map.svg"
 ```
 
 Ví dụ DNS trả10.0.11.45. DNS routing policy, health behavior và cache TTL quyết định kết quả discovery; không mặc định DNS query và API query có semantics hoàn toàn giống nhau.
@@ -346,6 +374,9 @@ lattice: VPC Lattice Service Network {
  b.order -> a.user: Cross-VPC service access
  b.order -> c.payment: Cross-account access / IAM auth policy
 }
+# Icons: https://icons.d2lang.com/
+lattice.a.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC.svg"
+lattice.b.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC.svg"
 ```
 
 Service Network có thể liên kết nhiều VPC/accounts mà không cần VPC peering/Transit GW cho service access này. Có weighted routing, access logs/metrics và IAM auth khi được cấu hình; URL trong hình là tên minh họa, không phải suffix bắt buộc.
@@ -374,6 +405,8 @@ legacy: App Mesh — Legacy Reference {
  router -> v1: 90%
  router -> v2: 10% Canary
 }
+# Icons: https://icons.d2lang.com/
+legacy.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/AWS-App-Mesh.svg"
 ```
 
 Tham khảo kiến trúc cũ: mTLS, traffic shifting, circuit-breaking/resource limits, retry/timeout, access logging và tracing theo proxy policy. Không chọn App Mesh cho triển khai mới; đối chiếu phần lifecycle/alternatives của bài.
@@ -429,6 +462,8 @@ queue -> consumer: ReceiveMessage
 consumer -> queue: DeleteMessage khi thành công
 consumer -> queue: Hiện lại sau timeout nếu crash {style.stroke-dash: 5}
 queue -> dlq: Vượt maxReceiveCount
+# Icons: https://icons.d2lang.com/
+queue.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
 ```
 
 **SQS Standard vs FIFO:**
@@ -469,6 +504,11 @@ topic -> notification
 topic -> analytics
 topic -> email
 topic -> http
+# Icons: https://icons.d2lang.com/
+topic.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Notification-Service-SNS.svg"
+inventory.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+notification.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+analytics.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 Một publish được fan-out tới tất cả subscribers. Độ trễ phụ thuộc dịch vụ đích, retry và tải, không phải cam kết cố định dưới 100ms.
@@ -505,6 +545,12 @@ n2 -> n5: "subscribe"
 n3 -> n6
 n4 -> n7
 n5 -> n8
+# Icons: https://icons.d2lang.com/
+n2.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Notification-Service-SNS.svg"
+n3.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+n4.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+n5.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+n8.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 **Tại sao không SNS → Lambda trực tiếp?**
@@ -538,6 +584,12 @@ bus -> inventory: "Rule source=order / created"
 bus -> saga: "Rule source=order / paid"
 bus -> welcome: "Rule source=user / signup"
 bus -> alert: "Rule ECS task STOPPED"
+# Icons: https://icons.d2lang.com/
+bus.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+inventory.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+saga.icon: "https://icons.d2lang.com/aws/Application%20Integration/AWS-Step-Functions.svg"
+welcome.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+alert.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Notification-Service-SNS.svg"
 ```
 
 Custom event ví dụ: `source=com.shopvn.order`, `detail-type=OrderCreated`, `detail={orderId:ORD-123,userId:USR-456,totalAmount:500000}`. Rule patterns phải match đúng source/detail-type thực tế; `TASK_STOPPED` là ý nghĩa minh họa, không mặc định một field hợp lệ cho mọi AWS event.
@@ -581,6 +633,8 @@ order -> msk
 msk -> inventory
 msk -> analytics
 msk -> search
+# Icons: https://icons.d2lang.com/
+msk.icon: "https://icons.d2lang.com/aws/Analytics/Amazon-Managed-Streaming-for-Kafka.svg"
 ```
 
 Retention ví dụ7ngày; reading không xóa messages ngay, groups có progress độc lập. Offsets thực tế là theo partition, không phải một scalar global offset của cả topic. Có thể replay trong retention window.
@@ -624,6 +678,10 @@ n4 -> n5: "Có, filter trên event fields"
 n4 -> n6: "Không, simple fan-out"
 n6 -> n7: "1 consumer point-to-point"
 n6 -> n8: "N consumers fan-out"
+# Icons: https://icons.d2lang.com/
+n3.icon: "https://icons.d2lang.com/aws/Analytics/Amazon-Managed-Streaming-for-Kafka.svg"
+n5.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+n7.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
 ```
 
 **Tóm tắt nhanh:**
@@ -665,6 +723,8 @@ shape: sequence_diagram
 "Order" -> "Order": "Update status: CONFIRMED"
 "EB" -> "Notif": "Rule: PaymentCompleted → Notification"
 "Notif" -> "Client": "Email confirmation"
+# Icons: https://icons.d2lang.com/
+EB.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
 ```
 
 **Ưu điểm:** Loose coupling, mỗi service independent, dễ thêm service mới (chỉ thêm rule).
@@ -757,6 +817,9 @@ fail -> queue: Visibility timeout hết — retry
 queue -> dlq: Vượt maxReceiveCount — ví dụ 3 lần nhận
 dlq -> alarm -> investigate
 investigate -> queue: Start DLQ Redrive → reprocess
+# Icons: https://icons.d2lang.com/
+queue.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+alarm.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-CloudWatch.svg"
 ```
 
 **Best practices DLQ:**
@@ -845,6 +908,9 @@ saga: Step Functions — Orchestration alternative {
  charge -> compensation: Failure
 }
 ingress -> sync.order
+# Icons: https://icons.d2lang.com/
+async.bus.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-EventBridge.svg"
+saga.icon: "https://icons.d2lang.com/aws/Application%20Integration/AWS-Step-Functions.svg"
 ```
 
 Các khối minh họa sync, event fan-out và orchestration; không phải luôn chạy cả choreography lẫn coordinator cho cùng một command. Compensation phải đảo đúng các bước đã thành công (release reserve, refund nếu đã charge, cancel order), không phải mọi fail đều gọi cùng một undo.

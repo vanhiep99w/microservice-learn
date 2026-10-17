@@ -8,8 +8,10 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
 import { D2InteractiveDiagram } from '@vanhiep99w/docs-kit/components/d2-interactive';
 import { parser } from './source-examples.mjs';
+import { d2IconAssetsRoot, remarkD2Icons } from './d2-icons.mjs';
 
-const processor = unified().use(remarkD2, {
+const processor = unified().use(remarkD2Icons).use(remarkD2, {
+  assetsRoot: d2IconAssetsRoot,
   cacheDir: '.next/cache/docs-kit/d2',
   concurrency: 1,
   defaultCaption: 'Sơ đồ',
@@ -38,6 +40,9 @@ test('docs-kit keeps existing diagrams static and builds source-linked opt-in di
   assert.equal(ordinary.component.name, 'D2Diagram');
   assert.equal(ordinary.props.source, undefined);
   assert.equal(ordinary.props.boards, undefined);
+  assert.match(ordinary.props.lightSvg, /data:image\/svg\+xml;base64,/u);
+  assert.match(ordinary.props.darkSvg, /data:image\/svg\+xml;base64,/u);
+  assert.doesNotMatch(ordinary.props.lightSvg, /https:\/\/icons\.d2lang\.com/u);
 
   const linked = await renderBlock(path, (node) => node.meta.includes('4.8.'));
   assert.equal(linked.component.name, 'D2InteractiveDiagram');

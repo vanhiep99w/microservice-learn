@@ -94,6 +94,17 @@ aws: AWS Cloud {
  vpc.private.payment -> vpc.endpoints.sqs
 }
 client -> aws.cdn: HTTPS sau DNS lookup
+# Icons: https://icons.d2lang.com/
+aws.dns.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-Route-53.svg"
+aws.cdn.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-CloudFront.svg"
+aws.waf.icon: "https://icons.d2lang.com/aws/Security%2C%20Identity%2C%20%26%20Compliance/AWS-WAF.svg"
+aws.vpc.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC.svg"
+aws.vpc.private.lb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+aws.vpc.data.cache.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
+aws.vpc.endpoints.dynamo.icon: "https://icons.d2lang.com/aws/Database/Amazon-DynamoDB.svg"
+aws.vpc.endpoints.sqs.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+aws.icon: "https://icons.d2lang.com/dev/amazonwebservices.svg"
+aws.vpc.public.nat.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC_NAT-Gateway_light-bg.svg"
 ```
 
 Route 53 thực hiện DNS, không proxy từng HTTP request. Internal ALB đặt ở private subnets; DynamoDB/SQS là managed services được truy cập qua VPC endpoints, không phải database instances nằm trong data subnets. NAT Gateway ở public subnet phục vụ outbound khi cần.
@@ -132,6 +143,9 @@ cache -> db: "Miss"
 db -> store
 store -> response
 cached -> response
+# Icons: https://icons.d2lang.com/
+cf.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-CloudFront.svg"
+cache.icon: "https://icons.d2lang.com/aws/Database/Amazon-ElastiCache.svg"
 ```
 
 Route 53 chỉ phân giải DNS; HTTP request đi từ Client tới CloudFront, không đi qua Route 53 như một HTTP proxy.
@@ -169,6 +183,14 @@ alb -> tg
 tg -> cluster.service.t1
 tg -> cluster.service.t2
 tg -> cluster.service.t3
+# Icons: https://icons.d2lang.com/
+alb.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+cluster.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+cluster.service.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+cluster.service.t1.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
+cluster.service.t2.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
+cluster.service.t3.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
+cluster.other.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
 ```
 
 **Các khái niệm ECS:**
@@ -207,6 +229,12 @@ cluster: ECS Cluster — EC2 Launch Type {
  one: EC2 Instance1 { agent: ECS Agent; a: Task A; b: Task B }
  two: EC2 Instance2 { agent: ECS Agent; c: Task C; d: Task D }
 }
+# Icons: https://icons.d2lang.com/
+cluster.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+cluster.one.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2.svg"
+cluster.one.agent.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+cluster.two.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2.svg"
+cluster.two.agent.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
 ```
 
 **Khi nào chọn ECS EC2 thay vì Fargate?**
@@ -237,6 +265,11 @@ eks: EKS Cluster {
  addons: AWS Load Balancer Controller / EBS CSI / CoreDNS / kube-proxy
  control -- data
 }
+# Icons: https://icons.d2lang.com/
+eks.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
+eks.data.mng.one.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2.svg"
+eks.data.mng.two.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2.svg"
+eks.data.fargate.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
 ```
 
 Control-plane/version/add-on/node upgrades theo EKS lifecycle và cấu hình; managed control plane không đồng nghĩa mọi thành phần của cluster tự upgrade cùng lúc.
@@ -272,6 +305,13 @@ gateway -> user: /users/*
 gateway -> order: /orders/*
 gateway -> payment: /payments/*
 sqs -> notification
+# Icons: https://icons.d2lang.com/
+gateway.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-API-Gateway.svg"
+user.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+order.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+payment.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
+sqs.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
+notification.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 **Ưu điểm:**
@@ -357,6 +397,10 @@ n10 -> n11: "Không"
 n11 -> n6: "Có, không chấp nhận cold start"
 n11 -> n12: "OK với cold start"
 n7 -> n13: "Mix: vừa ổn định vừa spiky"
+# Icons: https://icons.d2lang.com/
+n4.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Kubernetes-Service.svg"
+n6.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
+n12.icon: "https://icons.d2lang.com/aws/Compute/AWS-Lambda.svg"
 ```
 
 ### 3.7. Hybrid Approach — Kết hợp nhiều compute
@@ -383,6 +427,8 @@ hybrid: Hybrid Architecture {
   report: Report Generator — scheduled / interruption-tolerant
  }
 }
+# Icons: https://icons.d2lang.com/
+hybrid.fargate.icon: "https://icons.d2lang.com/aws/Compute/AWS-Fargate.svg"
 ```
 
 State/data durability, compliance và timeout limits phải được thiết kế riêng; compute choice không tự giải quyết stateful storage hay PCI compliance.
@@ -418,6 +464,8 @@ vpc: "VPC 10.0.0.0/16 — 65,536 địa chỉ IPv4" {
   data: "Data 10.0.22.0/24\nRDS Standby"
  }
 }
+# Icons: https://icons.d2lang.com/
+vpc.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Amazon-VPC.svg"
 ```
 
 ### 4.2. Subnet Strategy
@@ -489,6 +537,8 @@ ecr: ECR {
  order: "Repository order-service\nlatest • v2.0.1"
  payment: Repository payment-service
 }
+# Icons: https://icons.d2lang.com/
+ecr.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2-Container-Registry.svg"
 ```
 
 **Best practices:**
@@ -749,6 +799,8 @@ org: AWS Organizations — Management Account {
   prod: Production Account
  }
 }
+# Icons: https://icons.d2lang.com/
+org.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/AWS-Organizations.svg"
 ```
 
 ### 7.3. AWS Organizations & Control Tower
@@ -770,6 +822,9 @@ shared: Shared Account { ecr: ECR Images; ci: CI/CD Pipeline }
 prod: Production Account { task: ECS Task; role: Deploy Role }
 prod.task -> shared.ecr: Pull authorized images
 shared.ci -> prod.role: STS AssumeRole
+# Icons: https://icons.d2lang.com/
+shared.ecr.icon: "https://icons.d2lang.com/aws/Compute/Amazon-EC2-Container-Registry.svg"
+prod.task.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
 ```
 
 **Cách hoạt động:**

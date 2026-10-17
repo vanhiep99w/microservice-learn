@@ -262,6 +262,9 @@ micro: "Microservice — Dumb Pipes, Smart Endpoints" {
  pipe -> a
  pipe -> b
 }
+# Icons: https://icons.d2lang.com/
+micro.a.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
+micro.b.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 ### Tóm lại: SOA dễ hiểu qua phép ẩn dụ
@@ -414,6 +417,8 @@ app: E-Commerce Monolith {
  order <-> inventory
  payment <-> notification
 }
+# Icons: https://icons.d2lang.com/
+app.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 **Microservice approach:**

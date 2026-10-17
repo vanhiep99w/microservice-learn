@@ -60,6 +60,8 @@ mobile -> user
 mobile -> order
 mobile -> product
 mobile -> review
+# Icons: https://icons.d2lang.com/
+mobile.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Client biết từng service URL/port, nhiều round-trips, cross-cutting logic dễ lặp và thiếu một điểm monitor; URL thay đổi buộc client cập nhật.
@@ -104,6 +106,8 @@ n7 -> n8
 n7 -> n9
 n7 -> n10
 n7 -> n11
+# Icons: https://icons.d2lang.com/
+n3.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Gateway có thể gọi nhiều service trong một request aggregation. Tuy nhiên, các cuộc gọi như `Order Service` gọi `Payment Service` thường là service-to-service traffic riêng. Luồng đó cần cơ chế bảo vệ và tracing ở application hoặc [Service Mesh](../13-orchestration.md), không mặc nhiên đi qua Gateway.
@@ -246,6 +250,8 @@ cart -> join
 recommend -> join
 join -> response
 response -> client
+# Icons: https://icons.d2lang.com/
+client.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Một response có thể có dạng:

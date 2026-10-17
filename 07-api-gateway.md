@@ -76,6 +76,8 @@ app -> order: "HTTPS"
 app -> product: "HTTPS"
 app -> review: "HTTPS"
 app -> recommend: "HTTPS"
+# Icons: https://icons.d2lang.com/
+app.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Client biết URL từng service, mỗi trang cần 5 calls; đổi URL/port phải cập nhật clients. Auth/rate limiting/CORS/SSL bị lặp, thiếu điểm monitor/log/trace chung.
@@ -93,6 +95,8 @@ mobile -> gateway: GET https://api.myapp.com/homepage
 gateway -> user
 gateway -> order
 gateway -> product
+# Icons: https://icons.d2lang.com/
+mobile.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Client chỉ biết `api.myapp.com`; Gateway lo auth, routing, aggregation và rate limiting.
@@ -111,6 +115,8 @@ edge.gateway -> internal.user
 edge.gateway -> internal.order
 edge.gateway -> internal.product
 edge.gateway -> internal.payment
+# Icons: https://icons.d2lang.com/
+external.mobile.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Client không truy cập trực tiếp các internal services.
@@ -324,6 +330,12 @@ public -> kong
 kong -> internal
 internal -> user: "/users — User target group"
 internal -> order: "/orders — Order target group"
+# Icons: https://icons.d2lang.com/
+public.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+kong.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+internal.icon: "https://icons.d2lang.com/aws/Networking%20%26%20Content%20Delivery/Elastic-Load-Balancing-ELB_Application-load-balancer_light-bg.svg"
+user.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
+order.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-Service.svg"
 ```
 
 Có thể bỏ Internal ALB nếu Kong tự LB. Giữ ALB để tự cập nhật ECS targets, loại unhealthy instances và tách concern: Kong routing/auth, ALB LB/health. Kong không cần biết số replicas.
@@ -468,6 +480,8 @@ mbff -> backend.product
 public -> backend.user
 public -> backend.order
 public -> backend.product
+# Icons: https://icons.d2lang.com/
+mobile.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
 ```
 
 Web team sở hữu Web BFF; Mobile team sở hữu Mobile BFF.

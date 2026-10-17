@@ -414,6 +414,9 @@ abstraction: Thêm abstraction {
  old -> db
  new -> micro
 }
+# Icons: https://icons.d2lang.com/
+before.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
+abstraction.db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 Switch `use_new_order_service=true` sau kiểm chứng. Khi hết rollback window và mọi caller đã migrate: xóa Old implementation/abstraction không còn cần, giữ implementation mới.

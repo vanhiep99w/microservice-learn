@@ -611,6 +611,13 @@ ward: "Ward Service" {
  db: "Ward DB — Redis" {shape: cylinder}
  model -> db
 }
+# Icons: https://icons.d2lang.com/
+appointment.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+clinical.db.icon: "https://icons.d2lang.com/dev/mongodb.svg"
+lab.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+pharmacy.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+billing.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
+ward.db.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 Cùng bệnh nhân Nguyễn Văn A nhưng mỗi service chỉ lưu phần cần thiết, không service nào buộc biết toàn bộ hồ sơ.

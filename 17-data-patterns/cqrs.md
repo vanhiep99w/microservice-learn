@@ -145,6 +145,8 @@ read: Read Logic
 db: Database {shape: cylinder}
 command -> ch -> write -> db
 query -> qh -> read -> db
+# Icons: https://icons.d2lang.com/
+db.icon: "https://icons.d2lang.com/essentials/117-database.svg"
 ```
 
 Hai handler có thể dùng cùng entity hoặc cùng database schema. Mức này giúp business logic của command không bị trộn với logic định dạng response của query. Nó không tự tạo ra eventual consistency vì cả hai phía vẫn đọc và ghi cùng một database.
@@ -178,6 +180,8 @@ pg -> projector: "Reliable change stream"
 projector -> read
 query -> model
 model -> read
+# Icons: https://icons.d2lang.com/
+pg.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 Ưu điểm của mức 3 là mỗi phía có thể scale và chọn công nghệ phù hợp với workload của mình. Đổi lại, read database không tự động đồng bộ với write database. Hệ thống phải xử lý lag, duplicate, lỗi projector, rebuild và schema evolution.
@@ -322,6 +326,8 @@ shape: sequence_diagram
 "O" -> "R": "Đọc theo customer_id"
 "R" -> "O": "Danh sách order" { style.stroke-dash: 5 }
 "O" -> "U": "Order history" { style.stroke-dash: 5 }
+# Icons: https://icons.d2lang.com/
+W.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 ```
 
 Ngay sau `CreateOrder`, query lịch sử có thể chưa thấy order mới. UI có thể hiển thị trạng thái đang xử lý, chờ projection theo version hoặc dùng một đường đọc phù hợp với yêu cầu freshness.

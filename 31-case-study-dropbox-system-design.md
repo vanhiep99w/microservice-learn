@@ -309,6 +309,9 @@ n1.n2 -> n16: "download bytes" { style.stroke-width: 3 }
 n1.n3 -> n16: "download bytes" { style.stroke-width: 3 }
 n1.n4 -> n16: "download bytes" { style.stroke-width: 3 }
 n16 -> n17: "origin fetch"
+# Icons: https://icons.d2lang.com/
+n1.n4.icon: "https://icons.d2lang.com/tech/052-smartphone-3.svg"
+n12.icon: "https://icons.d2lang.com/dev/redis.svg"
 ```
 
 Mũi tên nét đậm biểu diễn **file bytes**. File content đi trực tiếp giữa client với S3/CDN. Application services chỉ xử lý metadata, authorization, upload session và signed URL.
