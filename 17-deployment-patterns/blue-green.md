@@ -70,6 +70,47 @@ n6 -> n7: "Đạt"
 n7 -> n2
 ```
 
+Animation minh họa Green được kiểm thử, nhận traffic, rồi **rollback routing về Blue khi metrics xấu**. Phần trăm chỉ áp dụng cho **request mới sau khi routing đã propagation**; không mô tả request đang chạy hay connection dài. Giả định Blue còn trong rollback window và đọc được state do Green ghi. Shared state không bị rollback khi đổi routing; nếu không giữ compatibility thì bước rollback này không an toàn.
+
+Trên website, bấm **Explore** rồi **Play** hoặc Previous/Next; không tự phát khi mở trang. Mỗi khung giữ 1.800 ms chỉ để đọc, không phải thời gian xử lý thực. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ hiển thị snapshot do tác giả biên soạn, không chạy request, timer hay business side effect. Không có JavaScript, mở **All views** để đọc mọi khung; có thể tải **Animated SVG** trong viewer. File tải xuống dùng animation native của D2, không mang theo controls hoặc thiết lập giảm chuyển động của website.
+
+```d2 mode=animation interval=1800 title="Blue-Green — kiểm thử, switch và rollback routing"
+direction: down
+router: "Router\nRequest mới"
+blue: "BLUE v1\nLIVE"
+green: "GREEN v2\nChưa kiểm thử"
+state: "Shared state\nKhông hoàn tác theo routing" {shape: cylinder}
+gate: "Gate\nChưa cho phép switch"
+router -> blue: "100%"
+router -> green: "0%" {style.stroke-dash: 5}
+blue -> state
+green -> state
+steps: {
+  "1 · Green qua readiness và smoke test": {
+    green: "GREEN v2\nReady, chưa nhận production traffic"
+    gate: "Gate\nReadiness và smoke test đạt"
+  }
+  "2 · Switch sang Green": {
+    blue: "BLUE v1\nGiữ để rollback"
+    green: "GREEN v2\nLIVE"
+    gate: "Quan sát Green\nBlue còn trong rollback window"
+    (router -> blue)[0].label: "0%"
+    (router -> blue)[0].style.stroke-dash: 5
+    (router -> green)[0].label: "100%"
+    (router -> green)[0].style.stroke-dash: 0
+  }
+  "3 · Metrics xấu, rollback routing": {
+    blue: "BLUE v1\nLIVE trở lại"
+    green: "GREEN v2\nNgừng nhận request mới"
+    gate: "Giả định rollback hợp lệ\nv1 vẫn đọc được state do v2 ghi"
+    (router -> blue)[0].label: "100%"
+    (router -> blue)[0].style.stroke-dash: 0
+    (router -> green)[0].label: "0%"
+    (router -> green)[0].style.stroke-dash: 5
+  }
+}
+```
+
 Blue và Green có thể là hai Kubernetes `Deployment`, hai target group phía sau Load Balancer hoặc hai nhóm task của cùng một service. Điều quan trọng là routing có thể chọn đúng một environment đang live, còn environment kia vẫn được khởi động và kiểm tra độc lập.
 
 ### Trạng thái traffic

@@ -177,7 +177,11 @@ shape: sequence_diagram
 
 Trạng thái là một phần của API contract. Một vòng đời thường dùng là:
 
-```d2 title="Luồng request và trạng thái job"
+Animation minh họa **một job thành công**: `pending → processing → completed`. Khung đậm là state hiện tại, mũi tên đậm là chuyển tiếp vừa xảy ra. Nhánh `failed` vẫn hiện để đọc contract, nhưng không xảy ra trong lần chạy này; `completed` giả định kết quả đã được lưu thành công, không chỉ là Worker ngừng chạy.
+
+Trên website, bấm **Explore** rồi **Play** hoặc Previous/Next; không tự phát khi mở trang. Mỗi khung giữ 1.800 ms chỉ để đọc, không phải thời gian xử lý thực. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ hiển thị snapshot do tác giả biên soạn, không chạy request, timer hay business side effect. Không có JavaScript, mở **All views** để đọc mọi khung; có thể tải **Animated SVG** trong viewer. File tải xuống dùng animation native của D2, không mang theo controls hoặc thiết lập giảm chuyển động của website.
+
+```d2 mode=animation interval=1800 title="Async job — từ pending đến completed"
 direction: down
 initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
 pending: "pending"
@@ -188,6 +192,32 @@ completed: "completed"
 processing -> completed
 failed: "failed"
 processing -> failed
+classes: {
+  idle: {style.stroke-width: 2; style.bold: false}
+  active: {style.stroke-width: 5; style.bold: true}
+  edge: {style.stroke-width: 2; style.animated: false}
+  transition: {style.stroke-width: 5; style.animated: true}
+}
+pending.class: active
+processing.class: idle
+completed.class: idle
+failed.class: idle
+(pending -> processing)[0].class: edge
+(processing -> completed)[0].class: edge
+(processing -> failed)[0].class: edge
+steps: {
+  "1 · Worker nhận job": {
+    pending.class: idle
+    processing.class: active
+    (pending -> processing)[0].class: transition
+  }
+  "2 · Lưu kết quả rồi hoàn tất": {
+    processing.class: idle
+    completed.class: active
+    (pending -> processing)[0].class: edge
+    (processing -> completed)[0].class: transition
+  }
+}
 ```
 
 | Trạng thái | Ý nghĩa | Dữ liệu nên có |

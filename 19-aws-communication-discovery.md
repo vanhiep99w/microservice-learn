@@ -466,6 +466,41 @@ queue -> dlq: Vượt maxReceiveCount
 queue.icon: "https://icons.d2lang.com/aws/Application%20Integration/Amazon-Simple-Queue-Service-SQS.svg"
 ```
 
+Animation theo dõi **một message `msg-1` trên SQS Standard**, cấu hình visibility timeout 30 giây và giả định chưa đạt `maxReceiveCount`. Worker đầu crash trước khi commit business effect hoặc gửi `DeleteMessage`; sau timeout, message có thể được nhận lại. Lần nhận mới có receipt handle mới `h2`; delete phải dùng handle của lần nhận hiện tại. Các handle chỉ là placeholder. Visibility timeout **không phải lock tuyệt đối**: Standard vẫn có thể delivery lặp, nên worker cần idempotent ngay cả ngoài kịch bản này. Nhánh DLQ vẫn được giữ trong sơ đồ tổng quan.
+
+Trên website, bấm **Explore** rồi **Play** hoặc Previous/Next; không tự phát khi mở trang. Mỗi khung giữ 1.800 ms chỉ để đọc, không phải thời gian xử lý thực. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ hiển thị snapshot do tác giả biên soạn, không chạy request, timer hay business side effect. Không có JavaScript, mở **All views** để đọc mọi khung; có thể tải **Animated SVG** trong viewer. File tải xuống dùng animation native của D2, không mang theo controls hoặc thiết lập giảm chuyển động của website.
+
+```d2 mode=animation interval=1800 title="SQS — visibility timeout, nhận lại và xóa message"
+grid-columns: 3
+queue: "SQS / msg-1\nVisible, chờ receive"
+worker: "Worker\nChưa xử lý msg-1"
+receipt: "Receipt handle\nChưa có"
+steps: {
+  "1 · ReceiveMessage lần đầu": {
+    queue: "SQS / msg-1\nẨn theo visibility timeout 30 giây"
+    worker: "Worker A\nBắt đầu xử lý"
+    receipt: "Receipt handle\nh1 của lần nhận đầu"
+  }
+  "2 · Worker crash, chưa DeleteMessage": {
+    worker: "Worker A\nCRASH trước commit business effect"
+  }
+  "3 · Hết visibility timeout": {
+    queue: "SQS / msg-1\nVisible trở lại, có thể nhận lại"
+    receipt: "Receipt handle\nKhông dùng lại h1 cho lần nhận mới"
+  }
+  "4 · ReceiveMessage lần tiếp theo": {
+    queue: "SQS / msg-1\nẨn theo visibility timeout mới"
+    worker: "Worker B\nXử lý lại, commit effect thành công"
+    receipt: "Receipt handle\nh2 của lần nhận mới"
+  }
+  "5 · DeleteMessage với h2 thành công": {
+    queue: "SQS / msg-1\nĐã xóa theo kết quả delete giả định"
+    worker: "Worker B\nHoàn tất; vẫn cần idempotent"
+    receipt: "Receipt handle\nĐã dùng h2 để delete"
+  }
+}
+```
+
 **SQS Standard vs FIFO:**
 
 | Tiêu chí | Standard | FIFO |

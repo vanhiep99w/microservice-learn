@@ -123,18 +123,73 @@ Các điều kiện trong bảng do tác giả giả định, không được t�
 
 Một Circuit Breaker thường có ba trạng thái: `CLOSED`, `OPEN` và `HALF-OPEN`.
 
-```d2 title="State machine"
+Ví dụ animation dưới đây giữ nguyên các nhánh của state machine và lần lượt nhấn mạnh **trạng thái hiện tại bằng khung đậm**, **chuyển tiếp vừa xảy ra bằng mũi tên đậm**. Kịch bản minh họa: mạch mở do vượt ngưỡng, probe lần đầu thất bại, rồi probe ở chu kỳ chờ tiếp theo thành công.
+
+Trên website, bấm **Explore 6 views**, rồi **Play** hoặc Previous/Next. Animation không tự phát khi mở bài. Mỗi khung hiển thị 1.800 ms chỉ để đọc; **không phải wait duration thực tế**. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ trình bày các điều kiện do tác giả giả định, không chạy cooldown timer, đếm lỗi hay gửi probe. Không có JavaScript vẫn đọc được sơ đồ ban đầu và các khung trong **All views**.
+
+```d2 mode=animation interval=1800 title="Circuit Breaker — probe thất bại rồi phục hồi"
 direction: down
+classes: {
+  idle: {
+    style.stroke-width: 2
+    style.bold: false
+  }
+  active: {
+    style.stroke-width: 5
+    style.bold: true
+  }
+  edge: {
+    style.stroke-width: 2
+    style.animated: false
+  }
+  transition: {
+    style.stroke-width: 5
+    style.animated: true
+  }
+}
 initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
-CLOSED: "CLOSED"
+CLOSED: "CLOSED" {class: active}
+OPEN: "OPEN" {class: idle}
+HALF_OPEN: "HALF_OPEN" {class: idle}
 initial1 -> CLOSED
-OPEN: "OPEN"
-CLOSED -> OPEN: "Failure rate hoặc slow-call rate vượt ngưỡng"
-HALF_OPEN: "HALF_OPEN"
-OPEN -> HALF_OPEN: "Hết wait duration"
-HALF_OPEN -> CLOSED: "Probe thành công theo policy"
-HALF_OPEN -> OPEN: "Probe thất bại hoặc quá chậm"
+CLOSED -> OPEN: "Failure rate hoặc slow-call rate vượt ngưỡng" {class: edge}
+OPEN -> HALF_OPEN: "Hết wait duration" {class: edge}
+HALF_OPEN -> CLOSED: "Probe thành công theo policy" {class: edge}
+HALF_OPEN -> OPEN: "Probe thất bại hoặc quá chậm" {class: edge}
+steps: {
+  "1 · Vượt ngưỡng — OPEN": {
+    CLOSED.class: idle
+    OPEN.class: active
+    (CLOSED -> OPEN)[0].class: transition
+  }
+  "2 · Hết chờ — HALF_OPEN": {
+    OPEN.class: idle
+    HALF_OPEN.class: active
+    (CLOSED -> OPEN)[0].class: edge
+    (OPEN -> HALF_OPEN)[0].class: transition
+  }
+  "3 · Probe thất bại — OPEN": {
+    HALF_OPEN.class: idle
+    OPEN.class: active
+    (OPEN -> HALF_OPEN)[0].class: edge
+    (HALF_OPEN -> OPEN)[0].class: transition
+  }
+  "4 · Hết lần chờ mới — HALF_OPEN": {
+    OPEN.class: idle
+    HALF_OPEN.class: active
+    (HALF_OPEN -> OPEN)[0].class: edge
+    (OPEN -> HALF_OPEN)[0].class: transition
+  }
+  "5 · Probe thành công — CLOSED": {
+    HALF_OPEN.class: idle
+    CLOSED.class: active
+    (OPEN -> HALF_OPEN)[0].class: edge
+    (HALF_OPEN -> CLOSED)[0].class: transition
+  }
+}
 ```
+
+Nếu muốn xem nét chạy trên mũi tên, bật motion riêng trong viewer; mặc định motion tắt và tôn trọng `prefers-reduced-motion`. Có thể tải **Animated SVG** được D2 tạo lúc build; file tải xuống có animation native riêng, không mang theo controls hay thiết lập giảm chuyển động của website.
 
 Circuit Breaker bắt đầu ở `CLOSED`. Khi mạch `OPEN` đủ lâu, nó không tự cho toàn bộ traffic quay lại ngay. Nó chuyển sang `HALF-OPEN` để dùng một số request thăm dò, rồi quyết định đóng lại hoặc mở tiếp.
 

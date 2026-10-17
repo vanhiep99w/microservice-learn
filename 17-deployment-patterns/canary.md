@@ -156,6 +156,44 @@ n4 -> n8: "Không đạt"
 n8 -> n9
 ```
 
+Animation chọn **nhánh promote thành công**, với weight cấu hình `0% → 5% → 25% → 50% → 100%` cho v2. Mỗi lần tăng giả định đã đủ cửa sổ quan sát và technical/business metrics đạt ngưỡng; không promote chỉ vì hết thời gian phát một khung. Phần trăm là **routing weight cấu hình**, không bảo đảm mẫu traffic nhỏ khớp chính xác. Khi không đạt, dùng nhánh abort trong flow phía trên thay vì tiếp tục các bước này.
+
+Trên website, bấm **Explore** rồi **Play** hoặc Previous/Next; không tự phát khi mở trang. Mỗi khung giữ 1.800 ms chỉ để đọc, không phải thời gian xử lý thực. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ hiển thị snapshot do tác giả biên soạn, không chạy request, timer hay business side effect. Không có JavaScript, mở **All views** để đọc mọi khung; có thể tải **Animated SVG** trong viewer. File tải xuống dùng animation native của D2, không mang theo controls hoặc thiết lập giảm chuyển động của website.
+
+```d2 mode=animation interval=1800 title="Canary — tăng traffic qua các cổng metrics"
+direction: down
+router: "Weighted router\nWeight cấu hình"
+stable: "Stable v1"
+canary: "Canary v2"
+gate: "Gate\nReady, smoke test và compatibility đạt"
+router -> stable: "100%"
+router -> canary: "0%" {style.stroke-dash: 5}
+steps: {
+  "1 · Mở canary 5%": {
+    gate: "Gate\nQuan sát cohort 5%"
+    (router -> stable)[0].label: "95%"
+    (router -> canary)[0].label: "5%"
+    (router -> canary)[0].style.stroke-dash: 0
+  }
+  "2 · Metrics đạt, tăng lên 25%": {
+    gate: "Gate\nBước 5% đạt, quan sát cohort 25%"
+    (router -> stable)[0].label: "75%"
+    (router -> canary)[0].label: "25%"
+  }
+  "3 · Metrics đạt, tăng lên 50%": {
+    gate: "Gate\nBước 25% đạt, quan sát cohort 50%"
+    (router -> stable)[0].label: "50%"
+    (router -> canary)[0].label: "50%"
+  }
+  "4 · Metrics đạt, promote v2": {
+    gate: "Gate\nBước 50% đạt, giữ v1 trong rollback window"
+    (router -> stable)[0].label: "0%"
+    (router -> stable)[0].style.stroke-dash: 5
+    (router -> canary)[0].label: "100%"
+  }
+}
+```
+
 ### Chuẩn bị version mới
 
 Trước khi mở traffic, cần chuẩn bị cả version mới và khả năng quan sát rollout:

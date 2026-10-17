@@ -1681,6 +1681,43 @@ broker -> consumer: "5 · Delivery lặp"
 consumer -> consumer: "Dedupe e1\nKhông trừ kho lần hai"
 ```
 
+Các snapshot minh họa cùng cửa sổ lỗi phía trên cho event `e1`: tồn kho ban đầu là 10, event yêu cầu trừ 1. Root là lúc order và outbox **đã commit cùng local transaction**. Giả định Inventory commit thay đổi tồn kho và dedupe record trong cùng local transaction; relay dùng lại `e1` sau restart. Broker có thể chấp nhận hai lần publish, nhưng consumer nhận diện duplicate nên tồn kho vẫn là 9. Đây không phải bảo đảm exactly-once cho mọi side effect.
+
+Trên website, bấm **Explore** rồi **Play** hoặc Previous/Next; không tự phát khi mở trang. Mỗi khung giữ 1.800 ms chỉ để đọc, không phải thời gian xử lý thực. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ hiển thị snapshot do tác giả biên soạn, không chạy request, timer hay business side effect. Không có JavaScript, mở **All views** để đọc mọi khung; có thể tải **Animated SVG** trong viewer. File tải xuống dùng animation native của D2, không mang theo controls hoặc thiết lập giảm chuyển động của website.
+
+```d2 mode=animation interval=1800 title="Outbox — state còn lại sau publish, crash và redelivery"
+grid-columns: 3
+outbox: "Order DB / Outbox\nOrder đã commit\ne1 chưa đánh dấu sent"
+relay: "Relay\nChuẩn bị publish e1"
+broker: "Broker\nChưa nhận e1"
+consumer: "Inventory Consumer\nChưa xử lý e1"
+stock: "Tồn kho\n10"
+dedupe: "Dedupe record\nChưa có e1"
+steps: {
+  "1 · Broker chấp nhận e1": {
+    relay: "Relay\nPublish được broker chấp nhận\nChưa mark sent"
+    broker: "Broker\nĐã chấp nhận e1 lần đầu"
+  }
+  "2 · Inventory commit effect và dedupe": {
+    consumer: "Inventory Consumer\nÁp dụng e1 trong local transaction"
+    stock: "Tồn kho\n9"
+    dedupe: "Dedupe record\nĐã commit e1 cùng thay đổi tồn kho"
+  }
+  "3 · Relay crash trước mark sent": {
+    relay: "Relay\nCRASH trước mark sent"
+  }
+  "4 · Restart, publish và delivery lặp": {
+    relay: "Relay\nRestart, publish lại cùng e1"
+    broker: "Broker\nChấp nhận lại e1, delivery lặp"
+    consumer: "Inventory Consumer\nNhận diện e1 đã xử lý\nKhông trừ kho lần hai"
+  }
+  "5 · Relay đánh dấu sent": {
+    relay: "Relay\nMark sent sau publish được chấp nhận"
+    outbox: "Order DB / Outbox\nOrder vẫn đã commit\ne1 đã đánh dấu sent"
+  }
+}
+```
+
 Giả định consumer commit business change và dedupe record trong cùng local transaction. Relay phải dùng lại event ID khi publish lại; nếu không, consumer không thể nhận diện hai delivery này là cùng một event.
 
 ## 11. Tổng kết

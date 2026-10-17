@@ -486,7 +486,11 @@ Data model phải xuất phát từ các query chính:
 
 ### 6.3. Trạng thái của File Version
 
-```d2 title="6.3. Trạng thái của File Version"
+Animation minh họa **một upload thành công**; khung và mũi tên đậm chỉ vị trí hiện tại trong vòng đời. `FAILED`, `ABORTED` và `EXPIRED` vẫn giữ nguyên trên sơ đồ nhưng là các nhánh thay thế, không phải các bước của happy path. Giả định checksum và scan đều đạt trước khi chuyển `READY`; animation không upload file hay thực hiện scan thật.
+
+Trên website, bấm **Explore** rồi **Play** hoặc Previous/Next; không tự phát khi mở trang. Mỗi khung giữ 1.800 ms chỉ để đọc, không phải thời gian xử lý thực. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ hiển thị snapshot do tác giả biên soạn, không chạy request, timer hay business side effect. Không có JavaScript, mở **All views** để đọc mọi khung; có thể tải **Animated SVG** trong viewer. File tải xuống dùng animation native của D2, không mang theo controls hoặc thiết lập giảm chuyển động của website.
+
+```d2 mode=animation interval=1800 title="File Version — từ PENDING đến READY"
 direction: down
 initial1: "Bắt đầu" {shape: circle; width: 40; height: 40}
 PENDING: "PENDING"
@@ -511,6 +515,44 @@ final4: "Kết thúc" {shape: circle; style.double-border: true; width: 40; heig
 EXPIRED -> final4
 final5: "Kết thúc" {shape: circle; style.double-border: true; width: 40; height: 40}
 READY -> final5
+classes: {
+  idle: {style.stroke-width: 2; style.bold: false}
+  active: {style.stroke-width: 5; style.bold: true}
+  edge: {style.stroke-width: 2; style.animated: false}
+  transition: {style.stroke-width: 5; style.animated: true}
+}
+PENDING.class: active
+UPLOADING.class: idle
+PROCESSING.class: idle
+READY.class: idle
+FAILED.class: idle
+ABORTED.class: idle
+EXPIRED.class: idle
+(PENDING -> UPLOADING)[0].class: edge
+(UPLOADING -> PROCESSING)[0].class: edge
+(PROCESSING -> READY)[0].class: edge
+(PROCESSING -> FAILED)[0].class: edge
+(PENDING -> ABORTED)[0].class: edge
+(UPLOADING -> EXPIRED)[0].class: edge
+steps: {
+  "1 · Cấp signed URLs": {
+    PENDING.class: idle
+    UPLOADING.class: active
+    (PENDING -> UPLOADING)[0].class: transition
+  }
+  "2 · Client yêu cầu complete": {
+    UPLOADING.class: idle
+    PROCESSING.class: active
+    (PENDING -> UPLOADING)[0].class: edge
+    (UPLOADING -> PROCESSING)[0].class: transition
+  }
+  "3 · Verify và scan đạt": {
+    PROCESSING.class: idle
+    READY.class: active
+    (UPLOADING -> PROCESSING)[0].class: edge
+    (PROCESSING -> READY)[0].class: transition
+  }
+}
 ```
 
 Chỉ version ở trạng thái `READY` mới được đặt làm `current_version_id` và xuất hiện trên thiết bị khác.

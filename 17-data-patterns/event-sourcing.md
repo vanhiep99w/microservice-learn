@@ -225,7 +225,11 @@ Event store không `UPDATE` event cũ để thể hiện state mới. Nếu giao
 
 Ví dụ, replay stream của order có thể tạo state như sau:
 
-```d2 title="Replay — apply event theo sequence để dựng state"
+Animation đọc **một event stream đã tồn tại**, theo sequence 1–4: `OrderCreated`, `PaymentReceived`, `OrderShipped`, `OrderDelivered`. Khung đậm là state dẫn xuất sau khi apply event; các state trước vẫn hiện làm bản đồ tham khảo, không phải nhiều bản ghi đang cùng active. Đây là replay thuần: **không charge tiền, gửi hàng hoặc phát lại side effect**.
+
+Trên website, bấm **Explore** rồi **Play** hoặc Previous/Next; không tự phát khi mở trang. Mỗi khung giữ 1.800 ms chỉ để đọc, không phải thời gian xử lý thực. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ hiển thị snapshot do tác giả biên soạn, không chạy request, timer hay business side effect. Không có JavaScript, mở **All views** để đọc mọi khung; có thể tải **Animated SVG** trong viewer. File tải xuống dùng animation native của D2, không mang theo controls hoặc thiết lập giảm chuyển động của website.
+
+```d2 mode=animation interval=1800 title="Event Sourcing — replay từng event để dựng state"
 direction: down
 empty: Chưa có order
 pending: PENDING
@@ -236,6 +240,46 @@ empty -> pending: OrderCreated
 pending -> paid: PaymentReceived
 paid -> shipped: OrderShipped
 shipped -> delivered: OrderDelivered
+classes: {
+  idle: {style.stroke-width: 2; style.bold: false}
+  active: {style.stroke-width: 5; style.bold: true}
+  edge: {style.stroke-width: 2; style.animated: false}
+  transition: {style.stroke-width: 5; style.animated: true}
+}
+empty.class: active
+pending.class: idle
+paid.class: idle
+shipped.class: idle
+delivered.class: idle
+(empty -> pending)[0].class: edge
+(pending -> paid)[0].class: edge
+(paid -> shipped)[0].class: edge
+(shipped -> delivered)[0].class: edge
+steps: {
+  "1 · Apply OrderCreated": {
+    empty.class: idle
+    pending.class: active
+    (empty -> pending)[0].class: transition
+  }
+  "2 · Apply PaymentReceived": {
+    pending.class: idle
+    paid.class: active
+    (empty -> pending)[0].class: edge
+    (pending -> paid)[0].class: transition
+  }
+  "3 · Apply OrderShipped": {
+    paid.class: idle
+    shipped.class: active
+    (pending -> paid)[0].class: edge
+    (paid -> shipped)[0].class: transition
+  }
+  "4 · Apply OrderDelivered": {
+    shipped.class: idle
+    delivered.class: active
+    (paid -> shipped)[0].class: edge
+    (shipped -> delivered)[0].class: transition
+  }
+}
 ```
 
 Replay đến version cụ thể cho phép xem state tại một mốc lịch sử. Với stream của một aggregate, sequence là cơ sở ordering đáng tin cậy hơn việc suy đoán thứ tự từ timestamp. Replay từ đầu cũng cho phép kiểm tra snapshot hoặc projection có khớp với nguồn hay không.

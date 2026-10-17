@@ -66,6 +66,41 @@ n7 -> n2: "Còn"
 n7 -> n8: "Hết"
 ```
 
+Animation dưới đây là các snapshot **sau mỗi lần v2 đạt readiness và một v1 được rút khỏi pool**. Giả định desired replicas = 3, `maxSurge: 1`, `maxUnavailable: 0`, đủ resource và contract v1/v2 tương thích. Các bước tạo pod, chờ readiness và drain nằm giữa các khung, không bị bỏ qua trong rollout thật. Số ready là capacity minh họa, **không phải tỷ lệ traffic**; không mô hình hóa pod terminating hoặc lỗi readiness. Flow phía trên vẫn mô tả nhánh chưa ready.
+
+Trên website, bấm **Explore** rồi **Play** hoặc Previous/Next; không tự phát khi mở trang. Mỗi khung giữ 1.800 ms chỉ để đọc, không phải thời gian xử lý thực. Khoảng cách trong sơ đồ không tỷ lệ với thời lượng. Viewer chỉ hiển thị snapshot do tác giả biên soạn, không chạy request, timer hay business side effect. Không có JavaScript, mở **All views** để đọc mọi khung; có thể tải **Animated SVG** trong viewer. File tải xuống dùng animation native của D2, không mang theo controls hoặc thiết lập giảm chuyển động của website.
+
+```d2 mode=animation interval=1800 title="Rolling Update — thay ba replica sau từng lần readiness đạt"
+direction: down
+pool: "Pool phục vụ\n3 replica ready"
+v1: "v1\n3 ready"
+v2: "v2\n0 ready"
+pool -> v1: "3 ready"
+pool -> v2: "0 ready" {style.stroke-dash: 5}
+steps: {
+  "1 · Thay replica thứ nhất": {
+    v1: "v1\n2 ready"
+    v2: "v2\n1 ready"
+    (pool -> v1)[0].label: "2 ready"
+    (pool -> v2)[0].label: "1 ready"
+    (pool -> v2)[0].style.stroke-dash: 0
+  }
+  "2 · Thay replica thứ hai": {
+    v1: "v1\n1 ready"
+    v2: "v2\n2 ready"
+    (pool -> v1)[0].label: "1 ready"
+    (pool -> v2)[0].label: "2 ready"
+  }
+  "3 · Toàn bộ là v2": {
+    v1: "v1\n0 ready"
+    v2: "v2\n3 ready"
+    (pool -> v1)[0].label: "0 ready"
+    (pool -> v1)[0].style.stroke-dash: 5
+    (pool -> v2)[0].label: "3 ready"
+  }
+}
+```
+
 ### Trình tự thay thế instance
 
 Ví dụ service có ba replica, một rollout có thể được hiểu như sau:

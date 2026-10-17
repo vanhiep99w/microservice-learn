@@ -274,7 +274,18 @@ Từ docs-kit 0.6.0, website đăng ký cả `D2Diagram` và `D2InteractiveDiagr
 |---|---|
 | `interactive`: zoom/pan, fit/reset, mở rộng, xem/copy D2 và tải SVG theo theme | [Dependency graph E-Commerce](25-case-study-ecommerce.md#23-service-dependency-graph), [kiến trúc Dropbox](31-case-study-dropbox-system-design.md#5-high-level-architecture), [quan hệ Kubernetes Objects](13-orchestration.md#48-tổng-hợp-quan-hệ-giữa-các-objects) |
 | `mode=steps`: trạng thái kế thừa qua từng bước, Previous/Next và Play/Pause | [Saga compensation khi hết hàng](17-data-patterns/saga.md#luồng-thành-công-và-thất-bại) |
+| `mode=animation`: highlight trạng thái/chuyển tiếp, Play/Pause và tải Animated SVG | [Circuit Breaker — probe thất bại rồi phục hồi](17-reliability-patterns/circuit-breaker.md#state-machine); các ví dụ bổ sung bên dưới |
 | `D2SourceLinks`: click node mở code tại chỗ | Các node YAML trong sơ đồ Kubernetes Objects ở mục 4.8 |
+
+Animation chỉ áp dụng cho diễn tiến có ý nghĩa, không bật toàn site hoặc lặp lại mọi sơ đồ tổng hợp. Các ví dụ bổ sung:
+
+| Nhóm | Animation đã áp dụng |
+|---|---|
+| State machine và replay | [Async job](17-communication-patterns/async-request-reply.md#luồng-request-và-trạng-thái-job), [Event Sourcing replay](17-data-patterns/event-sourcing.md#replay-để-dựng-state), [File Version upload](31-case-study-dropbox-system-design.md#63-trạng-thái-của-file-version) |
+| Deployment | [Rolling Update](17-deployment-patterns/rolling-update.md#cơ-chế-rollout), [Blue-Green switch/rollback](17-deployment-patterns/blue-green.md#blue-và-green), [Canary tăng weight](17-deployment-patterns/canary.md#quy-trình-progressive-rollout) |
+| Crash và redelivery | [Outbox sau crash](09-data-management.md#103-outbox--cdc--giải-pháp-hoàn-chỉnh), [SQS visibility/retry/delete](19-aws-communication-discovery.md#41-amazon-sqs--message-queue) |
+
+Giữ nguyên flow tổng quan khi animation chỉ theo một kịch bản; nhánh abort/failure vẫn phải đọc được. Snapshot chỉ thể hiện trạng thái tác giả giả định, không thực thi thao tác. Sơ đồ kiến trúc/dependency, timeline lịch sử, sequence cần thể hiện overlap và timing trace định lượng vẫn tĩnh; ví dụ Saga có `mode=steps` đã đủ Play/Pause nên không cần sinh thêm file animation.
 
 Thêm `interactive` vào fence hiện có:
 
@@ -292,9 +303,10 @@ client -> order
 
 - Bấm **Explore diagram** để tải controls; chưa bấm vẫn đọc được SVG. Không đưa D2 compiler/WASM vào browser. Toolbar hiện dùng tiếng Anh, chưa có API dịch nhãn.
 - `mode=steps` tự bật tương tác. Root là trạng thái ban đầu; mỗi entry trong `steps: { ... }` kế thừa bước trước. Không autoplay khi mở bài. Bàn phím canvas: `+`, `-`, `0`; trái/phải để chuyển bước.
+- `mode=animation interval=1800` thêm Animated SVG được render lúc build; interval là thời gian xem mỗi khung (ms), không phải business timer. Viewer không tự phát; motion trên mũi tên `style.animated` mặc định tắt và có nút bật riêng, tôn trọng reduced-motion. File Animated SVG tải xuống chạy theo hành vi native của D2, không mang theo controls/thiết lập giảm chuyển động của website. Với steps kế thừa, reset highlight của node/edge trước đó để không vô tình giữ nhiều trạng thái active.
 - Không có JavaScript vẫn có SVG, **All views** cho các board còn lại và **D2 source**. Giữ giải thích bằng prose để tài liệu gốc vẫn có ý nghĩa khi đọc trên GitHub.
 - Source links dùng `link: "./?source=..."` hoặc `node.link: "./?source=..."`, đặt URL trong dấu nháy kép, dùng cùng `project/snapshot/file/lines` như SourceRef. Pipeline validate các query links này trước khi sinh assets; adapter mở drawer không reload ở cùng trang. Dùng prefix `./?source=` cho D2: SDK hiện tại bỏ mất link chỉ có `?source=` khi compile. Website dùng trailing slash nên `./` vẫn trỏ đúng bài hiện tại. Giữ query URL percent-encoded, không nhúng secrets.
-- `mode=tabs` (scenarios độc lập), `mode=explorer` (layers/drill-down), `mode=animation`, override layout/theme theo fence, imports và TTF fonts cũng đã có trong package. Chưa bật đại trà vì chưa cần cho các ví dụ hiện tại; nhiều board làm tăng HTML/MDX và thời gian build. Icons local được dùng như hướng dẫn phía trên. Khi thêm, xem [API và giới hạn D2 0.6.0](https://github.com/vanhiep99w/docs-kit/blob/main/docs/d2.md), dùng roots tài nguyên chuyên biệt và chạy đầy đủ kiểm tra.
+- `mode=tabs` (scenarios độc lập), `mode=explorer` (layers/drill-down), override layout/theme theo fence, imports và TTF fonts cũng đã có trong package. Chưa bật đại trà vì chưa cần cho các ví dụ hiện tại; nhiều board làm tăng HTML/MDX và thời gian build. Icons local được dùng như hướng dẫn phía trên. Khi thêm, xem [API và giới hạn D2 0.6.0](https://github.com/vanhiep99w/docs-kit/blob/main/docs/d2.md), dùng roots tài nguyên chuyên biệt và chạy đầy đủ kiểm tra.
 
 ### SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài
 
