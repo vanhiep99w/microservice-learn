@@ -205,16 +205,16 @@ Tách DB không tự làm mất history: có thể dùng audit/history trong sta
 
 **Dual Write** là tình huống service phải thực hiện hai thao tác ghi độc lập — ghi database và publish event ra message broker — mà không có transaction nào bao cả hai:
 
+```d2 title="Dual Write — committed order không có event"
+direction: right
+commit: INSERT order COMMITTED
+publish: Publish OrderCreated thất bại
+result: "Order tồn tại\nInventory / Payment chưa được thông báo"
+commit -> publish: Broker down hoặc app crash giữa hai bước
+publish -> result
 ```
-Dual Write — 2 thao tác, KHÔNG atomic:
 
-  1. INSERT order vào DB          → ✅ COMMITTED
-  2. Publish OrderCreated vào Kafka → ❌ broker down / app crash giữa chừng
-
-  Kết quả: order tồn tại nhưng không service nào biết
-  → Inventory không trừ kho, Payment không charge
-  → "Order ma" trong hệ thống
-```
+Hai thao tác ghi độc lập không atomic. Cần lưu event intent cùng business data (ví dụ Transactional Outbox), không chỉ retry HTTP request với một order mới.
 
 Đảo thứ tự cũng hỏng: publish trước, ghi DB sau → event mồ côi cho dữ liệu không tồn tại. Đây không phải vấn đề hạ tầng HA — kể cả khi DB và Kafka đều 99.99% uptime, app vẫn có thể crash ngay giữa hai bước.
 

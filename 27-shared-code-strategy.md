@@ -619,7 +619,7 @@ Trong Microservice, các service giao tiếp qua **API** (REST, gRPC) hoặc **e
 2. Từ schema đó, **generate code** cho từng service
 3. Mỗi service có **code riêng** (generated), nhưng đảm bảo **compatible** với nhau
 
-```d2 title="5.1. Ý tưởng cốt lõi — \"Share contract, không share code\""
+```d2 title='5.1. Ý tưởng cốt lõi — "Share contract, không share code"'
 direction: right
 library: Shared implementation {
  order: Order
@@ -1725,7 +1725,7 @@ Shared code không chỉ ảnh hưởng tới **thiết kế** mà còn ảnh h�
 
 ### 7.1. Vấn đề cốt lõi — "Thay đổi 1 library → bao nhiêu service phải build lại?"
 
-```d2 title="7.1. Vấn đề cốt lõi — \"Thay đổi 1 library → bao nhiêu service phải build lại?\""
+```d2 title='7.1. Vấn đề cốt lõi — "Thay đổi 1 library → bao nhiêu service phải build lại?"'
 direction: right
 fix: "Dev fix common-auth1.5.1"
 nexus: "Publish Nexus"

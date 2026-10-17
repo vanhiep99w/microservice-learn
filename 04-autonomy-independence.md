@@ -774,22 +774,26 @@ Platform team không sở hữu business logic, service code và business data. 
 
 Team chịu trách nhiệm **toàn bộ lifecycle** của service: từ design → develop → test → deploy → monitor → on-call.
 
+```d2 title="Ownership tách rời và You Build It, You Run It"
+direction: down
+traditional: "Traditional — bàn giao qua ranh giới team" {
+  dev: Dev Team
+  code: Code
+  handoff: Throw over the wall
+  ops: Ops Team
+  dev -> code -> handoff -> ops
+}
+ownership: "Cùng team sở hữu toàn bộ lifecycle" {
+  code: Code
+  deploy: Deploy
+  monitor: Monitor
+  oncall: On-call
+  fix: Fix
+  code -> deploy -> monitor -> oncall -> fix -> code
+}
 ```
-Traditional Model:                    "You Build It, You Run It":
-──────────────────                    ─────────────────────────
 
-Dev Team → Code → "Throw over        Dev Team → Code → Deploy →
-the wall" → Ops Team                  Monitor → On-call → Fix
-
-Vấn đề:                              Lợi ích:
-• Dev không biết production           • Dev hiểu production
-  issues                                reality
-• Ops không hiểu business             • Feedback loop ngắn
-  logic                               • Quality tăng (phải
-• Blame game khi có sự cố              chịu hậu quả ❌ → code
-• Slow feedback loop                    tốt hơn ✅)
-                                      • Empathy với end user
-```
+Mô hình bàn giao thường khiến Dev thiếu context production, Ops thiếu business context và feedback chậm. Khi cùng team build và vận hành, feedback loop ngắn hơn, trách nhiệm chất lượng rõ hơn và team hiểu tác động tới end user.
 
 **Thực tế tại Amazon**: Mỗi team (6-8 người) sở hữu 1-2 service, chịu trách nhiệm on-call 24/7. Nếu service chết lúc 3 giờ sáng, chính team đó bị gọi dậy → Động lực viết code robust hơn.
 
@@ -801,24 +805,33 @@ Vấn đề:                              Lợi ích:
 
 Một **Self-Contained Service** là service có thể **hoàn thành tác vụ nghiệp vụ** mà **không cần gọi đồng bộ** đến service khác tại thời điểm xử lý request.
 
+```d2 title="Self-Contained — giảm phụ thuộc đồng bộ trên request path"
+direction: down
+sync: "Phụ thuộc đồng bộ" {
+  request: Request
+  order: Order Service
+  product: Product Service
+  pricing: Pricing Service
+  inventory: Inventory Service
+  request -> order
+  order -> product: Sync
+  order -> pricing: Sync
+  order -> inventory: Sync
+}
+local: "Đọc dữ liệu local" {
+  request: Request
+  order: Order Service
+  data: "Local read models\nProduct / Pricing / Inventory" {shape: cylinder}
+  events: Async events
+  response: Response
+  request -> order
+  order -> data: Đọc local
+  order -> response
+  order -> events: Đồng bộ bất đồng bộ
+}
 ```
-Không Self-Contained ❌:
-  Request → Order Service → gọi Product Service (sync)
-                          → gọi Pricing Service (sync)
-                          → gọi Inventory Service (sync)
-                          → trả response
-  
-  Vấn đề: Nếu bất kỳ service nào down → Order Service fail
 
-Self-Contained ✅:
-  Request → Order Service → dùng cached product data (local)
-                          → dùng cached pricing (local)
-                          → dùng cached inventory (local)
-                          → trả response
-                          → publish event (async) để sync data sau
-  
-  Lợi ích: Order Service hoạt động ngay cả khi service khác down
-```
+Đọc local giúp tiếp tục phục vụ các chức năng chấp nhận dữ liệu trễ khi upstream lỗi. Không dùng cache inventory hoặc pricing để khẳng định chắc chắn còn hàng/giá hợp lệ khi checkout; thao tác ghi vẫn cần contract xác nhận và consistency phù hợp.
 
 ### 7.2. Các thành phần của Self-Contained Service
 

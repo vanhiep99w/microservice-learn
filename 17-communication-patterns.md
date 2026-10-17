@@ -454,19 +454,31 @@ Giao tiếp bằng direct call (REST/gRPC) giữa các service tạo ra:
 
 **Event-Driven Architecture** (EDA — kiến trúc hướng sự kiện): service không gọi trực tiếp nhau mà **phát event** (sự kiện — mô tả *điều gì đã xảy ra*) lên một **message broker** (trung chuyển message: Kafka, RabbitMQ...). Các service quan tâm **subscribe** (đăng ký nhận) event đó.
 
+```d2 title="Command-Driven và Event-Driven — khác nhau ở dependency"
+direction: down
+command: "Command — yêu cầu một hành động" {
+  order: Order Service
+  payment: Payment.charge
+  inventory: Inventory.reserve
+  notification: Notification.send
+  order -> payment
+  order -> inventory
+  order -> notification
+}
+event: "Event — thông báo một sự kiện" {
+  order: Order Service
+  bus: Event Bus
+  payment: "Payment\nTự quyết định charge"
+  inventory: "Inventory\nTự quyết định reserve"
+  notification: "Notification\nTự quyết định gửi email"
+  order -> bus: OrderCreated
+  bus -> payment: Subscribe
+  bus -> inventory: Subscribe
+  bus -> notification: Subscribe
+}
 ```
-Tư duy khác biệt:
 
-Command-Driven: "Hãy làm việc này"        Event-Driven: "Việc này ĐÃ xảy ra"
-─────────────────────────────             ─────────────────────────────────
-Order → gọi Payment.charge()              Order → publish OrderCreated
-Order → gọi Inventory.reserve()           (Order KHÔNG biết ai lắng nghe)
-Order → gọi Notification.send()
-                                          Payment:    nghe event → charge
-→ Order biết rõ 3 service                 Inventory:  nghe event → reserve
-→ Tight coupling                         Notification: nghe event → gửi email
-                                          → Loose coupling
-```
+Command caller biết service nhận lệnh. Event producer chỉ công bố contract; consumer tự đăng ký và quyết định phản ứng. Các nhánh event độc lập, không ngụ ý thứ tự hoặc tính atomic giữa các consumer.
 
 Phân biệt quan trọng: **event** là *fact* quá khứ (`OrderCreated`, `PaymentCompleted`), **command** là *lệnh* hướng tới (`ChargePayment`, `ReserveStock`). Đặt tên event sai tense là dấu hiệu bạn đang "gọi hàm qua broker" chứ không thật sự event-driven. Phân tích sâu ở [06 §5](06-inter-service-communication.md#52-event-types--domain-event-vs-integration-event).
 

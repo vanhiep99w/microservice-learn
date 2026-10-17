@@ -211,45 +211,28 @@ third: Third-party Registration {
 
 Registry cần biết service instance nào **đang sống** và **có khả năng xử lý request**:
 
+```d2 title="Health Check — heartbeat, active probe và registration TTL"
+direction: down
+heartbeat: "Heartbeat — phát hiện mất liên lạc" {
+  payment: Payment Service
+  eureka: "Eureka\nKhông có heartbeat 90 s → DOWN"
+  payment -> eureka: Ping mỗi 30 s
+}
+active: "Active check — kiểm tra endpoint ứng dụng" {
+  consul: Consul
+  payment: "Payment /health"
+  health: "Kết quả\n200 + UP: healthy\n503 + DOWN: unhealthy\nTimeout: critical"
+  consul -> payment: GET mỗi 10 s
+  payment -> health
+}
+ttl: "Registration TTL" {
+  payment: Payment Service
+  registry: "Registry\nTTL 60 s — hết hạn thì xóa entry"
+  payment -> registry: Register / renew trước khi hết TTL
+}
 ```
-HEALTH CHECK — 3 cách kiểm tra:
-────────────────────────────────
 
-1. HEARTBEAT (Client → Registry)
-   ─────────────────────────────
-   Service gửi heartbeat (ping) đến registry mỗi 30s.
-   Registry không nhận heartbeat sau 90s → đánh dấu DOWN.
-
-   Payment Service → heartbeat mỗi 30s → Eureka
-   Payment Service crash → không gửi heartbeat
-   90s sau → Eureka: payment-001 = DOWN → loại khỏi danh sách
-
-   ⚠️ Vấn đề: Service gửi heartbeat nhưng thực ra không thể 
-   xử lý request (ví dụ: DB connection pool cạn) → registry 
-   vẫn nghĩ UP
-
-2. ACTIVE HEALTH CHECK (Registry → Service)
-   ─────────────────────────────────────────
-   Registry chủ động gọi health endpoint của service mỗi 10s.
-
-   Consul → GET http://payment:8084/health mỗi 10s
-   Response 200 + {"status": "UP", "db": "UP"} → HEALTHY
-   Response 503 + {"status": "DOWN", "db": "DOWN"} → UNHEALTHY
-   Không response (timeout) → CRITICAL
-
-   ✅ Chính xác hơn heartbeat: kiểm tra THỰC SỰ service 
-   có hoạt động không (bao gồm DB, cache, dependencies)
-
-3. TTL (Time-To-Live)
-   ───────────────────
-   Service phải "renew" registration trước khi TTL hết hạn.
-
-   Payment Service register với TTL = 60s
-   → Phải gọi renew trước 60s
-   → Không renew → registry tự xóa
-
-   Tương tự heartbeat nhưng ở mức registration thay vì ping.
-```
+Các khoảng 10/30/60/90 giây là cấu hình **minh họa**, không phải mặc định chung. Heartbeat còn sống không chứng minh app phục vụ được request (ví dụ pool DB cạn). Active check chỉ chính xác nếu health endpoint thực sự kiểm tra các điều kiện cần phục vụ traffic.
 
 ```
 Health Check Response — Nên check những gì?
@@ -874,45 +857,43 @@ KUBERNETES SERVICE TYPES:
 
 ### 9.3. Headless Services
 
+```d2 title="ClusterIP và Headless Service — client chọn endpoint ở đâu?"
+direction: down
+normal: "ClusterIP" {
+  client: Client
+  dns: DNS
+  vip: "Service Virtual IP\n10.96.45.123"
+  proxy: kube-proxy / service dataplane
+  pods: Payment Pods
+  client -> dns: Lookup payment-service
+  dns -> client: Trả Virtual IP
+  client -> vip -> proxy -> pods
+}
+headless: "Headless — clusterIP None" {
+  client: Client tự chọn endpoint
+  dns: "DNS\nCác endpoint đủ điều kiện publish"
+  pod1: "Pod 1\n10.244.1.5"
+  pod2: "Pod 2\n10.244.2.8"
+  pod3: "Pod 3\n10.244.3.12"
+  client -> dns: Lookup payment-service
+  dns -> client: Trả danh sách Pod IP
+  client -> pod1: Một endpoint đã chọn
+}
 ```
-HEADLESS SERVICE — Khi cần biết IP của TỪNG pod:
-─────────────────────────────────────────────────
 
-  Normal Service (ClusterIP):
-    DNS lookup "payment-service" → 10.96.45.123 (Virtual IP)
-    → Không biết pod nào phía sau
-    → kube-proxy load balance
+Headless hữu ích cho StatefulSet, client-side load balancing hoặc gRPC cần chọn endpoint trực tiếp. Ví dụ tên pod: `mysql-0.mysql-headless.default.svc`. Với ClusterIP, một kết nối HTTP/2 sống lâu có thể giữ các RPC trên cùng backend; muốn phân phối theo RPC cần client-side LB hoặc proxy hỗ trợ L7.
 
-  Headless Service (clusterIP: None):
-    DNS lookup "payment-service" → 
-      10.244.1.5    (Pod 1 IP)
-      10.244.2.8    (Pod 2 IP)
-      10.244.3.12   (Pod 3 IP)
-    → Trả về IP của TẤT CẢ pods!
-    → Client tự chọn pod (client-side discovery)
-
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: payment-service
-  spec:
-    clusterIP: None           # ← Headless!
-    selector:
-      app: payment
-    ports:
-      - port: 8084
-
-  Khi nào dùng Headless?
-  ──────────────────────
-  • StatefulSet: cần gọi đúng pod cụ thể (ví dụ: database replica)
-    → mysql-0.mysql-headless.default.svc (pod cụ thể)
-  • Client-side load balancing: client muốn tự chọn pod
-  • gRPC: cần kết nối trực tiếp đến mỗi pod (không qua L4 proxy)
-  
-  ⚠️ gRPC + ClusterIP = Vấn đề:
-  gRPC dùng HTTP/2 → 1 long-lived connection → kube-proxy chỉ route
-  connection ĐẦU TIÊN → mọi request đi đến 1 pod → không LB!
-  → Giải pháp: Headless Service + client-side LB, hoặc Service Mesh
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+spec:
+  clusterIP: None
+  selector:
+    app: payment
+  ports:
+    - port: 8084
 ```
 
 ---
@@ -986,36 +967,32 @@ Kong/NGINX chạy như Pods trong namespace riêng, scale bằng HPA; cloud LB �
 
 Discovery cơ bản không cần Eureka/Consul hay cấu hình IP thủ công.
 
+```d2 title="Order flow — Kubernetes DNS và Service routing"
+shape: sequence_diagram
+user: User
+gateway: API Gateway
+dns: Kubernetes DNS
+order: Order Pod 3
+users: User Pod 1
+inventory: Inventory Pod 2
+payment: Payment Pod 1
+kafka: Kafka
+notification: Notification Service
+user -> gateway: POST /orders
+gateway -> dns: Resolve order-service.production.svc
+dns -> gateway: Order Service ClusterIP
+gateway -> order: Service dataplane chọn một endpoint
+order -> users: "1 · GET user-service:8081/users/123"
+users -> order: User data
+order -> inventory: "2 · inventory-service:8085/check"
+inventory -> order: Inventory result
+order -> payment: "3 · payment-service:8084/charge"
+payment -> order: Payment result
+order -> kafka: "4 · Publish notification event (async)"
+kafka -> notification: Consume
 ```
-ORDER FLOW — Service Discovery in action:
-──────────────────────────────────────────
 
-  User → POST /orders
-
-  API Gateway:
-    → DNS: order-service.production.svc → ClusterIP
-    → kube-proxy → Order Pod #3
-
-  Order Service (Pod #3):
-    1. Validate user:
-       → http://user-service:8081/users/123
-       → DNS resolve → User Pod #1 (via kube-proxy)
-    
-    2. Check inventory:
-       → http://inventory-service:8085/check
-       → DNS resolve → Inventory Pod #2
-    
-    3. Process payment:
-       → http://payment-service:8084/charge
-       → DNS resolve → Payment Pod #1
-    
-    4. Send notification (async):
-       → Publish event to Kafka
-       → Notification Service consumes
-
-  Toàn bộ discovery = DNS + kube-proxy
-  Zero SDK, zero config, zero maintenance
-```
+Tên Service được DNS resolve tới ClusterIP; kube-proxy hoặc dataplane tương đương route connection tới endpoint đủ điều kiện. Số pod trên sơ đồ chỉ minh họa một lần chọn, không phải routing cố định. Không cần discovery SDK trong app, nhưng vẫn phải vận hành DNS, Service và health/readiness đúng.
 
 ---
 
@@ -1031,47 +1008,21 @@ ORDER FLOW — Service Discovery in action:
 | **Không cache registry** | Mỗi request đều query registry | Registry bị overload, thêm latency mỗi call | Client-side cache với TTL ngắn (30s), watch mechanism |
 | **Ignore graceful shutdown** | Service shutdown không deregister | Traffic đến instance đang shutdown → error | Implement shutdown hook: deregister → drain connections → stop |
 
+```d2 title="Graceful shutdown — ngừng nhận mới trước khi đóng tài nguyên"
+direction: down
+signal: Nhận SIGTERM
+bad: "Tắt ngay\nCắt in-flight request; registry/LB có thể còn route"
+remove: Deregister / đánh dấu không ready
+propagate: Chờ registry / LB cập nhật routing
+drain: "Drain in-flight requests\nVí dụ budget 15–30 s"
+close: Đóng connections
+stop: Shutdown
+signal -> bad: Không graceful
+signal -> remove: Graceful
+remove -> propagate -> drain -> close -> stop
 ```
-GRACEFUL SHUTDOWN — Tránh traffic đến instance đang tắt:
-────────────────────────────────────────────────────────
 
-  ❌ Không graceful:
-  Service nhận SIGTERM → tắt ngay
-  → Request đang xử lý bị cắt ngang
-  → Registry vẫn còn entry (chờ heartbeat timeout)
-  → Trong 30-90s: traffic vẫn route đến instance đã chết
-
-  ✅ Graceful shutdown:
-  Service nhận SIGTERM:
-    1. Deregister khỏi registry NGAY LẬP TỨC
-       → Registry xóa entry → không route traffic mới đến
-    2. Trả lỗi cho health check (503)
-       → Load balancer biết → ngưng gửi request mới
-    3. Chờ request đang xử lý hoàn thành (drain period: 15-30s)
-    4. Đóng connections
-    5. Shutdown
-
-  // Spring Boot example:
-  @PreDestroy
-  public void onShutdown() {
-      // 1. Deregister
-      discoveryClient.deregister();
-      // 2. Wait for in-flight requests
-      Thread.sleep(15_000);
-      // 3. Close resources
-      dataSource.close();
-  }
-
-  // Kubernetes: terminationGracePeriodSeconds
-  spec:
-    terminationGracePeriodSeconds: 30
-    containers:
-      - name: payment
-        lifecycle:
-          preStop:
-            exec:
-              command: ["sh", "-c", "sleep 10"]
-```
+Deregister hoặc health check 503 không làm mọi cache/LB cập nhật tức thì; cần chừa thời gian propagation trong shutdown budget. Với Kubernetes, cấu hình `terminationGracePeriodSeconds` (ví dụ 30 s) và lifecycle/preStop phù hợp; preStop cũng tiêu tốn grace period. Không dùng `Thread.sleep` cố định để thay việc theo dõi request đang xử lý.
 
 ---
 

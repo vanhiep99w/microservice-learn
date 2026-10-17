@@ -466,56 +466,23 @@ delay = random(base_delay, previous_delay × 3)
 
 Các lần thử đều dùng cùng operation identity. Tổng thời gian phải nằm trong deadline; hết budget thì dừng thay vì cố đủ số lần retry.
 
-```concurrency-lanes
-title: Retry với một lịch Full Jitter minh họa
-unit: ms
-provenance:
-  kind: illustrative
-  description: Giả định base 100 ms, attempt index bắt đầu từ 0. Hai lần chờ được tác giả chọn là 60 ms và 150 ms, không phải kết quả chạy random.
-lanes:
-  - id: caller
-    label: Caller
-  - id: dependency
-    label: Dependency
-events:
-  - id: a1
-    lane: caller
-    at: 0
-    label: Attempt 1
-  - id: f1
-    lane: dependency
-    at: 20
-    label: Lỗi transient
-  - id: a2
-    lane: caller
-    at: 80
-    label: Attempt 2
-  - id: f2
-    lane: dependency
-    at: 100
-    label: Lỗi transient
-  - id: a3
-    lane: caller
-    at: 250
-    label: Attempt 3
-  - id: ok
-    lane: dependency
-    at: 270
-    label: Thành công
-intervals:
-  - id: wait1
-    lane: caller
-    start: 20
-    end: 80
-    kind: wait
-    label: Jitter 60 ms trong [0, 100]
-  - id: wait2
-    lane: caller
-    start: 100
-    end: 250
-    kind: wait
-    label: Jitter 150 ms trong [0, 200]
+Lịch **minh họa**, đơn vị **ms**: base delay 100 ms, attempt index bắt đầu từ 0. Hai lần chờ 60 ms và 150 ms do tác giả chọn, không phải kết quả chạy random. Khoảng cách giữa các message không tỷ lệ với thời gian; đọc các mốc trên nhãn.
+
+```d2 title="Retry với một lịch Full Jitter minh họa"
+shape: sequence_diagram
+caller: Caller
+dependency: Dependency
+caller -> dependency: "0 ms · Attempt 1"
+dependency -> caller: "20 ms · Lỗi transient"
+caller -> caller: "Chờ 60 ms — chọn trong [0, 100]"
+caller -> dependency: "80 ms · Attempt 2"
+dependency -> caller: "100 ms · Lỗi transient"
+caller -> caller: "Chờ 150 ms — chọn trong [0, 200]"
+caller -> dependency: "250 ms · Attempt 3"
+dependency -> caller: "270 ms · Thành công"
 ```
+
+Mọi attempt dùng cùng operation identity. Chỉ bắt đầu lần thử tiếp theo khi còn đủ deadline budget; sơ đồ không thực thi timer hoặc retry.
 
 ### 3.4. Idempotency — Điều kiện tiên quyết
 
@@ -584,28 +551,29 @@ Circuit Breaker là pattern **quan trọng nhất** để ngăn Cascading Failur
 
 ### 4.1. Bài toán thực tế
 
+```d2 title="Circuit Breaker — giới hạn cascading failure"
+direction: down
+unprotected: "Không có Circuit Breaker" {
+  slow: Payment chậm 30 s thay vì 200 ms
+  wait: Order giữ thread chờ mỗi request
+  pool: "200 threads cùng bận\nRequest mới không có slot"
+  cascade: Caller của Order cũng bị chờ
+  slow -> wait -> pool -> cascade
+}
+protected: "Có Circuit Breaker" {
+  errors: "Payment lỗi / timeout\nĐạt ngưỡng failure đã cấu hình"
+  open: OPEN — không gọi Payment
+  fallback: "Fail fast / fallback theo contract\nVí dụ pending payment"
+  probe: HALF-OPEN — thử lại sau 30 s
+  closed: CLOSED khi probe đạt điều kiện
+  errors -> open -> fallback
+  open -> probe: Hết open wait
+  probe -> closed: Khôi phục
+  probe -> open: Vẫn lỗi
+}
 ```
-Tình huống: Order Service gọi Payment Service
 
-Không có Circuit Breaker:
-──────────────────────────────────────────────────────
-Payment Service bị chậm (latency 30s thay vì 200ms)
-→ Order Service chờ 30s cho mỗi request
-→ Thread pool (200 threads) đầy sau 200 requests
-→ Order Service không xử lý được request mới
-→ Inventory Service gọi Order Service cũng bị chờ
-→ Cascading Failure → Toàn bộ hệ thống sập
-
-Có Circuit Breaker:
-──────────────────────────────────────────────────────
-Payment Service bị chậm
-→ Circuit Breaker phát hiện: 50% requests thất bại
-→ Circuit OPEN: Ngắt mạch, không gọi Payment nữa
-→ Trả về fallback ngay lập tức (< 1ms)
-→ Order Service vẫn hoạt động bình thường ✅
-→ Sau 30s, thử gọi lại Payment (Half-Open)
-→ Payment đã khôi phục → Circuit CLOSED ✅
-```
+Các số 200 threads, 30 giây và ngưỡng 50% là **minh họa**; breaker cần sliding window/minimum calls và timeout phù hợp. Fail fast tại breaker có thể rất nhanh, nhưng không bảo đảm toàn bộ fallback dưới 1 ms hoặc cả hệ thống luôn hoạt động bình thường.
 
 ### 4.2. Circuit Breaker là gì?
 
@@ -693,39 +661,22 @@ Failure rate = 15/25 = 60% > 50% → OPEN!
 
 ### 4.5. Ví dụ thực tế — Payment Service gọi Bank API
 
+Timeline **minh họa**, đơn vị **giây**, không phải trace production. Khoảng cách giữa các mốc không tỷ lệ với thời lượng. Giả định window đã đủ số call để đánh giá và ba probe thành công đủ điều kiện đóng mạch.
+
+```d2 title="Payment Circuit Breaker — từ lỗi Bank API đến phục hồi"
+direction: down
+closed: "t=0 s · CLOSED\nBank API: 200 / 180 / 220 ms"
+errors: "Từ t=10 s · Bank lỗi\n4/5 calls thất bại = 80% > ngưỡng 50%"
+open: "t=30 s · OPEN\nKhông gọi Bank; trả pending hoặc queue theo contract"
+probe: "t=60 s · HALF-OPEN\nProbe: 200 / 190 / 210 ms"
+recovered: "t=61 s · CLOSED\nPhục hồi nếu đủ probe thành công"
+closed -> errors -> open
+open -> probe: Hết thời gian chờ 30 s
+probe -> recovered: Đạt tiêu chí đóng mạch
+probe -> open: Probe thất bại
 ```
-┌──────────────────────────────────────────────────────────────┐
-│         PAYMENT SERVICE → BANK API (Circuit Breaker)         │
-│                                                              │
-│  Timeline:                                                   │
-│  ─────────────────────────────────────────────────────────   │
-│                                                              │
-│  t=0s   🟢 CLOSED — Bank API bình thường                     │
-│         Request 1: ✅ 200ms                                  │
-│         Request 2: ✅ 180ms                                  │
-│         Request 3: ✅ 220ms                                  │
-│                                                              │
-│  t=10s  Bank API bắt đầu lỗi                                 │
-│         Request 4: ❌ timeout 5s                             │
-│         Request 5: ❌ timeout 5s                             │
-│         Request 6: ❌ 500 error                              │
-│         Request 7: ❌ timeout 5s                             │
-│         Request 8: ✅ 300ms                                  │
-│         → Failure rate: 4/5 = 80% > 50%                      │
-│                                                              │
-│  t=30s  🔴 OPEN — Ngắt mạch!                                 │
-│         Request 9-100: Reject ngay (< 1ms)                   │
-│         → Trả về: "Payment pending, try later"               │
-│         → Hoặc: Queue payment để xử lý sau                   │
-│                                                              │
-│  t=60s  🟡 HALF-OPEN — Thử lại                               │
-│         Request 101: ✅ 200ms → Bank đã OK!                  │
-│         Request 102: ✅ 190ms                                │
-│         Request 103: ✅ 210ms                                │
-│                                                              │
-│  t=61s  🟢 CLOSED — Hoạt động bình thường                    │
-└──────────────────────────────────────────────────────────────┘
-```
+
+Trong năm call lỗi minh họa có ba timeout 5 s, một HTTP 500 và một thành công 300 ms. Khi OPEN, các request mới bị reject tại breaker, không gọi Bank API; pending/queue là quyết định nghiệp vụ riêng, không đồng nghĩa thanh toán đã thành công.
 
 ### 4.6. Circuit Breaker + Retry — Kết hợp
 
@@ -921,20 +872,23 @@ separate: Separate Pools {
 
 **Ví dụ Kubernetes Resource Bulkhead** — cô lập ở tầng infrastructure:
 
+```d2 title="Bulkhead bằng resource limits — cô lập memory leak"
+direction: down
+shared: "Chung node 8 CPU / 16 GB RAM — không giới hạn riêng" {
+  payment: Payment memory leak
+  node: Node cạn RAM
+  order: Order cũng bị ảnh hưởng
+  payment -> node -> order
+}
+isolated: "Giới hạn riêng theo container / Pod" {
+  payment: "Payment\nrequests: 250m / 256 MiB\nlimits: 500m / 512 MiB"
+  oom: Payment bị OOMKill khi chạm memory limit
+  order: "Order — budget riêng\nrequests: 250m / 256 MiB\nlimits: 500m / 512 MiB"
+  payment -> oom
+}
 ```
-Không Bulkhead:
-  Payment + Order chạy chung node (8 CPU, 16GB RAM)
-  → Payment bị memory leak → node hết RAM → cả 2 chết ❌
 
-Có Bulkhead (resource limits):
-  Pod Payment:  requests: CPU 250m, RAM 256Mi
-                limits:   CPU 500m, RAM 512Mi
-  Pod Order:    requests: CPU 250m, RAM 256Mi
-                limits:   CPU 500m, RAM 512Mi
-
-  → Payment memory leak → chỉ OOMKill pod Payment
-  → Pod Order không bị ảnh hưởng ✅
-```
+Memory limit giúp thu hẹp phạm vi lỗi, không bảo đảm Order miễn nhiễm node pressure hoặc lỗi node. Resource requests phục vụ scheduling; CPU vượt limit bị throttle, không bị OOMKill vì CPU.
 
 ### 5.3. Các loại Bulkhead
 

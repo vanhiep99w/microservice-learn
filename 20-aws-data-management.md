@@ -780,50 +780,25 @@ Bốn pipeline là alternatives, không phải bốn bước nối tiếp. Dynam
 
 **Eventual consistency khi đọc lại:** commit thành công ở write database không đồng nghĩa OpenSearch đã phục vụ version mới.
 
-```concurrency-lanes
-title: "CQRS trên AWS: commit trước, projection cập nhật sau"
-unit: step
-provenance:
-  kind: illustrative
-  description: Ví dụ một update đi từ DynamoDB Streams qua projector tới OpenSearch; các bước không biểu thị SLA hoặc độ trễ đo được.
-lanes:
-  - id: write
-    label: DynamoDB
-  - id: projector
-    label: Stream projector
-  - id: read
-    label: OpenSearch / client
-events:
-  - id: committed
-    lane: write
-    at: 0
-    label: Order PAID được commit
-  - id: stale
-    lane: read
-    at: 1
-    label: Query vẫn thấy PENDING
-  - id: project
-    lane: projector
-    at: 2
-    label: Nhận record và index version mới
-  - id: fresh
-    lane: read
-    at: 3
-    label: Index refresh, query thấy PAID
-intervals:
-  - id: lag
-    lane: read
-    start: 0
-    end: 3
-    kind: wait
-    label: Cửa sổ projection lag
-relations:
-  - id: delivery
-    from: committed
-    to: project
-    label: CDC bất đồng bộ
-    description: Giả định consumer áp dụng version an toàn; không coi thứ tự trên sơ đồ là cơ chế chống duplicate hoặc stale overwrite.
+Lịch **minh họa** cho một update, đơn vị **bước logic**. Cửa sổ projection lag kéo dài từ bước 0 tới bước 3; khoảng cách trên sơ đồ không biểu thị thời lượng, SLA hoặc độ trễ đo được.
+
+```d2 title="CQRS trên AWS — commit trước, projection cập nhật sau"
+shape: sequence_diagram
+write: DynamoDB
+projector: Stream Projector
+search: OpenSearch
+client: Client
+write -> write: "0 · Commit order PAID"
+client -> search: "1 · Query trong cửa sổ projection lag"
+search -> client: "Vẫn thấy PENDING"
+write -> projector: "2 · CDC bất đồng bộ qua DynamoDB Streams"
+projector -> search: "Index version mới"
+search -> search: "3 · Index refresh"
+client -> search: "Query lại"
+search -> client: "Thấy PAID"
 ```
+
+Giả định projector xử lý version an toàn. Thứ tự message được vẽ không tự chống duplicate hoặc stale overwrite; index refresh cũng là một bước riêng sau khi ghi vào OpenSearch.
 
 ## 5. Event Sourcing trên AWS
 

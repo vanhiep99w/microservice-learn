@@ -254,24 +254,17 @@ routes:
 
 Một monolith e-commerce gồm `User | Product | Order | Payment | Inventory | Search` dùng chung một PostgreSQL. Kế hoạch strangling minh họa (timeline chỉ mang tính ví dụ):
 
+```d2 title="E-Commerce — thứ tự tách service trong migration"
+direction: down
+search: "Phase 1 · Search\nCoupling thấp; scale sale; search engine\nSync: monolith event → consumer index"
+auth: "Phase 2 · User / Auth\nTái sử dụng cho SSO / OAuth2"
+payment: "Phase 3 · Payment\nRanh giới bảo mật / PCI DSS"
+core: "Phase 4 · Order + Inventory\nCùng đợt vì coupling cao"
+product: "Phase 5 · Product\nDecommission monolith sau verify"
+search -> auth -> payment -> core -> product
 ```
-Phase 1: Tách Search trước
-  Lý do chọn: coupling thấp nhất, cần scale riêng lúc sale,
-  và công nghệ phù hợp hơn (search engine thay vì SQL LIKE)
-  Data sync: monolith publish event → Search service consume & index
 
-Phase 2: Tách User/Auth
-  Lý do: tái sử dụng cho SSO/OAuth2 của các app khác trong công ty
-
-Phase 3: Tách Payment
-  Lý do: compliance (PCI-DSS) — cần môi trường bảo mật riêng
-
-Phase 4: Tách Order + Inventory cùng lúc
-  Lý do: hai module coupling cao với nhau — tách riêng từng cái
-  sẽ tạo nhiều call qua lại tạm thời; tách cùng đợt gọn hơn
-
-Phase 5: Tách Product, decommission monolith
-```
+Đây là thứ tự phase **minh họa**, không phải trục thời gian tỷ lệ hoặc kế hoạch mặc định. Độ dài mỗi phase phụ thuộc coupling, migration data, kiểm chứng và rollback path.
 
 Sau mỗi phase: proxy route được mở rộng sang service mới, code cũ bị xóa, monolith nhỏ dần. Nếu Phase 3 (Payment) gặp vấn đề nghiêm trọng, team có thể **đóng băng kế hoạch** mà vẫn giữ nguyên mọi giá trị của Phase 1–2 — điều big bang rewrite không thể làm được.
 

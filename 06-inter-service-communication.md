@@ -516,23 +516,31 @@ kafka -> analytics: Async
 
 **Event-Driven Architecture** (EDA) là kiến trúc mà các service giao tiếp bằng cách **phát ra events** (sự kiện) khi có thay đổi, thay vì gọi trực tiếp service khác.
 
+```d2 title="Command-Driven và Event-Driven — khác nhau ở dependency"
+direction: down
+command: "Command — yêu cầu một hành động" {
+  order: Order Service
+  payment: Payment.charge
+  inventory: Inventory.reserve
+  notification: Notification.send
+  order -> payment
+  order -> inventory
+  order -> notification
+}
+event: "Event — thông báo một sự kiện" {
+  order: Order Service
+  bus: Event Bus
+  payment: "Payment\nTự quyết định charge"
+  inventory: "Inventory\nTự quyết định reserve"
+  notification: "Notification\nTự quyết định gửi email"
+  order -> bus: OrderCreated
+  bus -> payment: Subscribe
+  bus -> inventory: Subscribe
+  bus -> notification: Subscribe
+}
 ```
-Khác biệt tư duy:
-──────────────────
 
-Command-Driven (imperative):        Event-Driven (reactive):
-"Hãy làm việc này"                  "Việc này ĐÃ XẢY RA"
-
-Order Service:                      Order Service:
-  → gọi Payment.charge()             → publish OrderCreated event
-  → gọi Inventory.reserve()          
-  → gọi Notification.send()         Payment Service: "Ồ, có order mới → charge"
-                                    Inventory: "Ồ, có order mới → reserve"
-                                    Notification: "Ồ, có order mới → email"
-
-Order Service BIẾT về 3 service      Order Service KHÔNG BIẾT ai đang lắng nghe
-→ Tight coupling                    → Loose coupling
-```
+Command caller biết service nhận lệnh. Event producer chỉ công bố contract; consumer tự đăng ký và quyết định phản ứng. Các nhánh event độc lập, không ngụ ý thứ tự hoặc tính atomic giữa các consumer.
 
 ### 5.2. Event types — Domain Event vs Integration Event
 
@@ -731,26 +739,21 @@ Dùng khi cần response nhưng muốn buffer, retry/resilience qua broker và c
 
 **Saga** quản lý distributed transaction qua chuỗi local transactions + compensating actions:
 
+```d2 title="Saga đặt hàng — thành công hoặc compensation"
+direction: down
+create: "1 · Order\nCreate PENDING"
+charge: "2 · Payment\nCharge money"
+reserve: "3 · Inventory\nReserve stock" {shape: diamond}
+confirm: "4 · Order\nCONFIRMED"
+refund: "2′ · Payment\nREFUND"
+cancel: "1′ · Order\nCANCELLED"
+create -> charge -> reserve
+reserve -> confirm: Thành công
+reserve -> refund: Thất bại
+refund -> cancel: Refund đã hoàn tất
 ```
-Saga — Place Order:
-───────────────────
 
-Happy path:
-  1. Order Service:    Create order (PENDING)        ✅
-  2. Payment Service:  Charge money                  ✅
-  3. Inventory Service: Reserve stock                ✅
-  4. Order Service:    Update order (CONFIRMED)      ✅
-
-Failure (step 3 fails):
-  1. Order Service:    Create order (PENDING)        ✅
-  2. Payment Service:  Charge money                  ✅
-  3. Inventory Service: Reserve stock                ❌ FAIL
-  → Compensate:
-  2'. Payment Service: REFUND money                  ↩️
-  1'. Order Service:   Update order (CANCELLED)      ↩️
-  
-  Mỗi step thất bại → chạy compensating action ngược lại
-```
+Đây là hai nhánh của cùng một saga; không chạy cả confirm lẫn cancel. Compensation là thao tác nghiệp vụ mới và cũng có thể lỗi, nên cần retry/idempotency và theo dõi trạng thái chưa hoàn tất.
 
 > **Chi tiết**: Saga Pattern sẽ được trình bày kỹ trong [doc 09 — Data Management](09-data-management.md).
 

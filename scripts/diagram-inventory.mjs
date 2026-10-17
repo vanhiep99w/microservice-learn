@@ -5,18 +5,26 @@ import { pathToFileURL } from 'node:url';
 import { parser } from './source-examples.mjs';
 import { visit } from 'unist-util-visit';
 
-export async function inventoryDiagrams(root = '.') {
+/** Canonical sources only, including nested pattern pages and aggregates. */
+export async function sourceDocuments(root = '.') {
   const files = [];
-  for (const entry of await readdir(root, { withFileTypes: true })) {
-    if (entry.isFile() && /^\d\d-.*\.md$/u.test(entry.name)) files.push(entry.name);
-    if (entry.isDirectory() && /^17-/u.test(entry.name)) {
-      for (const name of await readdir(join(root, entry.name))) {
-        if (name.endsWith('.md')) files.push(`${entry.name}/${name}`);
-      }
+  async function patterns(dir) {
+    for (const entry of await readdir(join(root, dir), { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) await patterns(path);
+      else if (entry.isFile() && entry.name.endsWith('.md')) files.push(path);
     }
   }
+  for (const entry of await readdir(root, { withFileTypes: true })) {
+    if (entry.isFile() && /^\d\d-.*\.md$/u.test(entry.name)) files.push(entry.name);
+    if (entry.isDirectory() && /^17-/u.test(entry.name)) await patterns(entry.name);
+  }
+  return files.sort();
+}
+
+export async function inventoryDiagrams(root = '.') {
   const blocks = [];
-  for (const file of files.sort()) {
+  for (const file of await sourceDocuments(root)) {
     const markdown = await readFile(join(root, file), 'utf8');
     let heading = '';
     let index = 0;
@@ -27,7 +35,7 @@ export async function inventoryDiagrams(root = '.') {
       const language = node.lang || 'text';
       // Heuristic only: trees, tables, formulas and prose with arrows also
       // match. Review the content before deciding whether to migrate it.
-      const hasDiagramGlyphs = /[┌┐└┘╔╗╚╝├┬┤┴]|[─━═]{2,}[▶►>]|(?:--+|==+)>|[→←⇄⇆▼↓]/u.test(code);
+      const hasDiagramGlyphs = /[┌┐└┘╔╗╚╝├┬┤┴]|[─━═]{2,}|(?:-+|=+)>|[→←⇄⇆▼↓]/u.test(code);
       const kind = language === 'mermaid' ? 'mermaid'
         : language === 'd2' ? 'd2'
           : language === 'text' && hasDiagramGlyphs ? 'ascii-candidate'

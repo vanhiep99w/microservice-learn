@@ -80,12 +80,17 @@ Nếu hai thao tác không nằm trong cùng một transaction, không có thờ
 
 Ví dụ, Order Service cần tạo order và phát `OrderCreated` để Inventory Service bắt đầu xử lý tồn kho:
 
-```text
-Dual Write — hai thao tác không atomic:
-
-  1. INSERT order vào Order DB
-  2. Publish OrderCreated vào broker
+```d2 title="Dual Write — hai lần ghi độc lập"
+shape: sequence_diagram
+order: Order Service
+db: Order DB
+broker: Message Broker
+order -> db: INSERT order
+ db -> order: COMMIT thành công
+order -> broker: Publish OrderCreated — thao tác ghi thứ hai
 ```
+
+Không có transaction chung cho hai lời gọi trên. Publish có thể fail hoặc app có thể crash sau commit; broker accept cũng không đảm bảo application đã nhận được ACK.
 
 | Thứ tự hoặc sự cố | Kết quả | Hệ quả |
 |---|---|---|

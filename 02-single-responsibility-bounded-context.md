@@ -282,7 +282,7 @@ Nói đơn giản: **Bounded Context = "Trong phạm vi này, từ X có nghĩa 
 
 Đây là ví dụ kinh điển để hiểu Bounded Context:
 
-```d2 title="Ví dụ: Cùng khái niệm \"Product\" nhưng khác ngữ cảnh"
+```d2 title='Ví dụ: Cùng khái niệm "Product" nhưng khác ngữ cảnh'
 direction: right
 catalog: "Catalog Context" { model: "Product\nname • description • images[]\ncategory • specifications" }
 pricing: "Pricing Context" { model: "Product\nbasePrice • discount • taxRate\nfinalPrice() • currency" }

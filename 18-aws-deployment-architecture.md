@@ -878,21 +878,28 @@ prod.task.icon: "https://icons.d2lang.com/aws/Compute/Amazon-Elastic-Container-S
 
 ### Infrastructure
 
+```d2 title="Production account — nhóm tài nguyên triển khai ShopVN"
+direction: down
+account: Production Account {
+  vpc: "VPC 10.0.0.0/16\nHai AZ: ap-southeast-1a / 1b" {
+    ecs: shopvn-prod ECS Cluster {
+      fargate: "7 Fargate Services\nUser / Product / Order / Payment\nInventory / Search / Cart"
+      ec2: Report — EC2 + Spot
+    }
+    external: External ALB — api.shopvn.com
+    internal: Internal ALB — service-to-service
+    aurora: "Aurora PostgreSQL Multi-AZ\nOrder / User / Inventory" {shape: cylinder}
+    redis: "ElastiCache Redis\nProduct cache / session store" {shape: cylinder}
+  }
+  lambda: "3 Lambda functions\nNotification / Image / Recommendation"
+  dynamo: "DynamoDB\nCart / Session" {shape: cylinder}
+  sqs: SQS — order events / notification queue
+  s3: S3 — product images / static assets
+  cdn: CloudFront — static / API caching
+}
 ```
-Account: Production
-├── VPC: 10.0.0.0/16, 2 AZ (ap-southeast-1a, 1b)
-├── ECS Cluster: shopvn-prod
-│   ├── 7 Fargate Services (User, Product, Order, Payment, Inventory, Search, Cart)
-│   └── 1 EC2 Service + Spot (Report)
-├── ALB: External (api.shopvn.com) + Internal (service-to-service)
-├── Lambda: 3 functions (Notification, Image, Recommendation)
-├── RDS Aurora PostgreSQL: Multi-AZ (Order, User, Inventory)
-├── DynamoDB: Cart, Session
-├── ElastiCache Redis: Product cache, session store
-├── SQS: Order events, Notification queue
-├── S3: Product images, static assets
-└── CloudFront: CDN cho static + API caching
-```
+
+Đây là sơ đồ **phân nhóm tài nguyên**, không phải network/data-flow: không suy ra mọi service được gọi trực tiếp hoặc cùng chia sẻ schema. DynamoDB, SQS, S3, Lambda và CloudFront không mặc định là tài nguyên đặt trong subnet; connectivity/VPC endpoint phải cấu hình riêng.
 
 ### Chi phí ước tính (monthly)
 

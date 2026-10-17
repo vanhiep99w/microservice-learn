@@ -141,33 +141,17 @@ payment -- bus
 
 ### Dòng thời gian: SOA ra đời trước Microservice
 
+```d2 title="Các mốc phát triển từ Monolith qua SOA tới Microservice"
+direction: down
+monolith: "~1990s · Monolithic Architecture\nMột khối ứng dụng, deploy cùng nhau"
+soa: "~2000–2005 · SOA phổ biến\nService kết nối qua ESB\nEnterprise: ngân hàng / viễn thông\nIBM WebSphere / Oracle SOA Suite / TIBCO"
+limits: "~2005–2010 · Các hạn chế thường gặp\nESB phình to / bottleneck; SOAP/XML nặng"
+microservices: "~2011–2014 · Microservice được chú ý\nNetflix / Amazon / Spotify\nBài viết Fowler & Lewis năm 2014\nTách service, tránh tập trung logic vào ESB"
+cloud: "~2015+ · Cloud-native hỗ trợ mạnh\nDocker / Kubernetes / cloud platform"
+monolith -> soa -> limits -> microservices -> cloud
 ```
-Timeline kiến trúc phần mềm:
-═══════════════════════════════════════════════════════════════
 
-~1990s ──── Monolithic Architecture
-            │  Tất cả trong 1 cục, deploy 1 lần
-            │
-~2000-2005 ── SOA ra đời
-            │  Tách thành service, kết nối qua ESB
-            │  Phổ biến trong enterprise (ngân hàng, viễn thông)
-            │  Công cụ: IBM WebSphere, Oracle SOA Suite, TIBCO
-            │
-~2005-2010 ── SOA bộc lộ vấn đề
-            │  ESB phình to, trở thành bottleneck
-            │  SOAP/XML quá nặng nề
-            │
-~2011-2014 ── Microservice ra đời
-            │  Netflix, Amazon, Spotify áp dụng thành công
-            │  Martin Fowler & James Lewis đặt tên chính thức (2014)
-            │  Lấy ý tưởng tách service từ SOA,
-            │  nhưng BỎ ĐI sự tập trung (ESB)
-            │
-~2015+  ──── Microservice trở thành xu hướng chính
-            Cloud-native, Docker, Kubernetes hỗ trợ mạnh
-
-═══════════════════════════════════════════════════════════════
-```
+Đây là các mốc lịch sử **khái quát**, không phải ngày mọi tổ chức cùng chuyển kiến trúc. Khoảng cách giữa các thẻ không biểu thị thời lượng; các mô hình vẫn cùng tồn tại.
 
 > 💡 **Microservice không phải phát minh mới hoàn toàn** — nó là bước tiến hóa từ SOA, giữ lại ý tưởng hay (tách service) và loại bỏ điểm yếu (ESB tập trung, shared DB).
 
@@ -213,7 +197,7 @@ HR lấy thông tin nhân viên → ESB chuyển cho Accounting → Accounting t
 
 ### Ví dụ cụ thể: Luồng "Tạo đơn hàng" trong SOA
 
-```d2 title="Ví dụ cụ thể: Luồng \"Tạo đơn hàng\" trong SOA"
+```d2 title='Ví dụ cụ thể: Luồng "Tạo đơn hàng" trong SOA'
 shape: sequence_diagram
 "Client": "🖥️ Ứng dụng"
 "ESB": "📡 ESB (Trung tâm)"

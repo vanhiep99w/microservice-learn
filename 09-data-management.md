@@ -519,24 +519,24 @@ Trong monolith, chúng ta quen với **ACID** (Atomicity, Consistency, Isolation
 | **Phù hợp** | Single database, transaction đơn giản | Distributed system, microservices |
 | **Trade-off** | Hy sinh availability khi cần | Hy sinh consistency tạm thời |
 
+Các mốc 50 ms và 200 ms chỉ là **minh họa**, không phải SLA. Khoảng cách trên sơ đồ không biểu thị thời lượng.
+
+```d2 title="Eventual Consistency — các consumer cập nhật độc lập"
+direction: right
+order: Order Service
+db: Order DB {shape: cylinder}
+bus: Event Bus
+inventory: "Inventory Service\nVí dụ cập nhật sau 50 ms"
+inventorydb: Inventory DB {shape: cylinder}
+notification: "Notification Service\nVí dụ gửi email sau 200 ms"
+order -> db: Commit order
+order -> bus: OrderCreated sau commit
+bus -> inventory: Async delivery
+bus -> notification: Async delivery
+inventory -> inventorydb: Trừ tồn kho
 ```
-Ví dụ Eventual Consistency — E-Commerce:
-─────────────────────────────────────────
 
-  1. User đặt hàng → Order Service ghi order vào DB ✅
-  2. Order Service publish event "OrderCreated"
-  3. Inventory Service nhận event → trừ tồn kho (sau 50ms)
-  4. Notification Service nhận event → gửi email (sau 200ms)
-
-  Trong khoảng 50ms sau bước 1:
-    Order DB: order tồn tại ✅
-    Inventory DB: chưa trừ tồn kho ❌ (inconsistent!)
-    
-  Sau 200ms: Tất cả đã sync → consistent ✅
-
-  → "Eventually" consistent — không phải "immediately" consistent
-  → Chấp nhận được cho hầu hết business case
-```
+Giữa commit order và consumer xử lý, các read model có thể chưa đồng bộ. Hai consumer không phải hai bước tuần tự; chỉ hội tụ khi delivery và xử lý thành công. Muốn không mất event giữa DB commit và publish, cần Outbox/CDC hoặc cơ chế tin cậy tương đương.
 
 ---
 
@@ -787,19 +787,21 @@ Chọn nhanh:
 
 **Compensating Transaction** (giao dịch bù) là transaction đảo ngược hiệu ứng của transaction trước đó. **Không phải rollback** — mà là **tạo transaction mới** để undo.
 
-```
-Compensating Transaction ≠ Rollback:
-─────────────────────────────────────
-
-  Rollback (ACID):
-    BEGIN → INSERT order → ROLLBACK
-    → Order chưa bao giờ tồn tại (undo hoàn toàn)
-
-  Compensating Transaction (Saga):
-    T1: INSERT order (status=CREATED)      → COMMITTED ✅ (đã tồn tại!)
-    C1: UPDATE order SET status=CANCELLED  → COMMITTED ✅ (tạo transaction mới)
-    → Order VẪN tồn tại trong DB, nhưng status = CANCELLED
-    → Có audit trail: ai tạo, khi nào cancel
+```d2 title="Local rollback không giống Saga compensation"
+direction: down
+rollback: "Rollback của local transaction" {
+  begin: BEGIN
+  insert: INSERT order chưa commit
+  undo: ROLLBACK
+  result: Không có committed order mới
+  begin -> insert -> undo -> result
+}
+compensate: "Saga — transaction mới bù cho transaction đã commit" {
+  create: "T1 · INSERT order CREATED\nCOMMITTED"
+  cancel: "C1 · UPDATE order CANCELLED\nCOMMITTED"
+  result: "Order vẫn tồn tại\nLưu audit trail tạo / hủy"
+  create -> cancel -> result
+}
 ```
 
 ```
@@ -1324,34 +1326,19 @@ p3 -> search
 
 Admin query `orders_view WHERE status=SHIPPED`; dashboard query `daily_stats` theo ngày; user search `q=iPhone&status=SHIPPED`. Mỗi projection tối ưu một use case. Có thể thêm read model không đổi write side và rebuild từ event history còn đầy đủ.
 
+Chỉ rebuild được khi event stream còn đầy đủ, đọc được và projection code tái tạo state đúng. Event Store vẫn cần durability, backup và retention; không có bảo đảm “không bao giờ mất data” vô điều kiện.
+
+```d2 title="Rebuild projection từ event stream còn được giữ đầy đủ"
+direction: right
+events: "Event Store\nNguồn sự thật còn đầy đủ" {shape: cylinder}
+projector: Projection replay từ sequence đầu tiên
+new: Read model mới {shape: cylinder}
+verify: Đối chiếu kết quả / bắt kịp events mới
+switch: Chuyển reader sang model đã verify
+events -> projector -> new -> verify -> switch
 ```
-Projection bị lỗi / mất data thì sao?
-──────────────────────────────────────
 
-  Read DB chỉ là "bản sao được tính từ events".
-  Events (source of truth) KHÔNG BAO GIỜ mất.
-
-  Nếu Read DB hỏng:
-  ──────────────────
-    1. Xoá Read DB
-    2. Chạy lại Projection từ event #1
-    3. Projection replay TẤT CẢ events → rebuild Read DB
-    4. Done ✅ — data giống hệt như trước
-
-  Ví dụ:
-    Elasticsearch index bị corrupt
-    → Xoá index
-    → Projection replay 1 triệu events → rebuild index
-    → Mất vài phút, nhưng data KHÔNG MẤT
-
-  Giống như:
-    Sổ tiết kiệm (events) vẫn còn nguyên
-    Bảng tóm tắt số dư (Read DB) bị rách
-    → Tính lại từ sổ giao dịch → ra đúng số dư ✅
-
-  Đây là 1 ưu điểm lớn của Event Sourcing:
-  Read DB = DISPOSABLE (dùng xong có thể xoá, rebuild lại được)
-```
+Ví dụ index Elasticsearch hỏng: dựng index thay thế từ events, kiểm tra và catch up trước khi chuyển đọc. Không xóa read model production đang phục vụ chỉ để thử replay; thời gian rebuild phụ thuộc dung lượng, throughput và backlog. Read model có thể dựng lại, còn Event Store thì không phải dữ liệu disposable.
 
 ```
 Công nghệ thường dùng cho Projection:
@@ -1560,88 +1547,57 @@ join -> client
 
 ### 10.1. Vấn đề: Dual Write
 
-```
-Dual Write Problem:
-──────────────────
-
-  Order Service cần:
-  1. Ghi order vào DB
-  2. Publish event "OrderCreated" vào Message Broker
-
-  ❌ Vấn đề — 2 bước KHÔNG ATOMIC:
-
-  Scenario 1: DB OK, Publish FAIL
-  ────────────────────────────────
-    1. INSERT order vào DB → ✅ COMMITTED
-    2. Publish event vào Kafka → ❌ Kafka down!
-    → Order tồn tại trong DB nhưng KHÔNG AI biết
-    → Inventory không trừ kho, Payment không charge
-
-  Scenario 2: Publish OK, DB FAIL
-  ────────────────────────────────
-    1. Publish event vào Kafka → ✅
-    2. INSERT order vào DB → ❌ DB lỗi!
-    → Event đã gửi nhưng order KHÔNG tồn tại
-    → Inventory trừ kho cho order ma
-
-  Scenario 3: Service crash giữa chừng
-  ─────────────────────────────────────
-    1. INSERT order vào DB → ✅ COMMITTED
-    2. --- SERVICE CRASH ---
-    → Event KHÔNG BAO GIỜ được publish
-
-  ⚠️ Bạn KHÔNG THỂ đảm bảo 2 writes atomic
-     mà không dùng distributed transaction (2PC).
-     Nhưng 2PC thì đã nói rồi — TRÁNH trong microservice.
+```d2 title="Dual Write — đổi thứ tự không đóng được cửa sổ lỗi"
+direction: down
+dbfirst: "DB trước" {
+  commit: INSERT order COMMITTED
+  publish: Publish OrderCreated thất bại
+  result: "Order tồn tại nhưng consumer không biết\nInventory không trừ kho; Payment không charge"
+  commit -> publish: Broker down
+  publish -> result
+}
+brokerfirst: "Broker trước" {
+  publish: Publish OrderCreated thành công
+  insert: INSERT order thất bại
+  result: "Event đã tới consumer\nInventory có thể xử lý order không tồn tại"
+  publish -> insert: DB error
+  insert -> result
+}
+crash: "Crash giữa hai bước" {
+  commit: INSERT order COMMITTED
+  killed: Process crash
+  result: Không có process publish event
+  commit -> killed -> result
+}
 ```
 
+Ba container là các **kịch bản thay thế**, không nối tiếp nhau. Hai lời gọi ghi độc lập không atomic; đảo thứ tự không sửa được vấn đề. Outbox lưu business data và event intent cùng local transaction, rồi publish bất đồng bộ; không cần 2PC giữa DB và broker.
+
+Có cần Outbox khi cả DB và Kafka đều HA? **Có**, nếu yêu cầu business write và event intent phải atomic. HA (High Availability) giảm gián đoạn hạ tầng, không ghép hai lời gọi của application thành một transaction.
+
+```d2 title="HA không thay thế tính atomic của Dual Write"
+direction: down
+network: "Network lỗi dù DB và Kafka còn sống" {
+  db: DB commit thành công
+  send: "App publish timeout\nChưa biết broker đã nhận hay chưa"
+  result: "Có thể thiếu event hoặc phát lại\nHA không đóng cửa sổ lỗi"
+  db -> send -> result
+}
+process: "App lỗi dù hạ tầng còn sống" {
+  db: DB commit thành công
+  kill: Pod bị kill / OOM / deploy
+  result: Chưa gửi event
+  db -> kill -> result
+}
+order: "Publish trước cũng không an toàn" {
+  send: Kafka nhận event
+  db: DB từ chối INSERT do unique constraint
+  result: Consumer nhận event cho order không tồn tại
+  send -> db -> result
+}
 ```
-"Nhưng DB và Kafka của tôi đều HA, có cần Outbox không?"
-─────────────────────────────────────────────────────────
 
-  Trả lời: CÓ — vì HA và Outbox giải quyết 2 VẤN ĐỀ KHÁC NHAU.
-
-  HA giải quyết: "DB / Kafka có CHẾT hay không?"
-  Outbox giải quyết: "DB write và event publish có ĐỒNG BỘ hay không?"
-
-  Dù cả DB và Kafka đều HA 99.99%, vẫn xảy ra:
-  ──────────────────────────────────────────────
-
-  Tình huống 1: Network giữa App và Kafka bị timeout
-  ────────────────────────────────────────────────────
-    App → INSERT order vào DB       → ✅ (DB vẫn sống)
-    App → Publish event vào Kafka   → ❌ (network timeout)
-    
-    Kafka vẫn sống! Nhưng APP không gửi được → event mất
-    → HA không cứu được tình huống này
-
-  Tình huống 2: App crash / bị kill giữa 2 bước
-  ──────────────────────────────────────────────
-    App → INSERT order vào DB       → ✅ COMMITTED
-    App → --- POD BỊ KILL (OOM, deploy mới, scale down) ---
-    
-    DB vẫn sống, Kafka vẫn sống, nhưng event KHÔNG BAO GIỜ được gửi
-    → HA không liên quan — vấn đề ở APP, không phải infrastructure
-
-  Tình huống 3: Thứ tự thực hiện bị sai
-  ──────────────────────────────────────
-    App → Publish event vào Kafka   → ✅
-    App → INSERT order vào DB       → ❌ (unique constraint violation)
-    
-    Event đã gửi → Inventory trừ kho cho order KHÔNG TỒN TẠI
-    → "Phantom event" — event mồ côi, không có data tương ứng
-
-  ┌──────────────────────────────────────────────────────────────┐
-  │                                                              │
-  │  HA         = Infrastructure không chết                      │
-  │  Outbox     = Data + Event luôn đồng bộ (atomic)             │
-  │                                                              │
-  │  HA KHÔNG thể thay thế Outbox                                │
-  │  Outbox KHÔNG thể thay thế HA                                │
-  │  → Cần CẢ HAI                                                │
-  │                                                              │
-  └──────────────────────────────────────────────────────────────┘
-```
+HA và Outbox bổ sung cho nhau. Outbox chỉ làm **business data + outbox record** atomic trong DB; publish và đánh dấu sent vẫn có cửa sổ redelivery. Timeout cũng không chứng minh chắc chắn broker chưa nhận event.
 
 ```
 Khi nào CẦN Outbox Pattern?
@@ -1707,56 +1663,25 @@ Tránh polling loop/DB scans, có thể giảm latency. Độ tin cậy dựa tr
 
 **Đọc cửa sổ lỗi của Outbox:** local transaction không làm broker và database trở thành một transaction chung.
 
-```concurrency-lanes
-title: Outbox vẫn có thể phát lại sau crash
-unit: step
-provenance:
-  kind: illustrative
-  description: Lịch biên soạn cho một event, không phải trace đo từ broker hoặc bằng chứng exactly-once.
-lanes:
-  - id: db
-    label: Order DB
-  - id: relay
-    label: Outbox Relay
-  - id: consumer
-    label: Inventory Consumer
-events:
-  - id: commit
-    lane: db
-    at: 0
-    label: Commit order + outbox
-  - id: publish1
-    lane: relay
-    at: 1
-    label: Broker chấp nhận event e1
-  - id: apply
-    lane: consumer
-    at: 2
-    label: Áp dụng e1 và lưu dedupe
-  - id: crash
-    lane: relay
-    at: 3
-    label: Crash trước khi đánh dấu sent
-  - id: publish2
-    lane: relay
-    at: 4
-    label: Restart, publish lại e1
-  - id: skip
-    lane: consumer
-    at: 5
-    label: Dedupe e1, bỏ qua side effect
-relations:
-  - id: first
-    from: publish1
-    to: apply
-    label: Delivery lần đầu
-    description: Giả định consumer commit business change cùng dedupe record trong một local transaction.
-  - id: again
-    from: publish2
-    to: skip
-    label: Delivery lặp
-    description: Relay dùng lại event ID; consumer không trừ kho lần hai.
+Đây là lịch **minh họa** cho một event; các số 0–5 là bước logic, không phải thời gian đo được. Khoảng cách trên sơ đồ không biểu thị thời lượng và không chứng minh exactly-once.
+
+```d2 title="Outbox vẫn có thể phát lại sau crash"
+shape: sequence_diagram
+db: Order DB
+relay: Outbox Relay
+broker: Message Broker
+consumer: Inventory Consumer
+db -> db: "0 · Commit order + outbox"
+relay -> broker: "1 · Publish e1\nBroker chấp nhận"
+broker -> consumer: "2 · Delivery lần đầu"
+consumer -> consumer: "Áp dụng e1 + dedupe\nCùng local transaction"
+relay -> relay: "3 · Crash trước\nkhi đánh dấu sent"
+relay -> broker: "4 · Restart\nPublish lại e1"
+broker -> consumer: "5 · Delivery lặp"
+consumer -> consumer: "Dedupe e1\nKhông trừ kho lần hai"
 ```
+
+Giả định consumer commit business change và dedupe record trong cùng local transaction. Relay phải dùng lại event ID khi publish lại; nếu không, consumer không thể nhận diện hai delivery này là cùng một event.
 
 ## 11. Tổng kết
 

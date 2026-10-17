@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readdir, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { unified } from 'unified';
 import { visit } from 'unist-util-visit';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parser, collectExamples, validateReferences } from './source-examples.mjs';
+import { sourceDocuments } from './diagram-inventory.mjs';
 
 const features = [
   ['code-walkthrough', 'code-walkthrough', 'remarkCodeWalkthrough', 'code-walkthrough', 'CodeWalkthrough'],
@@ -13,21 +14,7 @@ const features = [
   ['code-diff', 'code-diff', 'remarkCodeDiff', 'code-diff', 'CodeDiff'],
   ['protocol-exchange', 'protocol-exchange', 'remarkProtocolExchange', 'protocol-exchange', 'ProtocolExchange'],
   ['span-waterfall', 'span-waterfall', 'remarkSpanWaterfall', 'span-waterfall', 'SpanWaterfall'],
-  ['concurrency-lanes', 'concurrency-lanes', 'remarkConcurrencyLanes', 'concurrency-lanes', 'ConcurrencyLanes'],
 ];
-
-async function sourceDocuments() {
-  const files = [];
-  for (const entry of await readdir('.', { withFileTypes: true })) {
-    if (entry.isFile() && /^\d\d-.*\.md$/u.test(entry.name)) files.push(entry.name);
-    if (entry.isDirectory() && /^17-/u.test(entry.name)) {
-      for (const name of await readdir(entry.name)) {
-        if (name.endsWith('.md')) files.push(`${entry.name}/${name}`);
-      }
-    }
-  }
-  return files.sort();
-}
 
 // Read literal/JSON props emitted by docs-kit; never evaluate MDX or source code.
 function componentProps(node) {
@@ -133,10 +120,14 @@ test('compact UI keeps rollback prerequisites visible before command copy', asyn
   assert.equal(depth, 0, 'Warning must not be hidden inside any disclosure');
 });
 
-test('docs-kit 0.8 uses public exports only and rejects all retired fences', async () => {
-  const retired = ['annotated', 'data-inspector', 'marble', 'state-transition'];
+test('docs-kit 0.9 uses public exports only and rejects all retired fences', async () => {
+  const retired = ['annotated', 'data-inspector', 'marble', 'state-transition', 'concurrency-lanes'];
   for (const language of retired) {
-    assert.throws(() => collectExamples(`\`\`\`${language}\ntitle: Obsolete\n\`\`\``, 'example.md'), /removed in docs-kit 0\.8\.0/u);
+    const version = language === 'concurrency-lanes' ? '0.9.0' : '0.8.0';
+    for (const meta of ['', ' source="snippets/obsolete.yaml"']) {
+      assert.throws(() => collectExamples(`\`\`\`${language}${meta}\ntitle: Obsolete\n\`\`\``, 'example.md'),
+        (error) => error.message.includes(`example.md:1: ${language} was removed in docs-kit ${version}`));
+    }
   }
   // Include README authoring examples and all aggregate/reference documents too.
   for (const path of ['README.md', ...await sourceDocuments()]) {
@@ -145,6 +136,7 @@ test('docs-kit 0.8 uses public exports only and rejects all retired fences', asy
     });
   }
   const pkg = JSON.parse(await readFile('node_modules/@vanhiep99w/docs-kit/package.json', 'utf8'));
+  assert.ok(!Object.keys(pkg.exports).some((path) => path.includes('concurrency-lanes')), 'Installed docs-kit must not expose the retired component');
   for (const path of ['source.config.ts', 'src/app/[[...slug]]/page.tsx', 'src/app/globals.css', 'src/components/source-explorer.tsx']) {
     const code = await readFile(path, 'utf8');
     for (const [, subpath] of code.matchAll(/['"]@vanhiep99w\/docs-kit\/([^'"\s]+)['"]/gu)) {

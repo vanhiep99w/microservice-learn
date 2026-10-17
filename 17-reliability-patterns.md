@@ -208,19 +208,24 @@ infra.routing -> local.call: Không route instance unhealthy
 
 **Timeout** (thời gian chờ tối đa) là cam kết: "Nếu service đích không phản hồi trong X ms/giây, tôi **hủy** cuộc gọi và đi tiếp". Không có Timeout, một cuộc gọi có thể chờ **vô hạn** — và mỗi cuộc gọi đang chờ đang giữ một thread, một connection, một ô nhớ:
 
+```d2 title="Timeout — giới hạn thời gian chiếm slot tại caller"
+direction: down
+without: "Không timeout" {
+  payment: Payment treo
+  wait: Order giữ thread / slot chờ không giới hạn
+  full: "200 slot đều bận\nOrder không nhận thêm việc"
+  payment -> wait -> full
+}
+with: "Có timeout" {
+  payment: Payment treo
+  timeout: Caller dừng chờ sau 3 s
+  release: Trả slot ở caller nếu client/runtime hỗ trợ
+  handling: Retry / fallback / báo lỗi theo contract
+  payment -> timeout -> release -> handling
+}
 ```
-KHÔNG có Timeout:
-  Payment Service treo
-    → mỗi request tới Payment chiếm 1 thread của Order Service, mãi mãi
-    → thread pool (200 threads) đầy sau 200 requests
-    → Order Service tê liệt dù code của nó không hề có lỗi ❌
 
-CÓ Timeout (3 giây):
-  Payment Service treo
-    → mỗi request chỉ giữ thread tối đa 3 giây
-    → thread được trả lại, Order Service vẫn phục vụ các request khác ✅
-    → lỗi được chuyển sang xử lý (retry / fallback / báo lỗi)
-```
+Ba giây và 200 slot là cấu hình **minh họa**. Timeout phía caller không tự hủy công việc đang chạy ở Payment; cancellation phải được truyền và xử lý riêng. Request rate cao vẫn có thể làm cạn pool trước timeout, nên cần thêm giới hạn concurrency/bulkhead.
 
 ⚠️ Lưu ý thực tế đáng ngạc nhiên: **không phải HTTP client nào cũng bật timeout mặc định**. Chẳng hạn `http.DefaultClient` của Go **không có timeout** — nếu bạn không chủ động set, bạn đang để mọi call chờ vô hạn. Luôn kiểm tra default của thư viện mình dùng.
 

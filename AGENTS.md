@@ -108,20 +108,21 @@ graph LR
 - Bài cần đối chiếu nhiều code dùng code fence có metadata `source="snippets/tên-artifact.ext"` và link `[Đọc source](?source=tên-file-không-đuôi&snapshot=article&file=snippets%2Ftên-artifact.ext)`; remark plugin chuyển link thành `SourceRef` của docs-kit.
 - Có thể thêm `&lines=1-4` để highlight. Không khai báo `region` nếu pipeline chưa có region đó.
 - Icon D2: chọn đúng sản phẩm trong `https://icons.d2lang.com/`, khai báo `node.icon` bằng URL catalog. Vendor SVG tin cậy và SHA-256 trong `diagrams/icons/manifest.json`; `remarkD2Icons` + `assetsRoot` nhúng icon lúc build. Không gán một logo cho node gộp nhiều sản phẩm hoặc dùng AWS logo cho thành phần generic. Xem hướng dẫn README.
-- docs-kit 0.8.0: chỉ opt-in `interactive` cho sơ đồ lớn; `mode=steps` khi cần diễn tiến trạng thái. Mặc định vẫn tĩnh; không bật toàn site. Viewer lazy-load khi bấm Explore, không chạy compiler trong browser.
+- Title D2 có dấu nháy kép bên trong dùng nháy đơn bao ngoài (`title='Flow "Đặt hàng"'`), không escape kiểu JSON; `check-diagrams` đối chiếu caption render với metadata và kiểm tra SVG light/dark.
+- docs-kit 0.9.0: chỉ opt-in `interactive` cho sơ đồ lớn; `mode=steps` khi cần diễn tiến trạng thái. Mặc định vẫn tĩnh; không bật toàn site. Viewer lazy-load khi bấm Explore, không chạy compiler trong browser.
 - Node D2 có thể dùng `link: "./?source=..."` hoặc `node.link: "./?source=..."` để mở SourceExplorer tại chỗ qua `D2SourceLinks`. Dùng query URL percent-encoded trong nháy kép; `prepare-content` validate cùng manifest như Markdown SourceRef.
 - Trích đoạn phải giữ code nguyên bản, có language hợp lệ, không trùng artifact path trong một bài. Không ngụ ý các snippets độc lập là một project chạy được.
 - `prepare-content` tự sinh/validate manifest và snapshots tại `public/source-examples/`. Không chỉnh/commit output hoặc cache `.next/cache/docs-kit/d2`.
 - Chỉ publish source tin cậy, không chứa secrets thật. HTML highlight và SVG D2 được nhúng vào trang, không phải dữ liệu input công khai.
 - Yêu cầu Node.js 22+. Chạy `npm test`, `npm run check-diagrams`, `npm run build` khi thay pipeline/component/diagram; thêm `npm run typecheck` sau khi build đã tạo types.
-- docs-kit 0.8.0 hỗ trợ fences `code-walkthrough`, `terminal-session`, `code-diff`, `protocol-exchange`, `span-waterfall`, `concurrency-lanes`. Chỉ dùng khi giúp đọc code/diễn tiến; code ngắn và JSON dùng fence thường, graph dùng D2, tổng hợp dùng bảng. Đọc API trong `node_modules/@vanhiep99w/docs-kit/docs/` trước khi thêm descriptor.
-- Không dùng lại AnnotatedExample, DataInspector, Marble/zoom hoặc StateTransitionExplorer: đã bị gỡ khỏi package; pipeline sẽ reject fences lỗi thời. Chuyển sang code/JSON + prose, bảng hoặc D2, không tạo widget local thay thế.
+- docs-kit 0.9.0 hỗ trợ fences `code-walkthrough`, `terminal-session`, `code-diff`, `protocol-exchange`, `span-waterfall`. Chỉ dùng khi giúp đọc code/diễn tiến; code ngắn và JSON dùng fence thường, graph dùng D2, tổng hợp dùng bảng. Đọc API trong `node_modules/@vanhiep99w/docs-kit/docs/` trước khi thêm descriptor.
+- Không dùng lại AnnotatedExample, DataInspector, Marble/zoom, StateTransitionExplorer hoặc ConcurrencyLanes: đã bị gỡ khỏi package (ConcurrencyLanes từ 0.9.0); pipeline sẽ reject fences lỗi thời. Chuyển sang code/JSON + prose, bảng hoặc D2, không tạo widget local thay thế.
 - CodeWalkthrough plugin/helper ở `@vanhiep99w/docs-kit/code-walkthrough`, types/validator ở `/code-walkthrough/data`; không dùng namespace `annotated-example/walkthrough`. Giữ snapshots/steps và ranges one-based inclusive.
 - Fence thường `source="..."` giữ nguyên code, ngôn ngữ và đường dẫn artifact; giữ SourceRef cũ. Diff/Walkthrough chỉ reference artifact đã publish riêng qua `before.source`, `after.source`, `snapshots[].source`; không gắn metadata một artifact lên descriptor nhiều phiên bản.
 - Diff không render caption/lời giải thích annotation; ProtocolExchange không render descriptions/annotations. Viết ngữ cảnh và giải thích trong prose quanh component. Điều kiện an toàn phải hiện trước thao tác; terminal dùng thêm `warning`, không chỉ đặt trong expected/description.
-- Timeline biên soạn phải có `provenance.kind: illustrative`, đơn vị và giả định rõ ràng. Các viewer chỉ mô tả, không chạy code, request, timer hay business side effect. Nội dung đóng trong disclosure và snapshot chưa chọn vẫn công khai, không chứa secrets thật.
-- `scripts/learning-components.test.mjs` kiểm tra mọi ví dụ của 6 nhóm component bằng parser, remark và server render, cùng public exports, source references và no-JS fallback. Không đưa Shiki/YAML parser/D2 renderer vào client.
-- Tham khảo hướng dẫn authoring trong README, mục “Website docs và quy ước D2 / SourceExplorer” và “Component học tập docs-kit 0.8.0”.
+- Span Waterfall biên soạn phải có `provenance.kind: illustrative`, đơn vị và giả định rõ ràng. D2 mô tả thời gian cần ghi tính minh họa, đơn vị/giả định trong prose và nêu rõ khoảng cách không tỷ lệ với thời lượng. Các viewer chỉ mô tả, không chạy code, request, timer hay business side effect. Nội dung đóng trong disclosure và snapshot chưa chọn vẫn công khai, không chứa secrets thật.
+- `scripts/learning-components.test.mjs` kiểm tra mọi ví dụ của 5 nhóm component bằng parser, remark và server render, cùng public exports, source references và no-JS fallback. Không đưa Shiki/YAML parser/D2 renderer vào client.
+- Tham khảo hướng dẫn authoring trong README, mục “Website docs và quy ước D2 / SourceExplorer” và “Component học tập docs-kit 0.9.0”.
 
 ### Khi thêm doc mới
 

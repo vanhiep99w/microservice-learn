@@ -843,16 +843,29 @@ alarm.icon: "https://icons.d2lang.com/aws/Management%20%26%20Governance/Amazon-C
 
 **FIFO Message Group ID** — ordering **per group**, không phải toàn bộ queue:
 
+```d2 title="SQS FIFO — ordering trong từng Message Group"
+direction: down
+queue: order-updates.fifo {
+  a: "Message Group order-123" {
+    created: created
+    paid: paid
+    shipped: shipped
+    created -> paid -> shipped
+  }
+  b: "Message Group order-456" {
+    created: created
+    cancelled: cancelled
+    created -> cancelled
+  }
+  c: "Message Group order-789" {
+    created: created
+    paid: paid
+    created -> paid
+  }
+}
 ```
-Queue FIFO: order-updates.fifo
 
-Message Group: "order-123"  → [created] → [paid] → [shipped]    (ordered)
-Message Group: "order-456"  → [created] → [cancelled]           (ordered)
-Message Group: "order-789"  → [created] → [paid]                (ordered)
-
-→ 3 groups xử lý SONG SONG, nhưng mỗi group thứ tự đúng
-→ Throughput = 300 msg/s × N groups (scale bằng cách tăng groups)
-```
+Mỗi hàng là một message group có ordering riêng; **không có ordering giữa các group**. Các group có thể được xử lý đồng thời nếu consumer/partition capacity cho phép. Không suy ra throughput là `300 msg/s × N groups`: quota FIFO còn phụ thuộc region, partition, batching và chế độ high throughput.
 
 ---
 

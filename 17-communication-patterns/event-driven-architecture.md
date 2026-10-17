@@ -294,13 +294,16 @@ Nếu nghiệp vụ không yêu cầu ordering, không nên thêm cơ chế orde
 
 Khi service vừa ghi database vừa publish event, cách làm trực tiếp tạo ra **dual write** (ghi kép: hai thao tác không cùng một transaction):
 
-```text
-❌
-1. INSERT order vào Order DB       ✅
-2. Publish OrderCreated             ❌ Broker down → event mất
-
-Order tồn tại nhưng Inventory không biết.
+```d2 title="Event-Driven — DB đã commit nhưng publish thất bại"
+direction: right
+commit: INSERT order COMMITTED
+publish: Publish OrderCreated thất bại
+result: "Order tồn tại\nInventory / Payment chưa được thông báo"
+commit -> publish: Broker down hoặc app crash giữa hai bước
+publish -> result
 ```
+
+Hai thao tác ghi độc lập không atomic. Cần lưu event intent cùng business data (ví dụ Transactional Outbox), không chỉ retry HTTP request với một order mới.
 
 **Transactional Outbox** ghi business data và event intent vào cùng database transaction. Một relay riêng publish các row đã commit:
 

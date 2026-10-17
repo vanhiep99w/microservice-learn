@@ -1260,40 +1260,40 @@ HEALTH CHECK:
 
 ### 6.4. Logging
 
+```d2 title="Container logging — stdout tới hệ thống tập trung"
+direction: down
+recommended: "Ưu tiên stdout / stderr" {
+  app: App — structured JSON log
+  stdout: stdout / stderr
+  capture: Container runtime capture
+  collection: Logging driver / log collector
+  store: "Centralized logs\nVí dụ ELK hoặc CloudWatch"
+  app -> stdout -> capture -> collection -> store
+}
+local: "Chỉ ghi file trong writable layer" {
+  app: App
+  file: /var/log/app.log
+  removed: Container bị xóa
+  lost: Logs có thể mất
+  app -> file -> removed -> lost
+}
 ```
-CONTAINER LOGGING:
-──────────────────
 
-  ✅ Log ra STDOUT/STDERR (không log ra file trong container):
-  ─────────────────────────────────────────────────────────────
-  Container logs → Docker logging driver → thu thập bởi:
-    • docker logs
-    • Fluentd / Fluent Bit
-    • CloudWatch Logs (AWS)
-    • ELK Stack
+Docker có thể đọc log qua `docker logs`; Fluentd/Fluent Bit hoặc logging driver chuyển log tới backend đã cấu hình. Nếu ghi file, cần volume/rotation/collector phù hợp thay vì dựa vào writable layer của container.
 
-  ❌ Log ra file trong container:
-  app → /var/log/app.log → container bị xóa → MẤT logs
-  → Phải mount volume → phức tạp
+Ví dụ Spring Boot cấu hình log JSON (cần escaping phù hợp nếu dùng thực tế):
 
-  ✅ Log ra stdout:
-  app → stdout → Docker capture → logging driver → centralized logs
+```yaml
+logging:
+  pattern:
+    console: '{"time":"%d","level":"%p","msg":"%m","service":"user-service"}%n'
+```
 
-  Ví dụ — Spring Boot:
-  ────────────────────
-  # application.yml
-  logging:
-    pattern:
-      console: '{"time":"%d","level":"%p","msg":"%m","service":"user-service"}%n'
+Ví dụ Node.js với pino:
 
-  → JSON format → dễ parse bởi ELK/CloudWatch
-
-  Ví dụ — Node.js:
-  ─────────────────
-  // Dùng pino (JSON logger)
-  const logger = require('pino')();
-  logger.info({ userId: 123, action: 'login' }, 'User logged in');
-  // → stdout: {"level":30,"time":1234,"userId":123,"msg":"User logged in"}
+```js
+const logger = require('pino')();
+logger.info({ userId: 123, action: 'login' }, 'User logged in');
 ```
 
 ### 6.5. .dockerignore

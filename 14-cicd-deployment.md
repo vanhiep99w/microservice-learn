@@ -679,33 +679,23 @@ spec:
 
 Hai strategy này đều **zero downtime** nên dễ nhầm. Điểm khác biệt cốt lõi:
 
+```d2 title="Rolling Update và Blue-Green — version nào nhận traffic?"
+direction: down
+rolling: "Rolling — cùng một pool nhận traffic" {
+  first: "Snapshot 1\nv1 / v1 / v2"
+  second: "Snapshot 2\nv1 / v2 / v2"
+  done: "Snapshot 3\nv2 / v2 / v2"
+  first -> second -> done
+}
+bluegreen: "Blue-Green — hai pool riêng" {
+  before: "Trước switch\nBlue v1 ×3: 100%\nGreen v2 ×3: 0% — test"
+  after: "Sau switch\nBlue v1 ×3: 0% — giữ rollback\nGreen v2 ×3: 100%"
+  before -> after: Switch routing
+  after -> before: Rollback routing nếu còn tương thích
+}
 ```
-ROLLING UPDATE — Thay TỪNG CON, v1 + v2 LẪN LỘN:
-──────────────────────────────────────────────────
 
-  Thời điểm 1:  [v1] [v1] [v2]    ← User A gọi v1, User B gọi v2
-  Thời điểm 2:  [v1] [v2] [v2]    ← Vẫn lẫn lộn
-  Thời điểm 3:  [v2] [v2] [v2]    ← Xong
-
-  → Trong quá trình rollout, CÓ LÚC v1 + v2 chạy cùng
-  → API phải backward compatible
-  → Rollback = rolling lại từng pod → CHẬM (vài phút)
-  → Resource: chỉ cần thêm 1-2 pod tạm
-
-
-BLUE-GREEN — Deploy FULL BỘ V2, rồi SWITCH 1 LẦN:
-───────────────────────────────────────────────────
-
-  Thời điểm 1:  [v1] [v1] [v1] ← 100% traffic
-                [v2] [v2] [v2] ← 0% traffic (đang test)
-
-  Thời điểm 2:  [v1] [v1] [v1] ← 0% traffic (giữ lại phòng rollback)
-                [v2] [v2] [v2] ← 100% traffic ← SWITCH!
-
-  → KHÔNG BAO GIỜ lẫn lộn — 100% users trên cùng 1 version
-  → Rollback = switch traffic về v1 → INSTANT (vài giây)
-  → Resource: cần GẤP ĐÔI (giữ cả Blue + Green)
-```
+Rolling cần tương thích trong giai đoạn v1/v2 cùng phục vụ; rollback cũng rollout dần, thường cần vài phút. Blue-Green có thể đổi routing nhanh hơn nhưng tốn tài nguyên giữ hai pool. Switch không bảo đảm mọi connection/request đang chạy đổi version tức thì; cả hai cách vẫn cần tương thích database, data và side effects.
 
 | Điểm so sánh | Rolling Update | Blue-Green |
 |---------------|----------------|------------|
@@ -888,35 +878,23 @@ TẠI SAO CÓ NGƯỜI SỬA TAY TRÊN CLUSTER?
   → Muốn thay đổi thật? Sửa trong Git, tạo PR — cách DUY NHẤT
 ```
 
+Lịch **minh họa** với mốc giờ, không phải SLA reconcile. Khoảng cách trên sơ đồ không biểu thị thời lượng.
+
+```d2 title="GitOps — phát hiện và xử lý configuration drift"
+direction: down
+initial: "09:00 · ArgoCD sync\nGit và cluster: v2.1 / replicas 3"
+manual: "11:00 · Sửa cluster trực tiếp\nreplicas 5 / LOG_LEVEL DEBUG"
+drift: "DRIFT\nGit vẫn replicas 3, không có LOG_LEVEL"
+noagent: "Không reconcile\nCluster tiếp tục lệch; chi phí/log tăng"
+reconcile: "Agent phát hiện drift\nSelf-heal trả cluster về desired state"
+change: "Muốn giữ replicas 5?\nPR → review/approve → merge → sync"
+initial -> manual -> drift
+drift -> noagent: Không có agent / không self-heal
+drift -> reconcile: Đã bật cơ chế self-heal phù hợp
+reconcile -> change: Thay đổi desired state có chủ đích
 ```
-VÍ DỤ CỤ THỂ:
-──────────────
 
-  9:00 AM — ArgoCD deploy từ Git: order-service:v2.1, replicas: 3 ✅
-
-  11:00 AM — DevOps Minh debug lỗi, chạy kubectl trực tiếp:
-     kubectl scale deployment order-service --replicas=5
-     kubectl set env deployment/order-service LOG_LEVEL=DEBUG
-
-     → Cluster bây giờ: replicas=5, LOG_LEVEL=DEBUG
-     → Git vẫn ghi:     replicas=3, không có LOG_LEVEL
-     → DRIFT! Cluster ≠ Git
-
-  Minh fix xong bug, quên revert lại. Đi ăn trưa 🍜
-
-  ❌ KHÔNG CÓ AGENT:
-     → Cluster chạy replicas=5 + DEBUG log mãi mãi
-     → Tháng sau: "Sao bill server tăng?" "Log đầy disk?"
-     → Không ai nhớ ai sửa gì 😰
-
-  ✅ CÓ AGENT (ArgoCD reconcile mỗi 3 phút):
-     → 11:03 AM: ArgoCD phát hiện cluster ≠ Git
-     → Tự động revert: replicas=3, xóa LOG_LEVEL=DEBUG
-     → Cluster luôn giống Git ✅
-     → Minh muốn đổi replicas=5 thật?
-       → Sửa deployment.yaml trong Git, tạo PR, được approve → ArgoCD apply
-       → Có record rõ ràng: ai đổi, lúc nào, vì sao
-```
+Hai lệnh gây drift trong ví dụ là `kubectl scale deployment order-service --replicas=5` và `kubectl set env deployment/order-service LOG_LEVEL=DEBUG`. ArgoCD chỉ tự sửa drift khi cấu hình automated sync/self-heal tương ứng; không mặc định suy ra “cứ 3 phút là luôn tự revert”. Thay đổi cần giữ lâu dài phải đi qua Git.
 
 ```
 GITOPS — 4 NGUYÊN TẮC:

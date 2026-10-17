@@ -1125,21 +1125,32 @@ half -> open: "Thử fail — chờ thêm 30s"
 
 Tương tự Trace ID ở trên — Gateway circuit breaker **không cover** các request không đi qua Gateway:
 
-```
-Gateway Circuit Breaker bảo vệ AI?
-───────────────────────────────────
-
-  ✅ Client → Gateway → Order Service (lỗi) → Gateway mở CB → 503
-     Gateway BIẾT Order Service đang lỗi → ngưng gọi
-
-  ❌ Cron Job → Order Service → Payment Service (lỗi) → ???
-     Không có Gateway ở đây → không ai mở CB
-
-  ❌ Kafka Consumer → Inventory Service → Product Service (lỗi) → ???
-     Message flow, không qua Gateway
-
-  ❌ Order Service → gRPC → Payment Service (lỗi) → ???
-     Service-to-service trực tiếp, Gateway không tham gia
+```d2 title="Phạm vi bảo vệ của Circuit Breaker tại Gateway"
+direction: down
+edge: "Đi qua Gateway" {
+  client: Client
+  gateway: "Gateway + Circuit Breaker\nOPEN thì trả 503, không gọi Order"
+  order: Order Service
+  client -> gateway
+  gateway -> order: Chỉ khi breaker cho phép
+}
+cron: "Không qua Gateway — cần breaker tại caller" {
+  job: Cron Job
+  order: Order Service
+  payment: Payment Service
+  job -> order -> payment
+}
+message: "Consumer không qua Gateway" {
+  kafka: Kafka Consumer
+  inventory: Inventory Service
+  product: Product Service
+  kafka -> inventory -> product
+}
+grpc: "Service-to-service trực tiếp" {
+  order: Order Service
+  payment: Payment Service
+  order -> payment: gRPC
+}
 ```
 
 ```

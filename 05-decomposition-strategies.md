@@ -469,30 +469,31 @@ Entities:
 
 **Cẩn thận**: Đây là cách đơn giản nhất nhưng dễ sai nhất. Nó dẫn đến **CRUD services** (service chỉ làm Create/Read/Update/Delete) — thiếu business logic, coupling cao vì logic nằm ở caller.
 
+```d2 title="Anemic Service và service sở hữu business logic"
+direction: down
+anemic: "Anemic — business logic bị đẩy lên caller" {
+  caller: "Gateway / BFF\nĐiều phối + xử lý lỗi / compensation"
+  inventory: Inventory.check
+  order: "Order CRUD\ncreate / get / update / delete"
+  payment: Payment.charge
+  notification: Notification.send
+  caller -> inventory
+  caller -> order
+  caller -> payment
+  caller -> notification
+}
+rich: "Business logic thuộc Order Service" {
+  caller: Gateway / BFF
+  order: "Order Service\nplaceOrder / cancelOrder / getOrderStatus"
+  inventory: Inventory
+  payment: Payment
+  caller -> order: Contract nghiệp vụ
+  order -> inventory: Reserve / hoàn kho
+  order -> payment: Charge / refund
+}
 ```
-❌ Anti-pattern: Anemic Services (CRUD only)
 
-  Order Service:          Caller (API Gateway / BFF):
-  • createOrder()         • Gọi Inventory.check()
-  • getOrder()            • Gọi Order.create()
-  • updateOrder()         • Gọi Payment.charge()
-  • deleteOrder()         • Gọi Notification.send()
-                          • Xử lý error, rollback...
-  
-  → Business logic nằm ở caller, không ở service
-  → Order Service chỉ là CRUD wrapper quanh database
-  → Caller phải biết quá nhiều → tight coupling
-
-✅ Nên: Order Service chứa business logic
-
-  Order Service:
-  • placeOrder()          ← Tự gọi Inventory, Payment bên trong
-  • cancelOrder()         ← Tự xử lý hoàn tiền, hoàn kho
-  • getOrderStatus()
-  
-  → Business logic nằm trong service
-  → Caller chỉ cần biết: "placeOrder với data này"
-```
+Các mũi tên thể hiện dependency, không phải thứ tự gọi. Caller chỉ biết contract nghiệp vụ của Order Service; service này chịu trách nhiệm điều phối và xử lý lỗi phù hợp.
 
 ### 6.3. Decompose by Volatility
 

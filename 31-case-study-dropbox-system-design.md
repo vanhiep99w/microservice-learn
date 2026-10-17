@@ -1059,18 +1059,31 @@ Idempotency key = event type + bucket + object key + version/generation
 
 Pseudo flow:
 
-```text
-1. Nhận ObjectCreated event.
-2. Kiểm tra event đã xử lý chưa.
-3. Đọc upload session và expected checksum.
-4. Verify object metadata.
-5. Trong transaction:
-   - chuyển version PROCESSING → READY;
-   - cập nhật current version nếu base revision hợp lệ;
-   - ghi outbox change event.
-6. Đánh dấu event đã xử lý.
-7. ACK queue message.
+```d2 title="ObjectCreated — xử lý idempotent và cập nhật metadata an toàn"
+direction: down
+receive: Nhận ObjectCreated
+dedupe: Event đã xử lý? {shape: diamond}
+verify: Load upload session / expected checksum và verify object metadata
+valid: Metadata / checksum hợp lệ? {shape: diamond}
+tx: "Metadata DB local transaction" {
+  state: Transition PROCESSING → READY
+  current: Cập nhật current version nếu base revision hợp lệ
+  outbox: Ghi outbox change event
+  seen: Lưu dedupe record cùng commit
+  state -> current -> outbox -> seen
+}
+retry: Retry / quarantine theo loại lỗi — không đánh dấu READY
+ack: ACK queue message
+receive -> dedupe
+dedupe -> ack: Đã commit xử lý trước đó
+dedupe -> verify: Chưa xử lý
+verify -> valid
+valid -> tx.state: Hợp lệ
+valid -> retry: Không hợp lệ / cần xử lý lỗi
+tx.seen -> ack: Sau commit
 ```
+
+Dedupe record và business transition phải commit atomic hoặc dùng cơ chế tương đương; không chỉ đánh dấu đã xử lý sau ACK. Base revision conflict không được ghi đè current version mới hơn. Event lặp `READY → READY` không tạo thêm version hay cộng quota lần nữa; side effect ra ngoài DB phải đi qua cơ chế tin cậy như outbox.
 
 Nếu event lặp lại, transition `READY → READY` không được tạo thêm version hoặc cộng quota lần nữa.
 

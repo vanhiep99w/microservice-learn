@@ -186,10 +186,21 @@ Broker thường dùng **at-least-once delivery**: ưu tiên không mất event,
 
 Consumer phải dùng `event_id` hoặc idempotency key để nhận ra event đã xử lý:
 
-```text
-Payment nhận evt-abc lần đầu  → charge thành công, lưu evt-abc đã xử lý
-Payment nhận evt-abc lần hai  → thấy đã xử lý, bỏ qua
+```d2 title="Idempotent consumer — hai delivery, một business effect"
+shape: sequence_diagram
+broker: Broker
+payment: Payment Consumer
+state: Business state + dedupe store
+broker -> payment: Delivery đầu — evt-abc
+payment -> state: Áp dụng business change và ghi evt-abc atomic
+state -> payment: Commit thành công
+broker -> payment: Delivery lặp — evt-abc
+payment -> state: Kiểm tra evt-abc đã xử lý
+state -> payment: Đã xử lý
+payment -> payment: Bỏ qua business effect trùng
 ```
+
+Ví dụ chỉ minh họa local atomicity. Nếu charge đi qua payment provider bên ngoài, cần thêm idempotency contract của provider và reconciliation; một dedupe record trong DB riêng không tự làm DB và provider atomic.
 
 #### 2. Transactional Outbox: không mất event khi broker lỗi
 
@@ -276,15 +287,22 @@ Hãy hình dung Event Sourcing là sổ giao dịch ngân hàng. Không sửa d�
 
 Muốn biết trạng thái hiện tại của `order-123`, Order Service đọc event stream theo thứ tự rồi áp dụng từng event:
 
-```text
-Bắt đầu: không có order
-
-OrderCreated       → status = CREATED
-PaymentReceived    → status = PAID
-OrderPacked        → status = PACKED
-OrderShipped       → status = SHIPPED
-OrderDelivered     → status = DELIVERED
+```d2 title="Replay order stream — state thay đổi theo event sequence"
+direction: down
+empty: Chưa có order
+created: CREATED
+paid: PAID
+packed: PACKED
+shipped: SHIPPED
+delivered: DELIVERED
+empty -> created: OrderCreated
+created -> paid: PaymentReceived
+paid -> packed: OrderPacked
+packed -> shipped: OrderShipped
+shipped -> delivered: OrderDelivered
 ```
+
+Các edge là event đã lưu theo sequence, không phải command gọi payment hay shipping. Replay chỉ dựng state, không phát lại side effect.
 
 Quá trình đọc lại này gọi là **replay** hoặc **rehydrate**.
 
@@ -303,12 +321,14 @@ Khi nhận command mới, aggregate phải dựng lại state trước, kiểm t
 
 Ví dụ khách yêu cầu hủy đơn:
 
-```text
-Command: CancelOrder(order-123)
-
-1. Order aggregate replay history → biết order đang SHIPPED
-2. Rule nói “đơn đã ship không thể cancel bình thường”
-3. Từ chối command; không tạo event mới
+```d2 title="Command bị từ chối sau khi rehydrate aggregate"
+direction: right
+command: CancelOrder order-123
+replay: Replay history của aggregate
+state: State hiện tại SHIPPED
+rule: Rule không cho cancel bình thường
+reject: Từ chối command — không append event mới
+command -> replay -> state -> rule -> reject
 ```
 
 Nếu order còn `PAID` nhưng chưa ship, aggregate có thể append `OrderCancelled`. Event cũ `PaymentReceived` vẫn được giữ; sau đó có thể có `PaymentRefunded` như một fact mới. Không xóa lịch sử.
@@ -325,11 +345,12 @@ Audit log:
 
 Event Sourcing khác ở chỗ hệ thống bảo đảm **mọi thay đổi nghiệp vụ được ghi bằng event**, và state hiện tại có thể được dựng lại từ event đó:
 
-```text
-Event Sourcing:
-  events = [OrderCreated, PaymentReceived, OrderShipped]
-          ↓ replay
-  orders.status = SHIPPED         ← state dựng lại được
+```d2 title="Event Sourcing — event stream là nguồn dựng state"
+direction: right
+events: "Event stream\nOrderCreated / PaymentReceived / OrderShipped" {shape: cylinder}
+replay: Replay / apply theo sequence
+state: orders.status = SHIPPED
+events -> replay -> state
 ```
 
 Ví dụ bảng `order_list_view` bị xóa do lỗi migration. Với audit log thông thường, team cần restore bảng chính từ backup. Với Event Sourcing, team có thể tạo một projection mới rồi replay toàn bộ `OrderCreated`, `PaymentReceived`, `OrderShipped` để dựng lại bảng đọc.
@@ -439,10 +460,18 @@ Nếu `orders` đã đáp ứng tốt cả ghi và đọc, hoặc UI chỉ JOIN 
 
 Mỗi stream có version. Nếu hai request cùng đọc order ở version 7:
 
-```text
-Request A append thành công → stream lên version 8
-Request B append với expected version 7 → bị từ chối
+```d2 title="Append event — expected version phải được kiểm tra atomic"
+shape: sequence_diagram
+a: Request A
+b: Request B
+store: Event Store — version 7
+a -> store: Append với expected version 7
+store -> a: Thành công — stream version 8
+b -> store: Append với expected version 7
+store -> b: Conflict — từ chối stale append
 ```
+
+Hai request ban đầu dựa trên cùng version 7. Event Store phải enforce expected version khi append; request B không được ghi đè hoặc tự bỏ qua conflict.
 
 Request B phải load lại state version 8 rồi kiểm tra command còn hợp lệ không. Điều này giúp business rule không bị hai request ghi đè lẫn nhau.
 

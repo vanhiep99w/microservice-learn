@@ -547,21 +547,19 @@ CodeDeploy **không hỗ trợ trực tiếp EKS**. Cho EKS deployment, có 3 op
 
 **Rolling Update** là strategy mặc định của ECS — thay thế tasks dần dần, **không cần** CodeDeploy.
 
-```
-ECS ROLLING UPDATE
-────────────────────
+Giả định ECS Service có `desiredCount: 4`, `minimumHealthyPercent: 50` (ít nhất 2 healthy tasks) và `maximumPercent: 200` (tối đa 8 tasks trong deployment, theo scheduler). Các node là snapshot **minh họa**, không phải một lịch cố định ECS cam kết.
 
-  Cấu hình ECS Service:
-  • desiredCount: 4
-  • minimumHealthyPercent: 50%   → ít nhất 2 tasks luôn healthy
-  • maximumPercent: 200%         → tối đa 8 tasks cùng lúc
-
-  Step 1:  [v1] [v1] [v1] [v1]           ← 4 tasks v1
-  Step 2:  [v1] [v1] [v1] [v1] [v2] [v2] ← Thêm 2 tasks v2
-  Step 3:  [v1] [v1] [v2] [v2]           ← Drain 2 tasks v1
-  Step 4:  [v1] [v1] [v2] [v2] [v2] [v2] ← Thêm 2 tasks v2
-  Step 5:  [v2] [v2] [v2] [v2]           ← Drain 2 tasks v1 cuối
-  Done!    [v2] [v2] [v2] [v2]           ← 100% v2 ✅
+```d2 title="ECS Rolling Update — ví dụ desired count bốn tasks"
+direction: down
+initial: "1 · v1 ×4"
+surge1: "2 · v1 ×4 + v2 ×2\nChờ v2 healthy"
+drain1: "3 · v1 ×2 + v2 ×2"
+surge2: "4 · v1 ×2 + v2 ×4\nChờ v2 mới healthy"
+done: "5 · v2 ×4\nDrain hết v1 — 100% v2"
+initial -> surge1: Thêm tasks trong maximumPercent
+surge1 -> drain1: Drain hai v1 khi đủ healthy tasks
+ drain1 -> surge2: Thêm hai v2
+surge2 -> done: Drain hai v1 cuối
 ```
 
 ```hcl source="snippets/6-1-rolling-update-ecs-default.tf"

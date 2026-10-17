@@ -6,6 +6,7 @@ import { visit } from 'unist-util-visit';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
+import { D2Diagram } from '@vanhiep99w/docs-kit/components/d2';
 import { D2InteractiveDiagram } from '@vanhiep99w/docs-kit/components/d2-interactive';
 import { parser } from './source-examples.mjs';
 import { d2IconAssetsRoot, remarkD2Icons } from './d2-icons.mjs';
@@ -31,7 +32,7 @@ async function renderBlock(path, select) {
     const expression = attribute.value.data.estree.body[0].expression;
     return [attribute.name, expression.type === 'Literal' ? expression.value : JSON.parse(expression.arguments[0].value)];
   }));
-  return { component, props };
+  return { node, component, props };
 }
 
 test('docs-kit keeps existing diagrams static and builds source-linked opt-in diagrams', async () => {
@@ -50,6 +51,56 @@ test('docs-kit keeps existing diagrams static and builds source-linked opt-in di
     assert.match(linked.props[theme], /href="\.\/\?source=13-orchestration/u);
     assert.match(linked.props[theme], /4-3-deployment\.yaml/u);
     assert.match(linked.props[theme], /4-1-pod\.yaml/u);
+  }
+});
+
+test('retired concurrency examples render as D2 while preserving timing and failure context', async (t) => {
+  for (const [path, title, labels, unit] of [
+    ['09-data-management.md', 'Outbox vẫn có thể phát lại', ['e1', 'sent', 'dedupe'], 'bước logic'],
+    ['10-resilience-patterns.md', 'Retry với một lịch Full Jitter', ['60 ms', '150 ms', '270 ms'], 'ms'],
+    ['20-aws-data-management.md', 'CQRS trên AWS — commit trước', ['PENDING', 'PAID', 'OpenSearch'], 'bước logic'],
+  ]) {
+    await t.test(path, async () => {
+      const { node, component, props } = await renderBlock(path, (block) => block.meta.includes(title));
+      assert.equal(component.name, 'D2Diagram');
+      assert.match(node.value, /shape: sequence_diagram/u);
+      const html = renderToStaticMarkup(createElement(D2Diagram, props));
+      for (const label of labels) {
+        assert.ok(html.toLowerCase().includes(label.toLowerCase()), `${path}: missing rendered ${label}`);
+      }
+      assert.doesNotMatch(html, /concurrency-lanes|<iframe|<canvas/u);
+      const tree = parser.parse(await readFile(path, 'utf8'));
+      const diagram = tree.children.find((child) => child.type === 'code' && child.meta?.includes(title));
+      const intro = tree.children[tree.children.indexOf(diagram) - 1];
+      const text = intro.children.map((child) => child.value ?? child.children?.map((item) => item.value).join('') ?? '').join('');
+      assert.match(text, /minh họa/u);
+      assert.ok(text.includes(unit), `${path}: missing time unit`);
+      assert.match(text, /không (?:biểu thị|tỷ lệ)/u);
+    });
+  }
+});
+
+test('D2 titles containing double quotes retain their complete rendered captions', async () => {
+  for (const [path, title] of [
+    ['01-microservice-overview.md', 'Ví dụ cụ thể: Luồng "Tạo đơn hàng" trong SOA'],
+    ['02-single-responsibility-bounded-context.md', 'Ví dụ: Cùng khái niệm "Product" nhưng khác ngữ cảnh'],
+    ['17-design-patterns.md', 'Flow "Đặt hàng" — các pattern phối hợp'],
+    ['27-shared-code-strategy.md', '5.1. Ý tưởng cốt lõi — "Share contract, không share code"'],
+    ['27-shared-code-strategy.md', '7.1. Vấn đề cốt lõi — "Thay đổi 1 library → bao nhiêu service phải build lại?"'],
+  ]) {
+    const { props } = await renderBlock(path, (block) => block.meta.includes(title));
+    assert.equal(props.caption, title, path);
+  }
+});
+
+test('historical timeline uses categorical cards, not sequence lifelines', async () => {
+  const { node, component, props } = await renderBlock('01-microservice-overview.md', (block) => block.meta.includes('Các mốc phát triển'));
+  assert.equal(component.name, 'D2Diagram');
+  assert.match(node.value, /direction: down/u);
+  assert.doesNotMatch(node.value, /sequence_diagram/u);
+  const html = renderToStaticMarkup(createElement(D2Diagram, props));
+  for (const label of ['1990s', '2000', '2014', '2015', 'Kubernetes']) {
+    assert.ok(html.includes(label), `Historical timeline missing ${label}`);
   }
 });
 

@@ -39,7 +39,7 @@
   - [Icon D2 — AWS và công nghệ được hỗ trợ](#icon-d2--aws-và-công-nghệ-được-hỗ-trợ)
   - [D2 tương tác — zoom, steps và liên kết source](#d2-tương-tác--zoom-steps-và-liên-kết-source)
   - [SourceExplorer — đối chiếu nhiều đoạn code trong cùng bài](#sourceexplorer--đối-chiếu-nhiều-đoạn-code-trong-cùng-bài)
-  - [Component học tập docs-kit 0.8.0](#component-học-tập-docs-kit-080)
+  - [Component học tập docs-kit 0.9.0](#component-học-tập-docs-kit-090)
 - [Tham khảo](#-tham-khảo)
 
 ---
@@ -211,7 +211,7 @@ Mỗi tài liệu đều có:
 
 ## Website docs và quy ước D2 / SourceExplorer
 
-Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.8.0**. Yêu cầu **Node.js 22+**.
+Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.9.0**. Yêu cầu **Node.js 22+**.
 
 ```bash
 npm ci
@@ -241,6 +241,7 @@ client -> order -> db
 - Chuyển sang D2 khi thể hiện tương đương được: state transition có điều kiện rõ ràng; ER dùng `sql_table` giữ fields, constraints và cardinality; flow rẽ nhánh/fan-out có điều kiện và điểm hợp nhất tường minh. Không đổi một `par` thành chuỗi gọi tuần tự chỉ để bỏ Mermaid.
 - Timeline lịch sử / các mốc phát triển có thể dùng D2: `direction: down`, các mốc nối dọc, mỗi mốc là một thẻ nội dung; không dùng `sequence_diagram`. Khoảng cách giữa các mốc không tự biểu thị thời lượng. Nếu cần trục thời gian thẳng và thẻ căn chỉnh chính xác như infographic, ưu tiên SVG/HTML.
 - Giữ Mermaid khi cần semantics chuyên biệt chưa chuyển tương đương: Gantt migration trong hai case study và Multipart Upload có `loop` + `par` trong bài Dropbox. Giữ text cho cây thư mục, logs, payloads, công thức, bảng căn cột và timing trace cần bảo toàn trục thời gian định lượng; sơ đồ đầu README giữ ASCII để đọc trực tiếp trên GitHub.
+- `title` có dấu nháy kép bên trong dùng nháy đơn bao ngoài, ví dụ `title='Flow "Đặt hàng"'`. Không dùng `\"` trong title: parser metadata của docs-kit không xử lý escape kiểu JSON; `check-diagrams` kiểm tra cả caption đã render.
 - D2 fenced blocks được render trên website; GitHub chỉ hiển thị source D2. Dùng nhãn ngắn, tách sơ đồ lớn thành các phần. Escape ký tự `$` thành `\$` trong nhãn D2 để không bị hiểu là substitution.
 - `npm run check-diagrams` render và kiểm tra tất cả D2 trong tài liệu gốc, kể cả các bài tổng hợp không publish riêng. Cache dùng `.next/cache/docs-kit/d2`, không commit vào Git.
 - `npm run diagrams:inventory` liệt kê các block Mermaid / ASCII candidate theo file, dòng và heading; `npm run diagrams:inventory -- --json` xuất toàn bộ inventory kèm source hash. Candidate chỉ là gợi ý rà soát: cây thư mục, bảng và prose có mũi tên cũng có thể được nhận diện, không nên tự động chuyển hàng loạt.
@@ -316,9 +317,9 @@ metadata:
 - `prepare-content` sinh manifest và JSON highlight light/dark tại `public/source-examples/`, rồi kiểm tra project/snapshot/file/line references. Reference sai làm build thất bại. Assets được tái tạo, không commit; **không đưa secrets thật hoặc HTML không tin cậy vào source**.
 - Giữ code quan trọng inline để bài vẫn đọc được trên GitHub. SourceExplorer bổ sung khả năng đọc chéo, không thay thế giải thích trong bài.
 
-### Component học tập docs-kit 0.8.0
+### Component học tập docs-kit 0.9.0
 
-Website dùng **6 nhóm component học tập**, với **12 ví dụ** được chọn theo nhu cầu đọc. D2 và SourceExplorer tiếp tục hoạt động như trước; không bật tương tác hoặc thay mọi code fence trên toàn site.
+Website dùng **5 nhóm component học tập**, với **9 ví dụ** được chọn theo nhu cầu đọc. D2 và SourceExplorer tiếp tục hoạt động như trước; không bật tương tác hoặc thay mọi code fence trên toàn site.
 
 | Fence | Dùng khi | Ví dụ đã áp dụng |
 |---|---|---|
@@ -327,9 +328,16 @@ Website dùng **6 nhóm component học tập**, với **12 ví dụ** được 
 | `code-diff` | Đối chiếu code trước/sau, đổi inline/split và copy nguyên bản | [API contract](03-loose-coupling-high-cohesion.md#242-api-contract--versioning), [Shared library](27-shared-code-strategy.md#43-backward-compatibility) |
 | `protocol-exchange` | HTTP request/response với headers và body dễ đối chiếu | [REST](06-inter-service-communication.md#21-rest-httpjson), [Rate limit](07-api-gateway.md#34-rate-limiting--throttling) |
 | `span-waterfall` | Span có thời điểm/thời lượng, cần nhìn overlap | [Distributed tracing](11-observability-evolvability.md#42-distributed-tracing-là-gì), [Timeout không tự hủy downstream](17-reliability-patterns/timeout.md#checklist) |
-| `concurrency-lanes` | Nhiều actor, khoảng chờ và cửa sổ lỗi; tên tác vụ hiện ngay trên timeline | [Outbox crash](09-data-management.md#10-transactional-outbox-pattern), [Full Jitter](10-resilience-patterns.md#33-exponential-backoff-với-jitter), [Projection lag](20-aws-data-management.md#43-sync-data-giữa-write-db-và-read-db) |
 
-**Chuyển đổi từ 0.7.x:** đây là breaking release, không chỉ đổi version dependency.
+**Chuyển đổi từ 0.8.x lên 0.9.0:**
+
+- ConcurrencyLanes đã bị xóa khỏi package. Gỡ cả remark plugin, MDX map, component import và CSS; không tạo widget local thay thế.
+- Ba ví dụ [Outbox crash](09-data-management.md#10-transactional-outbox-pattern), [Full Jitter](10-resilience-patterns.md#33-exponential-backoff-với-jitter) và [Projection lag](20-aws-data-management.md#43-sync-data-giữa-write-db-và-read-db) chuyển sang D2 sequence. Giữ mốc logic/thời gian và giả định bằng prose; khoảng cách message không phải trục thời gian tỷ lệ.
+- Rà cả tài liệu gốc lẫn các bài `17-*/` và aggregate: thêm **57 sơ đồ D2** từ flow ASCII/text, gồm timeline lịch sử, dependency, fan-out, rollout, optimistic locking và replay. Giữ Mermaid cho hai Gantt và multipart upload có `loop`/`par`; giữ text cho cây thư mục, log, payload và ví dụ căn cột.
+- Sửa thêm **5 caption D2** có nháy kép escape khiến parser đọc sai metadata; dùng nháy đơn bao ngoài để giữ nguyên nội dung caption.
+- Bộ inventory nhận cả mũi tên `->` và timeline dùng đường kẻ; kết quả chỉ là candidate để review, không tự chuyển mọi bảng/công thức thành diagram. `check-diagrams` kiểm tra mọi fence D2 thực sự sinh component với SVG light/dark, không chỉ đếm code block.
+
+**Các thay đổi từ 0.7.x lên 0.8.0 vẫn áp dụng:**
 
 - Gỡ toàn bộ plugin, MDX map và CSS của **AnnotatedExample, DataInspector, MarbleDiagram/zoom và StateTransitionExplorer**. Không dựng lại các widget này bằng component local.
 - **20 ví dụ code có chú thích** trở về code fence đúng ngôn ngữ, kèm giải thích và số dòng bằng Markdown. **17 ví dụ JSON** trở về JSON nguyên bản kèm chú thích field; không còn search/tree/copy-field. Snippets và SourceRef vẫn giữ nguyên.
@@ -343,7 +351,7 @@ Website dùng **6 nhóm component học tập**, với **12 ví dụ** được 
 - Descriptor là YAML tin cậy của tác giả. Code, command, body và snapshot chỉ được hiển thị; không chạy shell, gọi API, mô phỏng broker hoặc tự kiểm chứng business contract.
 - Dùng `code: |-` / `json: |-` để giữ nội dung và bỏ newline cuối ngoài ý muốn. Ranges code tính từ **1**, inclusive trên snapshot hoặc đúng bên before/after, không phải dòng Markdown.
 - Viết bối cảnh và điều kiện áp dụng trong prose quanh component. Điều kiện an toàn phải hiện **trước** thao tác; với terminal dùng thêm `TerminalStep.warning`. Không chỉ đặt chúng trong caption, description hoặc expected vì metadata có thể không render hoặc nằm trong ghi chú thu gọn.
-- Timeline phải khai báo `provenance`; dữ liệu tự biên soạn dùng `kind: illustrative`. Nêu rõ đơn vị, giả định, overlap và khoảng chưa mô hình hóa. Không suy ra critical path, happens-before hoặc exactly-once side effect từ tọa độ.
+- Span Waterfall phải khai báo `provenance`; dữ liệu tự biên soạn dùng `kind: illustrative`. Với D2 mô tả thời gian, ghi tính minh họa, đơn vị và giả định trong prose ngay quanh sơ đồ; tọa độ không tỷ lệ với thời lượng. Nêu rõ overlap và khoảng chưa mô hình hóa. Không suy ra critical path, happens-before hoặc exactly-once side effect từ tọa độ.
 - Dùng Walkthrough cho diễn tiến có ý nghĩa; code ngắn chỉ cần fence thường và giải thích. D2 vẫn ưu tiên cho graph/kiến trúc, tables cho đối chiếu tổng hợp; không thay tất cả thành viewer.
 - Chỉ dùng `view: split` / `wordDiff: true` cho diff ngắn cần đối chiếu. Walkthrough không autoplay; không JavaScript vẫn có mọi snapshot và danh sách bước. `src/app/globals.css` có override `@layer base` / `@media (scripting: none)` cho `pre[hidden]` trong Walkthrough để không bị Tailwind ẩn các snapshot fallback; khi có JavaScript vẫn chỉ hiện snapshot đang chọn. Native disclosures và nội dung server-rendered vẫn đọc được, còn copy/select cần hydration.
 - Nội dung đóng hoặc snapshot chưa chọn vẫn được publish trong HTML/dữ liệu trang: chỉ dùng credential giả và dữ liệu đã lọc.
@@ -363,11 +371,11 @@ const maxAttempts = 3;
 - Fence thường có `source="snippets/tên-file.ext"` publish đúng code và ngôn ngữ, không publish YAML descriptor. Giữ Markdown SourceRef kế bên và các link D2 trỏ tới artifact đó; pipeline validate project/snapshot/file/lines trước khi sinh assets.
 - Không gắn metadata một artifact lên `code-diff` hoặc `code-walkthrough`. Publish code gốc riêng rồi reference qua `before.source` / `after.source` hoặc `snapshots[].source`; pipeline kiểm tra cả những reference này.
 - Sau migration, **213 artifacts cũ vẫn giữ nguyên code, ngôn ngữ và đường dẫn**. Các snippets vẫn là trích đoạn độc lập, không phải project chạy được.
-- Pipeline báo lỗi nếu gặp fence thuộc bốn nhóm đã bỏ, tránh render YAML descriptor lỗi thời như một code block hoặc vô tình publish nó vào SourceExplorer.
+- Pipeline báo lỗi nếu gặp fence thuộc năm nhóm đã bỏ (kể cả `concurrency-lanes` từ 0.9.0), tránh render YAML descriptor lỗi thời như một code block hoặc vô tình publish nó vào SourceExplorer.
 
-Plugin đăng ký ở `source.config.ts`, MDX components ở `src/app/[[...slug]]/page.tsx`, CSS ở `src/app/globals.css`. Không import parser, Shiki hay D2 renderer vào client component. `scripts/learning-components.test.mjs` validate/compile/server-render mọi ví dụ của cả 6 nhóm, kiểm tra public exports, source references, cảnh báo luôn hiện và fallback không JavaScript. Chạy đủ `npm test`, `npm run check-diagrams`, `npm run build`, `npm run typecheck` khi thay component hoặc descriptor.
+Plugin đăng ký ở `source.config.ts`, MDX components ở `src/app/[[...slug]]/page.tsx`, CSS ở `src/app/globals.css`. Không import parser, Shiki hay D2 renderer vào client component. `scripts/learning-components.test.mjs` validate/compile/server-render mọi ví dụ của cả 5 nhóm, kiểm tra public exports, source references, cảnh báo luôn hiện và fallback không JavaScript. Chạy đủ `npm test`, `npm run check-diagrams`, `npm run build`, `npm run typecheck` khi thay component hoặc descriptor.
 
-API chi tiết: [docs-kit 0.8.0](https://www.npmjs.com/package/@vanhiep99w/docs-kit/v/0.8.0), tài liệu từng component và hướng dẫn migration tại `node_modules/@vanhiep99w/docs-kit/docs/` và README của package.
+API chi tiết: [docs-kit 0.9.0](https://www.npmjs.com/package/@vanhiep99w/docs-kit/v/0.9.0), tài liệu từng component và hướng dẫn migration tại `node_modules/@vanhiep99w/docs-kit/docs/` và README của package.
 
 ## 📚 Tham khảo
 

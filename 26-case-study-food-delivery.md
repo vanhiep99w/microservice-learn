@@ -775,13 +775,23 @@ Trong môi trường containerized (ECS, Kubernetes), mỗi service instance đ�
 
 **Service Discovery** giải quyết bài toán: **"Service A muốn gọi Service B — gọi đến đâu?"**
 
+```d2 title="Discovery — tránh cố định địa chỉ của instance"
+direction: down
+hardcoded: "Hardcode endpoint" {
+  caller: Caller của Order
+  ip: "http://10.0.3.47:3003\nIP instance cũ"
+  caller -> ip: Instance thay IP — endpoint không còn đúng
+}
+discovery: "Tên service ổn định" {
+  caller: Caller của Order
+  dns: "order-service.fastbite.local:3007"
+  endpoint: Endpoint được discovery trả về
+  caller -> dns: Resolve tên service
+  dns -> endpoint: IP theo record / cache hiện tại
+}
 ```
-❌ Không có Service Discovery:
-   Order Service → http://10.0.3.47:3003  ← IP cứng, container restart = mất kết nối
 
-✅ Có Service Discovery:
-   Order Service → http://order-service.fastbite.local:3007  ← DNS tự resolve đúng IP
-```
+DNS/discovery không cập nhật tức thì ở mọi client: phải tính TTL/cache, health check và connection reuse. DNS name là contract ổn định hơn IP của một container.
 
 #### So sánh Client-side vs Server-side Discovery
 
@@ -1421,12 +1431,24 @@ return 0  -- driver đã bị claim bởi đơn khác
 
 Scenario: 2 ops cùng sửa thông tin nhà hàng (giờ mở cửa), người sau ghi đè thay đổi của người trước.
 
+```d2 title="Restaurant — optimistic locking từ chối stale write"
+shape: sequence_diagram
+a: Ops A
+b: Ops B
+db: Restaurant DB
+a -> db: Read version 5
+db -> a: Restaurant version 5
+b -> db: Read version 5
+db -> b: Restaurant version 5
+a -> a: Sửa giờ mở cửa
+b -> b: Sửa địa chỉ
+a -> db: Save với expected version 5
+db -> a: Thành công — version 6
+b -> db: Save với expected version 5
+db -> b: CONFLICT — version hiện tại là 6
 ```
-Ops A đọc restaurant (version = 5), sửa giờ mở cửa
-Ops B đọc restaurant (version = 5), sửa địa chỉ
-Ops A save → version 5→6 ✓
-Ops B save → version 5→6 ✗ CONFLICT! (version đã là 6)
-```
+
+Điều kiện version phải được kiểm tra **atomic trong DB write** (compare-and-swap), không phải đọc rồi kiểm tra ở application trước một UPDATE vô điều kiện. Caller bị conflict cần reload và quyết định merge/retry phù hợp.
 
 ```sql
 -- Optimistic locking — kiểm tra version khi update
@@ -1451,14 +1473,26 @@ T+0:06  Callback từ MoMo đến muộn (delay 5 phút)
         → Nếu Order đã CANCELLED (do timeout) → Trigger refund tự động
 ```
 
+```d2 title="Payment callback — dedupe trước khi quyết định theo trạng thái order"
+direction: down
+callback: Nhận callback đã xác thực
+seen: "payment_provider_txn_id\nđã xử lý?" {shape: diamond}
+ack: Return success — không lặp side effect
+status: Đọc / kiểm tra order status {shape: diamond}
+confirm: "Confirm payment\nOrder → PAID"
+next: Assign driver theo workflow
+refund: Refund theo contract + notify user
+review: Reconcile / xử lý trạng thái khác
+callback -> seen
+seen -> ack: Đã xử lý
+seen -> status: Chưa xử lý
+status -> confirm: PAYMENT_PENDING
+confirm -> next
+status -> refund: CANCELLED
+status -> review: Trạng thái khác / race
 ```
--- Xử lý trong Payment Service:
-1. Lookup order by order_id → check status
-2. Nếu status = PAYMENT_PENDING → confirm payment → order → PAID → assign driver
-3. Nếu status = CANCELLED → auto refund → notify user "Đã hoàn tiền"
-4. Idempotency: check payment_provider_txn_id đã xử lý chưa
-   → Nếu đã xử lý → return success (không xử lý lại)
-```
+
+Đây là flow logic, không phải atomicity do sơ đồ cung cấp. Dedupe và state transition cần cơ chế concurrency an toàn; refund/assign driver cũng phải idempotent và có retry/reconciliation. ACK callback không tự chứng minh mọi downstream side effect đã hoàn tất.
 
 **④ Event mất / Consumer down**
 
@@ -1553,15 +1587,17 @@ HALF_OPEN -> OPEN: "Probe request fails"
 
 Payment, Dispatch, Tracking là các service độc lập với DB riêng — chúng không ảnh hưởng trực tiếp đến nhau. Nhưng vấn đề nằm ở **Order Service — service gọi tất cả chúng**. Khi tạo đơn, Order Service phải gọi Payment, Dispatch, Promotion. Nếu dùng chung 1 thread/connection pool:
 
+```d2 title="Không có Bulkhead — một dependency chiếm shared pool"
+direction: down
+slow: Google Maps Routing API — timeout 5 s
+caller: Dispatch Service giữ lời gọi chờ
+pool: "Order shared pool 100 threads\n70 threads chờ dependency chậm"
+remaining: "Còn 30 threads cho Payment / Promotion / Notification"
+full: Request mới chờ / hết slot dù dependency khác còn khỏe
+slow -> caller -> pool -> remaining -> full
 ```
-Ví dụ: Order Service có 100 threads, dùng chung cho mọi outbound call
 
-Routing API (Google Maps) bị chậm (timeout 5s mỗi request)
-→ 70 threads đang chờ Dispatch Service trả về (vì Dispatch chờ Routing API)
-→ Chỉ còn 30 threads cho cả Payment + Promotion + Notification
-→ Các request tạo đơn mới không có thread để gọi Payment
-→ Toàn bộ order flow CHẾT — dù Payment và Promotion vẫn hoạt động bình thường!
-```
+Các số thread và timeout là **minh họa** cho blocking client. Cần giới hạn concurrency/queue riêng cho từng dependency; async I/O không dùng thread theo cùng cách nhưng vẫn có thể cạn connection, memory hoặc request slots.
 
 > 💡 **Bulkhead không bảo vệ giữa các downstream service** — nó bảo vệ **bên trong caller (Order Service)**, đảm bảo 1 downstream chậm/chết không chiếm hết resource, kéo theo các downstream khác không gọi được. Giống tàu thuỷ chia khoang kín nước — 1 khoang thủng thì các khoang khác vẫn an toàn.
 

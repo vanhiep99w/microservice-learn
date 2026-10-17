@@ -42,8 +42,10 @@ export function collectExamples(markdown, filename) {
       }
     }
     // Do not silently publish obsolete YAML descriptors as ordinary code.
-    if (['annotated', 'data-inspector', 'marble', 'state-transition'].includes(node.lang)) {
-      throw new Error(`${filename}:${node.position.start.line}: ${node.lang} was removed in docs-kit 0.8.0; use ordinary code/JSON, Markdown tables or D2`);
+    const removedIn = node.lang === 'concurrency-lanes' ? '0.9.0'
+      : ['annotated', 'data-inspector', 'marble', 'state-transition'].includes(node.lang) ? '0.8.0' : null;
+    if (removedIn) {
+      throw new Error(`${filename}:${node.position.start.line}: ${node.lang} was removed in docs-kit ${removedIn}; use ordinary code/JSON, Markdown tables or D2`);
     }
     // Multi-version descriptors reference separately published source artifacts;
     // the descriptor itself is never a source file.

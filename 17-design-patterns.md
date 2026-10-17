@@ -154,7 +154,7 @@ services.user.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 
 ### Flow "Đặt hàng" — các pattern phối hợp
 
-```d2 title="Flow \"Đặt hàng\" — các pattern phối hợp"
+```d2 title='Flow "Đặt hàng" — các pattern phối hợp'
 shape: sequence_diagram
 "C": "Client"
 "GW": "API Gateway"

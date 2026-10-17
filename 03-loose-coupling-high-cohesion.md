@@ -119,9 +119,13 @@ Service A phụ thuộc vào **chi tiết cài đặt bên trong** của Service
 ```
 
 **Ví dụ vi phạm**:
-```
-Order Service → SELECT * FROM inventory.products WHERE stock > 0
-                         ↑ đọc trực tiếp DB của Inventory Service!
+```d2 title="Implementation Coupling — truy cập chéo database"
+direction: right
+order: Order Service
+inventory: Inventory Service
+db: "Inventory DB\nproducts" {shape: cylinder}
+order -> db: "SELECT * FROM inventory.products WHERE stock > 0\nTruy cập chéo — coupling vào schema"
+inventory -> db: Sở hữu
 ```
 
 Khi Inventory Service đổi schema (ví dụ rename `stock` → `quantity`), Order Service sẽ **lỗi ngay lập tức**.
@@ -164,9 +168,14 @@ Phải deploy **nhiều service cùng lúc** để hệ thống hoạt động �
 
 Service A cần **thông tin nghiệp vụ** từ Service B để hoàn thành công việc. Đây là coupling **tự nhiên** và không thể tránh hoàn toàn.
 
-```
-✅ Order Service cần biết giá sản phẩm → gọi Product Service API
-✅ Shipping Service cần biết địa chỉ → gọi Customer Service API
+```d2 title="Domain Coupling qua API công khai"
+direction: right
+order: Order Service
+product: Product Service API
+shipping: Shipping Service
+customer: Customer Service API
+order -> product: Cần giá sản phẩm
+shipping -> customer: Cần địa chỉ giao hàng
 ```
 
 **Quan trọng**: Domain Coupling là chấp nhận được, nhưng cần **giảm thiểu** và **quản lý tốt**.
@@ -281,16 +290,27 @@ annotations:
 
 Thay vì service A **yêu cầu** service B làm gì (command), service A **thông báo** điều gì đã xảy ra (event), và các service khác tự quyết định phản ứng.
 
+```d2 title="Command trực tiếp và event broadcast"
+direction: down
+command: "Command — producer chỉ định việc phải làm" {
+  order: Order Service
+  payment: Payment Service
+  order -> payment: "Hãy trừ tiền khách hàng 100\$"
+}
+event: "Event — producer thông báo việc đã xảy ra" {
+  order: Order Service
+  bus: Event Bus
+  payment: "Payment Service\nTự quyết định thanh toán"
+  inventory: "Inventory Service\nTự quyết định reserve hàng"
+  email: "Email Service\nTự quyết định gửi xác nhận"
+  order -> bus: "OrderCreated #123 — tổng 100\$"
+  bus -> payment: Subscribe
+  bus -> inventory: Subscribe
+  bus -> email: Subscribe
+}
 ```
-# Command Pattern (higher coupling) ⚠️
-Order Service → "Hãy trừ tiền khách hàng 100$" → Payment Service
 
-# Event Pattern (lower coupling) ✅
-Order Service → "Đơn hàng #123 đã được tạo, tổng 100$" → Event Bus
-Payment Service tự lắng nghe và quyết định: "OK, tôi sẽ xử lý thanh toán"
-Inventory Service tự lắng nghe và quyết định: "OK, tôi sẽ reserve hàng"
-Email Service tự lắng nghe và quyết định: "OK, tôi sẽ gửi email xác nhận"
-```
+Các consumer phản ứng độc lập; các nhánh fan-out không thể hiện thứ tự xử lý hoặc một distributed transaction.
 
 #### 2.4.4. Database per Service
 

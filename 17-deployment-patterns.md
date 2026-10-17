@@ -147,13 +147,19 @@ Trước khi đến Blue-Green và Canary, cần nắm **Rolling Update** — ch
 
 **Rolling Update** thay thế instance cũ bằng instance mới **từng cái một**: tạo pod v2 → đợi pod v2 ready → tắt một pod v1 → lặp lại đến khi toàn bộ là v2.
 
+```d2 title="Rolling Update — từ ba pod v1 tới ba pod v2"
+direction: down
+initial: "Bước 0\nv1 / v1 / v1"
+surge: "Bước 1\nv1 / v1 / v1 + v2 starting\nv2 chưa nhận traffic"
+ready: "Bước 2\nv1 / v1 / v2 ready"
+next: "Bước 3\nv1 / v2 / v2"
+done: "Bước 4\nv2 / v2 / v2"
+initial -> surge: Tạo pod mới trong surge budget
+surge -> ready: v2 ready rồi giảm v1
+ready -> next -> done
 ```
-Bước 0:   [v1] [v1] [v1]          ← 0% v2
-Bước 1:   [v1] [v1] [v1] [v2🟡]   ← v2 khởi động, chưa nhận traffic
-Bước 2:   [v1] [v1] [v2✅]        ← v2 ready, 1 pod v1 bị thay
-Bước 3:   [v1] [v2] [v2]
-Bước 4:   [v2] [v2] [v2] ✅        ← rollout hoàn tất
-```
+
+Các node là snapshot logic, không phải số giây. Ví dụ giả định được phép surge một pod và chỉ route tới pod ready; rollout thực tế còn phụ thuộc readiness, maxSurge và maxUnavailable.
 
 Điểm kiểm soát chính trên Kubernetes: `maxSurge` (tối đa thêm bao nhiêu pod mới trong lúc rollout) và `maxUnavailable` (cho phép giảm bao nhiêu pod sẵn sàng — đặt `0` để zero downtime), cùng `readinessProbe` để quyết định khi nào pod mới được nhận traffic. Rollback bằng `kubectl rollout undo` — nhưng phải **rolling ngược từng pod**, nên chậm hơn switch traffic (vài phút thay vì vài giây).
 
@@ -604,15 +610,18 @@ Nguyên tắc cho API contract giữa các service (chi tiết [29, mục 2.1](2
 
 **Expand-Contract** là pattern migration schema thành nhiều bước nhỏ để schema cũ và mới cùng tồn tại:
 
-```
-1. EXPAND      ADD COLUMN full_name NULL        ← v1 vẫn chạy bình thường
-2. DEPLOY      v2 đọc full_name, fallback       ← v1 + v2 cùng chạy
-   (compatible)  customer_name; ghi cả hai
-3. BACKFILL    UPDATE ... SET full_name =       ← job riêng, theo batch,
-               customer_name                      có checkpoint
-4. SWITCH READ v2 đọc primary full_name
-5. CONTRACT    DROP COLUMN customer_name        ← CHỈ SAU khi rollback
-                                                window đóng
+```d2 title="Expand-Contract — giữ compatibility trong rollback window"
+direction: down
+expand: "1 · EXPAND\nADD COLUMN full_name NULL\nGiữ customer_name cho v1"
+deploy: "2 · DEPLOY compatible v2\nĐọc full_name, fallback customer_name\nGhi cả hai theo contract"
+backfill: "3 · BACKFILL\nfull_name ← customer_name\nBatch riêng, có checkpoint"
+switch: "4 · SWITCH READ\nĐọc primary full_name sau verify"
+gate: "Rollback window đã đóng?\nKhông còn consumer / code cần cột cũ?" {shape: diamond}
+contract: "5 · CONTRACT\nDROP customer_name sau phê duyệt"
+keep: Giữ schema mở rộng / tiếp tục quan sát
+expand -> deploy -> backfill -> switch -> gate
+gate -> contract: Có — đủ điều kiện
+gate -> keep: Chưa
 ```
 
 Ba quy tắc gắn với deployment patterns:
@@ -719,16 +728,23 @@ n9 -> n12
 
 **Bối cảnh:** Order Service (e-commerce) cần release v2 với hai thay đổi: (a) luồng checkout mới cho phép lưu nhiều địa chỉ giao, (b) đổi schema: `customer_name` → `full_name`. Service xử lý ~500K request/ngày, có Service Mesh (Istio), Grafana dashboard theo version, và hệ thống feature flag nội bộ.
 
+Lịch **minh họa**, đơn vị **ngày**. Khoảng cách giữa các mốc không tỷ lệ với thời lượng; ngày 12 không tự động cho phép thao tác phá hủy schema.
+
+```d2 title="Order Service v2 — deploy, release và contract là các mốc riêng"
+direction: down
+expand: "Ngày 0 · EXPAND DB\nADD full_name; giữ customer_name"
+deploy: "Ngày 1 · DEPLOY v2\nRolling; flag OFF; dark launch\nSmoke / internal test"
+canary: "Ngày 2–3 · CANARY\nCohort / traffic 1% → 5% → 25%\nGates: error rate, p99, order success"
+full: "Ngày 5 · 100% traffic\nGiữ v1 và schema cũ; quan sát"
+gate: "Ngày 12 · Đủ điều kiện đóng rollback window?" {shape: diamond}
+contract: "CONTRACT\nDROP customer_name; xóa flag + code path cũ"
+hold: Tiếp tục giữ compatibility
+expand -> deploy -> canary -> full -> gate
+gate -> contract: Đã verify / hết consumer cũ
+gate -> hold: Chưa
 ```
-Ngày 0          Ngày 1               Ngày 2-3              Ngày 5         Ngày 12
-────────────────────────────────────────────────────────────────────────────────▶
-EXPAND DB       DEPLOY v2            CANARY                100%           CONTRACT
-ADD COLUMN      (Rolling, flag OFF)  flag 1% → 5% → 25%    traffic        DROP customer_name
-full_name       dark launch          theo weight Istio     giữ v1         xóa flag
-                + smoke test         gates: error rate,    quan sát       + code path cũ
-                internal test        p99, order success
-                                     ──────── rollback window ────────▶ đóng
-```
+
+Rollback window phải mở trong giai đoạn canary và quan sát. Nếu dùng cả feature flag lẫn Istio traffic weight, cần xác định rõ cohort và tỷ lệ hiệu dụng; đó là hai cơ chế khác nhau, không mặc định cùng một phần trăm.
 
 Diễn biến từng giai đoạn và pattern đảm nhiệm việc gì:
 

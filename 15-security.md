@@ -1820,25 +1820,33 @@ network.icon: "https://icons.d2lang.com/azure/_Companies/Kubernetes.svg"
 
 **Security flow khi user tạo order:**
 
+```d2 title="Checkout — các điểm kiểm tra bảo mật trên request path"
+shape: sequence_diagram
+user: User / SPA
+idp: Keycloak
+edge: CloudFront / WAF
+gateway: API Gateway
+order: Order Service
+opa: OPA
+payment: Payment Service
+audit: ELK / Audit pipeline
+user -> idp: Login
+idp -> user: Access token + refresh token
+user -> edge: POST /orders + JWT
+edge -> gateway: Traffic đã qua perimeter policy
+gateway -> gateway: Verify RS256 signature / claims và rate limit
+gateway -> order: Request + identity context theo contract
+order -> opa: Có quyền tạo order?
+opa -> order: Allow theo policy
+order -> order: Validate input — Pydantic / Joi
+order -> payment: mTLS + Client Credentials
+payment -> payment: Verify certificate / SPIFFE identity / authorization
+payment -> payment: Process payment và encrypt dữ liệu nhạy cảm
+order -> audit: Log đã lọc secrets / sensitive data
+payment -> audit: Audit event
 ```
-1. User login → Keycloak → nhận JWT (access + refresh token)
-2. SPA gửi POST /orders + JWT → qua CloudFront + WAF
-3. API Gateway:
-   → Verify JWT signature (RS256, public key từ Keycloak)
-   → Check rate limit (100 req/min/user)
-   → Forward request + user claims
-4. Order Service:
-   → Extract user roles từ JWT
-   → OPA check: user có quyền tạo order?
-   → Validate input (Pydantic/Joi)
-   → Gọi Payment Service (mTLS, Client Credentials)
-5. Payment Service:
-   → Verify mTLS cert (Istio)
-   → Verify service identity (SPIFFE)
-   → Process payment (PCI DSS compliant)
-   → Encrypt sensitive data trước khi lưu
-6. Tất cả requests được log → ELK → audit trail
-```
+
+Đây là happy path; policy deny hoặc token không hợp lệ phải chặn trước business side effect. Ví dụ rate limit 100 request/phút/user không phải cấu hình chung. mTLS xác thực workload, không tự thay thế authorization; sơ đồ cũng không chứng minh hệ thống đạt PCI DSS.
 
 ---
 

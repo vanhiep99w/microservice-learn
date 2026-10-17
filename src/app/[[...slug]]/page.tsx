@@ -15,7 +15,6 @@ import { CodeDiff } from '@vanhiep99w/docs-kit/components/code-diff';
 import { CodeDiffWithSource } from '@vanhiep99w/docs-kit/components/code-diff-source';
 import { ProtocolExchange } from '@vanhiep99w/docs-kit/components/protocol-exchange';
 import { SpanWaterfall } from '@vanhiep99w/docs-kit/components/span-waterfall';
-import { ConcurrencyLanes } from '@vanhiep99w/docs-kit/components/concurrency-lanes';
 import { D2Diagram } from '@vanhiep99w/docs-kit/components/d2';
 import { D2InteractiveDiagram } from '@vanhiep99w/docs-kit/components/d2-interactive';
 import { SourceRef } from '@vanhiep99w/docs-kit/components/source-explorer';
@@ -63,7 +62,6 @@ export default async function Page({
           CodeDiffWithSource,
           ProtocolExchange,
           SpanWaterfall,
-          ConcurrencyLanes,
         }} />
       </DocsBody>
     </DocsPage>

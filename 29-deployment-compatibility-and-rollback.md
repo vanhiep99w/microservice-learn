@@ -357,11 +357,15 @@ RENAME COLUMN customer_name TO full_name;
 
 Trong Rolling Update:
 
-```text
-Pod v1 vẫn chạy
-v1 đọc customer_name
-column đã bị rename
-→ v1 lỗi ngay lập tức
+```d2 title="Rename column trực tiếp làm pod v1 đang chạy lỗi"
+direction: right
+rename: Migration rename customer_name thành full_name
+schema: Schema không còn customer_name
+v1: Pod v1 vẫn đọc customer_name
+error: Query lỗi — mixed-version rollout bị phá
+rename -> schema
+v1 -> schema: SELECT theo contract cũ
+schema -> error: Column không tồn tại
 ```
 
 Rollback image về v1 cũng không giải quyết được vì schema đã bị thay đổi theo hướng breaking.
@@ -407,10 +411,20 @@ Khi ghi:
 
 Trong giai đoạn này:
 
-```text
-v1 → đọc/ghi customer_name
-v2 → đọc/ghi customer_name và full_name
+```d2 title="Expand schema — hai version cùng dùng được dữ liệu"
+direction: right
+v1: v1
+v2: v2 compatible
+schema: Orders — expanded schema {
+  old: customer_name
+  added: full_name
+}
+v1 -> schema.old: Đọc / ghi
+v2 -> schema.old: Fallback đọc / tiếp tục ghi
+v2 -> schema.added: Ưu tiên đọc / ghi
 ```
+
+Dual-write hai field cần cùng transaction hoặc invariant phù hợp. Giữ field cũ chưa đủ nếu v2 ghi giá trị hoặc semantics mà v1 không hiểu.
 
 Cả hai version cùng dùng database mà không phá nhau.
 

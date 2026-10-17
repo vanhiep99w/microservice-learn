@@ -225,11 +225,17 @@ Event store không `UPDATE` event cũ để thể hiện state mới. Nếu giao
 
 Ví dụ, replay stream của order có thể tạo state như sau:
 
-```text
-OrderCreated       -> status = PENDING
-PaymentReceived    -> status = PAID
-OrderShipped       -> status = SHIPPED
-OrderDelivered     -> status = DELIVERED
+```d2 title="Replay — apply event theo sequence để dựng state"
+direction: down
+empty: Chưa có order
+pending: PENDING
+paid: PAID
+shipped: SHIPPED
+delivered: DELIVERED
+empty -> pending: OrderCreated
+pending -> paid: PaymentReceived
+paid -> shipped: OrderShipped
+shipped -> delivered: OrderDelivered
 ```
 
 Replay đến version cụ thể cho phép xem state tại một mốc lịch sử. Với stream của một aggregate, sequence là cơ sở ordering đáng tin cậy hơn việc suy đoán thứ tự từ timestamp. Replay từ đầu cũng cho phép kiểm tra snapshot hoặc projection có khớp với nguồn hay không.

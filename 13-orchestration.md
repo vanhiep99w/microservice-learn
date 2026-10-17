@@ -909,16 +909,27 @@ startupProbe:
   failureThreshold: 30         # 30 × 10s = 5 phút để start
 ```
 
+```d2 title="Startup Probe — bảo vệ ứng dụng khởi động chậm"
+direction: down
+without: "Không có startup probe / budget khởi động phù hợp" {
+  boot: App đang boot
+  live: Liveness kiểm tra quá sớm
+  restart: Probe fail đủ ngưỡng — restart
+  boot -> live -> restart -> boot
+}
+with: "Có startup probe" {
+  boot: App đang boot
+  startup: Startup probe {shape: diamond}
+  live: Bắt đầu liveness + readiness
+  restart: Restart nếu hết failure budget
+  boot -> startup
+  startup -> live: Pass
+  startup -> startup: Chưa pass — còn budget
+  startup -> restart: Hết budget
+}
 ```
-Tại sao cần Startup Probe?
-  Không có startup probe:
-    → liveness probe check ngay → app chưa start xong → fail
-    → K8s restart → app lại chưa start xong → fail → restart loop 💀
 
-  Có startup probe:
-    → K8s chờ startup probe pass (tối đa 5 phút)
-    → Sau khi pass → liveness + readiness probe mới bắt đầu
-```
+Budget startup ví dụ 5 phút được cấu hình qua `failureThreshold × periodSeconds` và timeout phù hợp; không phải thời gian Kubernetes luôn chờ cố định. Liveness/readiness chưa chạy cho tới khi startup probe thành công.
 
 ### 6.4. So sánh 3 loại Probe
 

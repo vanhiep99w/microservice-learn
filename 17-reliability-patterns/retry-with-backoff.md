@@ -303,17 +303,19 @@ Timeout sau khi request đã được gửi không chứng minh server chưa th�
 
 **Idempotency Key** là định danh duy nhất cho một business operation. Client hoặc service tạo key một lần, rồi gửi lại **cùng key** trong mọi lần retry. Provider hoặc service nhận request phải hỗ trợ contract tương ứng: khi thấy key đã xử lý, nó trả lại kết quả đã lưu hoặc trạng thái của operation thay vì thực hiện side effect lần nữa.
 
-```text
-Operation: charge order-123
-Idempotency-Key: pay_order-123
-
-Attempt 1: POST /payments với pay_order-123 → provider xử lý
-           Response bị timeout
-Attempt 2: POST /payments với pay_order-123 → provider nhận ra key trùng
-           → trả kết quả cũ hoặc trạng thái hiện tại
-
-Không được tạo key mới cho Attempt 2 của cùng operation.
+```d2 title="Retry payment — giữ nguyên operation identity sau timeout"
+shape: sequence_diagram
+caller: Caller
+provider: Payment Provider
+caller -> provider: "Attempt 1 · charge order-123\nIdempotency-Key pay_order-123"
+provider -> provider: Xử lý operation và lưu trạng thái / kết quả
+caller -> caller: Timeout — chưa biết kết quả, không suy ra payment fail
+caller -> provider: "Attempt 2 · cùng operation\nCùng Idempotency-Key pay_order-123"
+provider -> provider: Nhận diện key trùng theo contract
+provider -> caller: Kết quả cũ hoặc trạng thái hiện tại
 ```
+
+Không tạo key mới cho attempt 2 của cùng operation. Provider phải hỗ trợ idempotency với phạm vi và retention phù hợp; nếu không xác định được kết quả, cần query/reconciliation thay vì charge mới.
 
 Nếu provider không hỗ trợ Idempotency Key hoặc không có cách tra trạng thái, không nên tự động retry một side effect chưa rõ kết quả. Hãy giữ operation ở trạng thái chờ, đối soát hoặc yêu cầu workflow nghiệp vụ xử lý tiếp.
 
