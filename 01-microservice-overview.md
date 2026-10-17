@@ -453,30 +453,41 @@ n6 -> n8: "event: payment.completed"
 
 Netflix là một trong những case study nổi tiếng nhất về chuyển đổi từ Monolith sang Microservice.
 
-```
-Timeline:
-═══════════════════════════════════════════════════════════
+```d2 title="Netflix — Các mốc chuyển đổi từ Monolith sang Microservice"
+direction: down
 
-2007 ─── Monolithic Architecture
-         │ - Single Java WAR deployment
-         │ - Shared Oracle database
-         │ - Vertical scaling
-         │
-2008 ─── Database corruption → 3 ngày downtime
-         │ → Quyết định chuyển sang Microservice
-         │
-2009-2011 ─── Migration phase
-         │ - Tách từng module thành service
-         │ - Chuyển sang AWS (cloud-native)
-         │ - Xây dựng OSS tools: Eureka, Zuul, Hystrix
-         │
-2012+ ── Full Microservice
-         │ - 700+ microservices
-         │ - 1 tỷ API calls/ngày
-         │ - Deploy hàng nghìn lần/ngày
+m2007: "2007 — Monolithic Architecture" {
+  style.border-radius: 12
+  details: "• Single Java WAR deployment\n• Shared Oracle database\n• Vertical scaling" {
+    shape: text
+  }
+}
 
-═══════════════════════════════════════════════════════════
+m2008: "2008 — Sự cố database" {
+  style.border-radius: 12
+  details: "• Database corruption: 3 ngày downtime\n• Quyết định chuyển sang Microservice" {
+    shape: text
+  }
+}
+
+migration: "2009–2011 — Migration phase" {
+  style.border-radius: 12
+  details: "• Tách từng module thành service\n• Chuyển sang AWS (cloud-native)\n• Xây dựng OSS tools:\nEureka, Zuul, Hystrix" {
+    shape: text
+  }
+}
+
+microservices: "2012+ — Full Microservice" {
+  style.border-radius: 12
+  details: "• 700+ microservices\n• 1 tỷ API calls/ngày\n• Deploy hàng nghìn lần/ngày" {
+    shape: text
+  }
+}
+
+m2007 -> m2008 -> migration -> microservices
 ```
+
+> **Cách đọc:** Đây là timeline lịch sử, không phải sequence diagram của một transaction. Các mũi tên chỉ thứ tự các mốc; khoảng cách giữa các thẻ không biểu thị độ dài thời gian.
 
 **Bài học từ Netflix:**
 1. **Strangler Fig Pattern** — Dần dần thay thế từng phần của Monolith, không rewrite từ đầu

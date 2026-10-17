@@ -46,6 +46,7 @@ microservice-learn/
 3. **Nội dung** — Phân theo H2 (`##`) và H3 (`###`)
 4. **Diagrams** — Sử dụng:
    - **D2** (`d2` code block có `title`) cho kiến trúc, dependency graph, flowchart và sequence đơn giản; render build-time qua `@vanhiep99w/docs-kit`
+   - **Timeline lịch sử / các mốc phát triển** có thể dùng D2 với `direction: down`, mỗi mốc là một thẻ nội dung nối dọc; không dùng `sequence_diagram`. Ghi rõ khoảng cách không phản ánh thời lượng. Nếu cần căn chỉnh infographic chính xác, dùng SVG/HTML.
    - **Mermaid** cho sơ đồ chuyên biệt cần semantics chưa chuyển tương đương (parallel/alternative fragments, activation, state machine, ER, Gantt)
    - **Text / ASCII art** cho cây thư mục, logs, payloads và ví dụ phụ thuộc căn cột; không ưu tiên ASCII cho sơ đồ kiến trúc mới
    - **Tables** cho so sánh, tổng hợp
