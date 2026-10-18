@@ -109,7 +109,7 @@ graph LR
 - Có thể thêm `&lines=1-4` để highlight. Không khai báo `region` nếu pipeline chưa có region đó.
 - Icon D2: chọn đúng sản phẩm trong `https://icons.d2lang.com/`, khai báo `node.icon` bằng URL catalog. Vendor SVG tin cậy và SHA-256 trong `diagrams/icons/manifest.json`; `remarkD2Icons` + `assetsRoot` nhúng icon lúc build. Không gán một logo cho node gộp nhiều sản phẩm hoặc dùng AWS logo cho thành phần generic. Xem hướng dẫn README.
 - Title D2 có dấu nháy kép bên trong dùng nháy đơn bao ngoài (`title='Flow "Đặt hàng"'`), không escape kiểu JSON; `check-diagrams` đối chiếu caption render với metadata và kiểm tra SVG light/dark.
-- docs-kit 0.9.0: chỉ opt-in `interactive` cho sơ đồ lớn; `mode=steps` khi cần diễn tiến trạng thái. Mặc định vẫn tĩnh; không bật toàn site. Viewer lazy-load khi bấm Explore, không chạy compiler trong browser.
+- docs-kit 0.9.8 mặc định bật viewer với zoom/fit/fullscreen và scale 0.85; controls tự tải sau hydration, compiler vẫn chỉ chạy lúc build. Dùng `interactive=false` cho ngoại lệ server-only, `mode=steps` khi cần diễn tiến trạng thái; không bật animation tự động cho mọi sơ đồ.
 - Node D2 có thể dùng `link: "./?source=..."` hoặc `node.link: "./?source=..."` để mở SourceExplorer tại chỗ qua `D2SourceLinks`. Dùng query URL percent-encoded trong nháy kép; `prepare-content` validate cùng manifest như Markdown SourceRef.
 - Trích đoạn phải giữ code nguyên bản, có language hợp lệ, không trùng artifact path trong một bài. Không ngụ ý các snippets độc lập là một project chạy được.
 - `prepare-content` tự sinh/validate manifest và snapshots tại `public/source-examples/`. Không chỉnh/commit output hoặc cache `.next/cache/docs-kit/d2`.

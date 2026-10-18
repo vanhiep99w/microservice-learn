@@ -6,7 +6,6 @@ import { visit } from 'unist-util-visit';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { remarkD2 } from '@vanhiep99w/docs-kit/d2';
-import { D2Diagram } from '@vanhiep99w/docs-kit/components/d2';
 import { D2InteractiveDiagram } from '@vanhiep99w/docs-kit/components/d2-interactive';
 import { parser } from './source-examples.mjs';
 import { d2IconAssetsRoot, remarkD2Icons } from './d2-icons.mjs';
@@ -35,11 +34,11 @@ async function renderBlock(path, select) {
   return { node, component, props };
 }
 
-test('docs-kit keeps existing diagrams static and builds source-linked opt-in diagrams', async () => {
+test('docs-kit opens viewer controls by default and preserves source-linked diagrams', async () => {
   const path = '13-orchestration.md';
   const ordinary = await renderBlock(path, (node) => node.meta.includes('Kubernetes Cluster'));
-  assert.equal(ordinary.component.name, 'D2Diagram');
-  assert.equal(ordinary.props.source, undefined);
+  assert.equal(ordinary.component.name, 'D2InteractiveDiagram');
+  assert.equal(ordinary.props.source, ordinary.node.value);
   assert.equal(ordinary.props.boards, undefined);
   assert.match(ordinary.props.lightSvg, /data:image\/svg\+xml;base64,/u);
   assert.match(ordinary.props.darkSvg, /data:image\/svg\+xml;base64,/u);
@@ -62,9 +61,9 @@ test('retired concurrency examples render as D2 while preserving timing and fail
   ]) {
     await t.test(path, async () => {
       const { node, component, props } = await renderBlock(path, (block) => block.meta.includes(title));
-      assert.equal(component.name, 'D2Diagram');
+      assert.equal(component.name, 'D2InteractiveDiagram');
       assert.match(node.value, /shape: sequence_diagram/u);
-      const html = renderToStaticMarkup(createElement(D2Diagram, props));
+      const html = renderToStaticMarkup(createElement(D2InteractiveDiagram, props));
       for (const label of labels) {
         assert.ok(html.toLowerCase().includes(label.toLowerCase()), `${path}: missing rendered ${label}`);
       }
@@ -95,10 +94,10 @@ test('D2 titles containing double quotes retain their complete rendered captions
 
 test('historical timeline uses categorical cards, not sequence lifelines', async () => {
   const { node, component, props } = await renderBlock('01-microservice-overview.md', (block) => block.meta.includes('Các mốc phát triển'));
-  assert.equal(component.name, 'D2Diagram');
+  assert.equal(component.name, 'D2InteractiveDiagram');
   assert.match(node.value, /direction: down/u);
   assert.doesNotMatch(node.value, /sequence_diagram/u);
-  const html = renderToStaticMarkup(createElement(D2Diagram, props));
+  const html = renderToStaticMarkup(createElement(D2InteractiveDiagram, props));
   for (const label of ['1990s', '2000', '2014', '2015', 'Kubernetes']) {
     assert.ok(html.includes(label), `Historical timeline missing ${label}`);
   }

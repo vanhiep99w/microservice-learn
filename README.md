@@ -268,7 +268,7 @@ bucket.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service
 
 ### D2 tương tác — zoom, steps và liên kết source
 
-Từ docs-kit 0.6.0, website đăng ký cả `D2Diagram` và `D2InteractiveDiagram`. **Mặc định vẫn là sơ đồ tĩnh**; chỉ thêm viewer ở nơi giúp đọc rõ hơn:
+Website dùng docs-kit **0.9.8**, đăng ký cả `D2Diagram` và `D2InteractiveDiagram`. **Viewer với zoom/fit/fullscreen bật sẵn**, scale mặc định `0.85`; `interactive=false` là ngoại lệ server-only. Các ví dụ dưới đây minh họa thêm modes và source links:
 
 | Tính năng | Đã áp dụng |
 |---|---|
@@ -287,7 +287,7 @@ Animation chỉ áp dụng cho diễn tiến có ý nghĩa, không bật toàn s
 
 Giữ nguyên flow tổng quan khi animation chỉ theo một kịch bản; nhánh abort/failure vẫn phải đọc được. Snapshot chỉ thể hiện trạng thái tác giả giả định, không thực thi thao tác. Sơ đồ kiến trúc/dependency, timeline lịch sử, sequence cần thể hiện overlap và timing trace định lượng vẫn tĩnh; ví dụ Saga có `mode=steps` đã đủ Play/Pause nên không cần sinh thêm file animation.
 
-Thêm `interactive` vào fence hiện có:
+Fence có thể ghi rõ `interactive` (không bắt buộc từ 0.9.8):
 
 ````markdown
 ```d2 interactive title="Đọc kiến trúc và mở code"
@@ -301,7 +301,7 @@ client -> order
 ```
 ````
 
-- Bấm **Explore diagram** để tải controls; chưa bấm vẫn đọc được SVG. Không đưa D2 compiler/WASM vào browser. Toolbar hiện dùng tiếng Anh, chưa có API dịch nhãn.
+- Controls tự tải sau hydration, không cần bấm Explore. Không đưa D2 compiler/WASM vào browser. SVG/source vẫn đọc được khi chưa có controls; toolbar hiện dùng tiếng Anh, chưa có API dịch nhãn.
 - `mode=steps` tự bật tương tác. Root là trạng thái ban đầu; mỗi entry trong `steps: { ... }` kế thừa bước trước. Không autoplay khi mở bài. Bàn phím canvas: `+`, `-`, `0`; trái/phải để chuyển bước.
 - `mode=animation interval=1800` thêm Animated SVG được render lúc build; interval là thời gian xem mỗi khung (ms), không phải business timer. Viewer không tự phát; motion trên mũi tên `style.animated` mặc định tắt và có nút bật riêng, tôn trọng reduced-motion. File Animated SVG tải xuống chạy theo hành vi native của D2, không mang theo controls/thiết lập giảm chuyển động của website. Với steps kế thừa, reset highlight của node/edge trước đó để không vô tình giữ nhiều trạng thái active.
 - Không có JavaScript vẫn có SVG, **All views** cho các board còn lại và **D2 source**. Giữ giải thích bằng prose để tài liệu gốc vẫn có ý nghĩa khi đọc trên GitHub.
