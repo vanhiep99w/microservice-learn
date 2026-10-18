@@ -118,7 +118,8 @@ test('Saga steps preserve compensation state and all boards have a no-JS fallbac
     assert.match(final, /reservation/u);
   }
   const html = renderToStaticMarkup(createElement(D2InteractiveDiagram, props));
-  assert.match(html, /Explore 6 views/u);
+  assert.doesNotMatch(html, /Explore 6 views/u);
+  assert.match(html, /class="d2-source-menu"/u);
   assert.match(html, /All views/u);
   assert.match(html, /D2 source/u);
   assert.match(html, /CANCELLED/u);

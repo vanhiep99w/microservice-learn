@@ -123,7 +123,8 @@ test('authored animation examples render all snapshots and preserve their teachi
         }
       }
       const html = renderToStaticMarkup(createElement(D2InteractiveDiagram, props));
-      assert.ok(html.includes(`Explore ${expected.count} views`));
+      assert.ok(!html.includes(`Explore ${expected.count} views`));
+      assert.ok(html.includes('class="d2-source-menu"'));
       assert.ok(html.includes(`All views (${expected.count})`));
       for (const board of props.boards.slice(1)) assert.ok(html.includes(board.label));
       assert.ok(markdown.includes('không chạy request, timer hay business side effect'));

@@ -60,7 +60,8 @@ test('Circuit Breaker animation preserves branches, resets highlights and retain
   }
 
   const html = renderToStaticMarkup(createElement(D2InteractiveDiagram, props));
-  assert.ok(html.includes('Explore 6 views'));
+  assert.doesNotMatch(html, /Explore 6 views/u);
+  assert.ok(html.includes('class="d2-source-menu"'));
   assert.ok(html.includes('All views (6)'));
   for (const board of props.boards.slice(1)) assert.ok(html.includes(board.label));
   assert.ok(html.includes('D2 source'));
