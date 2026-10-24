@@ -211,7 +211,7 @@ Mỗi tài liệu đều có:
 
 ## Website docs và quy ước D2 / SourceExplorer
 
-Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.9.0**. Yêu cầu **Node.js 22+**.
+Website dùng Next.js + Fumadocs và [`@vanhiep99w/docs-kit`](https://www.npmjs.com/package/@vanhiep99w/docs-kit) **0.12.0**. Yêu cầu **Node.js 22+**.
 
 ```bash
 npm ci
@@ -268,7 +268,7 @@ bucket.icon: "https://icons.d2lang.com/aws/Storage/Amazon-Simple-Storage-Service
 
 ### D2 tương tác — zoom, steps và liên kết source
 
-Website dùng docs-kit **0.9.8**, đăng ký cả `D2Diagram` và `D2InteractiveDiagram`. **Viewer với zoom/fit/fullscreen bật sẵn**, scale mặc định `0.85`; `interactive=false` là ngoại lệ server-only. Các ví dụ dưới đây minh họa thêm modes và source links:
+Website dùng docs-kit **0.12.0**, đăng ký cả `D2Diagram` và `D2InteractiveDiagram`. **Viewer với zoom/fit/fullscreen bật sẵn**, scale mặc định `0.85`; `interactive=false` là ngoại lệ server-only. Các ví dụ dưới đây minh họa thêm modes và source links:
 
 | Tính năng | Đã áp dụng |
 |---|---|
@@ -387,7 +387,7 @@ const maxAttempts = 3;
 
 Plugin đăng ký ở `source.config.ts`, MDX components ở `src/app/[[...slug]]/page.tsx`, CSS ở `src/app/globals.css`. Không import parser, Shiki hay D2 renderer vào client component. `scripts/learning-components.test.mjs` validate/compile/server-render mọi ví dụ của cả 5 nhóm, kiểm tra public exports, source references, cảnh báo luôn hiện và fallback không JavaScript. Chạy đủ `npm test`, `npm run check-diagrams`, `npm run build`, `npm run typecheck` khi thay component hoặc descriptor.
 
-API chi tiết: [docs-kit 0.9.0](https://www.npmjs.com/package/@vanhiep99w/docs-kit/v/0.9.0), tài liệu từng component và hướng dẫn migration tại `node_modules/@vanhiep99w/docs-kit/docs/` và README của package.
+API chi tiết: [docs-kit 0.12.0](https://www.npmjs.com/package/@vanhiep99w/docs-kit/v/0.12.0), tài liệu từng component và hướng dẫn migration tại `node_modules/@vanhiep99w/docs-kit/docs/` và README của package.
 
 ## 📚 Tham khảo
 
