@@ -213,28 +213,7 @@ Việc tách không luôn tốt hơn: nếu hai phần luôn thay đổi, deploy
 
 **Ví dụ giả định:** Trang chi tiết đơn có ba mặt hàng. Order Service gọi Product Service một lần cho từng SKU để lấy tên/ảnh, rồi gọi thêm từng SKU để lấy giá. Sáu round-trip có thể được thay bằng một query batch hoặc read model phù hợp.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="6.2. Ví dụ và remediation" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: chatty
-#     label: "Lookup riêng từng sản phẩm"
-#     steps:
-#       - edge: "(O -> P)[0]"
-#         description: "Order Service → Product Service: GET /products/A"
-#       - edge: "(O -> P)[1]"
-#         description: "Order Service → Product Service: GET /products/B"
-#       - edge: "(O -> P)[2]"
-#         description: "Order Service → Product Service: GET /products/C"
-#   - id: batch
-#     label: "Batch theo use case"
-#     steps:
-#       - edge: "(O -> P)[3]"
-#         description: "Order Service → Product Service: POST /products:batch {ids:[A,B,C]}"
-#       - edge: "(P -> O)[0]"
-#         description: "Product Service → Order Service: Dữ liệu cần cho use case"
-# @endflow
+```d2 title="6.2. Ví dụ và remediation"
 shape: sequence_diagram
 "O": "Order Service"
 "P": "Product Service"
@@ -246,8 +225,6 @@ shape: sequence_diagram
 "O" -> "P": "POST /products:batch {ids:[A,B,C]}"
 "P" -> "O": "Dữ liệu cần cho use case" { style.stroke-dash: 5 }
 ```
-
-Ba lookup lẻ và batch là hai phương án thay thế, không phải bốn request bắt buộc cho cùng một lần đọc.
 
 **Remediation:**
 

@@ -1164,29 +1164,7 @@ COMPLETED -> final3
 
 **Failure Sequence — Payment Failed:**
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="4.2. Saga Orchestration cho Order Lifecycle" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(PAY -> K)[0]"
-#         description: "Payment → Kafka: payment.failed.v1"
-#       - edge: "(K -> OS)[0]"
-#         description: "Kafka → Order Saga: consume payment.failed"
-#       - edge: "(OS -> PRM)[0]"
-#         description: "Order Saga → Promotion: reverseVoucherUsage(orderId)"
-#       - edge: "(PRM -> OS)[0]"
-#         description: "Promotion → Order Saga: reversed ✓"
-#       - edge: "(OS -> OS)[0]"
-#         description: "Order Saga → Order Saga: Update order status=CANCELLED"
-#       - edge: "(OS -> K)[0]"
-#         description: "Order Saga → Kafka: order.cancelled.v1"
-#       - edge: "(K -> NTF)[0]"
-#         description: "Kafka → Notification: consume order.cancelled"
-# @endflow
+```d2 title="4.2. Saga Orchestration cho Order Lifecycle"
 shape: sequence_diagram
 "OS": "Order Saga"
 "PAY": "Payment"

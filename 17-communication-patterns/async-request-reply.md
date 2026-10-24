@@ -150,49 +150,7 @@ Luồng điển hình gồm các bước sau:
 6. Worker ghi kết quả vào Result Store, rồi chuyển job sang `completed`; nếu không thể xử lý, chuyển sang `failed` cùng lý do.
 7. Client Poll status URL hoặc nhận kết quả qua cơ chế push đã thống nhất.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Luồng request và trạng thái job" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: submit
-#     label: "Nhận job: trả 202"
-#     steps:
-#       - edge: "(C -> API)[0]"
-#         description: "Client → Report API: POST /reports + Idempotency-Key"
-#       - edge: "(API -> J)[0]"
-#         description: "Report API → Job Store: Tạo job và state = pending"
-#       - edge: "(API -> Q)[0]"
-#         description: "Report API → Queue: Enqueue GenerateReport(job_id)"
-#       - edge: "(API -> C)[0]"
-#         description: "Report API → Client: 202 + Location + Retry-After"
-#   - id: worker
-#     label: "Worker xử lý nền"
-#     steps:
-#       - edge: "(Q -> W)[0]"
-#         description: "Queue → Report Worker: Deliver job"
-#       - edge: "(W -> J)[0]"
-#         description: "Report Worker → Job Store: state = processing, progress = 0"
-#       - edge: "(W -> J)[1]"
-#         description: "Report Worker → Job Store: Cập nhật progress = 40"
-#       - edge: "(W -> R)[0]"
-#         description: "Report Worker → Result Store: Lưu file báo cáo"
-#       - edge: "(R -> W)[0]"
-#         description: "Result Store → Report Worker: result reference"
-#       - edge: "(W -> J)[2]"
-#         description: "Report Worker → Job Store: state = completed + downloadUrl"
-#   - id: poll
-#     label: "Client đọc kết quả"
-#     steps:
-#       - edge: "(C -> API)[1]"
-#         description: "Client → Report API: GET /reports/{job_id}/status"
-#       - edge: "(API -> J)[1]"
-#         description: "Report API → Job Store: Đọc trạng thái"
-#       - edge: "(J -> API)[0]"
-#         description: "Job Store → Report API: completed + downloadUrl"
-#       - edge: "(API -> C)[1]"
-#         description: "Report API → Client: 200 status và kết quả"
-# @endflow
+```d2 title="Luồng request và trạng thái job"
 shape: sequence_diagram
 "C": "Client"
 "API": "Report API"
@@ -216,8 +174,6 @@ shape: sequence_diagram
 "J" -> "API": "completed + downloadUrl" { style.stroke-dash: 5 }
 "API" -> "C": "200 status và kết quả" { style.stroke-dash: 5 }
 ```
-
-Submit, worker và polling là ba phần của vòng đời job. Playback không mô phỏng chúng chạy đồng thời; client có thể polling khi worker vẫn đang xử lý.
 
 Trạng thái là một phần của API contract. Một vòng đời thường dùng là:
 
@@ -543,29 +499,7 @@ Async Request-Reply không quy định một cách duy nhất để chuyển rep
 
 **Polling** là cách client gọi status URL theo chu kỳ:
 
-```d2 title="Polling" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(client -> api)[0]"
-#         description: "Client → Reports API: POST /reports"
-#       - edge: "(api -> client)[0]"
-#         description: "Reports API → Client: 202 Location /reports/9f3c/status"
-#       - edge: "(client -> api)[1]"
-#         description: "Client → Reports API: Sau30s — GET status"
-#       - edge: "(api -> client)[1]"
-#         description: "Reports API → Client: pending"
-#       - edge: "(client -> api)[2]"
-#         description: "Client → Reports API: Sau60s — GET status"
-#       - edge: "(api -> client)[2]"
-#         description: "Reports API → Client: processing / progress40"
-#       - edge: "(client -> api)[3]"
-#         description: "Client → Reports API: Poll tiếp theo policy"
-#       - edge: "(api -> client)[3]"
-#         description: "Reports API → Client: completed / downloadUrl"
-# @endflow
+```d2 title="Polling"
 shape: sequence_diagram
 client: Client
 api: Reports API

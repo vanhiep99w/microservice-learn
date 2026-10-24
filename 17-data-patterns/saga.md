@@ -166,33 +166,7 @@ Nếu nghiệp vụ không chấp nhận các giới hạn này, không nên đ�
 
 Event diễn tả một fact đã xảy ra, chẳng hạn `OrderCreated` hoặc `PaymentCompleted`. Service nhận event tự quyết định có phản ứng hay không dựa trên contract của nó.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Luồng qua events" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(O -> O)[0]"
-#         description: "Order Service → Order Service: T1: Tạo order PENDING"
-#       - edge: "(O -> P)[0]"
-#         description: "Order Service → Payment Service: OrderCreated"
-#       - edge: "(P -> P)[0]"
-#         description: "Payment Service → Payment Service: T2: Charge payment"
-#       - edge: "(P -> I)[0]"
-#         description: "Payment Service → Inventory Service: PaymentCompleted"
-#       - edge: "(I -> I)[0]"
-#         description: "Inventory Service → Inventory Service: T3: Reserve stock"
-#       - edge: "(I -> P)[0]"
-#         description: "Inventory Service → Payment Service: StockReservationFailed"
-#       - edge: "(P -> P)[1]"
-#         description: "Payment Service → Payment Service: C2: Refund payment"
-#       - edge: "(P -> O)[0]"
-#         description: "Payment Service → Order Service: PaymentRefunded"
-#       - edge: "(O -> O)[1]"
-#         description: "Order Service → Order Service: C1: Cancel order"
-# @endflow
+```d2 title="Luồng qua events"
 shape: sequence_diagram
 "O": "Order Service"
 "P": "Payment Service"
@@ -229,37 +203,7 @@ Choreography thường dễ bắt đầu với Saga khoảng 3–4 bước và �
 
 Command mang ý nghĩa "hãy thực hiện việc này" và hướng tới một service cụ thể. Cách phối hợp này là command-driven, dù command có thể được truyền qua HTTP, RPC hoặc message broker.
 
-```d2 title="Luồng qua commands" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(C -> S)[0]"
-#         description: "Client → Saga Orchestrator: Start PlaceOrder"
-#       - edge: "(S -> O)[0]"
-#         description: "Saga Orchestrator → Order Service: CreateOrder command"
-#       - edge: "(O -> S)[0]"
-#         description: "Order Service → Saga Orchestrator: OK, order_id"
-#       - edge: "(S -> P)[0]"
-#         description: "Saga Orchestrator → Payment Service: ChargePayment command"
-#       - edge: "(P -> S)[0]"
-#         description: "Payment Service → Saga Orchestrator: OK, payment_id"
-#       - edge: "(S -> I)[0]"
-#         description: "Saga Orchestrator → Inventory Service: ReserveStock command"
-#       - edge: "(I -> S)[0]"
-#         description: "Inventory Service → Saga Orchestrator: Rejected, out of stock"
-#       - edge: "(S -> P)[1]"
-#         description: "Saga Orchestrator → Payment Service: RefundPayment command"
-#       - edge: "(P -> S)[1]"
-#         description: "Payment Service → Saga Orchestrator: OK, refund_id"
-#       - edge: "(S -> O)[1]"
-#         description: "Saga Orchestrator → Order Service: CancelOrder command"
-#       - edge: "(O -> S)[1]"
-#         description: "Order Service → Saga Orchestrator: OK"
-#       - edge: "(S -> S)[0]"
-#         description: "Saga Orchestrator → Saga Orchestrator: Mark saga COMPENSATED"
-# @endflow
+```d2 title="Luồng qua commands"
 shape: sequence_diagram
 "C": "Client"
 "S": "Saga Orchestrator"

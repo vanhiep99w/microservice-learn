@@ -165,39 +165,7 @@ Ngược lại, Gateway hoặc BFF có thể làm **API Aggregation** cho một 
 
 **Ví dụ giả định:** `Order Service` cần dựng trang chi tiết một order có ba item với SKU `A`, `B` và `C`. Với mỗi SKU, service gọi một lần để lấy tên và ảnh, rồi gọi thêm một lần để lấy giá.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Luồng chatty" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(O -> P)[0]"
-#         description: "Order Service → Product Service: GET /products/A"
-#       - edge: "(P -> O)[0]"
-#         description: "Product Service → Order Service: name, image"
-#       - edge: "(O -> P)[1]"
-#         description: "Order Service → Product Service: GET /products/A/price"
-#       - edge: "(P -> O)[1]"
-#         description: "Product Service → Order Service: price"
-#       - edge: "(O -> P)[2]"
-#         description: "Order Service → Product Service: GET /products/B"
-#       - edge: "(P -> O)[2]"
-#         description: "Product Service → Order Service: name, image"
-#       - edge: "(O -> P)[3]"
-#         description: "Order Service → Product Service: GET /products/B/price"
-#       - edge: "(P -> O)[3]"
-#         description: "Product Service → Order Service: price"
-#       - edge: "(O -> P)[4]"
-#         description: "Order Service → Product Service: GET /products/C"
-#       - edge: "(P -> O)[4]"
-#         description: "Product Service → Order Service: name, image"
-#       - edge: "(O -> P)[5]"
-#         description: "Order Service → Product Service: GET /products/C/price"
-#       - edge: "(P -> O)[5]"
-#         description: "Product Service → Order Service: price"
-# @endflow
+```d2 title="Luồng chatty"
 shape: sequence_diagram
 "O": "Order Service"
 "P": "Product Service"
@@ -242,17 +210,7 @@ Content-Type: application/json
 }
 ```
 
-```d2 title="Luồng coarse-grained" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(O -> P)[0]"
-#         description: "Order Service → Product Service: POST /products:batch {ids:[A,B,C]}"
-#       - edge: "(P -> O)[0]"
-#         description: "Product Service → Order Service: projection gồm name, image, price"
-# @endflow
+```d2 title="Luồng coarse-grained"
 shape: sequence_diagram
 "O": "Order Service"
 "P": "Product Service"

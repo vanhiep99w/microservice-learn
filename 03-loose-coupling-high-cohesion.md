@@ -375,31 +375,7 @@ n2.n12 -> n2.n8: "chỉ dùng"
 
 **Tight Coupling ❌**:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Bài toán: Xử lý đơn hàng trong E-Commerce" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(C -> O)[0]"
-#         description: "Client → Order Service: Tạo đơn hàng"
-#       - edge: "(O -> P)[0]"
-#         description: "Order Service → Payment Service: POST /payments/charge (sync)"
-#       - edge: "(P -> O)[0]"
-#         description: "Payment Service → Order Service: Payment OK"
-#       - edge: "(O -> I)[0]"
-#         description: "Order Service → Inventory Service: PUT /inventory/reserve (sync)"
-#       - edge: "(I -> O)[0]"
-#         description: "Inventory Service → Order Service: Reserved OK"
-#       - edge: "(O -> N)[0]"
-#         description: "Order Service → Notification Service: POST /notifications/send (sync)"
-#       - edge: "(N -> O)[0]"
-#         description: "Notification Service → Order Service: Sent OK"
-#       - edge: "(O -> C)[0]"
-#         description: "Order Service → Client: Đơn hàng thành công"
-# @endflow
+```d2 title="Bài toán: Xử lý đơn hàng trong E-Commerce"
 shape: sequence_diagram
 "C": "Client"
 "O": "Order Service"
@@ -676,32 +652,7 @@ Triệu chứng: deploy một service phải deploy service khác; đổi một 
 
 **Đặc điểm**: Service A phải gọi Service B **quá nhiều lần** để hoàn thành 1 tác vụ, tạo ra **network overhead** lớn.
 
-```d2 title="5.2. Chatty Services" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: chatty
-#     label: "N call riêng lẻ"
-#     steps:
-#       - edge: "(O -> P)[0]"
-#         description: "Order Service → Product Service: GET /products/1"
-#       - edge: "(P -> O)[0]"
-#         description: "Product Service → Order Service: Product 1"
-#       - edge: "(O -> P)[1]"
-#         description: "Order Service → Product Service: GET /products/2"
-#       - edge: "(P -> O)[1]"
-#         description: "Product Service → Order Service: Product 2"
-#       - edge: "(O -> P)[2]"
-#         description: "Order Service → Product Service: GET /products/3"
-#       - edge: "(P -> O)[2]"
-#         description: "Product Service → Order Service: Product 3"
-#   - id: batch
-#     label: "Một batch request"
-#     steps:
-#       - edge: "(O -> P)[3]"
-#         description: "Order Service → Product Service: POST /products/batch {\"ids\": [1,2,3]}"
-#       - edge: "(P -> O)[3]"
-#         description: "Product Service → Order Service: [Product 1, Product 2, Product 3]"
-# @endflow
+```d2 title="5.2. Chatty Services"
 shape: sequence_diagram
 "O": "Order Service"
 "P": "Product Service"
@@ -718,8 +669,6 @@ shape: sequence_diagram
 "P" -> "O": "[Product 1, Product 2, Product 3]" { style.stroke-dash: 5 }
 "O".note4: "1 call cho N sản phẩm! 🚀"
 ```
-
-Chọn một cách lấy cùng bộ dữ liệu: chatty thực hiện nhiều call; batch gom thành một request. Không chạy batch sau toàn bộ call lẻ.
 
 **Cách fix**:
 - Thiết kế **batch API** (lấy nhiều items trong 1 request)

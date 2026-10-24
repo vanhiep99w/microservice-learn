@@ -138,27 +138,7 @@ Khi provider đổi `authRef` thành `authorizationReference`, chỉ Adapter và
 
 Một Adapter thường có hai chiều dịch: request từ domain sang external contract, rồi response/error từ external contract về domain.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="3.1. Luồng request và response" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(D -> A)[0]"
-#         description: "Checkout domain → Payment Adapter: authorize(command)"
-#       - edge: "(A -> A)[0]"
-#         description: "Payment Adapter → Payment Adapter: Validate boundary và map request"
-#       - edge: "(A -> P)[0]"
-#         description: "Payment Adapter → Payment provider: submitTransaction(provider request)"
-#       - edge: "(P -> A)[0]"
-#         description: "Payment provider → Payment Adapter: provider response hoặc provider error"
-#       - edge: "(A -> A)[1]"
-#         description: "Payment Adapter → Payment Adapter: Map state, error và response"
-#       - edge: "(A -> D)[0]"
-#         description: "Payment Adapter → Checkout domain: PaymentResult"
-# @endflow
+```d2 title="3.1. Luồng request và response"
 shape: sequence_diagram
 "D": "Checkout domain"
 "A": "Payment Adapter"

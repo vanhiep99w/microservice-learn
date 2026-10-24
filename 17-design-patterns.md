@@ -145,41 +145,7 @@ services.user.db.icon: "https://icons.d2lang.com/dev/postgresql.svg"
 
 ### Flow "Đặt hàng" — các pattern phối hợp
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title='Flow "Đặt hàng" — các pattern phối hợp' mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(C -> GW)[0]"
-#         description: "Client → API Gateway: POST /api/v1/orders (Correlation ID)"
-#       - edge: "(GW -> GW)[0]"
-#         description: "API Gateway → API Gateway: Auth, Rate Limit"
-#       - edge: "(GW -> O)[0]"
-#         description: "API Gateway → Order Service: Forward request"
-#       - edge: "(O -> O)[0]"
-#         description: "Order Service → Order Service: Create Order (PENDING)"
-#       - edge: "(O -> O)[1]"
-#         description: "Order Service → Order Service: Save DB + Outbox (atomic)"
-#       - edge: "(O -> K)[0]"
-#         description: "Order Service → Kafka: OrderCreated event"
-#       - edge: "(K -> P)[0]"
-#         description: "Kafka → Payment Service: Consume → Process Payment"
-#       - edge: "(P -> K)[0]"
-#         description: "Payment Service → Kafka: PaymentCompleted event"
-#       - edge: "(K -> I)[0]"
-#         description: "Kafka → Inventory Service: Consume → Reserve Inventory"
-#       - edge: "(I -> K)[0]"
-#         description: "Inventory Service → Kafka: InventoryReserved event"
-#       - edge: "(K -> O)[0]"
-#         description: "Kafka → Order Service: Consume → Order CONFIRMED"
-#       - edge: "(O -> GW)[0]"
-#         description: "Order Service → API Gateway: 201 Created"
-#       - edge: "(GW -> C)[0]"
-#         description: "API Gateway → Client: Response"
-# @endflow
+```d2 title='Flow "Đặt hàng" — các pattern phối hợp'
 shape: sequence_diagram
 "C": "Client"
 "GW": "API Gateway"

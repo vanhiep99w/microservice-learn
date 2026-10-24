@@ -277,21 +277,7 @@ Trong **Client-Side Discovery**, service **consumer** (caller) chịu trách nhi
 2. **Chọn** 1 instance (load balancing)
 3. **Gọi** trực tiếp đến instance đó
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="4.1. Cách hoạt động" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(order -> registry)[0]"
-#         description: "Order Service — Consumer → Service Registry: 1. Query payment-service"
-#       - edge: "(registry -> order)[0]"
-#         description: "Service Registry → Order Service — Consumer: 2. Instances 10.0.1.1, 10.0.1.2, 10.0.1.3 :8084"
-#       - edge: "(order -> payment)[0]"
-#         description: "Order Service — Consumer → Payment — 10.0.1.2:8084: 4. HTTP/gRPC trực tiếp — không qua proxy/LB"
-# @endflow
+```d2 title="4.1. Cách hoạt động"
 shape: sequence_diagram
 order: Order Service — Consumer
 registry: Service Registry
@@ -395,21 +381,7 @@ CLIENT-SIDE LOAD BALANCING ALGORITHMS:
 
 Trong **Server-Side Discovery**, client gọi qua **Load Balancer / Router** — component này query registry và forward request đến instance phù hợp. Client **không biết** registry tồn tại.
 
-```d2 title="5.1. Cách hoạt động" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(order -> lb)[0]"
-#         description: "Order Service — chỉ biết tên → Load Balancer / Router: DNS / VIP — payment-service /charge"
-#       - edge: "(lb -> registry)[0]"
-#         description: "Load Balancer / Router → Service Registry: Query payment-service"
-#       - edge: "(registry -> lb)[0]"
-#         description: "Service Registry → Load Balancer / Router: Instances 10.0.1.1, 10.0.1.2, 10.0.1.3 :8084"
-#       - edge: "(lb -> payment)[0]"
-#         description: "Load Balancer / Router → Payment — 10.0.1.2:8084: Forward request"
-# @endflow
+```d2 title="5.1. Cách hoạt động"
 shape: sequence_diagram
 order: Order Service — chỉ biết tên
 lb: Load Balancer / Router
@@ -493,19 +465,7 @@ Thực tế chọn thế nào?
 
 DNS (Domain Name System) là cơ chế "discovery" cơ bản nhất — map tên sang IP. Có thể dùng DNS cho service discovery bằng cách **cập nhật DNS records** khi service instances thay đổi.
 
-```d2 title="7.1. Cách hoạt động" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(order -> dns)[0]"
-#         description: "Order Service → DNS Server — CoreDNS / Consul DNS: Lookup payment-service.myapp.local"
-#       - edge: "(dns -> order)[0]"
-#         description: "DNS Server — CoreDNS / Consul DNS → Order Service: A records — 10.0.1.1 / 10.0.1.2 / 10.0.1.3"
-#       - edge: "(order -> payment)[0]"
-#         description: "Order Service → Payment — 10.0.1.2:8084: HTTP POST /charge"
-# @endflow
+```d2 title="7.1. Cách hoạt động"
 shape: sequence_diagram
 order: Order Service
 dns: DNS Server — CoreDNS / Consul DNS
@@ -1007,37 +967,7 @@ Kong/NGINX chạy như Pods trong namespace riêng, scale bằng HPA; cloud LB �
 
 Discovery cơ bản không cần Eureka/Consul hay cấu hình IP thủ công.
 
-```d2 title="Order flow — Kubernetes DNS và Service routing" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(user -> gateway)[0]"
-#         description: "User → API Gateway: POST /orders"
-#       - edge: "(gateway -> dns)[0]"
-#         description: "API Gateway → Kubernetes DNS: Resolve order-service.production.svc"
-#       - edge: "(dns -> gateway)[0]"
-#         description: "Kubernetes DNS → API Gateway: Order Service ClusterIP"
-#       - edge: "(gateway -> order)[0]"
-#         description: "API Gateway → Order Pod 3: Service dataplane chọn một endpoint"
-#       - edge: "(order -> users)[0]"
-#         description: "Order Pod 3 → User Pod 1: 1 · GET user-service:8081/users/123"
-#       - edge: "(users -> order)[0]"
-#         description: "User Pod 1 → Order Pod 3: User data"
-#       - edge: "(order -> inventory)[0]"
-#         description: "Order Pod 3 → Inventory Pod 2: 2 · inventory-service:8085/check"
-#       - edge: "(inventory -> order)[0]"
-#         description: "Inventory Pod 2 → Order Pod 3: Inventory result"
-#       - edge: "(order -> payment)[0]"
-#         description: "Order Pod 3 → Payment Pod 1: 3 · payment-service:8084/charge"
-#       - edge: "(payment -> order)[0]"
-#         description: "Payment Pod 1 → Order Pod 3: Payment result"
-#       - edge: "(order -> kafka)[0]"
-#         description: "Order Pod 3 → Kafka: 4 · Publish notification event (async)"
-#       - edge: "(kafka -> notification)[0]"
-#         description: "Kafka → Notification Service: Consume"
-# @endflow
+```d2 title="Order flow — Kubernetes DNS và Service routing"
 shape: sequence_diagram
 user: User
 gateway: API Gateway

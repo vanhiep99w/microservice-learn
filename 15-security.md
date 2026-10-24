@@ -144,23 +144,7 @@ payment -- internal
 
 **Authentication** (AuthN) là quá trình xác minh danh tính — trả lời câu hỏi **"Bạn là ai?"**
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="3.1. Authentication là gì?" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(user -> idp)[0]"
-#         description: "User → Identity Provider: Credentials — user/password"
-#       - edge: "(idp -> user)[0]"
-#         description: "Identity Provider → User: Token"
-#       - edge: "(user -> service)[0]"
-#         description: "User → Service: Request + Token"
-#       - edge: "(service -> user)[0]"
-#         description: "Service → User: Response"
-# @endflow
+```d2 title="3.1. Authentication là gì?"
 shape: sequence_diagram
 user: User
 idp: Identity Provider
@@ -253,23 +237,7 @@ client -> resource: "Request + Access Token"
 
 OAuth 2.0 gốc được thiết kế cho bài toán **ủy quyền bên thứ ba (delegated authorization)** — "App A muốn truy cập dữ liệu user trên Server B". Ví dụ thực tế:
 
-```d2 title="3.4. OpenID Connect (OIDC)" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(user -> canva)[0]"
-#         description: "User → Canva — Client App: Đăng nhập / Cấp quyền Google Photos"
-#       - edge: "(canva -> google)[0]"
-#         description: "Canva — Client App → Google — Authorization / Resource Server: Redirect authorization request"
-#       - edge: "(google -> user)[0]"
-#         description: "Google — Authorization / Resource Server → User: Login / Consent page"
-#       - edge: "(user -> google)[0]"
-#         description: "User → Google — Authorization / Resource Server: Credentials trực tiếp vào Google / Consent đọc photos"
-#       - edge: "(google -> canva)[0]"
-#         description: "Google — Authorization / Resource Server → Canva — Client App: Code / Token theo OAuth flow đã chọn"
-# @endflow
+```d2 title="3.4. OpenID Connect (OIDC)"
 shape: sequence_diagram
 user: User
 canva: Canva — Client App
@@ -520,31 +488,7 @@ TẠI SAO KHÔNG TRẢ TOKEN THẲNG?
 
 **Flow từng bước — ví dụ "Đăng nhập Shopee bằng Google":**
 
-```d2 title="3.5. Các OAuth 2.0 Grant Types" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(User -> App)[0]"
-#         description: "👤 User (Browser) → 🖥️ Shopee Backend: 1. Click \"Đăng nhập bằng Google\""
-#       - edge: "(App -> User)[0]"
-#         description: "🖥️ Shopee Backend → 👤 User (Browser): 2. Redirect sang Google"
-#       - edge: "(User -> Auth)[0]"
-#         description: "👤 User (Browser) → 🔐 Google (Auth Server): 3. Nhập email/password VÀO GOOGLE"
-#       - edge: "(Auth -> Auth)[0]"
-#         description: "🔐 Google (Auth Server) → 🔐 Google (Auth Server): 4. Tạo authorization code (phiếu hẹn)"
-#       - edge: "(Auth -> User)[0]"
-#         description: "🔐 Google (Auth Server) → 👤 User (Browser): 5. Redirect về Shopee kèm CODE shopee.vn/callback?code=abc123"
-#       - edge: "(User -> App)[1]"
-#         description: "👤 User (Browser) → 🖥️ Shopee Backend: 6. Trình duyệt gọi Shopee với code"
-#       - edge: "(App -> Auth)[0]"
-#         description: "🖥️ Shopee Backend → 🔐 Google (Auth Server): 7. Shopee gửi CODE + SECRET cho Google (server-to-server, không qua browser)"
-#       - edge: "(Auth -> App)[0]"
-#         description: "🔐 Google (Auth Server) → 🖥️ Shopee Backend: 8. Google trả ACCESS TOKEN cho Shopee"
-#       - edge: "(App -> User)[1]"
-#         description: "🖥️ Shopee Backend → 👤 User (Browser): 9. Login thành công! Set cookie session"
-# @endflow
+```d2 title="3.5. Các OAuth 2.0 Grant Types"
 shape: sequence_diagram
 "User": "👤 User (Browser)" {shape: person}
 "App": "🖥️ Shopee Backend"
@@ -610,21 +554,7 @@ GIẢI THÍCH TỪNG BƯỚC — NGÔN NGỮ DỄ HIỂU
 
 SPA/Mobile app không giữ được `client_secret` (vì code chạy trên thiết bị user, ai cũng đọc được). **PKCE** (Proof Key for Code Exchange) thay thế secret bằng một "bài toán" mà chỉ client gốc mới giải được.
 
-```d2 title="3.5. Các OAuth 2.0 Grant Types" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(client -> auth)[0]"
-#         description: "Browser / Mobile Client → Authorization Server: 2. /authorize — code_challenge E9Me... / code_challenge_method S256"
-#       - edge: "(auth -> client)[0]"
-#         description: "Authorization Server → Browser / Mobile Client: 3. Authorization code ABC"
-#       - edge: "(client -> auth)[1]"
-#         description: "Browser / Mobile Client → Authorization Server: 4. POST /token — code ABC + code_verifier dBjf..."
-#       - edge: "(auth -> client)[1]"
-#         description: "Authorization Server → Browser / Mobile Client: 5. Access token nếu hợp lệ"
-# @endflow
+```d2 title="3.5. Các OAuth 2.0 Grant Types"
 shape: sequence_diagram
 client: Browser / Mobile Client
 auth: Authorization Server
@@ -643,21 +573,7 @@ Kẻ chỉ trộm code mà không có verifier không thể redeem code theo PKC
 
 Khi 2 microservice gọi nhau, không có user nào đăng nhập cả — chỉ là máy gọi máy. Service dùng `client_id` + `client_secret` (đã đăng ký trước) để xin token.
 
-```d2 title="3.5. Các OAuth 2.0 Grant Types" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(a -> auth)[0]"
-#         description: "Service A → Authorization Server: POST /token — grant_type client_credentials"
-#       - edge: "(auth -> a)[0]"
-#         description: "Authorization Server → Service A: Access Token cho Service A"
-#       - edge: "(a -> b)[0]"
-#         description: "Service A → Service B: GET /api/orders — Authorization Bearer token"
-#       - edge: "(b -> a)[0]"
-#         description: "Service B → Service A: Response"
-# @endflow
+```d2 title="3.5. Các OAuth 2.0 Grant Types"
 shape: sequence_diagram
 a: Service A
 auth: Authorization Server
@@ -831,21 +747,7 @@ n8 -> n10: "Denied"
 
 ### 4.5. Token Refresh & Revocation
 
-```d2 title="4.5. Token Refresh & Revocation" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(client -> auth)[0]"
-#         description: "Client → Auth Server: Login"
-#       - edge: "(auth -> client)[0]"
-#         description: "Auth Server → Client: Access Token ví dụ15phút + Refresh Token ví dụ7ngày"
-#       - edge: "(client -> auth)[1]"
-#         description: "Client → Auth Server: POST /token — Refresh Token"
-#       - edge: "(auth -> client)[1]"
-#         description: "Auth Server → Client: New Access Token / Rotate Refresh Token theo policy"
-# @endflow
+```d2 title="4.5. Token Refresh & Revocation"
 shape: sequence_diagram
 client: Client
 auth: Auth Server
@@ -1536,25 +1438,7 @@ ROADMAP TRIỂN KHAI ZERO TRUST
 - **Encryption as a service**: Encrypt/decrypt không cần quản lý key
 - **Leasing & Renewal**: Secrets có thời hạn
 
-```d2 title="9.2. HashiCorp Vault" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(service -> vault)[0]"
-#         description: "Service → Vault: 1. Authenticate — Kubernetes ServiceAccount token"
-#       - edge: "(vault -> service)[0]"
-#         description: "Vault → Service: 2. Vault Token theo policy"
-#       - edge: "(service -> vault)[1]"
-#         description: "Service → Vault: 3. Read secret/db-pass hoặc database/creds role"
-#       - edge: "(vault -> db)[0]"
-#         description: "Vault → Database: Dynamic secret — tạo temporary DB user nếu dùng DB engine"
-#       - edge: "(vault -> service)[1]"
-#         description: "Vault → Service: 4. Secret / Dynamic credentials — lease ví dụ1h"
-#       - edge: "(vault -> db)[1]"
-#         description: "Vault → Database: Hết lease / Revoke → revoke dynamic user"
-# @endflow
+```d2 title="9.2. HashiCorp Vault"
 shape: sequence_diagram
 service: Service
 vault: Vault

@@ -702,31 +702,7 @@ Choreography — Ưu / Nhược:
 
 Có **1 Orchestrator** (điều phối viên) biết toàn bộ flow, ra lệnh cho từng service theo thứ tự.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="6.3. Orchestration Saga" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(Client -> Orchestrator)[0]"
-#         description: "Client → Order Saga Orchestrator: Đặt hàng"
-#       - edge: "(Orchestrator -> Order)[0]"
-#         description: "Order Saga Orchestrator → Order Service: Tạo order (PENDING)"
-#       - edge: "(Order -> Orchestrator)[0]"
-#         description: "Order Service → Order Saga Orchestrator: OK"
-#       - edge: "(Orchestrator -> Payment)[0]"
-#         description: "Order Saga Orchestrator → Payment Service: Trừ tiền"
-#       - edge: "(Payment -> Orchestrator)[0]"
-#         description: "Payment Service → Order Saga Orchestrator: OK"
-#       - edge: "(Orchestrator -> Inventory)[0]"
-#         description: "Order Saga Orchestrator → Inventory Service: Trừ tồn kho"
-#       - edge: "(Inventory -> Orchestrator)[0]"
-#         description: "Inventory Service → Order Saga Orchestrator: OK"
-#       - edge: "(Orchestrator -> Order)[1]"
-#         description: "Order Saga Orchestrator → Order Service: Update order → CONFIRMED"
-# @endflow
+```d2 title="6.3. Orchestration Saga"
 shape: sequence_diagram
 "Client": "Client"
 "Orchestrator": "Order Saga\nOrchestrator"
@@ -1689,29 +1665,7 @@ Tránh polling loop/DB scans, có thể giảm latency. Độ tin cậy dựa tr
 
 Đây là lịch **minh họa** cho một event; các số 0–5 là bước logic, không phải thời gian đo được. Khoảng cách trên sơ đồ không biểu thị thời lượng và không chứng minh exactly-once.
 
-```d2 title="Outbox vẫn có thể phát lại sau crash" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(db -> db)[0]"
-#         description: "Order DB → Order DB: 0 · Commit order + outbox"
-#       - edge: "(relay -> broker)[0]"
-#         description: "Outbox Relay → Message Broker: 1 · Publish e1 Broker chấp nhận"
-#       - edge: "(broker -> consumer)[0]"
-#         description: "Message Broker → Inventory Consumer: 2 · Delivery lần đầu"
-#       - edge: "(consumer -> consumer)[0]"
-#         description: "Inventory Consumer → Inventory Consumer: Áp dụng e1 + dedupe Cùng local transaction"
-#       - edge: "(relay -> relay)[0]"
-#         description: "Outbox Relay → Outbox Relay: 3 · Crash trước khi đánh dấu sent"
-#       - edge: "(relay -> broker)[1]"
-#         description: "Outbox Relay → Message Broker: 4 · Restart Publish lại e1"
-#       - edge: "(broker -> consumer)[1]"
-#         description: "Message Broker → Inventory Consumer: 5 · Delivery lặp"
-#       - edge: "(consumer -> consumer)[1]"
-#         description: "Inventory Consumer → Inventory Consumer: Dedupe e1 Không trừ kho lần hai"
-# @endflow
+```d2 title="Outbox vẫn có thể phát lại sau crash"
 shape: sequence_diagram
 db: Order DB
 relay: Outbox Relay

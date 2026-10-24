@@ -830,41 +830,7 @@ agent: Desktop Sync Agent {
 
 ### 10.2. Durable Change Log và cursor
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="10.2. Durable Change Log và cursor" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(L -> S)[0]"
-#         description: "Laptop → Sync Service: 1. Commit version 42 from base version 41"
-#       - edge: "(S -> DB)[0]"
-#         description: "Sync Service → Metadata DB: 2. Transaction: set current version 42"
-#       - edge: "(S -> DB)[1]"
-#         description: "Sync Service → Metadata DB: 3. Insert outbox event"
-#       - edge: "(S -> L)[0]"
-#         description: "Sync Service → Laptop: 4. Commit accepted"
-#       - edge: "(DB -> CL)[0]"
-#         description: "Metadata DB → Change Log: 5. Publish FileVersionReady(sequence=9001)"
-#       - edge: "(CL -> N)[0]"
-#         description: "Change Log → Notification Service: 6. New change available"
-#       - edge: "(N -> P)[0]"
-#         description: "Notification Service → Phone: 7. WebSocket hint: changes available"
-#       - edge: "(P -> S)[0]"
-#         description: "Phone → Sync Service: 8. GET /changes?cursor=8995"
-#       - edge: "(S -> CL)[0]"
-#         description: "Sync Service → Change Log: 9. Read events 8996..9001"
-#       - edge: "(CL -> S)[0]"
-#         description: "Change Log → Sync Service: 10. Ordered change batch"
-#       - edge: "(S -> P)[0]"
-#         description: "Sync Service → Phone: 11. Changes + nextCursor=9001"
-#       - edge: "(P -> P)[0]"
-#         description: "Phone → Phone: 12. Apply version 42 locally"
-#       - edge: "(P -> S)[1]"
-#         description: "Phone → Sync Service: 13. ACK cursor 9001"
-# @endflow
+```d2 title="10.2. Durable Change Log và cursor"
 shape: sequence_diagram
 "L": "Laptop"
 "S": "Sync Service"

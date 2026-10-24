@@ -1066,23 +1066,7 @@ SECRET ENGINES — CÁC LOẠI "KHO BÍ MẬT"
 
 ### 8.4. Authentication Methods
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="8.4. Authentication Methods" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(pod -> vault)[0]"
-#         description: "Pod order-svc — production → Vault: Kubernetes Auth — ServiceAccount Token"
-#       - edge: "(vault -> k8s)[0]"
-#         description: "Vault → Kubernetes API: TokenReview / Verify identity theo auth method"
-#       - edge: "(k8s -> vault)[0]"
-#         description: "Kubernetes API → Vault: Validation result"
-#       - edge: "(vault -> pod)[0]"
-#         description: "Vault → Pod order-svc — production: Vault token với policies / TTL nếu hợp lệ"
-# @endflow
+```d2 title="8.4. Authentication Methods"
 shape: sequence_diagram
 pod: Pod order-svc — production
 vault: Vault
@@ -1123,31 +1107,7 @@ dynamic: Dynamic Credentials — ví dụ lease1h {
 
 Credentials riêng giúp gán identity/audit và giới hạn thời gian sử dụng; renew/revoke cần app/agent/Vault/DB hoạt động theo policy. Lộ một credential vẫn có quyền DB của role đó, không chỉ quyền trong một Pod. Vault audit ghi secret/auth operations; audit từng DB query cần database audit riêng. Static credentials vẫn có thể rotate; không mặc định phải dùng vĩnh viễn.
 
-```d2 title="8.5. Dynamic Secrets — Tính năng mạnh nhất" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(pod -> vault)[0]"
-#         description: "Pod order-svc → Vault: 1. Authenticate K8s token"
-#       - edge: "(vault -> pod)[0]"
-#         description: "Vault → Pod order-svc: Vault Token"
-#       - edge: "(pod -> vault)[1]"
-#         description: "Pod order-svc → Vault: 2. Request DB credentials"
-#       - edge: "(vault -> pg)[0]"
-#         description: "Vault → PostgreSQL: 3. CREATE ROLE v-order-abc"
-#       - edge: "(pg -> vault)[0]"
-#         description: "PostgreSQL → Vault: OK"
-#       - edge: "(vault -> pod)[1]"
-#         description: "Vault → Pod order-svc: username v-order-abc / password random123 / lease1h — minh họa"
-#       - edge: "(pod -> pg)[0]"
-#         description: "Pod order-svc → PostgreSQL: 4. Connect bằng temporary credentials"
-#       - edge: "(pg -> pod)[0]"
-#         description: "PostgreSQL → Pod order-svc: Connected"
-#       - edge: "(vault -> pg)[1]"
-#         description: "Vault → PostgreSQL: 5. Lease hết / Revoke — revoke role theo DB plugin"
-# @endflow
+```d2 title="8.5. Dynamic Secrets — Tính năng mạnh nhất"
 shape: sequence_diagram
 pod: Pod order-svc
 vault: Vault
@@ -1272,25 +1232,7 @@ db_creds = get_secret("prod/order-service/db")
 
 **Auto-rotation với RDS:**
 
-```d2 title="9.1. AWS Secrets Manager" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(sm -> rotation)[0]"
-#         description: "Secrets Manager → Rotation Lambda: 1. Trigger rotation — ví dụ mỗi30ngày"
-#       - edge: "(rotation -> rds)[0]"
-#         description: "Rotation Lambda → RDS: 2. Tạo / Update credential theo rotation strategy"
-#       - edge: "(rds -> rotation)[0]"
-#         description: "RDS → Rotation Lambda: Update / Test result"
-#       - edge: "(rotation -> sm)[0]"
-#         description: "Rotation Lambda → Secrets Manager: 3. Stage / Promote secret version sau validation"
-#       - edge: "(app -> sm)[0]"
-#         description: "Application → Secrets Manager: 4. Refresh secret bằng SDK/cache policy"
-#       - edge: "(sm -> app)[0]"
-#         description: "Secrets Manager → Application: New secret version"
-# @endflow
+```d2 title="9.1. AWS Secrets Manager"
 shape: sequence_diagram
 sm: Secrets Manager
 rotation: Rotation Lambda
@@ -1574,23 +1516,7 @@ FEATURE FLAGS LƯU Ở ĐÂU?
 
 **Cách hoạt động trong thực tế:**
 
-```d2 title="11.2. Feature Flags" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(pm -> flags)[0]"
-#         description: "PM / QA → Feature Flag Service: Admin UI — new_checkout enabled / rollout25%"
-#       - edge: "(sdk -> flags)[0]"
-#         description: "Service SDK → Feature Flag Service: App start / Poll mỗi10–30s"
-#       - edge: "(flags -> sdk)[0]"
-#         description: "Feature Flag Service → Service SDK: Flag values / Targeting rules"
-#       - edge: "(app -> sdk)[0]"
-#         description: "Business Code → Service SDK: is_enabled new_checkout / user_id"
-#       - edge: "(sdk -> app)[0]"
-#         description: "Service SDK → Business Code: Local evaluation — New hoặc Old checkout"
-# @endflow
+```d2 title="11.2. Feature Flags"
 shape: sequence_diagram
 pm: PM / QA
 flags: Feature Flag Service

@@ -720,23 +720,7 @@ delivered -> notify_done
 
 Khi cần **response** nhưng vẫn muốn **decouple** qua message broker:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="6.1. Request-Reply qua Message Queue" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(a -> broker)[0]"
-#         description: "Service A → Broker: Request message — replyTo queue-A"
-#       - edge: "(broker -> b)[0]"
-#         description: "Broker → Service B: Forward"
-#       - edge: "(b -> broker)[0]"
-#         description: "Service B → Broker: Reply message — to queue-A"
-#       - edge: "(broker -> a)[0]"
-#         description: "Broker → Service A: Response"
-# @endflow
+```d2 title="6.1. Request-Reply qua Message Queue"
 shape: sequence_diagram
 a: Service A
 broker: Broker

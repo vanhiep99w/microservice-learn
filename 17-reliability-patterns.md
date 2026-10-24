@@ -249,25 +249,7 @@ Nguyên tắc chọn giá trị:
 
 Use case: **Order Service hiển thị trang giỏ hàng cần số tồn kho từ Inventory Service**. Inventory thỉnh thoảng quá tải lúc flash-sale.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="3.3. Ví dụ thực tế" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(U -> O)[0]"
-#         description: "User → Order Service: Xem giỏ hàng"
-#       - edge: "(O -> I)[0]"
-#         description: "Order Service → Inventory Service: GET /stock/SKU-123 (timeout 3s)"
-#       - edge: "(O -> C)[0]"
-#         description: "Order Service → Cache: Đọc tồn kho từ cache"
-#       - edge: "(C -> O)[0]"
-#         description: "Cache → Order Service: stock = 42 (data 5 phút trước)"
-#       - edge: "(O -> U)[0]"
-#         description: "Order Service → User: Trang giỏ hàng ✅ (kèm nhãn \"tồn kho tham khảo\")"
-# @endflow
+```d2 title="3.3. Ví dụ thực tế"
 shape: sequence_diagram
 "U": "User"
 "O": "Order Service"

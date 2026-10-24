@@ -968,33 +968,7 @@ Phù hợp cho **event-driven architecture** — define schema cho messages trê
 
 #### Flow hoạt động:
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Flow hoạt động:" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(order -> order)[0]"
-#         description: "Order Producer → Order Producer: 1. Build event"
-#       - edge: "(order -> registry)[0]"
-#         description: "Order Producer → Schema Registry: 2. Serializer register / Lookup schema"
-#       - edge: "(registry -> registry)[0]"
-#         description: "Schema Registry → Schema Registry: 3. Check schema tồn tại / Compatibility khi đăng ký mới"
-#       - edge: "(registry -> order)[0]"
-#         description: "Schema Registry → Order Producer: 4. Schema ID"
-#       - edge: "(order -> kafka)[0]"
-#         description: "Order Producer → Kafka: 5/6. Serialize bytes + Schema ID"
-#       - edge: "(kafka -> payment)[0]"
-#         description: "Kafka → Payment Consumer: 7. Deliver bytes + Schema ID"
-#       - edge: "(payment -> registry)[0]"
-#         description: "Payment Consumer → Schema Registry: 8. Fetch writer schema by ID nếu cache miss"
-#       - edge: "(registry -> payment)[0]"
-#         description: "Schema Registry → Payment Consumer: Writer schema"
-#       - edge: "(payment -> payment)[0]"
-#         description: "Payment Consumer → Payment Consumer: 9. Deserialize thành object"
-# @endflow
+```d2 title="Flow hoạt động:"
 shape: sequence_diagram
 order: Order Producer
 registry: Schema Registry

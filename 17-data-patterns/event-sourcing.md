@@ -330,31 +330,7 @@ Event stream là nguồn tốt cho append và replay nhưng không phải lúc n
 
 Projector đọc events, transform dữ liệu và ghi projection. Projector không nên quyết định invariant của aggregate. Ví dụ, projector có thể tính cột `balance`, nhưng không được tự chấp nhận một lệnh rút tiền chỉ vì read model đang hiển thị đủ số dư.
 
-> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
-
-```d2 title="Projector biến events thành view" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(C -> S)[0]"
-#         description: "Client → Account Service: WithdrawMoney command"
-#       - edge: "(S -> ES)[0]"
-#         description: "Account Service → Event Store: Load stream và rehydrate aggregate"
-#       - edge: "(S -> S)[0]"
-#         description: "Account Service → Account Service: Validate invariant"
-#       - edge: "(S -> ES)[1]"
-#         description: "Account Service → Event Store: Append MoneyWithdrawn"
-#       - edge: "(ES -> P)[0]"
-#         description: "Event Store → Balance Projector: Deliver event theo stream version"
-#       - edge: "(P -> R)[0]"
-#         description: "Balance Projector → Read Model: Upsert balance view"
-#       - edge: "(S -> C)[0]"
-#         description: "Account Service → Client: Command đã commit"
-#       - edge: "(C -> R)[0]"
-#         description: "Client → Read Model: Query balance view"
-# @endflow
+```d2 title="Projector biến events thành view"
 shape: sequence_diagram
 "C": "Client"
 "S": "Account Service"
@@ -424,31 +400,7 @@ State hiện tại không được tính bằng cách sửa một dòng `balance
 
 Một command `WithdrawMoney(account_id = account-001, amount = 100000)` có thể đi qua các bước sau:
 
-```d2 title="Luồng nạp và rút tiền" mode=flow interactive=true
-# @flow
-# scenarios:
-#   - id: main
-#     label: "Kịch bản minh họa"
-#     steps:
-#       - edge: "(C -> A)[0]"
-#         description: "Client → Account Service: WithdrawMoney(account-001, 100000)"
-#       - edge: "(A -> E)[0]"
-#         description: "Account Service → Event Store: Load snapshot + events"
-#       - edge: "(E -> A)[0]"
-#         description: "Event Store → Account Service: State balance = 450000, version = 5"
-#       - edge: "(A -> A)[0]"
-#         description: "Account Service → Account Service: Aggregate kiểm tra amount > 0 và balance đủ"
-#       - edge: "(A -> E)[1]"
-#         description: "Account Service → Event Store: Append MoneyWithdrawn, expected_version = 5"
-#       - edge: "(E -> A)[1]"
-#         description: "Event Store → Account Service: Commit version = 6"
-#       - edge: "(A -> C)[0]"
-#         description: "Account Service → Client: Accepted, account_version = 6"
-#       - edge: "(E -> P)[0]"
-#         description: "Event Store → Balance Projector: MoneyWithdrawn version = 6"
-#       - edge: "(P -> P)[0]"
-#         description: "Balance Projector → Balance Projector: Cập nhật projection"
-# @endflow
+```d2 title="Luồng nạp và rút tiền"
 shape: sequence_diagram
 "C": "Client"
 "A": "Account Service"
