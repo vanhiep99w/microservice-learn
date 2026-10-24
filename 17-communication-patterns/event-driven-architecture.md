@@ -180,7 +180,31 @@ Một flow điển hình gồm các bước sau:
 6. Consumer thực hiện local transaction, áp dụng side effect (tác động nghiệp vụ như charge hoặc gửi email) và chỉ ACK sau thời điểm an toàn theo contract.
 7. Lỗi tạm thời được retry. Message không xử lý được sau giới hạn retry được chuyển vào **Dead Letter Queue (DLQ)**.
 
-```d2 title="Vòng đời một event"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Vòng đời một event" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(P -> D)[0]"
+#         description: "Producer → Producer DB: Ghi business data + event intent"
+#       - edge: "(D -> P)[0]"
+#         description: "Producer DB → Producer: Commit local transaction"
+#       - edge: "(R -> D)[0]"
+#         description: "Outbox Relay → Producer DB: Đọc event chưa publish"
+#       - edge: "(R -> B)[0]"
+#         description: "Outbox Relay → Broker: Publish event"
+#       - edge: "(B -> R)[0]"
+#         description: "Broker → Outbox Relay: Broker ACK"
+#       - edge: "(B -> C)[0]"
+#         description: "Broker → Consumer: Deliver event"
+#       - edge: "(C -> C)[0]"
+#         description: "Consumer → Consumer: Dedupe + local transaction"
+#       - edge: "(C -> B)[0]"
+#         description: "Consumer → Broker: ACK hoặc commit offset"
+# @endflow
 shape: sequence_diagram
 "P": "Producer"
 "D": "Producer DB"

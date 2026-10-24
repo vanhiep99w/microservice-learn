@@ -96,7 +96,31 @@ Một triển khai Correlation ID có năm quy tắc liên kết với nhau:
 4. **Forward qua từng transport**: HTTP dùng header; message dùng headers, properties hoặc attributes của broker.
 5. **Trả lại cho client**: response echo ID để hỗ trợ tra cứu khi cần.
 
-```d2 title="Giải pháp và quy tắc thiết kế"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Giải pháp và quy tắc thiết kế" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> G)[0]"
+#         description: "Client → API Gateway: POST /orders"
+#       - edge: "(G -> O)[0]"
+#         description: "API Gateway → Order Service: HTTP + X-Correlation-ID"
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: HTTP + cùng correlation_id"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Service → Order Service: Kết quả thanh toán"
+#       - edge: "(O -> B)[0]"
+#         description: "Order Service → Message Broker: OrderCreated + message header"
+#       - edge: "(B -> N)[0]"
+#         description: "Message Broker → Notification Service: Consume + cùng correlation_id"
+#       - edge: "(O -> G)[0]"
+#         description: "Order Service → API Gateway: 201 + X-Correlation-ID"
+#       - edge: "(G -> C)[0]"
+#         description: "API Gateway → Client: 201 + X-Correlation-ID"
+# @endflow
 shape: sequence_diagram
 "C": "Client"
 "G": "API Gateway"

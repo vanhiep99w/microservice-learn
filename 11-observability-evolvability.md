@@ -220,7 +220,35 @@ Production thường ghi **INFO trở lên**. Chỉ bật **DEBUG/TRACE** có ph
 
 Correlation ID (hay Request ID) là một identifier duy nhất được truyền qua **tất cả service** mà request đi qua:
 
-```d2 title="2.4. Correlation ID — Xuyên suốt các service"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="2.4. Correlation ID — Xuyên suốt các service" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(U -> GW)[0]"
+#         description: "User → API Gateway: POST /orders"
+#       - edge: "(GW -> OS)[0]"
+#         description: "API Gateway → Order Service: Forward request Header: X-Correlation-ID: req-abc-123"
+#       - edge: "(OS -> OS)[0]"
+#         description: "Order Service → Order Service: Log: [req-abc-123] Creating order #456"
+#       - edge: "(OS -> PS)[0]"
+#         description: "Order Service → Payment Service: Process payment Header: X-Correlation-ID: req-abc-123"
+#       - edge: "(PS -> PS)[0]"
+#         description: "Payment Service → Payment Service: Log: [req-abc-123] Charging $99.99"
+#       - edge: "(PS -> OS)[0]"
+#         description: "Payment Service → Order Service: Payment success"
+#       - edge: "(OS -> NS)[0]"
+#         description: "Order Service → Notification Service: Send notification Header: X-Correlation-ID: req-abc-123"
+#       - edge: "(NS -> NS)[0]"
+#         description: "Notification Service → Notification Service: Log: [req-abc-123] Email sent"
+#       - edge: "(OS -> GW)[0]"
+#         description: "Order Service → API Gateway: Order created"
+#       - edge: "(GW -> U)[0]"
+#         description: "API Gateway → User: 201 Created"
+# @endflow
 shape: sequence_diagram
 "U": "User"
 "GW": "API Gateway"
@@ -855,7 +883,21 @@ tracestate: vendor1=value1,vendor2=value2
 
 #### Quá trình tạo Trace và Span — Từng bước
 
-```d2 title="Quá trình tạo Trace và Span — Từng bước"
+```d2 title="Quá trình tạo Trace và Span — Từng bước" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(U -> A)[0]"
+#         description: "User → API Gateway: POST /orders (không có traceparent)"
+#       - edge: "(A -> B)[0]"
+#         description: "API Gateway → Order Service: Forward request traceparent: 00-abc123-spanA-01"
+#       - edge: "(B -> K)[0]"
+#         description: "Order Service → Kafka: Publish message Header: traceparent = 00-abc123-spanB-01"
+#       - edge: "(K -> C)[0]"
+#         description: "Kafka → Notification Service: Consume message Header: traceparent = 00-abc123-spanB-01"
+# @endflow
 shape: sequence_diagram
 "U": "User"
 "A": "API Gateway"

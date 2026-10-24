@@ -311,7 +311,31 @@ Projector dựng `order_history_view` theo đúng nhu cầu của trang "Lịch 
 
 Luồng đọc không phải JOIN các bảng normalized trên mỗi request. Query tải nặng của nhiều người dùng có thể đọc read database hoặc index dành riêng cho view lịch sử, trong khi write transaction vẫn tập trung ở write side.
 
-```d2 title="Order history"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Order history" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(U -> O)[0]"
+#         description: "User → Order Service: CreateOrder command"
+#       - edge: "(O -> W)[0]"
+#         description: "Order Service → PostgreSQL: Ghi order và order items"
+#       - edge: "(W -> P)[0]"
+#         description: "PostgreSQL → Order projector: Order* events hoặc CDC"
+#       - edge: "(P -> R)[0]"
+#         description: "Order projector → Order history view: Dựng denormalized history view"
+#       - edge: "(U -> O)[1]"
+#         description: "User → Order Service: GetOrderHistory query"
+#       - edge: "(O -> R)[0]"
+#         description: "Order Service → Order history view: Đọc theo customer_id"
+#       - edge: "(R -> O)[0]"
+#         description: "Order history view → Order Service: Danh sách order"
+#       - edge: "(O -> U)[0]"
+#         description: "Order Service → User: Order history"
+# @endflow
 shape: sequence_diagram
 "U": "User"
 "O": "Order Service"

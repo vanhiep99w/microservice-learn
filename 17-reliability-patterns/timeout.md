@@ -132,7 +132,23 @@ Một request đi qua nhiều lớp. Cài một timeout ở HTTP client không t
 | **Read hoặc response timeout** | Chờ response sau khi request đã được gửi | Dừng chờ nếu downstream không trả dữ liệu kịp hạn |
 | **Idle timeout** | Connection nhàn rỗi trong pool | Đóng connection đã không hoạt động để tránh giữ connection cũ quá lâu |
 
-```d2 title="Timeout ở lớp kết nối và response"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Timeout ở lớp kết nối và response" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> D)[0]"
+#         description: "Caller → Dependency: Thiết lập connection"
+#       - edge: "(D -> C)[0]"
+#         description: "Dependency → Caller: Connection sẵn sàng"
+#       - edge: "(C -> D)[1]"
+#         description: "Caller → Dependency: Gửi request"
+#       - edge: "(D -> C)[1]"
+#         description: "Dependency → Caller: Response"
+# @endflow
 shape: sequence_diagram
 "C": "Caller"
 "D": "Dependency"
@@ -272,7 +288,21 @@ local_timeout = min(local_cap, remaining_budget - local_margin)
 
 Deadline propagation truyền thời hạn của request qua các hop thay vì để mỗi service đặt timeout độc lập. Với gRPC, deadline có thể được truyền trong metadata của call. Với REST, team thường quy ước một header deadline hoặc remaining budget riêng và yêu cầu mọi tầng tôn trọng nó.
 
-```d2 title="Truyền deadline xuống service"
+```d2 title="Truyền deadline xuống service" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> G)[0]"
+#         description: "Client → API Gateway: Checkout, deadline = t+5s"
+#       - edge: "(G -> O)[0]"
+#         description: "API Gateway → Order Service: Forward deadline = t+5s"
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: Authorize, local cap 3s"
+#       - edge: "(P -> B)[0]"
+#         description: "Payment Service → Bank API: Call Bank, local cap 2s"
+# @endflow
 shape: sequence_diagram
 "C": "Client"
 "G": "API Gateway"
@@ -337,7 +367,29 @@ Order Service cần phản hồi trong thời gian người dùng chấp nhận.
 
 ### Luồng checkout có deadline
 
-```d2 title="Luồng checkout có deadline"
+```d2 title="Luồng checkout có deadline" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(U -> G)[0]"
+#         description: "User → API Gateway: POST /checkout, deadline t+5s"
+#       - edge: "(G -> O)[0]"
+#         description: "API Gateway → Order Service: Forward request và deadline"
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: Authorize order-123, deadline còn lại"
+#       - edge: "(P -> B)[0]"
+#         description: "Payment Service → Bank API: Charge, local cap tối đa 2s"
+#       - edge: "(P -> P)[0]"
+#         description: "Payment Service → Payment Service: Không nhận phản hồi kịp"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Service → Order Service: Timeout / trạng thái chưa xác định"
+#       - edge: "(O -> G)[0]"
+#         description: "Order Service → API Gateway: PENDING_PAYMENT hoặc lỗi theo contract"
+#       - edge: "(G -> U)[0]"
+#         description: "API Gateway → User: Kết quả trong deadline của checkout"
+# @endflow
 shape: sequence_diagram
 "U": "User"
 "G": "API Gateway"
@@ -349,7 +401,7 @@ shape: sequence_diagram
 "O" -> "P": "Authorize order-123, deadline còn lại"
 "O".note1: "[Order Service — Payment Service]\nIdempotency-Key = order-123-payment"
 "P" -> "B": "Charge, local cap tối đa 2s"
-"B" -> "P": "Không phản hồi kịp" { style.stroke-dash: 5 }
+"P" -> "P": "Không nhận phản hồi kịp" { style.stroke-dash: 5 }
 "P".note2: "Deadline hoặc response timeout hết"
 "P" -> "O": "Timeout / trạng thái chưa xác định" { style.stroke-dash: 5 }
 "O" -> "G": "PENDING_PAYMENT hoặc lỗi theo contract" { style.stroke-dash: 5 }

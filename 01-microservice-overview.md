@@ -197,7 +197,31 @@ HR lấy thông tin nhân viên → ESB chuyển cho Accounting → Accounting t
 
 ### Ví dụ cụ thể: Luồng "Tạo đơn hàng" trong SOA
 
-```d2 title='Ví dụ cụ thể: Luồng "Tạo đơn hàng" trong SOA'
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title='Ví dụ cụ thể: Luồng "Tạo đơn hàng" trong SOA' mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(Client -> ESB)[0]"
+#         description: "🖥️ Ứng dụng → 📡 ESB (Trung tâm): Tạo đơn hàng (SOAP/XML)"
+#       - edge: "(ESB -> INV)[0]"
+#         description: "📡 ESB (Trung tâm) → 📦 Inventory Service: 1. Kiểm tra tồn kho"
+#       - edge: "(INV -> ESB)[0]"
+#         description: "📦 Inventory Service → 📡 ESB (Trung tâm): Còn hàng ✅"
+#       - edge: "(ESB -> PAY)[0]"
+#         description: "📡 ESB (Trung tâm) → 💳 Payment Service: 2. Xử lý thanh toán"
+#       - edge: "(PAY -> ESB)[0]"
+#         description: "💳 Payment Service → 📡 ESB (Trung tâm): Thanh toán OK ✅"
+#       - edge: "(ESB -> SHIP)[0]"
+#         description: "📡 ESB (Trung tâm) → 🚚 Shipping Service: 3. Tạo vận đơn"
+#       - edge: "(SHIP -> ESB)[0]"
+#         description: "🚚 Shipping Service → 📡 ESB (Trung tâm): Vận đơn #12345 ✅"
+#       - edge: "(ESB -> Client)[0]"
+#         description: "📡 ESB (Trung tâm) → 🖥️ Ứng dụng: Đơn hàng thành công!"
+# @endflow
 shape: sequence_diagram
 "Client": "🖥️ Ứng dụng"
 "ESB": "📡 ESB (Trung tâm)"

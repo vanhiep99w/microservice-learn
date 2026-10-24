@@ -186,7 +186,29 @@ Broker thường dùng **at-least-once delivery**: ưu tiên không mất event,
 
 Consumer phải dùng `event_id` hoặc idempotency key để nhận ra event đã xử lý:
 
-```d2 title="Idempotent consumer — hai delivery, một business effect"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Idempotent consumer — hai delivery, một business effect" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(broker -> payment)[0]"
+#         description: "Broker → Payment Consumer: Delivery đầu — evt-abc"
+#       - edge: "(payment -> state)[0]"
+#         description: "Payment Consumer → Business state + dedupe store: Áp dụng business change và ghi evt-abc atomic"
+#       - edge: "(state -> payment)[0]"
+#         description: "Business state + dedupe store → Payment Consumer: Commit thành công"
+#       - edge: "(broker -> payment)[1]"
+#         description: "Broker → Payment Consumer: Delivery lặp — evt-abc"
+#       - edge: "(payment -> state)[1]"
+#         description: "Payment Consumer → Business state + dedupe store: Kiểm tra evt-abc đã xử lý"
+#       - edge: "(state -> payment)[1]"
+#         description: "Business state + dedupe store → Payment Consumer: Đã xử lý"
+#       - edge: "(payment -> payment)[0]"
+#         description: "Payment Consumer → Payment Consumer: Bỏ qua business effect trùng"
+# @endflow
 shape: sequence_diagram
 broker: Broker
 payment: Payment Consumer

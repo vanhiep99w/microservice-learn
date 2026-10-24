@@ -322,7 +322,25 @@ Câu hỏi pattern này trả lời: *"Request này đã đi qua đâu, từng b
 
 **Luồng của pattern:**
 
-```d2 title="4.2. Giải pháp"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="4.2. Giải pháp" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> GW)[0]"
+#         description: "Client → API Gateway: POST /orders (chưa có traceparent)"
+#       - edge: "(GW -> O)[0]"
+#         description: "API Gateway → Order Service: Forward + traceparent"
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: POST /charge + traceparent"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Service → Order Service: 200 OK (span Payment đóng, ghi duration)"
+#       - edge: "(O -> GW)[0]"
+#         description: "Order Service → API Gateway: 201 Created (span Order đóng)"
+# @endflow
 shape: sequence_diagram
 "C": "Client"
 "GW": "API Gateway"
@@ -988,7 +1006,27 @@ Readiness kiểm tra dependency có chọn lọc; tránh deep check mọi depend
 
 **Một request đặt hàng đi qua hệ thống này:**
 
-```d2 title="10. Ví dụ tổng hợp — Observability cho E-Commerce"
+```d2 title="10. Ví dụ tổng hợp — Observability cho E-Commerce" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> GW)[0]"
+#         description: "Client → API Gateway: POST /orders"
+#       - edge: "(GW -> O)[0]"
+#         description: "API Gateway → Order Svc: forward (cid + traceparent)"
+#       - edge: "(O -> P)[0]"
+#         description: "Order Svc → Payment Svc: POST /charge (cid + traceparent)"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Svc → Order Svc: 200 OK"
+#       - edge: "(O -> N)[0]"
+#         description: "Order Svc → Notification Svc: publish OrderCreated (cid + traceparent trong Kafka headers)"
+#       - edge: "(O -> GW)[0]"
+#         description: "Order Svc → API Gateway: 201 Created (header echo X-Correlation-ID: req-789)"
+#       - edge: "(GW -> C)[0]"
+#         description: "API Gateway → Client: 201 + mã req-789 hiển thị ở UI khi lỗi"
+# @endflow
 shape: sequence_diagram
 "C": "Client"
 "GW": "API Gateway"

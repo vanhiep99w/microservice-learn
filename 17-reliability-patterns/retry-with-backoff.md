@@ -303,7 +303,27 @@ Timeout sau khi request đã được gửi không chứng minh server chưa th�
 
 **Idempotency Key** là định danh duy nhất cho một business operation. Client hoặc service tạo key một lần, rồi gửi lại **cùng key** trong mọi lần retry. Provider hoặc service nhận request phải hỗ trợ contract tương ứng: khi thấy key đã xử lý, nó trả lại kết quả đã lưu hoặc trạng thái của operation thay vì thực hiện side effect lần nữa.
 
-```d2 title="Retry payment — giữ nguyên operation identity sau timeout"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Retry payment — giữ nguyên operation identity sau timeout" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(caller -> provider)[0]"
+#         description: "Caller → Payment Provider: Attempt 1 · charge order-123 Idempotency-Key pay_order-123"
+#       - edge: "(provider -> provider)[0]"
+#         description: "Payment Provider → Payment Provider: Xử lý operation và lưu trạng thái / kết quả"
+#       - edge: "(caller -> caller)[0]"
+#         description: "Caller → Caller: Timeout — chưa biết kết quả, không suy ra payment fail"
+#       - edge: "(caller -> provider)[1]"
+#         description: "Caller → Payment Provider: Attempt 2 · cùng operation Cùng Idempotency-Key pay_order-123"
+#       - edge: "(provider -> provider)[1]"
+#         description: "Payment Provider → Payment Provider: Nhận diện key trùng theo contract"
+#       - edge: "(provider -> caller)[0]"
+#         description: "Payment Provider → Caller: Kết quả cũ hoặc trạng thái hiện tại"
+# @endflow
 shape: sequence_diagram
 caller: Caller
 provider: Payment Provider
@@ -329,14 +349,32 @@ Operation này nằm trên đường critical của checkout và có side effect
 
 ### Luồng retry an toàn
 
-```d2 title="Luồng retry an toàn"
+```d2 title="Luồng retry an toàn" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: Charge order-123, Idempotency-Key = pay_order-123"
+#       - edge: "(P -> B)[0]"
+#         description: "Payment Service → Payment provider: POST /payments với cùng key"
+#       - edge: "(P -> P)[0]"
+#         description: "Payment Service → Payment Service: Timeout hoặc response bị mất"
+#       - edge: "(P -> B)[1]"
+#         description: "Payment Service → Payment provider: Retry POST /payments với cùng key"
+#       - edge: "(B -> P)[0]"
+#         description: "Payment provider → Payment Service: Trả kết quả đã lưu hoặc kết quả hiện tại"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Service → Order Service: Thành công, thất bại hoặc pending theo contract"
+# @endflow
 shape: sequence_diagram
 "O": "Order Service"
 "P": "Payment Service"
 "B": "Payment provider"
 "O" -> "P": "Charge order-123, Idempotency-Key = pay_order-123"
 "P" -> "B": "POST /payments với cùng key"
-"B" -> "P": "Timeout hoặc response bị mất" { style.stroke-dash: 5 }
+"P" -> "P": "Timeout hoặc response bị mất" { style.stroke-dash: 5 }
 "P".note1: "Kết quả chưa xác định; còn retry budget"
 "P" -> "B": "Retry POST /payments với cùng key"
 "B" -> "P": "Trả kết quả đã lưu hoặc kết quả hiện tại" { style.stroke-dash: 5 }

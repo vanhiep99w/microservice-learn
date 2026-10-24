@@ -466,9 +466,33 @@ delay = random(base_delay, previous_delay × 3)
 
 Các lần thử đều dùng cùng operation identity. Tổng thời gian phải nằm trong deadline; hết budget thì dừng thay vì cố đủ số lần retry.
 
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
 Lịch **minh họa**, đơn vị **ms**: base delay 100 ms, attempt index bắt đầu từ 0. Hai lần chờ 60 ms và 150 ms do tác giả chọn, không phải kết quả chạy random. Khoảng cách giữa các message không tỷ lệ với thời gian; đọc các mốc trên nhãn.
 
-```d2 title="Retry với một lịch Full Jitter minh họa"
+```d2 title="Retry với một lịch Full Jitter minh họa" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(caller -> dependency)[0]"
+#         description: "Caller → Dependency: 0 ms · Attempt 1"
+#       - edge: "(dependency -> caller)[0]"
+#         description: "Dependency → Caller: 20 ms · Lỗi transient"
+#       - edge: "(caller -> caller)[0]"
+#         description: "Caller → Caller: Chờ 60 ms — chọn trong [0, 100]"
+#       - edge: "(caller -> dependency)[1]"
+#         description: "Caller → Dependency: 80 ms · Attempt 2"
+#       - edge: "(dependency -> caller)[1]"
+#         description: "Dependency → Caller: 100 ms · Lỗi transient"
+#       - edge: "(caller -> caller)[1]"
+#         description: "Caller → Caller: Chờ 150 ms — chọn trong [0, 200]"
+#       - edge: "(caller -> dependency)[2]"
+#         description: "Caller → Dependency: 250 ms · Attempt 3"
+#       - edge: "(dependency -> caller)[2]"
+#         description: "Dependency → Caller: 270 ms · Thành công"
+# @endflow
 shape: sequence_diagram
 caller: Caller
 dependency: Dependency

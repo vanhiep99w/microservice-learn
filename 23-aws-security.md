@@ -336,7 +336,23 @@ Observed calls không bao phủ mọi disaster/rare path. Không cần cố cấ
 
 Trong kiến trúc multi-account (xem [doc 18](18-aws-deployment-architecture.md)), services ở account khác nhau cần giao tiếp. AWS dùng **AssumeRole** pattern.
 
-```d2 title="2.3. Cross-Account Access"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="2.3. Cross-Account Access" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(order -> sts)[0]"
+#         description: "Account A — Order Task Role A → AWS STS: 1. AssumeRole Role B"
+#       - edge: "(sts -> role)[0]"
+#         description: "AWS STS → Account B — Cross-account Role B: Evaluate trust + caller permissions"
+#       - edge: "(sts -> order)[0]"
+#         description: "AWS STS → Account A — Order Task Role A: 2. Temporary credentials scoped theo Role B"
+#       - edge: "(order -> s3)[0]"
+#         description: "Account A — Order Task Role A → Account B — Shared S3 Bucket: 3. Access S3 với temporary credentials"
+# @endflow
 shape: sequence_diagram
 order: Account A — Order Task Role A
 sts: AWS STS
@@ -385,7 +401,21 @@ Trong [doc 15](15-security.md), ta đã nói về **Centralized Authentication**
 
 **Cognito User Pool** là user directory — quản lý sign-up, sign-in, MFA, password policies.
 
-```d2 title="3.1. Cognito User Pools — Authentication"
+```d2 title="3.1. Cognito User Pools — Authentication" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(client -> pool)[0]"
+#         description: "SPA / Mobile → Cognito User Pool: Sign Up"
+#       - edge: "(pool -> client)[0]"
+#         description: "Cognito User Pool → SPA / Mobile: Confirmation / Verification challenge theo flow"
+#       - edge: "(client -> pool)[1]"
+#         description: "SPA / Mobile → Cognito User Pool: Confirm / Sign In"
+#       - edge: "(pool -> client)[1]"
+#         description: "Cognito User Pool → SPA / Mobile: ID / Access / Refresh tokens theo auth flow"
+# @endflow
 shape: sequence_diagram
 client: SPA / Mobile
 pool: Cognito User Pool
@@ -474,7 +504,23 @@ resource "aws_cognito_user_pool_client" "web" {
 
 **Cognito Identity Pool** khác với User Pool — nó cấp **AWS credentials tạm thời** cho authenticated/unauthenticated users, cho phép truy cập trực tiếp AWS services.
 
-```d2 title="3.2. Cognito Identity Pools — Federated Identity"
+```d2 title="3.2. Cognito Identity Pools — Federated Identity" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(client -> user)[0]"
+#         description: "Client → Cognito User Pool — User Directory: Sign in"
+#       - edge: "(user -> client)[0]"
+#         description: "Cognito User Pool — User Directory → Client: JWT tokens"
+#       - edge: "(client -> identity)[0]"
+#         description: "Client → Cognito Identity Pool — Credential Broker: Present federated token"
+#       - edge: "(identity -> client)[0]"
+#         description: "Cognito Identity Pool — Credential Broker → Client: Temporary AccessKeyId / SecretAccessKey / SessionToken qua IAM role mapping"
+#       - edge: "(client -> aws)[0]"
+#         description: "Client → AWS Services — S3 / DynamoDB: Authorized AWS API calls bằng temporary credentials"
+# @endflow
 shape: sequence_diagram
 client: Client
 user: Cognito User Pool — User Directory
@@ -504,7 +550,25 @@ Cognito trả về 3 loại token sau khi authenticate thành công:
 | **Access Token** | Authorize API calls | Scopes, groups, client_id | API Gateway, Backend services |
 | **Refresh Token** | Lấy token mới khi hết hạn | Opaque (không decode được) | Client → Cognito |
 
-```d2 title="3.3. JWT & Token Management"
+```d2 title="3.3. JWT & Token Management" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(client -> cognito)[0]"
+#         description: "Client → Cognito: 1. Sign In"
+#       - edge: "(cognito -> client)[0]"
+#         description: "Cognito → Client: ID + Access + Refresh tokens"
+#       - edge: "(client -> gw)[0]"
+#         description: "Client → API Gateway: 2. API Call — Access Token trong Authorization header"
+#       - edge: "(gw -> client)[0]"
+#         description: "API Gateway → Client: Response"
+#       - edge: "(client -> cognito)[1]"
+#         description: "Client → Cognito: 3. Refresh bằng Refresh Token"
+#       - edge: "(cognito -> client)[1]"
+#         description: "Cognito → Client: New ID / Access tokens, Refresh rotation nếu bật"
+# @endflow
 shape: sequence_diagram
 client: Client
 cognito: Cognito

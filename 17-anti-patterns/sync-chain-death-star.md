@@ -207,7 +207,35 @@ Sync Chain cũng khác **Chatty Services**. Chatty tập trung vào số round-t
 
 Giả sử client gửi yêu cầu checkout. Gateway gọi Order Service. Order gọi Payment, Payment gọi Fraud, rồi Fraud gọi Bank API. Caller chờ kết quả từng bước:
 
-```d2 title="Luồng đồng bộ"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Luồng đồng bộ" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> G)[0]"
+#         description: "Client → API Gateway: Checkout"
+#       - edge: "(G -> O)[0]"
+#         description: "API Gateway → Order Service: Tạo hoặc xác nhận order"
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: Authorize payment"
+#       - edge: "(P -> F)[0]"
+#         description: "Payment Service → Fraud Service: Kiểm tra fraud"
+#       - edge: "(F -> B)[0]"
+#         description: "Fraud Service → Bank API: Gọi Bank API"
+#       - edge: "(B -> F)[0]"
+#         description: "Bank API → Fraud Service: Kết quả hoặc timeout"
+#       - edge: "(F -> P)[0]"
+#         description: "Fraud Service → Payment Service: Kết quả kiểm tra"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Service → Order Service: Kết quả payment"
+#       - edge: "(O -> G)[0]"
+#         description: "Order Service → API Gateway: Kết quả checkout"
+#       - edge: "(G -> C)[0]"
+#         description: "API Gateway → Client: Response"
+# @endflow
 shape: sequence_diagram
 "C": "Client"
 "G": "API Gateway"

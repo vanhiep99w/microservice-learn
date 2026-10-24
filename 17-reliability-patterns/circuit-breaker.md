@@ -356,7 +356,49 @@ Các con số này chỉ nhằm minh họa state transition. Production cần d�
 
 ### Luồng khi Bank API lỗi kéo dài
 
-```d2 title="Luồng khi Bank API lỗi kéo dài"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Luồng khi Bank API lỗi kéo dài" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: failure
+#     label: "CLOSED: dependency lỗi"
+#     steps:
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: Thanh toán order-456"
+#       - edge: "(P -> CB)[0]"
+#         description: "Payment Service → Circuit Breaker: Execute payment operation"
+#       - edge: "(CB -> B)[0]"
+#         description: "Circuit Breaker → Bank API: Charge với timeout"
+#       - edge: "(B -> CB)[0]"
+#         description: "Bank API → Circuit Breaker: Timeout hoặc 5xx"
+#       - edge: "(CB -> P)[0]"
+#         description: "Circuit Breaker → Payment Service: Ghi nhận failure"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Service → Order Service: Kết quả lỗi hoặc pending theo policy"
+#   - id: open
+#     label: "OPEN: không gọi Bank"
+#     steps:
+#       - edge: "(O -> P)[1]"
+#         description: "Order Service → Payment Service: Payment request mới"
+#       - edge: "(P -> CB)[1]"
+#         description: "Payment Service → Circuit Breaker: Kiểm tra state"
+#       - edge: "(CB -> P)[1]"
+#         description: "Circuit Breaker → Payment Service: OPEN — reject ngay"
+#       - edge: "(P -> Q)[0]"
+#         description: "Payment Service → Payment Queue: Đưa payment vào queue"
+#       - edge: "(P -> O)[1]"
+#         description: "Payment Service → Order Service: PENDING_PAYMENT"
+#   - id: probe
+#     label: "HALF-OPEN: probe thành công"
+#     steps:
+#       - edge: "(CB -> B)[1]"
+#         description: "Circuit Breaker → Bank API: HALF-OPEN probe"
+#       - edge: "(B -> CB)[1]"
+#         description: "Bank API → Circuit Breaker: Success"
+#       - edge: "(CB -> P)[2]"
+#         description: "Circuit Breaker → Payment Service: CLOSED sau policy kiểm tra"
+# @endflow
 shape: sequence_diagram
 "O": "Order Service"
 "P": "Payment Service"
@@ -380,6 +422,8 @@ shape: sequence_diagram
 "B" -> "CB": "Success" { style.stroke-dash: 5 }
 "CB" -> "P": "CLOSED sau policy kiểm tra" { style.stroke-dash: 5 }
 ```
+
+Các kịch bản giả định state ban đầu tương ứng CLOSED, OPEN hoặc HALF-OPEN. Playback không tự tính threshold, chờ cooldown hay đổi state circuit breaker.
 
 Một timeline cụ thể theo ví dụ trong tài liệu nguồn:
 

@@ -563,7 +563,29 @@ Một số thao tác **chạy lâu hơn thời gian request bình thường** �
 
 **Async Request-Reply** (yêu cầu–phản hồi bất đồng bộ): client gửi request, server **nhận ngay việc cần làm** và trả về ngay `202 Accepted` kèm **URL tra cứu trạng thái**. Client **poll** (hỏi vòng) URL đó cho tới khi hoàn tất:
 
-```d2 title="7.2. Cách hoạt động"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="7.2. Cách hoạt động" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> API)[0]"
+#         description: "Client → API / Gateway: POST /reports {type: \"monthly\"}"
+#       - edge: "(API -> W)[0]"
+#         description: "API / Gateway → Worker (qua queue): enqueue job (id: 123)"
+#       - edge: "(API -> C)[0]"
+#         description: "API / Gateway → Client: 202 Accepted Location: /reports/123/status"
+#       - edge: "(C -> API)[1]"
+#         description: "Client → API / Gateway: GET /reports/123/status"
+#       - edge: "(API -> C)[1]"
+#         description: "API / Gateway → Client: 200 {\"state\": \"processing\", \"progress\": 40}"
+#       - edge: "(C -> API)[2]"
+#         description: "Client → API / Gateway: GET /reports/123/status"
+#       - edge: "(API -> C)[2]"
+#         description: "API / Gateway → Client: 200 {\"state\": \"completed\", \"downloadUrl\": \"/reports/123/file\"}"
+# @endflow
 shape: sequence_diagram
 "C": "Client"
 "API": "API / Gateway"

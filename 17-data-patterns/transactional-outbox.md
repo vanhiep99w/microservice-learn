@@ -80,7 +80,21 @@ Nếu hai thao tác không nằm trong cùng một transaction, không có thờ
 
 Ví dụ, Order Service cần tạo order và phát `OrderCreated` để Inventory Service bắt đầu xử lý tồn kho:
 
-```d2 title="Dual Write — hai lần ghi độc lập"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Dual Write — hai lần ghi độc lập" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(order -> db)[0]"
+#         description: "Order Service → Order DB: INSERT order"
+#       - edge: "(db -> order)[0]"
+#         description: "Order DB → Order Service: COMMIT thành công"
+#       - edge: "(order -> broker)[0]"
+#         description: "Order Service → Message Broker: Publish OrderCreated — thao tác ghi thứ hai"
+# @endflow
 shape: sequence_diagram
 order: Order Service
 db: Order DB
@@ -125,7 +139,31 @@ Outbox không thay thế HA, và HA cũng không thay thế Outbox.
 
 Khi xử lý command, service ghi business data và event vào cùng database transaction:
 
-```d2 title="Ghi business data và outbox trong local transaction"
+```d2 title="Ghi business data và outbox trong local transaction" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(A -> D)[0]"
+#         description: "Order Service → Order DB: BEGIN local transaction"
+#       - edge: "(A -> D)[1]"
+#         description: "Order Service → Order DB: INSERT orders (status = PENDING)"
+#       - edge: "(A -> D)[2]"
+#         description: "Order Service → Order DB: INSERT outbox (OrderCreated)"
+#       - edge: "(A -> D)[3]"
+#         description: "Order Service → Order DB: COMMIT"
+#       - edge: "(R -> D)[0]"
+#         description: "Outbox Relay → Order DB: Đọc outbox row chưa publish"
+#       - edge: "(R -> M)[0]"
+#         description: "Outbox Relay → Message Broker: Publish OrderCreated"
+#       - edge: "(M -> R)[0]"
+#         description: "Message Broker → Outbox Relay: Broker xác nhận"
+#       - edge: "(R -> D)[1]"
+#         description: "Outbox Relay → Order DB: Đánh dấu hoặc dọn row theo policy"
+#       - edge: "(M -> I)[0]"
+#         description: "Message Broker → Inventory Service: Deliver event"
+# @endflow
 shape: sequence_diagram
 "A": "Order Service"
 "D": "Order DB"

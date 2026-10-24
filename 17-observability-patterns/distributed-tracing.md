@@ -307,7 +307,35 @@ Có thể bắt đầu bằng head sampling vì cách triển khai đơn giản.
 
 Giả sử người dùng gọi `POST /orders`. Gateway tạo trace nếu request chưa có `traceparent`, sau đó context được truyền qua Order Service, Inventory Service và Payment Service:
 
-```d2 title="Request đặt hàng"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="Request đặt hàng" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> G)[0]"
+#         description: "Client → API Gateway: POST /orders"
+#       - edge: "(G -> O)[0]"
+#         description: "API Gateway → Order Service: Forward + traceparent"
+#       - edge: "(O -> I)[0]"
+#         description: "Order Service → Inventory Service: Reserve stock + traceparent"
+#       - edge: "(I -> O)[0]"
+#         description: "Inventory Service → Order Service: Stock reserved"
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: Charge payment + traceparent"
+#       - edge: "(P -> B)[0]"
+#         description: "Payment Service → Bank API: POST /charges + traceparent"
+#       - edge: "(B -> P)[0]"
+#         description: "Bank API → Payment Service: 200 OK"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Service → Order Service: Payment completed"
+#       - edge: "(O -> G)[0]"
+#         description: "Order Service → API Gateway: 201 Created"
+#       - edge: "(G -> C)[0]"
+#         description: "API Gateway → Client: 201 Created"
+# @endflow
 shape: sequence_diagram
 "C": "Client"
 "G": "API Gateway"

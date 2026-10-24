@@ -328,7 +328,33 @@ Saga có hai kiểu triển khai: **Choreography** (phối hợp qua events, kh�
 
 Mỗi service thực hiện việc của mình rồi publish event; service khác lắng nghe và tiếp tục. Không ai nắm "bức tranh toàn cảnh" — flow là hành vi nổi (emergent) của các subscriptions.
 
-```d2 title="4.2. Choreography Saga — phối qua events"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="4.2. Choreography Saga — phối qua events" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(O -> O)[0]"
+#         description: "Order Service → Order Service: Tạo order (PENDING) + outbox"
+#       - edge: "(O -> P)[0]"
+#         description: "Order Service → Payment Service: OrderCreated (event)"
+#       - edge: "(P -> P)[0]"
+#         description: "Payment Service → Payment Service: Charge thẻ + outbox"
+#       - edge: "(P -> I)[0]"
+#         description: "Payment Service → Inventory Service: PaymentCompleted (event)"
+#       - edge: "(I -> I)[0]"
+#         description: "Inventory Service → Inventory Service: Reserve stock —❌ THẤT BẠI (hết hàng)"
+#       - edge: "(I -> P)[0]"
+#         description: "Inventory Service → Payment Service: StockReservationFailed (event)"
+#       - edge: "(P -> P)[1]"
+#         description: "Payment Service → Payment Service: Refund thẻ (C2)"
+#       - edge: "(P -> O)[0]"
+#         description: "Payment Service → Order Service: PaymentRefunded (event)"
+#       - edge: "(O -> O)[1]"
+#         description: "Order Service → Order Service: Update order → CANCELLED (C1)"
+# @endflow
 shape: sequence_diagram
 "O": "Order Service"
 "P": "Payment Service"
@@ -351,7 +377,33 @@ shape: sequence_diagram
 
 Một **Saga Orchestrator** (điều phối viên) nắm state machine của saga: gửi command tới từng service, nhận reply, quyết định bước tiếp hoặc kích hoạt compensation. Orchestrator phải **persist saga log** để sống sót qua crash.
 
-```d2 title="4.3. Orchestration Saga — điều phối tập trung"
+```d2 title="4.3. Orchestration Saga — điều phối tập trung" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: main
+#     label: "Kịch bản minh họa"
+#     steps:
+#       - edge: "(C -> OR)[0]"
+#         description: "Client → Saga Orchestrator (persist saga log): Start saga \"PlaceOrder\""
+#       - edge: "(OR -> O)[0]"
+#         description: "Saga Orchestrator (persist saga log) → Order Service: CreateOrder (command)"
+#       - edge: "(O -> OR)[0]"
+#         description: "Order Service → Saga Orchestrator (persist saga log): OK"
+#       - edge: "(OR -> P)[0]"
+#         description: "Saga Orchestrator (persist saga log) → Payment Service: ChargePayment (command)"
+#       - edge: "(P -> OR)[0]"
+#         description: "Payment Service → Saga Orchestrator (persist saga log): OK"
+#       - edge: "(OR -> I)[0]"
+#         description: "Saga Orchestrator (persist saga log) → Inventory Service: ReserveStock (command)"
+#       - edge: "(I -> OR)[0]"
+#         description: "Inventory Service → Saga Orchestrator (persist saga log): ❌ FAIL"
+#       - edge: "(OR -> P)[1]"
+#         description: "Saga Orchestrator (persist saga log) → Payment Service: RefundPayment (compensate)"
+#       - edge: "(OR -> O)[1]"
+#         description: "Saga Orchestrator (persist saga log) → Order Service: CancelOrder (compensate)"
+#       - edge: "(OR -> OR)[0]"
+#         description: "Saga Orchestrator (persist saga log) → Saga Orchestrator (persist saga log): Saga log: COMPENSATED"
+# @endflow
 shape: sequence_diagram
 "C": "Client"
 "OR": "Saga Orchestrator\n(persist saga log)"

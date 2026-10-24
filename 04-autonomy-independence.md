@@ -858,7 +858,30 @@ service: Self-contained Service {
 
 **Giải pháp**: Sao chép (replicate) dữ liệu cần thiết vào local database.
 
-```d2 title="7.3. Data Locality — Sao chép dữ liệu cần thiết"
+> Playback dưới đây minh họa thứ tự các bước do tác giả chọn; không gửi request thật, không mô phỏng concurrency và tốc độ phát không phải latency. Bạn có thể chạy hoặc xem từng bước.
+
+```d2 title="7.3. Data Locality — Sao chép dữ liệu cần thiết" mode=flow interactive=true
+# @flow
+# scenarios:
+#   - id: sync
+#     label: "Đồng bộ cache nền"
+#     steps:
+#       - edge: "(PS -> EB)[0]"
+#         description: "Product Service → Event Bus: Publish: ProductUpdated {id:1, name:\"iPhone\", price:999}"
+#       - edge: "(EB -> OS)[0]"
+#         description: "Event Bus → Order Service: Consume event"
+#       - edge: "(OS -> LC)[0]"
+#         description: "Order Service → Local Cache (Order DB): Lưu: product_cache {id:1, name:\"iPhone\", price:999}"
+#   - id: local
+#     label: "Đọc local cache"
+#     steps:
+#       - edge: "(OS -> LC)[1]"
+#         description: "Order Service → Local Cache (Order DB): Query: product_cache WHERE id=1"
+#       - edge: "(LC -> OS)[0]"
+#         description: "Local Cache (Order DB) → Order Service: {name:\"iPhone\", price:999}"
+#       - edge: "(OS -> OS)[0]"
+#         description: "Order Service → Order Service: Tạo đơn hàng với cached data"
+# @endflow
 shape: sequence_diagram
 "PS": "Product Service"
 "EB": "Event Bus"
@@ -874,6 +897,8 @@ shape: sequence_diagram
 "OS" -> "OS": "Tạo đơn hàng với cached data"
 "OS".note3: "✅ Không cần gọi Product Service!"
 ```
+
+Đồng bộ dữ liệu nền và xử lý request dùng local cache là hai giai đoạn riêng. Request đọc cache không phải chờ một event mới từ Product Service.
 
 **Trade-off**:
 
