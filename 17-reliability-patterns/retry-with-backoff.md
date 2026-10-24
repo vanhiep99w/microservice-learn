@@ -336,7 +336,7 @@ shape: sequence_diagram
 "B": "Payment provider"
 "O" -> "P": "Charge order-123, Idempotency-Key = pay_order-123"
 "P" -> "B": "POST /payments với cùng key"
-"P" -> "P": "Timeout hoặc response bị mất" { style.stroke-dash: 5 }
+"B" -> "P": "Timeout hoặc response bị mất" { style.stroke-dash: 5 }
 "P".note1: "Kết quả chưa xác định; còn retry budget"
 "P" -> "B": "Retry POST /payments với cùng key"
 "B" -> "P": "Trả kết quả đã lưu hoặc kết quả hiện tại" { style.stroke-dash: 5 }

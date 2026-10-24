@@ -349,7 +349,7 @@ shape: sequence_diagram
 "O" -> "P": "Authorize order-123, deadline còn lại"
 "O".note1: "[Order Service — Payment Service]\nIdempotency-Key = order-123-payment"
 "P" -> "B": "Charge, local cap tối đa 2s"
-"P" -> "P": "Không nhận phản hồi kịp" { style.stroke-dash: 5 }
+"B" -> "P": "Không phản hồi kịp" { style.stroke-dash: 5 }
 "P".note2: "Deadline hoặc response timeout hết"
 "P" -> "O": "Timeout / trạng thái chưa xác định" { style.stroke-dash: 5 }
 "O" -> "G": "PENDING_PAYMENT hoặc lỗi theo contract" { style.stroke-dash: 5 }
